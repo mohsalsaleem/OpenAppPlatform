@@ -1,8 +1,8 @@
-# Docker Application Platform Product and Architecture Draft
+# OpenAppPlatform Product and Architecture Draft
 
-A Docker application platform that manages complete applications above existing deployment operators such as Coolify, Dokploy, Dokku, and Portainer. The intended experience follows DigitalOcean App Platform: users work with applications, components, environments, and releases while retaining their existing Docker infrastructure.
+OpenAppPlatform is an application-first Docker control plane that manages complete applications directly on Docker Engine or through deployment operators such as Coolify, Dokploy, Dokku, and Portainer. The intended experience follows DigitalOcean App Platform: users work with applications, components, environments, and releases while retaining their existing Docker infrastructure.
 
-Status: Draft design, 9 October 2026. Product name remains open. This records the agreed direction and proposed implementation; no infrastructure changes are authorized by this document.
+Status: Draft design, 9 October 2026. Product name: OpenAppPlatform. Bare Docker and Coolify are first-class initial targets. This records the agreed direction and proposed implementation; no infrastructure changes are authorized by this document.
 
 ## Product direction
 
@@ -28,7 +28,7 @@ The platform adds application lifecycle coordination. It does not promise server
 ## Decisions
 
 - Preserve the existing Coolify investment and support adoption of current resources.
-- Use a generic Docker application model with operator adapters.
+- Use a generic Docker application model with a direct Docker adapter and operator adapters.
 - Treat DigitalOcean App Platform as the experience reference.
 - Start with standard operator deployments.
 - Make rolling and blue-green deployment optional, selectable capabilities.
@@ -36,7 +36,7 @@ The platform adds application lifecycle coordination. It does not promise server
 - Keep deployment execution deterministic; AI uses the same authorized operations as the UI.
 - Use Go, React and TypeScript, and PostgreSQL as the proposed stack.
 - Begin with one controller application and a PostgreSQL database.
-- Support Coolify first, then validate portability with a second adapter.
+- Support bare Docker Engine and Coolify in the initial delivery; add other operator adapters incrementally.
 
 ## Application experience
 
@@ -66,15 +66,17 @@ flowchart TB
     U[Dashboard CLI and MCP] --> A
     A --> D[(PostgreSQL)]
     D <--> C[Controller and release coordinator]
-    C --> O[Operator adapter]
+    C --> O[Target adapter]
     O --> P[Coolify Dokploy Dokku or Portainer]
     P --> I[Docker workloads]
+    O --> E[Docker Engine API]
+    E --> I
     C -. Optional routing adapter .-> R[Service router]
     R --> I
     C -. Optional node agent .-> N[Host connectivity and inspection]
 ```
 
-The controller owns desired application state, resource mappings, release sequencing, and reconciliation. Operators own the underlying resources and their normal container lifecycle.
+The controller owns desired application state, resource mappings, release sequencing, and reconciliation. On operator-backed targets, operators own the underlying resources and their normal container lifecycle. On bare Docker targets, OpenAppPlatform manages explicitly owned containers and networks through Docker Engine; Docker restart policies provide local process recovery.
 
 Routing is a separate adapter. A node agent is optional and fills verified API gaps; it must not independently recreate operator-owned containers. Neither routing nor a node agent is a prerequisite for the initial standard-deployment experience.
 
@@ -86,8 +88,8 @@ Routing is a separate adapter. A node agent is optional and fills verified API g
 | Environment | Configuration and placement for staging or production |
 | Component | HTTP service, worker, scheduled job, or static frontend |
 | Dependency | Linked database, queue, storage, or external service |
-| Target | Operator connection and server placement |
-| Instance | Independently replaceable workload mapped to an operator resource |
+| Target | Direct Docker or operator connection and server placement |
+| Instance | Independently replaceable workload mapped to a container or operator resource |
 | Release | Immutable component versions and configuration snapshot |
 | Deployment | An attempt to apply a release with recorded steps and outcomes |
 | Route | Stable public or private endpoint and active backends |
@@ -107,7 +109,7 @@ Capabilities include immutable artifact deployment, isolated replacement creatio
 | Dokploy | API or CLI | Application resources or supported Swarm services |
 | Dokku | SSH commands | Applications and process types |
 | Portainer | REST API | Isolated stacks or services appropriate to the environment |
-| Docker | Secured Docker API | Containers, networks, and volumes |
+| Bare Docker | Local Unix socket, SSH, or mutually authenticated TLS | Owned containers, networks, and explicitly managed volumes |
 
 Adapters ship as Go packages initially. An external plugin protocol is deferred.
 
@@ -115,7 +117,7 @@ Unsupported requested behavior produces a clear planning error. The platform mus
 
 ## GitHub and build lifecycle
 
-For adopted components, GitHub events enter the platform controller. Direct operator automatic deployment is disabled while the source connection is retained. There must be one owner of release sequencing.
+For adopted components, GitHub events enter the platform controller. Direct operator automatic deployment is disabled while the source connection is retained. Bare Docker targets use the same webhook and release coordinator without requiring another deployment platform. There must be one owner of release sequencing.
 
 The controller verifies webhook signatures, deduplicates deliveries, maps repositories and branches to components, records the exact commit, and serializes deployments for a component.
 
@@ -127,13 +129,13 @@ Repository events affecting multiple components can create one release with an e
 
 | Strategy | Behavior | Initial scope |
 | --- | --- | --- |
-| Standard | Delegate deployment to the operator and observe its outcome | Included |
+| Standard | Use the operator lifecycle or direct Docker replacement and observe the outcome | Included |
 | Rolling | Prepare replacements, check readiness, add traffic, drain old instances | Deferred |
 | Blue-green | Prepare an inactive release slot, verify it, and promote routing | Deferred |
 
 The user selects strategies per component, with application defaults. Promotion policy is separate: automatic after verification or manual approval.
 
-Standard deployment has the operator's availability behavior. The platform must display that behavior and does not imply downtime-free operation.
+Standard deployment has the operator's availability behavior or, on bare Docker, a documented stop-and-replace lifecycle with possible downtime. The platform must display that behavior and does not imply downtime-free operation.
 
 For rolling deployment, the controller can manage independent replacements or delegate to a verified native strategy. Preparation, health checks, routing changes, and retirement are persisted steps.
 
@@ -143,7 +145,7 @@ Blue-green remains optional. Stateless HTTP components can use release slots, wh
 
 Application-level endpoints should remain stable across instance changes. Future routing adapters publish versioned backend configurations, acknowledge the applied version, and support backend removal and connection draining.
 
-Candidate releases may require release-scoped internal routes so candidate components communicate with one another. Public traffic can enter through an operator proxy and forward to a dedicated router when necessary.
+Candidate releases may require release-scoped internal routes so candidate components communicate with one another. Public traffic can enter through an operator proxy and forward to a dedicated router when necessary. Bare Docker targets can use explicit host port mappings or a supported routing adapter; domain and TLS support must be provided explicitly.
 
 An adapter must provide a reachable endpoint for verification. If operator APIs cannot supply private connectivity, the target requires a supported network configuration or node agent.
 
@@ -207,7 +209,7 @@ The model provider stays behind an interface. Core deployment operations continu
 4. GitHub event handling with deduplication and component deployment serialization.
 5. Unified status, bounded logs, configuration, and partial-failure reporting.
 6. Structured API, MCP tools, and read-only AI diagnosis.
-7. A second adapter to test portability.
+7. First-class direct Docker Engine deployment alongside Coolify, with shared adapter contract tests.
 
 Follow with health-gated replacement deployments, routing integration, scaling, and optional blue-green.
 
@@ -216,6 +218,9 @@ Do not make a two-slot deployment mechanism mandatory for the first version. The
 ## Acceptance criteria
 
 - Existing Coolify resources can be adopted without recreation or data loss.
+- An application can deploy to a server with Docker Engine and no Coolify, Dokploy, Dokku, Portainer, Swarm, or Kubernetes installation.
+- Bare Docker deployments support immutable images, configuration, health inspection, bounded logs, stop, and restart.
+- Direct Docker reconciliation affects only explicitly owned or adopted resources and retains durable volumes.
 - One application presents all components and their actual running versions.
 - Duplicate GitHub deliveries do not start duplicate logical deployments.
 - Controller restart resumes or reconciles an interrupted operation.
@@ -230,10 +235,10 @@ Do not make a two-slot deployment mechanism mandatory for the first version. The
 
 ## Open decisions
 
-- Product name and whether the initial audience is one owner or multiple teams.
+- Whether the initial audience is one owner or multiple teams.
 - Authentication, roles, invitation model, and environment approval policies.
 - Exact Coolify versions and API capabilities to support.
-- Second adapter: direct Docker is proposed to test portability.
+- Docker Engine versions, connection modes, and host platforms to support.
 - Build artifact storage and exact-commit deployment support.
 - Routing technology and private network setup for advanced strategies.
 - AI providers, model selection, budgets, and context retention.
@@ -253,4 +258,3 @@ These references support integration feasibility; adapter guarantees require ver
 - [Portainer API](https://docs.portainer.io/api/examples)
 - [River documentation](https://riverqueue.com/docs)
 - [sqlc documentation](https://docs.sqlc.dev/en/latest/)
-
