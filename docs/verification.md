@@ -65,11 +65,10 @@ Standard deployment does not promise uninterrupted traffic. A successful release
 requires provider completion and a running workload; configurable application
 readiness checks, ongoing health reconciliation, routing, and advanced strategies
 are subsequent milestones. Workers, jobs, Git source adoption, source builds,
-other adapters, AI, and MCP are not implemented yet.
+other adapters and AI remain planned; read-only MCP is implemented.
 
 This is a single-owner preview. Production identity, roles, audit retention,
-versioned upgrade migrations, backup and restore verification, and explicit
-attention-state resolution remain required before production rollout. The
+backup and restore verification, and full automatic crash reconciliation remain required before production rollout. The
 repository's license choice is also outstanding.
 
 ## Follow up offline milestone
@@ -87,3 +86,20 @@ retries after configuration changes.
 The read-only MCP server passed unit tests plus a real stdio handshake, tool
 discovery, and authenticated application read against the isolated offline
 workspace. This does not imply full conformance testing against every MCP client.
+
+## Core workflow coverage
+
+The isolated suite includes a browser journey that creates, deploys, inspects
+live health, fetches instance logs, edits the image and port, and deploys the
+replacement using cached Docker fixtures. PostgreSQL system tests cover
+observation recovery after a lost response, partial recovery, remaining-instance
+resumption, stale recovery rejection, pre-dispatch preparation retries, and
+observation deadline renewal. Unit tests reject unrelated Coolify deployment IDs.
+Runtime inspection and logs use instance bindings rather than the latest release.
+The exact local pass and source fingerprint are recorded in the ignored test-env
+report directory; GitHub CI remains disabled.
+
+The retained Coolify staging fixture also passed the updated release lifecycle,
+image-digest check, and HTTPS verification using deployment history scoped by
+resource UUID. The installed API omits numeric IDs from application projections;
+correlation therefore checks bounded resource-specific history instead.

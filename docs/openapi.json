@@ -943,8 +943,189 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "ordinal",
+            "in": "query",
+            "description": "Select an instance; defaults to 1",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4,
+              "default": 1
+            }
           }
         ]
+      }
+    },
+    "/api/v1/applications/{id}/instances": {
+      "get": {
+        "summary": "Inspect current per-instance runtime health",
+        "operationId": "getApplicationInstances",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Instance"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/deployments/{id}/recover": {
+      "post": {
+        "summary": "Recheck an exact provider deployment or retry preparation before dispatch",
+        "operationId": "recoverDeployment",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Requires an attention state and its current updatedAt. Never reissues an uncertain deployment. Missing provider IDs must be identified by the owner; resource association is verified. Unfinished instances resume once all attention steps are resolved.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Recovery"
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -1227,6 +1408,13 @@
           },
           "error": {
             "type": "string"
+          },
+          "recoveryPhase": {
+            "type": "string"
+          },
+          "observationStartedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
@@ -1288,6 +1476,70 @@
           "definitionVersion"
         ],
         "additionalProperties": false
+      },
+      "Instance": {
+        "type": "object",
+        "required": [
+          "component",
+          "ordinal",
+          "status",
+          "checkedAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "resource": {
+            "$ref": "#/components/schemas/Resource"
+          },
+          "error": {
+            "type": "string"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Recovery": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "component",
+          "ordinal",
+          "expectedUpdatedAt"
+        ],
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expectedUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "remoteDeploymentId": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "retryPreparation": {
+            "type": "boolean"
+          }
+        }
       }
     }
   }

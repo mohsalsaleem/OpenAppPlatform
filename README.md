@@ -10,7 +10,8 @@ Implemented: Go API and controller, PostgreSQL persistence, River deployment
 jobs, a React dashboard, target-scoped Coolify and direct Docker adapters, versioned configuration editing,
 and a read-only MCP interface. Standard releases
 support multiple web components and instances, explicit Docker-image resource
-adoption, frozen artifacts, idempotency, progress, and bounded logs.
+adoption, frozen artifacts, idempotency, progress, live instance inspection,
+per-instance bounded logs, and explicit observation recovery.
 
 Verified locally with PostgreSQL and Chromium, and through a real deployment on
 an isolated staging project in the owner's existing Coolify.
@@ -134,3 +135,27 @@ not silently performed through this editor.
 
 SQL migrations now have immutable checksums and version records. Existing preview
 schemas are adopted by the idempotent first migration, then upgraded additively.
+
+## Inspect and recover
+
+The application overview polls current instance health independently of release
+history. Select an instance to read its latest 100 log lines, including when a
+newer release failed before reaching that instance. The API exposes
+`GET /api/v1/applications/{id}/instances` and
+`GET /api/v1/applications/{id}/logs/{component}?ordinal=2`.
+
+An attention-state release exposes recovery controls in its release history.
+Recheck the recorded provider deployment; if the dispatch response was lost,
+inspect the operator and supply the exact deployment ID for that instance.
+Docker validates the active container ID; Coolify validates deployment-to-resource
+association within its latest 100 resource deployments. Selecting the correct historical deployment remains the owner's
+responsibility. Recovery never issues another uncertain dispatch. Preparation
+can be retried only when it failed before dispatch. Remaining instances resume
+through durable jobs once all attention states are resolved.
+
+`POST /api/v1/deployments/{id}/recover` accepts `component`, `ordinal`, and the
+release's current `expectedUpdatedAt`, plus either an optional
+`remoteDeploymentId` or `retryPreparation: true` where supported. Stale recovery
+requests conflict. Recovery does not roll back data or cancel provider work.
+If no provider operation can be identified after uncertain dispatch, the release
+remains blocked; automatic provider-history reconciliation is still planned.

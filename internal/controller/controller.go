@@ -211,6 +211,7 @@ func (w *Worker) Work(ctx context.Context, job *river.Job[DeployArgs]) error {
 				d.State = "attention"
 				for i := range d.Steps {
 					if d.Steps[i].Phase != "succeeded" && d.Steps[i].Phase != "failed" {
+						d.Steps[i].RecoveryPhase = d.Steps[i].Phase
 						d.Steps[i].Phase = "attention"
 						d.Steps[i].Error = "Adapter operation retries exhausted; inspect provider before retrying"
 						break
@@ -258,6 +259,7 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 	}
 	d.State = "running"
 	fail := func(step *domain.Step, state string, err error) error {
+		step.RecoveryPhase = step.Phase
 		step.Phase = state
 		step.Error = err.Error()
 		d.State = state
@@ -308,10 +310,12 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 			}
 			remote, e := a.Deploy(ctx, step.ResourceID)
 			if e != nil {
-				return fail(step, "attention", fmt.Errorf("deployment dispatch outcome is uncertain; inspect Coolify before retrying: %w", e))
+				return fail(step, "attention", fmt.Errorf("deployment dispatch outcome is uncertain; inspect provider before retrying: %w", e))
 			}
 			step.RemoteDeploymentID = remote
 			step.Phase = "observing"
+			now := time.Now().UTC()
+			step.ObservationStartedAt = &now
 			if e = c.Store.SaveDeployment(ctx, d); e != nil {
 				return e
 			}
@@ -319,7 +323,11 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 		case "dispatching":
 			return fail(step, "attention", errors.New("controller interrupted during dispatch; inspect provider before retrying"))
 		case "observing":
-			if time.Since(d.CreatedAt) > 15*time.Minute {
+			started := d.CreatedAt
+			if step.ObservationStartedAt != nil {
+				started = *step.ObservationStartedAt
+			}
+			if time.Since(started) > 15*time.Minute {
 				return fail(step, "attention", errors.New("deployment observation exceeded 15 minutes; provider may still be running"))
 			}
 			status, e := a.Observe(ctx, step.RemoteDeploymentID, step.ResourceID)
@@ -343,6 +351,10 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 	}
 	d.State = "succeeded"
 	for _, s := range d.Steps {
+		if s.Phase == "attention" {
+			d.State = "attention"
+			break
+		}
 		if s.Phase == "failed" {
 			d.State = "failed"
 			break

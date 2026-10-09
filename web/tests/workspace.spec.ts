@@ -67,3 +67,98 @@ test("authentication, application setup, release confirmation, and target discov
   ).toBeTruthy();
   expect(errors).toEqual([]);
 });
+
+test("deploy, inspect live instances, read logs, and update a Docker application", async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  test.skip(
+    !process.env.OAP_TEST_DOCKER_IMAGE,
+    "Requires the isolated Docker test environment",
+  );
+  async function deployAndWait() {
+    await page.getByRole("button", { name: "Deploy application" }).click();
+    const queued = page.waitForResponse(
+      (response) =>
+        response.request().method() === "POST" &&
+        response.url().endsWith("/deployments"),
+    );
+    await page.getByRole("button", { name: "Deploy now" }).click();
+    const response = await queued;
+    expect(response.status()).toBe(202);
+    const release = await response.json();
+    await expect
+      .poll(
+        async () => {
+          const current = await page.request.get(
+            `/api/v1/deployments/${release.id}`,
+            {
+              headers: { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` },
+            },
+          );
+          expect(current.ok()).toBeTruthy();
+          return (await current.json()).state;
+        },
+        { timeout: 60000 },
+      )
+      .toBe("succeeded");
+    await expect(
+      page.getByRole("button", { name: "Deploy application" }),
+    ).toBeEnabled();
+  }
+  await page.goto("/");
+  await page
+    .getByLabel("Platform access token")
+    .fill(process.env.OAP_API_TOKEN!);
+  await page.getByRole("button", { name: "Connect to workspace" }).click();
+  await page.getByRole("link", { name: "New application" }).click();
+  await page
+    .getByLabel("Application name", { exact: true })
+    .fill(`browser-live-${Date.now()}`);
+  await page
+    .getByLabel("Container image", { exact: true })
+    .fill(process.env.OAP_TEST_DOCKER_IMAGE!);
+  await page.getByLabel("Internal port", { exact: true }).fill("8080");
+  await page.getByRole("button", { name: "Create application" }).click();
+  await deployAndWait();
+  await page.getByRole("tab", { name: "Overview" }).click();
+  const live = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Live instances" }) });
+  await expect(live).toContainText("running:healthy", { timeout: 15000 });
+  await page.getByRole("button", { name: "View web instance 1 logs" }).click();
+  await expect(page.locator(".log-output")).toContainText("fixture", {
+    timeout: 5000,
+  });
+  await page.getByRole("tab", { name: "Configuration" }).click();
+  await page
+    .getByLabel("Container image for web")
+    .fill(process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!);
+  await page.getByLabel("Internal port for web").fill("8025");
+  await page.getByRole("button", { name: "Save configuration" }).click();
+  await expect(
+    page.getByText("Configuration saved. Deploy when you are ready."),
+  ).toBeVisible();
+  await deployAndWait();
+  await page.getByRole("tab", { name: "Overview" }).click();
+  await expect(live).toContainText("running:healthy", { timeout: 15000 });
+  await expect(page.locator(".image-ref")).toContainText(
+    process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!,
+  );
+  await expect
+    .poll(async () => {
+      const applicationId = page.url().split("/").at(-1);
+      const response = await page.request.get(
+        `/api/v1/applications/${applicationId}/instances`,
+        { headers: { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` } },
+      );
+      expect(response.ok()).toBeTruthy();
+      return (await response.json())[0].resource.image;
+    })
+    .toBe(process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!);
+  await expect(page.locator(".release-banner")).toContainText("succeeded");
+  await page.screenshot({
+    path: "../.local/ui-live-instances.png",
+    fullPage: true,
+  });
+});

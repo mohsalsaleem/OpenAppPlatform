@@ -49,6 +49,7 @@ management, and automatic discovery/assembly are not complete.
 
 | Phase | Outcome | Main work |
 | --- | --- | --- |
+| M0 | Make everyday application workflows functional | Create, deploy, live health/logs, configuration updates, recovery, manual grouping and supported scaling on Docker and Coolify |
 | M1 | Trust OAP with an owner's real applications | Auth, agent principals, audit, recovery, backups, secret references, basic security and observability, dogfooding |
 | M2 | Operate safely through remote APIs and agents | Tunnels, remote MCP, action plans and approvals, manual overrides, AI switches, skills, notifications |
 | M3 | Assemble existing applications and build from source | Operator discovery, grouping/adoption plans, optional AI assistance, stack detection, build adapters, image lifecycle, more operators |
@@ -435,10 +436,13 @@ workloads on eligible targets.
 
 ## Next implementation slice
 
-Implement owner/agent authentication, scoped credentials, and a mutation audit trail
-alongside a safe attention-state recovery workflow. Add backup/restore coverage and
-local encrypted secret references before remote mutation access or autonomous
-lifecycle management. Start dogfooding in staging once those gates pass.
+Prioritize M0: verify create → deploy → inspect → update → recover on bare Docker
+and the existing isolated Coolify staging target. Finish practical component
+connectivity, restart, supported scaling, and manual resource grouping, with
+explicit operator capabilities and reproducible examples. Keep existing preview
+token authentication. Advanced owner/agent auth, AI guardrails, remote agent
+features, and generative UI are deferred until the core workflows are usable.
+Production exposure still requires the later security and operational gates.
 
 Open decisions include the owner login method, first external secret provider,
 first analytics export, default inference policy, tunnel choice for each client,

@@ -777,3 +777,15 @@ details summary {
   color: #607553;
   padding: 10px 0;
 }
+
+.recovery-panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border, #d8dce2);
+  border-radius: 8px;
+}
+.recovery-step {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}

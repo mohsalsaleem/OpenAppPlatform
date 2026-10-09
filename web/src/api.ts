@@ -32,6 +32,7 @@ export interface Step {
   component: string;
   ordinal: number;
   phase: string;
+  recoveryPhase?: string;
   resourceId?: string;
   remoteDeploymentId?: string;
   observed?: string;
@@ -72,4 +73,14 @@ export async function api<T>(
   const data = await res.json();
   if (!res.ok) throw new Error(data.message || "Request failed");
   return data;
+}
+
+export interface Instance {
+  component: string;
+  ordinal: number;
+  resourceId?: string;
+  status: string;
+  resource?: Resource;
+  error?: string;
+  checkedAt: string;
 }

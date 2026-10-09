@@ -206,3 +206,34 @@ func (s *Store) UpdateApplicationTx(ctx context.Context, tx pgx.Tx, id string, m
 	}
 	return scanApp(tx.QueryRow(ctx, `UPDATE oap_applications SET spec=$2,version=version+1,updated_at=now() WHERE id=$1 AND version=$3 RETURNING id,spec,created_at,updated_at,version`, id, b, expectedVersion))
 }
+
+// Bindings are the current instance references, independent of release history.
+type Binding struct {
+	Component  string
+	Ordinal    int
+	ResourceID string
+}
+
+func (s *Store) Bindings(ctx context.Context, id string) ([]Binding, error) {
+	rows, e := s.Pool.Query(ctx, "SELECT component,ordinal,resource_id FROM oap_bindings WHERE application_id=$1 ORDER BY component,ordinal", id)
+	if e != nil {
+		return nil, e
+	}
+	defer rows.Close()
+	out := []Binding{}
+	for rows.Next() {
+		var b Binding
+		if e = rows.Scan(&b.Component, &b.Ordinal, &b.ResourceID); e != nil {
+			return nil, e
+		}
+		out = append(out, b)
+	}
+	return out, rows.Err()
+}
+func (s *Store) SaveDeploymentTx(ctx context.Context, tx pgx.Tx, d *domain.Deployment) error {
+	b, e := json.Marshal(d.Steps)
+	if e != nil {
+		return e
+	}
+	return tx.QueryRow(ctx, "UPDATE oap_deployments SET state=$2,steps=$3,updated_at=now() WHERE id=$1 RETURNING updated_at", d.ID, d.State, b).Scan(&d.UpdatedAt)
+}

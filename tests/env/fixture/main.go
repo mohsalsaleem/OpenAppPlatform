@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,6 +15,7 @@ var version = "dev"
 var port = "8080"
 
 func main() {
+	log.Printf("fixture %s listening on %s", version, port)
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

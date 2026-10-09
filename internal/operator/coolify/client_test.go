@@ -89,9 +89,9 @@ func TestObserveAcceptsStringApplicationIDAndRequiresProviderCompletion(t *testi
 		case "/api/v1/projects/p/staging":
 			json.NewEncoder(w).Encode(map[string]any{"applications": []map[string]string{{"uuid": "u"}}})
 		case "/api/v1/applications/u":
-			json.NewEncoder(w).Encode(map[string]string{"uuid": "u", "status": "running:healthy"})
-		case "/api/v1/deployments/d":
-			json.NewEncoder(w).Encode(map[string]string{"status": "finished", "application_id": "79"})
+			json.NewEncoder(w).Encode(map[string]string{"id": "79", "uuid": "u", "status": "running:healthy"})
+		case "/api/v1/deployments/applications/u":
+			json.NewEncoder(w).Encode(map[string]any{"count": 1, "deployments": []map[string]string{{"deployment_uuid": "d", "status": "finished", "application_id": "79"}}})
 		default:
 			t.Error("unexpected path", r.URL.Path)
 			http.NotFound(w, r)
@@ -102,5 +102,61 @@ func TestObserveAcceptsStringApplicationIDAndRequiresProviderCompletion(t *testi
 	got, e := c.Observe(context.Background(), "d", "u")
 	if e != nil || got.State != "succeeded" || got.ResourceStatus != "running:healthy" {
 		t.Fatalf("observation %v %v", got, e)
+	}
+}
+
+func TestObserveRejectsUnrelatedProviderDeployment(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/projects/p/staging":
+			w.Write([]byte(`{"applications":[{"uuid":"u"}]}`))
+		case "/api/v1/applications/u":
+			w.Write([]byte(`{"uuid":"u","status":"running:healthy"}`))
+		case "/api/v1/deployments/applications/u":
+			w.Write([]byte(`{"count":1,"deployments":[{"deployment_uuid":"owned-operation","status":"finished"}]}`))
+		default:
+			t.Errorf("unexpected global lookup: %s", r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	c, _ := New(domain.Target{URL: srv.URL, ProjectID: "p", Environment: "staging"}, "token")
+	if _, e := c.Observe(context.Background(), "unrelated-operation", "u"); e == nil {
+		t.Fatal("unrelated provider deployment accepted")
+	}
+}
+
+func TestObservePaginatesBoundedResourceHistory(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/projects/p/staging":
+			w.Write([]byte(`{"applications":[{"uuid":"u"}]}`))
+		case "/api/v1/applications/u":
+			w.Write([]byte(`{"uuid":"u","status":"running:healthy"}`))
+		case "/api/v1/deployments/applications/u":
+			calls++
+			deployments := []map[string]string{}
+			for i := 0; i < 20; i++ {
+				deployments = append(deployments, map[string]string{"deployment_uuid": "other", "status": "finished"})
+			}
+			if r.URL.Query().Get("skip") == "20" {
+				deployments[0]["deployment_uuid"] = "older"
+				deployments[0]["status"] = "in_progress"
+			}
+			json.NewEncoder(w).Encode(map[string]any{"count": 200, "deployments": deployments})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	c, _ := New(domain.Target{URL: srv.URL, ProjectID: "p", Environment: "staging"}, "token")
+	got, e := c.Observe(context.Background(), "older", "u")
+	if e != nil || got.State != "running" || calls != 2 {
+		t.Fatalf("pagination %v %v calls=%d", got, e, calls)
+	}
+	calls = 0
+	if _, e = c.Observe(context.Background(), "absent", "u"); e == nil || calls != 5 {
+		t.Fatalf("unbounded history search: %v calls=%d", e, calls)
 	}
 }

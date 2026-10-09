@@ -120,13 +120,15 @@ type Application struct {
 	Version   int64     `json:"version"`
 }
 type Step struct {
-	Component          string `json:"component"`
-	Ordinal            int    `json:"ordinal"`
-	Phase              string `json:"phase"`
-	ResourceID         string `json:"resourceId,omitempty"`
-	RemoteDeploymentID string `json:"remoteDeploymentId,omitempty"`
-	Observed           string `json:"observed,omitempty"`
-	Error              string `json:"error,omitempty"`
+	RecoveryPhase        string     `json:"recoveryPhase,omitempty"`
+	ObservationStartedAt *time.Time `json:"observationStartedAt,omitempty"`
+	Component            string     `json:"component"`
+	Ordinal              int        `json:"ordinal"`
+	Phase                string     `json:"phase"`
+	ResourceID           string     `json:"resourceId,omitempty"`
+	RemoteDeploymentID   string     `json:"remoteDeploymentId,omitempty"`
+	Observed             string     `json:"observed,omitempty"`
+	Error                string     `json:"error,omitempty"`
 }
 type Deployment struct {
 	ID                string    `json:"id"`

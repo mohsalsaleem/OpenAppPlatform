@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -226,25 +227,63 @@ func (s *Server) routes() http.Handler {
 		}
 		write(w, 200, d)
 	})
+	mux.HandleFunc("GET /api/v1/applications/{id}/instances", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		defer cancel()
+		instances, e := c.Instances(ctx, r.PathValue("id"))
+		if e != nil {
+			fail(w, e)
+			return
+		}
+		write(w, 200, instances)
+	})
+	mux.HandleFunc("POST /api/v1/deployments/{id}/recover", func(w http.ResponseWriter, r *http.Request) {
+		var request controller.Recovery
+		if e := decode(w, r, &request); e != nil {
+			write(w, 400, map[string]string{"code": "invalid_recovery", "message": e.Error()})
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+		d, e := c.Recover(ctx, r.PathValue("id"), request)
+		if e != nil {
+			if errors.Is(e, domain.ErrConflict) || errors.Is(e, domain.ErrNotFound) {
+				fail(w, e)
+			} else {
+				write(w, 422, map[string]string{"code": "recovery_rejected", "message": e.Error()})
+			}
+			return
+		}
+		write(w, 200, d)
+	})
 	mux.HandleFunc("GET /api/v1/applications/{id}/logs/{component}", func(w http.ResponseWriter, r *http.Request) {
-		appID := r.PathValue("id")
-		ds, e := c.Store.Deployments(r.Context(), appID)
+		ordinal := 1
+		if raw := r.URL.Query().Get("ordinal"); raw != "" {
+			n, e := strconv.Atoi(raw)
+			if e != nil || n < 1 || n > 4 {
+				write(w, 400, map[string]string{"code": "invalid_instance", "message": "ordinal must be between 1 and 4"})
+				return
+			}
+			ordinal = n
+		}
+		app, e := c.Store.Application(r.Context(), r.PathValue("id"))
 		if e != nil {
 			fail(w, e)
 			return
 		}
-		if len(ds) == 0 {
-			write(w, 404, map[string]string{"code": "no_instance", "message": "Deploy this component first"})
-			return
-		}
-		a, e := c.Adapter(r.Context(), ds[0].Manifest.TargetID)
+		bindings, e := c.Store.Bindings(r.Context(), app.ID)
 		if e != nil {
 			fail(w, e)
 			return
 		}
-		for _, step := range ds[0].Steps {
-			if step.Component == r.PathValue("component") && step.ResourceID != "" {
-				logs, e := a.Logs(r.Context(), step.ResourceID, 100)
+		for _, b := range bindings {
+			if b.Component == r.PathValue("component") && b.Ordinal == ordinal {
+				adapter, e := c.Adapter(r.Context(), app.Manifest.TargetID)
+				if e != nil {
+					fail(w, e)
+					return
+				}
+				logs, e := adapter.Logs(r.Context(), b.ResourceID, 100)
 				if e != nil {
 					write(w, 502, map[string]string{"code": "logs_unavailable", "message": e.Error()})
 					return
@@ -256,5 +295,6 @@ func (s *Server) routes() http.Handler {
 		}
 		write(w, 404, map[string]string{"code": "no_instance", "message": "No deployed instance for this component"})
 	})
+
 	return mux
 }

@@ -234,19 +234,34 @@ func deploymentState(s string) string {
 	}
 }
 func (c *Client) Observe(ctx context.Context, id, resourceID string) (operator.DeploymentStatus, error) {
-	var result struct {
-		Status        string          `json:"status"`
-		ApplicationID json.RawMessage `json:"application_id"`
+	// Coolify omits numeric IDs from resource projections. Verify association via
+	// resource-scoped history instead of trusting a global deployment lookup.
+	resource, err := c.Inspect(ctx, resourceID)
+	if err != nil {
+		return operator.DeploymentStatus{}, err
 	}
-	if e := c.request(ctx, "GET", "/deployments/"+url.PathEscape(id), nil, &result); e != nil {
-		return operator.DeploymentStatus{}, e
+	for skip := 0; skip < 100; skip += 20 {
+		var result struct {
+			Count       int `json:"count"`
+			Deployments []struct {
+				UUID   string `json:"deployment_uuid"`
+				Status string `json:"status"`
+			} `json:"deployments"`
+		}
+		path := "/deployments/applications/" + url.PathEscape(resourceID) + "?take=20&skip=" + strconv.Itoa(skip)
+		if err = c.request(ctx, "GET", path, nil, &result); err != nil {
+			return operator.DeploymentStatus{}, err
+		}
+		for _, deployment := range result.Deployments {
+			if deployment.UUID == id {
+				return operator.DeploymentStatus{State: deploymentState(deployment.Status), ResourceStatus: resource.Status}, nil
+			}
+		}
+		if len(result.Deployments) < 20 || skip+len(result.Deployments) >= result.Count {
+			break
+		}
 	}
-	state := deploymentState(result.Status)
-	r, e := c.Inspect(ctx, resourceID)
-	if e != nil {
-		return operator.DeploymentStatus{}, e
-	}
-	return operator.DeploymentStatus{State: state, ResourceStatus: r.Status}, nil
+	return operator.DeploymentStatus{}, errors.New("provider deployment is not in this resource's recent history; inspect the operator")
 }
 func (c *Client) Logs(ctx context.Context, id string, lines int) (string, error) {
 	if lines < 1 || lines > 200 {

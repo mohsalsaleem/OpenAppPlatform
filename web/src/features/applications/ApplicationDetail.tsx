@@ -7,8 +7,14 @@ import {
   Component as ComponentIcon,
   Terminal,
 } from "lucide-react";
-import { api, type Application, type Deployment } from "../../api";
+import {
+  api,
+  type Application,
+  type Deployment,
+  type Instance,
+} from "../../api";
 import { DeploymentDialog } from "../../components/DeploymentDialog";
+import { RecoveryPanel } from "./RecoveryPanel";
 import { ConfigurationEditor } from "./ConfigurationEditor";
 import { Status } from "../../components/Status";
 import { ErrorBox, Loading } from "../../components/Feedback";
@@ -19,20 +25,13 @@ const when = (s: string) =>
     hour: "2-digit",
     minute: "2-digit",
   });
-function componentPhase(d: Deployment | undefined, name: string): string {
-  const steps = d?.steps.filter((s) => s.component === name) || [];
-  if (!steps.length) return "not deployed";
-  if (steps.some((s) => s.phase === "attention")) return "attention";
-  if (steps.some((s) => s.phase === "failed")) return "failed";
-  if (steps.every((s) => s.phase === "succeeded")) return "succeeded";
-  return steps.find((s) => s.phase !== "succeeded")?.phase || "pending";
-}
 export function ApplicationDetail() {
   const { id } = useParams();
   const client = useQueryClient();
   const [tab, setTab] = useState("overview");
   const [review, setReview] = useState<Application | null>(null);
   const [logs, setLogs] = useState("");
+  const [logInstance, setLogInstance] = useState("");
   const [logError, setLogError] = useState("");
   const app = useQuery({
     queryKey: ["application", id],
@@ -42,6 +41,11 @@ export function ApplicationDetail() {
     queryKey: ["deployments", id],
     queryFn: () => api<Deployment[]>(`/applications/${id}/deployments`),
     refetchInterval: 2000,
+  });
+  const instances = useQuery({
+    queryKey: ["instances", id],
+    queryFn: () => api<Instance[]>(`/applications/${id}/instances`),
+    refetchInterval: 5000,
   });
   const deploy = useMutation({
     mutationFn: (definitionVersion: number) =>
@@ -56,11 +60,13 @@ export function ApplicationDetail() {
       client.invalidateQueries({ queryKey: ["deployments", id] });
     },
   });
-  async function showLogs(component: string) {
+  async function showLogs(component: string, ordinal = 1) {
     try {
       setLogError("");
+      setLogs("");
+      setLogInstance(`${component} / ${ordinal}`);
       const x = await api<{ logs: string }>(
-        `/applications/${id}/logs/${component}`,
+        `/applications/${id}/logs/${component}?ordinal=${ordinal}`,
       );
       setLogs(x.logs);
       setTab("logs");
@@ -161,12 +167,66 @@ export function ApplicationDetail() {
                       ?.image || c.image}
                   </code>
                 </div>
-                <Status value={componentPhase(latest, c.name)} />
+                <span className="small muted">{c.instances} configured</span>
                 <button
                   className="icon-button"
                   title={`View ${c.name} logs`}
                   aria-label={`View ${c.name} logs`}
                   onClick={() => showLogs(c.name)}
+                >
+                  <Terminal size={18} />
+                </button>
+              </div>
+            ))}
+          </section>
+          <section className="panel">
+            <div className="section-heading">
+              <h2>Live instances</h2>
+              <button
+                className="secondary"
+                disabled={instances.isFetching}
+                onClick={() => instances.refetch()}
+              >
+                Refresh health
+              </button>
+            </div>
+            <p className="small muted">
+              Current operator state, separate from the recorded release result.
+            </p>
+            <ErrorBox error={instances.error} />
+            {instances.isPending && <Loading />}
+            {instances.data?.map((instance) => (
+              <div
+                className="step"
+                key={`${instance.component}-${instance.ordinal}`}
+              >
+                <div className="grow">
+                  <strong>
+                    {instance.component} / {instance.ordinal}
+                  </strong>
+                  <p className="small muted">
+                    Checked {when(instance.checkedAt)}
+                  </p>
+                  {instance.error && (
+                    <p className="error-inline">{instance.error}</p>
+                  )}
+                  {instance.resource?.url &&
+                    /^https?:\/\//.test(instance.resource.url) && (
+                      <a
+                        href={instance.resource.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Open service
+                      </a>
+                    )}
+                </div>
+                <Status value={instance.status} />
+                <button
+                  className="icon-button"
+                  aria-label={`View ${instance.component} instance ${instance.ordinal} logs`}
+                  disabled={!instance.resourceId}
+                  onClick={() => showLogs(instance.component, instance.ordinal)}
                 >
                   <Terminal size={18} />
                 </button>
@@ -214,6 +274,7 @@ export function ApplicationDetail() {
                   <Status value={s.phase} />
                 </div>
               ))}
+              {d.state === "attention" && <RecoveryPanel deployment={d} />}
             </article>
           ))}
         </section>
@@ -224,20 +285,25 @@ export function ApplicationDetail() {
           <div className="section-heading">
             <h2>Component logs</h2>
             <div className="log-buttons">
-              {a.manifest.components.map((c) => (
-                <button
-                  className="secondary"
-                  key={c.name}
-                  onClick={() => showLogs(c.name)}
-                >
-                  {c.name}
-                </button>
-              ))}
+              {instances.data
+                ?.filter((i) => i.resourceId)
+                .map((i) => (
+                  <button
+                    className="secondary"
+                    key={`${i.component}-${i.ordinal}`}
+                    onClick={() => showLogs(i.component, i.ordinal)}
+                  >
+                    {i.component} / {i.ordinal}
+                  </button>
+                ))}
             </div>
           </div>
           <p className="small muted">
-            Latest 100 lines from the first instance. Logs can include
-            application data.
+            Latest 100 lines
+            {logInstance
+              ? ` from ${logInstance}`
+              : " from the selected instance"}
+            . Logs can include application data.
           </p>
           <pre className="log-output">
             {logs || "Select a deployed component to fetch its logs."}
