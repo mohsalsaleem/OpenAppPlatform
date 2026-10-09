@@ -4,6 +4,15 @@ OpenAppPlatform is an application-first Docker control plane that manages comple
 
 Status: Draft design, 9 October 2026. Product name: OpenAppPlatform. Bare Docker and Coolify are first-class initial targets. This records the agreed direction and proposed implementation; no infrastructure changes are authorized by this document.
 
+The [roadmap delivery queue](../ROADMAP.md#m0-core-workflow-delivery-queue)
+is the current execution order and separates implemented behavior from future
+contracts. Finish Coolify runtime configuration/connections, then prioritize guided
+assembly, GitHub release ownership, environment organization, readiness/recovery,
+and stable routing. Auth/agent/AI work follows the usable core. Technology choices
+below remain proposals where they differ from the implementation; additional
+frameworks or services are not required to satisfy the product model.
+
+
 ## Product direction
 
 Users should be able to connect repositories, define components, select an existing deployment target, and deploy a complete application. Existing resources can be adopted rather than recreated.

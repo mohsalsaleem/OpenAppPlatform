@@ -37,7 +37,11 @@ Implemented and tested:
   idempotency, retries, deployment deadlines, and conservative uncertain dispatch.
 - Versioned configuration editing, stale-plan preconditions, and checksummed SQL
   migrations.
-- Dashboard, bounded logs, OpenAPI, examples, and read-only stdio MCP tools.
+- Dashboard, live instance health, per-instance bounded logs, OpenAPI, examples,
+  and read-only stdio MCP tools.
+- Recorded Docker/Coolify restart operations and observation recovery.
+- Docker plain runtime variables, app-local DNS connections, verified scale-up,
+  and confirmed scale-down with reserved retained bindings and reactivation.
 - Local Docker lifecycle and replacement tests, database/race/browser tests, and
   isolated Coolify staging verification.
 
@@ -59,6 +63,85 @@ management, and automatic discovery/assembly are not complete.
 
 Security, recovery, and dogfooding continue in every phase. Basic monitoring and
 backup visibility belong in M1; richer analytics can wait until M4.
+
+## M0 Core workflow delivery queue
+
+This is the active execution order. Complete the current adapter work, then take
+one reviewable slice at a time. This queue implements the original application
+platform design; it does not make every later roadmap integration a prerequisite.
+Auth and AI work remain deferred until these everyday workflows are usable.
+
+### Current slice: Coolify runtime configuration and connections
+
+Finish capability-aware, controller-owned Coolify configuration updates and
+component connections. Preserve operator-managed secrets and adopted runtime
+configuration. Verify supported endpoints and variable update/removal behavior
+against the installed operator; do not guess Docker networking from resource
+names. If private connectivity requires a node agent or unsupported changes,
+report the limitation and offer an explicit existing endpoint configuration.
+Keep Docker and Coolify capability differences visible. Coolify instance
+retirement is still unsupported and needs separate API/ownership verification.
+
+**Exit gate:** a two-component staging application receives the intended runtime
+configuration, communicates through its declared supported connection, updates
+without changing unrelated variables/resources, and retains a verified recovery
+path. Unsupported behavior is rejected. Docker regressions continue to pass.
+
+### Next ordered batches
+
+| Order | Deliverable | Acceptance evidence |
+| --- | --- | --- |
+| 1 | Guided discovery and manual application assembly | Inspect an existing Coolify environment, select supported resources, preview ownership/configuration mappings, group them under one application, and inspect health/logs without a deployment or provider mutation. Explicit management handoff is separate; source-backed resources stay observe-only until their build/release contract exists. |
+| 2 | GitHub-triggered release ownership | Repository/branch-to-component mapping, signed event verification, delivery deduplication, exact commit recording, and affected-component releases. Verify an existing Coolify source-build path can build the requested commit; otherwise use an explicitly configured image build path. Build once and reuse an immutable digest for replicas. Test push, duplicate delivery, failure, and recovery locally before a staging handoff. |
+| 3 | Application and environment organization | One logical application with staging/production environments, separate targets/configuration, and clear navigation. Preserve existing application/resource/release IDs through a tested compatibility migration. Reusable definitions and a readable configuration diff reduce repeated setup. |
+| 4 | Release verification and recovery controls | Configurable readiness probes, dependency/start ordering, deploy only selected affected components, release/artifact comparison, explicit rollback to a compatible known-good runtime snapshot, and owner-visible cancellation/abandon/reconciliation paths. Exercise process crashes and stale workers without duplicate dispatches or database edits. Rollback does not rewind application data. |
+| 5 | Stable endpoints, domains, and replica routing | Reuse operator proxies where supported; add a small routing adapter only where necessary. Keep endpoints stable through replacement and scaling, verify domain/TLS setup, remove stopped backends, and define health-aware routing and draining. Surviving workloads/routes continue if the controller is down. Docker DNS alone is not the completion gate. |
+| 6 | First useful workload and configuration breadth | Worker lifecycle, linked existing databases/queues/storage, minimal runtime secret references, private registry access, and configurable resource limits. Add a single execution path at a time with real examples. Scheduled jobs require a durable schedule identity and proof that restart does not create duplicate active schedulers. Stateful provisioning waits for backup/restore and storage guarantees. |
+| 7 | Reproducible installation and staging dogfooding | Package/bootstrap one Go service, UI, and PostgreSQL; run OAP through a supported operator in staging. Demonstrate update, compatible rollback, controller recovery from outside OAP, and metadata backup/restore. Resolve the open-source license before the first public release. |
+
+Minimum secret references and registry credentials must precede any batch that
+needs private artifacts or sensitive runtime inputs. They are not permission to
+store secrets in plain manifests. M1 retains the full encrypted store, BYOK,
+rotation, owner authentication, agent scopes, and audit work. OAP metadata backup
+and an external recovery command are prerequisites to the dogfooding update drill.
+
+Dependencies can advance a small prerequisite, not an entire later phase. For
+example, readiness and a routing contract must precede a claimed rolling rollout;
+workers must not inherit HTTP deployment assumptions. Keep examples and system
+integration tests paired with each slice. Run `make test-local` before pushing,
+use only isolated/authorized staging fixtures for live verification, and leave
+GitHub CI disabled until the owner changes that instruction. GitHub release
+webhooks are product functionality; they do not require enabling repository CI.
+
+### M0 completion and what follows
+
+**Exit gate:** create or assemble an application, configure its supported components
+and environment, receive a GitHub release event, build/select the exact artifact,
+deploy, reach stable supported endpoints, inspect current health/logs, restart and
+scale where supported, and recover a failed update through the UI/API. Run this
+journey on Docker and the existing Coolify staging installation, with explicit
+capability limits and repeatable installation/examples.
+
+Then proceed to M1 owner-grade operation: production auth/scopes and audit,
+stronger crash reconciliation, backups/restore, encrypted/BYOK secrets, container
+and image policies, basic monitoring/notification delivery, and production-readiness
+dogfooding. The M0 preview token is not a production access model.
+
+M2 follows for remote access, safe agent mutations, guardrails (including database
+access), skills, BYOK inference, and ChatGPT/MCP access. Evaluate a read-only OpenUI
+workspace after the core and permission boundaries are ready; it remains optional
+and existing UI/API operation must work with AI disabled.
+
+M3 extends deterministic discovery/builds with optional AI assembly and stack
+optimization, and adds operator adapters incrementally. M4 brings richer monitoring,
+per-app/custom analytics, and separately opt-in feedback, diagnostics, and telemetry.
+M5 adds multi-server placement/transport and taints/annotations. M6 runtime research
+covers Firecracker, celld, and optional Cloudflare Durable Objects independently.
+
+Rolling and blue-green remain selectable later strategies. Neither is enforced.
+Implement them only after readiness, stable routing, and rollback/data-compatibility
+contracts are verified. Tunnels, enterprise identity services, a new scheduler,
+and external analytics/model services are not dependencies of the M0 stack.
 
 ## M1 Owner grade operation
 
@@ -410,7 +493,7 @@ workloads on eligible targets.
 | Auth; agent identity, auth, and audit | M1, extended in M2 |
 | Crash recovery and stale states; retries and timeouts | M1 |
 | Backups and restore | M1 |
-| Secret store; BYOK and automatic local key creation | M1, provider extensions later |
+| Secret store; BYOK and automatic local key creation | M0 minimum runtime references where needed; M1 store/BYOK, provider extensions later |
 | Container security | M1, build isolation in M3, runtime isolation in M6 |
 | Docker image management | M1 baseline, M3 full lifecycle |
 | Dogfooding | M1 and each release |
@@ -419,9 +502,12 @@ workloads on eligible targets.
 | Agent/AI guardrails, especially direct database access | M1 identity/permissions; M2 bounded access and execution |
 | Manual overrides | M2, placement extensions in M5 |
 | Disable AI; BYOK models; API-first agents | M2 and product rules |
+| GitHub release triggers; repositories and exact build artifacts | M0 core ownership; M3 build/stack extensions |
+| Environments, routes, optional rollout strategies | M0 environment/routing contracts; optional rolling/blue-green after verification |
+| Workers, jobs, linked dependencies | M0 verified workload slices; stateful provisioning after backup/storage gates |
 | Skills | M2 |
 | ChatGPT plugins/apps/MCP integration | M2 |
-| AI-enabled discovery, grouping, and application assembly | M3 |
+| Discovery, grouping, and application assembly | M0 guided/manual; M3 optional AI assistance |
 | Automatic stack detection and optimization; Railpack/Nixpacks alternatives | M3 |
 | Monitoring and logs | M1 baseline, M4 richer integration |
 | Notifications | M1 event foundation, M2/M4 delivery and workflows |
@@ -436,13 +522,12 @@ workloads on eligible targets.
 
 ## Next implementation slice
 
-Prioritize M0: verify create → deploy → inspect → update → recover on bare Docker
-and the existing isolated Coolify staging target. Finish practical component
-connectivity, restart, supported scaling, and manual resource grouping, with
-explicit operator capabilities and reproducible examples. Keep existing preview
-token authentication. Advanced owner/agent auth, AI guardrails, remote agent
-features, and generative UI are deferred until the core workflows are usable.
-Production exposure still requires the later security and operational gates.
+Finish the current Coolify runtime configuration/connection slice. Then start
+M0 batch 1, guided discovery and manual application assembly, followed by the
+ordered queue above. Source-backed management handoff and GitHub sequencing must
+be verified before disabling an existing operator trigger. Preserve the KISS stack,
+local pre-push gate, and capability-aware behavior. Auth, remote agents, AI guardrails,
+and generative UI remain deferred; production exposure still requires M1 gates.
 
 Open decisions include the owner login method, first external secret provider,
 first analytics export, default inference policy, tunnel choice for each client,
