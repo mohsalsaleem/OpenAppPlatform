@@ -8,7 +8,10 @@ import {
   type Target,
   type Manifest,
   type Resource,
+  type Component,
+  type Capabilities,
 } from "../../api";
+import { RuntimeVariables } from "./RuntimeVariables";
 import { ErrorBox, Loading } from "../../components/Feedback";
 export function NewApplication() {
   const navigate = useNavigate();
@@ -19,8 +22,11 @@ export function NewApplication() {
   });
   const [name, setName] = useState("");
   const [target, setTarget] = useState("");
-  const [components, setComponents] = useState([
+  const [components, setComponents] = useState<
+    (Component & { editorId: string })[]
+  >([
     {
+      editorId: crypto.randomUUID(),
       name: "web",
       image: "nginx:1.27-alpine",
       port: 80,
@@ -34,6 +40,12 @@ export function NewApplication() {
   const selected = targets.data?.find(
     (t) => t.id === (target || targets.data?.[0]?.id),
   );
+  const [invalid, setInvalid] = useState<Record<string, boolean>>({});
+  const capabilities = useQuery({
+    queryKey: ["capabilities", selected?.id],
+    queryFn: () => api<Capabilities>(`/targets/${selected!.id}/capabilities`),
+    enabled: !!selected,
+  });
   const resources = useQuery({
     queryKey: ["resources", selected?.id],
     queryFn: () => api<Resource[]>(`/targets/${selected!.id}/resources`),
@@ -52,12 +64,12 @@ export function NewApplication() {
   });
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (!selected) return;
+    if (!selected || components.some((c) => invalid[c.editorId])) return;
     mutation.mutate({
       name,
       targetId: selected.id,
       environment: selected.environment,
-      components: components.map((c) => ({
+      components: components.map(({ editorId: _editorId, ...c }) => ({
         ...c,
         resourceId: c.resourceId || undefined,
       })),
@@ -127,6 +139,7 @@ export function NewApplication() {
                 setComponents([
                   ...components,
                   {
+                    editorId: crypto.randomUUID(),
                     name: `web-${components.length + 1}`,
                     image: "nginx:1.27-alpine",
                     port: 80,
@@ -144,7 +157,7 @@ export function NewApplication() {
             </button>
           </div>
           {components.map((c, i) => (
-            <div className="component-form" key={i}>
+            <div className="component-form" key={c.editorId}>
               <div className="section-heading">
                 <span className="small">
                   <ComponentIcon size={16} /> Component {i + 1}
@@ -291,9 +304,28 @@ export function NewApplication() {
                   </small>
                 </div>
               </div>
+              <RuntimeVariables
+                key={`${selected?.id}-${c.editorId}-${c.resourceId}`}
+                component={c}
+                onChange={(field, value) =>
+                  setComponents(
+                    components.map((v, n) =>
+                      n === i ? { ...v, [field]: value } : v,
+                    ),
+                  )
+                }
+                onValidity={(valid) =>
+                  setInvalid((current) => ({
+                    ...current,
+                    [c.editorId]: !valid,
+                  }))
+                }
+                environmentSupported={!!capabilities.data?.environment}
+                connectionsSupported={!!capabilities.data?.applicationDns}
+              />
             </div>
           ))}
-          <ErrorBox error={resources.error} />
+          <ErrorBox error={resources.error || capabilities.error} />
           <p className="small muted">
             Standard deployment uses the operator’s lifecycle and may cause
             downtime. Instances are grouped; traffic balancing is not yet
@@ -307,7 +339,11 @@ export function NewApplication() {
           </Link>
           <button
             className="primary"
-            disabled={!selected || mutation.isPending}
+            disabled={
+              !selected ||
+              mutation.isPending ||
+              components.some((c) => invalid[c.editorId])
+            }
           >
             {mutation.isPending ? "Creating…" : "Create application"}
           </button>

@@ -3,6 +3,8 @@ package controller
 import (
 	"context"
 	"errors"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
+	"maps"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 )
@@ -37,6 +39,17 @@ func (c *Controller) UpdateApplication(ctx context.Context, id string, m domain.
 	if len(current.Manifest.Components) != len(m.Components) {
 		return domain.Application{}, errors.New("component addition and removal require an explicit topology change workflow")
 	}
+	target, e := c.Store.TargetTx(ctx, tx, m.TargetID)
+	if e != nil {
+		return domain.Application{}, e
+	}
+	adapter, e := c.Factory(target)
+	if e != nil {
+		return domain.Application{}, e
+	}
+	if e = operator.ValidateRuntime(m, adapter.Capabilities()); e != nil {
+		return domain.Application{}, e
+	}
 	existing := map[string]domain.Component{}
 	for _, comp := range current.Manifest.Components {
 		existing[comp.Name] = comp
@@ -49,7 +62,7 @@ func (c *Controller) UpdateApplication(ctx context.Context, id string, m domain.
 		if comp.Instances < old.Instances {
 			return domain.Application{}, errors.New("scale-down requires explicit instance retirement")
 		}
-		if old.ResourceID != "" && (comp.Image != old.Image || comp.Port != old.Port || comp.HostPort != old.HostPort) {
+		if old.ResourceID != "" && (comp.Image != old.Image || comp.Port != old.Port || comp.HostPort != old.HostPort || !maps.Equal(comp.Env, old.Env) || !maps.Equal(comp.Services, old.Services)) {
 			return domain.Application{}, errors.New("adopted resource runtime configuration must be changed through the operator")
 		}
 	}

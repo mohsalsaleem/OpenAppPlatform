@@ -56,3 +56,30 @@ stateful services.
 Application networks are scoped by target and application identity. Networks do
 not extend across hosts. Engine restart policies provide local process recovery;
 the controller does not provide recovery from host failure or automatic scaling.
+
+## Runtime configuration and connections
+
+Managed Docker components accept `env` string maps and `services` maps from
+variable names to managed component names. A connection such as
+`{"API_URL":"api"}` becomes `API_URL=http://api:<release-port>` inside the
+application network. References must stay within the application and cannot
+point to adopted resources. They are resolved from each frozen release, so a
+port update and its callers' configuration are applied together by that release.
+Deployment order is the manifest order; dependency readiness ordering is not
+implemented. Standard updates can interrupt connectivity.
+
+Variables are bounded plain configuration, visible in application definitions
+and release history. They are not a secret store. Docker image defaults remain
+available unless overridden. Changing or removing runtime variables changes the
+container revision and requires deployment; saving alone does not apply them.
+
+`POST /api/v1/applications/{id}/restarts` accepts `component`, `ordinal`, and
+`expectedVersion`, with an `Idempotency-Key`. The durable operation restarts just
+the bound active container, preserves its identity and current configuration,
+and observes its health. An uncertain restart enters attention instead of being
+reissued. No prepared replacement is promoted by restart.
+
+Scale up from the configuration editor and deploy. Existing unchanged containers
+are reused and new ordinals receive their own instances. Fixed host ports still
+require one instance. Scale-down, traffic draining, and replica routing are not
+implemented yet.

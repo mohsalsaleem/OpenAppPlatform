@@ -1,4 +1,6 @@
 export interface Component {
+  env?: Record<string, string>;
+  services?: Record<string, string>;
   name: string;
   kind: string;
   image: string;
@@ -32,6 +34,7 @@ export interface Step {
   component: string;
   ordinal: number;
   phase: string;
+  action?: "restart";
   recoveryPhase?: string;
   resourceId?: string;
   remoteDeploymentId?: string;
@@ -83,4 +86,10 @@ export interface Instance {
   resource?: Resource;
   error?: string;
   checkedAt: string;
+}
+
+export interface Capabilities {
+  restart: boolean;
+  environment: boolean;
+  applicationDns: boolean;
 }

@@ -74,6 +74,9 @@ func (c *Controller) CreateApplication(ctx context.Context, m domain.Manifest) (
 	if e != nil {
 		return domain.Application{}, e
 	}
+	if e = operator.ValidateRuntime(m, a.Capabilities()); e != nil {
+		return domain.Application{}, e
+	}
 	for _, comp := range m.Components {
 		if comp.ResourceID != "" {
 			r, e := a.Inspect(ctx, comp.ResourceID)
@@ -99,6 +102,21 @@ func (c *Controller) EnqueueImages(ctx context.Context, appID, key string, image
 	return c.EnqueueVersion(ctx, appID, key, images, 0)
 }
 func (c *Controller) EnqueueVersion(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64) (domain.Deployment, error) {
+	return c.enqueueOperation(ctx, appID, key, images, expectedVersion, nil)
+}
+
+type RestartRequest struct {
+	Component string `json:"component"`
+	Ordinal   int    `json:"ordinal"`
+}
+
+func (c *Controller) EnqueueRestart(ctx context.Context, appID, key string, request RestartRequest, version int64) (domain.Deployment, error) {
+	if request.Component == "" || request.Ordinal < 1 || version < 1 {
+		return domain.Deployment{}, errors.New("component, ordinal and expectedVersion are required")
+	}
+	return c.enqueueOperation(ctx, appID, key, nil, version, &request)
+}
+func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64, restart *RestartRequest) (domain.Deployment, error) {
 	if len(key) < 8 || len(key) > 128 {
 		return domain.Deployment{}, errors.New("Idempotency-Key must contain 8 to 128 characters")
 	}
@@ -124,7 +142,8 @@ func (c *Controller) EnqueueVersion(ctx context.Context, appID, key string, imag
 	requestBody, _ := json.Marshal(struct {
 		Images  map[string]string `json:"images"`
 		Version int64             `json:"expectedVersion"`
-	}{images, expectedVersion})
+		Restart *RestartRequest   `json:"restart,omitempty"`
+	}{images, expectedVersion, restart})
 	requestSum := sha256.Sum256(requestBody)
 	requestHash := hex.EncodeToString(requestSum[:])
 	var existingID, oldHash string
@@ -171,7 +190,7 @@ func (c *Controller) EnqueueVersion(ctx context.Context, appID, key string, imag
 	sum := sha256.Sum256(spec)
 	hash := hex.EncodeToString(sum[:])
 	if existingErr == nil {
-		if oldHash != hash {
+		if restart != nil || oldHash != hash {
 			return domain.Deployment{}, domain.ErrConflict
 		}
 		return c.Store.DeploymentTx(ctx, tx, existingID)
@@ -184,6 +203,40 @@ func (c *Controller) EnqueueVersion(ctx context.Context, appID, key string, imag
 		return domain.Deployment{}, domain.ErrConflict
 	}
 	d := domain.Deployment{ID: domain.NewID(), ApplicationID: appID, Manifest: a.Manifest, DefinitionVersion: a.Version, State: "queued", Steps: domain.InitialSteps(a.Manifest)}
+	target, e := c.Store.TargetTx(ctx, tx, a.Manifest.TargetID)
+	if e != nil {
+		return d, e
+	}
+	adapter, e := c.Factory(target)
+	if e != nil {
+		return d, e
+	}
+	if restart == nil {
+		if e = operator.ValidateRuntime(a.Manifest, adapter.Capabilities()); e != nil {
+			return d, e
+		}
+	} else {
+		if !adapter.Capabilities().Restart {
+			return d, errors.New("target does not support restart")
+		}
+		if _, ok := adapter.(operator.Restarter); !ok {
+			return d, errors.New("target does not implement restart")
+		}
+		found := false
+		for _, comp := range a.Manifest.Components {
+			if comp.Name == restart.Component && restart.Ordinal <= comp.Instances {
+				found = true
+			}
+		}
+		if !found {
+			return d, errors.New("restart selects an unknown component or instance")
+		}
+		ref, e := c.Store.BindingTx(ctx, tx, appID, restart.Component, restart.Ordinal)
+		if e != nil {
+			return d, e
+		}
+		d.Steps = []domain.Step{{Component: restart.Component, Ordinal: restart.Ordinal, ResourceID: ref, Phase: "pending", Action: "restart"}}
+	}
 	steps, _ := json.Marshal(d.Steps)
 	e = tx.QueryRow(ctx, "INSERT INTO oap_deployments(id,application_id,state,spec,steps,idempotency_key,request_hash,definition_version,request_hash_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,2) RETURNING created_at,updated_at", d.ID, appID, d.State, spec, steps, key, requestHash, a.Version).Scan(&d.CreatedAt, &d.UpdatedAt)
 	if e != nil {
@@ -270,6 +323,9 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 		if step.Phase == "succeeded" || step.Phase == "failed" || step.Phase == "attention" {
 			continue
 		}
+		if step.Action != "" && step.Action != "restart" {
+			return fail(step, "attention", errors.New("unknown operation action"))
+		}
 		var comp domain.Component
 		for _, v := range d.Manifest.Components {
 			if v.Name == step.Component {
@@ -278,7 +334,15 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 		}
 		switch step.Phase {
 		case "pending":
-			if comp.ResourceID != "" {
+			if step.Action == "restart" {
+				resource, e := a.Inspect(ctx, step.ResourceID)
+				if e != nil {
+					return fail(step, "failed", e)
+				}
+				if comp.ResourceID == "" && resource.Description != "OpenAppPlatform:"+d.ApplicationID+":"+comp.Name {
+					return fail(step, "attention", errors.New("managed resource ownership changed; inspect provider before restarting"))
+				}
+			} else if comp.ResourceID != "" {
 				resource, inspectErr := a.Inspect(ctx, comp.ResourceID)
 				if inspectErr != nil {
 					return fail(step, "failed", inspectErr)
@@ -288,7 +352,11 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 				}
 				step.ResourceID = comp.ResourceID
 			} else {
-				r, e := a.Ensure(ctx, operator.Spec{Name: domain.ResourceName(d.ApplicationID, comp.Name, step.Ordinal), Ownership: "OpenAppPlatform:" + d.ApplicationID + ":" + comp.Name, Component: comp})
+				runtime, e := domain.RuntimeComponent(d.Manifest, comp.Name)
+				if e != nil {
+					return fail(step, "failed", e)
+				}
+				r, e := a.Ensure(ctx, operator.Spec{Name: domain.ResourceName(d.ApplicationID, comp.Name, step.Ordinal), Ownership: "OpenAppPlatform:" + d.ApplicationID + ":" + comp.Name, Component: runtime})
 				if e != nil {
 					return e
 				}
@@ -308,7 +376,16 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 			if e = c.Store.SaveDeployment(ctx, d); e != nil {
 				return e
 			}
-			remote, e := a.Deploy(ctx, step.ResourceID)
+			var remote string
+			if step.Action == "restart" {
+				restarter, ok := a.(operator.Restarter)
+				if !ok {
+					return fail(step, "attention", errors.New("restart capability is unavailable"))
+				}
+				remote, e = restarter.Restart(ctx, step.ResourceID)
+			} else {
+				remote, e = a.Deploy(ctx, step.ResourceID)
+			}
 			if e != nil {
 				return fail(step, "attention", fmt.Errorf("deployment dispatch outcome is uncertain; inspect provider before retrying: %w", e))
 			}

@@ -1,7 +1,13 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Save, RotateCcw } from "lucide-react";
-import { api, type Application, type Manifest } from "../../api";
+import {
+  api,
+  type Application,
+  type Manifest,
+  type Capabilities,
+} from "../../api";
+import { RuntimeVariables } from "./RuntimeVariables";
 import { ErrorBox } from "../../components/Feedback";
 
 export function ConfigurationEditor({
@@ -15,6 +21,13 @@ export function ConfigurationEditor({
     structuredClone(app.manifest),
   );
   const [saved, setSaved] = useState(false);
+  const [editorRevision, setEditorRevision] = useState(0);
+  const [invalid, setInvalid] = useState<Record<string, boolean>>({});
+  const capabilities = useQuery({
+    queryKey: ["capabilities", app.manifest.targetId],
+    queryFn: () =>
+      api<Capabilities>(`/targets/${app.manifest.targetId}/capabilities`),
+  });
   const dirty = JSON.stringify(draft) !== JSON.stringify(base.manifest);
   const stale = app.version !== base.version;
   const save = useMutation({
@@ -30,6 +43,7 @@ export function ConfigurationEditor({
       setBase(updated);
       setDraft(structuredClone(updated.manifest));
       setSaved(true);
+      setInvalid({});
       client.setQueryData(["application", app.id], updated);
       client.invalidateQueries({ queryKey: ["applications"] });
     },
@@ -39,8 +53,14 @@ export function ConfigurationEditor({
     setDraft(structuredClone(app.manifest));
     setSaved(false);
     save.reset();
+    setEditorRevision((v) => v + 1);
+    setInvalid({});
   }
-  function change(index: number, field: string, value: string | number) {
+  function change(
+    index: number,
+    field: string,
+    value: string | number | Record<string, string>,
+  ) {
     setSaved(false);
     setDraft({
       ...draft,
@@ -70,7 +90,12 @@ export function ConfigurationEditor({
           <button
             className="primary"
             onClick={() => save.mutate()}
-            disabled={!dirty || stale || save.isPending}
+            disabled={
+              !dirty ||
+              stale ||
+              save.isPending ||
+              Object.values(invalid).some(Boolean)
+            }
           >
             <Save size={15} />
             {save.isPending ? "Saving…" : "Save configuration"}
@@ -88,9 +113,12 @@ export function ConfigurationEditor({
           Configuration saved. Deploy when you are ready.
         </p>
       )}
-      <ErrorBox error={save.error} />
+      <ErrorBox error={save.error || capabilities.error} />
       {draft.components.map((c, i) => (
-        <div className="component-form" key={c.name}>
+        <div
+          className="component-form"
+          key={`${c.name}-${base.version}-${editorRevision}`}
+        >
           <h2>{c.name}</h2>
           <p className="small muted">
             {c.resourceId
@@ -137,6 +165,10 @@ export function ConfigurationEditor({
                   readOnly={!!c.resourceId}
                   onChange={(e) => change(i, "instances", +e.target.value)}
                 />
+                <small className="muted">
+                  Increase instances and deploy to scale up. Scale-down requires
+                  explicit instance retirement and is not supported yet.
+                </small>
               </div>
             </div>
             <div>
@@ -156,6 +188,13 @@ export function ConfigurationEditor({
               </small>
             </div>
           </div>
+          <RuntimeVariables
+            component={c}
+            onChange={(field, value) => change(i, field, value)}
+            onValidity={(valid) => setInvalid({ ...invalid, [c.name]: !valid })}
+            environmentSupported={!!capabilities.data?.environment}
+            connectionsSupported={!!capabilities.data?.applicationDns}
+          />
         </div>
       ))}
       <details>

@@ -160,3 +160,33 @@ func TestObservePaginatesBoundedResourceHistory(t *testing.T) {
 		t.Fatalf("unbounded history search: %v calls=%d", e, calls)
 	}
 }
+
+func TestRestartScopesResourceAndReturnsProviderOperation(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/v1/projects/p/staging":
+			w.Write([]byte(`{"applications":[{"uuid":"u"}]}`))
+		case "/api/v1/applications/u":
+			w.Write([]byte(`{"uuid":"u","status":"running:healthy"}`))
+		case "/api/v1/applications/u/restart":
+			if r.Method != "POST" {
+				t.Fatal(r.Method)
+			}
+			calls++
+			w.Write([]byte(`{"deployment_uuid":"restart-operation"}`))
+		default:
+			t.Errorf("unexpected mutation %s", r.URL.Path)
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	c, _ := New(domain.Target{URL: srv.URL, ProjectID: "p", Environment: "staging"}, "token")
+	if _, e := c.Restart(context.Background(), "foreign"); e == nil || calls != 0 {
+		t.Fatal("foreign resource restart allowed")
+	}
+	remote, e := c.Restart(context.Background(), "u")
+	if e != nil || remote != "restart-operation" || calls != 1 {
+		t.Fatalf("restart %s %v %d", remote, e, calls)
+	}
+}

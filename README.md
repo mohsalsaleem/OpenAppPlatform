@@ -11,7 +11,8 @@ jobs, a React dashboard, target-scoped Coolify and direct Docker adapters, versi
 and a read-only MCP interface. Standard releases
 support multiple web components and instances, explicit Docker-image resource
 adoption, frozen artifacts, idempotency, progress, live instance inspection,
-per-instance bounded logs, and explicit observation recovery.
+per-instance bounded logs, explicit observation recovery, per-instance restart,
+and Docker runtime variables and application DNS connections.
 
 Verified locally with PostgreSQL and Chromium, and through a real deployment on
 an isolated staging project in the owner's existing Coolify.
@@ -159,3 +160,9 @@ release's current `expectedUpdatedAt`, plus either an optional
 requests conflict. Recovery does not roll back data or cancel provider work.
 If no provider operation can be identified after uncertain dispatch, the release
 remains blocked; automatic provider-history reconciliation is still planned.
+
+Target capabilities are exposed at `GET /api/v1/targets/{id}/capabilities` and
+checked when configurations and operations are admitted. Native restart is
+supported by Docker and Coolify; managed `env` and `services` configuration is
+currently supported by Docker. Unsupported fields are rejected rather than
+silently ignored. See the [connected Docker example](examples/README.md#connected-docker-components).

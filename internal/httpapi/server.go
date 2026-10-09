@@ -115,6 +115,14 @@ func (s *Server) routes() http.Handler {
 		}
 		write(w, 200, x)
 	})
+	mux.HandleFunc("GET /api/v1/targets/{id}/capabilities", func(w http.ResponseWriter, r *http.Request) {
+		adapter, e := c.Adapter(r.Context(), r.PathValue("id"))
+		if e != nil {
+			fail(w, e)
+			return
+		}
+		write(w, 200, adapter.Capabilities())
+	})
 	mux.HandleFunc("GET /api/v1/targets/{id}/resources", func(w http.ResponseWriter, r *http.Request) {
 		a, e := c.Adapter(r.Context(), r.PathValue("id"))
 		if e != nil {
@@ -214,6 +222,27 @@ func (s *Server) routes() http.Handler {
 				fail(w, e)
 			} else {
 				write(w, 422, map[string]string{"code": "deployment_rejected", "message": e.Error()})
+			}
+			return
+		}
+		write(w, 202, d)
+	})
+	mux.HandleFunc("POST /api/v1/applications/{id}/restarts", func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Component       string `json:"component"`
+			Ordinal         int    `json:"ordinal"`
+			ExpectedVersion int64  `json:"expectedVersion"`
+		}
+		if e := decode(w, r, &request); e != nil {
+			write(w, 400, map[string]string{"code": "invalid_restart", "message": e.Error()})
+			return
+		}
+		d, e := c.EnqueueRestart(r.Context(), r.PathValue("id"), r.Header.Get("Idempotency-Key"), controller.RestartRequest{Component: request.Component, Ordinal: request.Ordinal}, request.ExpectedVersion)
+		if e != nil {
+			if errors.Is(e, domain.ErrConflict) || errors.Is(e, domain.ErrNotFound) {
+				fail(w, e)
+			} else {
+				write(w, 422, map[string]string{"code": "restart_rejected", "message": e.Error()})
 			}
 			return
 		}

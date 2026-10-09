@@ -94,3 +94,24 @@ func TestSettingsAreStrict(t *testing.T) {
 		t.Fatal("unknown secret-bearing settings accepted")
 	}
 }
+
+func TestRestartNeverMutatesForeignOrCandidateContainers(t *testing.T) {
+	for _, reference := range []string{"foreign", "active-next"} {
+		t.Run(reference, func(t *testing.T) {
+			mutations := 0
+			c := fakeClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "GET" {
+					mutations++
+				}
+				labels := map[string]string{prefix + "target": "fixture", prefix + "environment": "staging", prefix + "owner": "owner", prefix + "reference": "active"}
+				if reference == "foreign" {
+					labels[prefix+"target"] = "other"
+				}
+				json.NewEncoder(w).Encode(map[string]any{"Id": "container-id", "Config": map[string]any{"Labels": labels}})
+			})
+			if _, e := c.Restart(context.Background(), reference); e == nil || mutations != 0 {
+				t.Fatal("foreign/candidate restart allowed")
+			}
+		})
+	}
+}

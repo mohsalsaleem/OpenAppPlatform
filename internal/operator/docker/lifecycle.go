@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -15,6 +16,8 @@ import (
 )
 
 func revision(s operator.Spec, imageID string) string {
+	// Replica count belongs to application topology, not an instance's runtime.
+	s.Component.Instances = 1
 	b, _ := json.Marshal(struct {
 		Spec  operator.Spec
 		Image string
@@ -90,7 +93,12 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	if s.Component.HostPort != 0 {
 		host["PortBindings"] = map[string]any{port: []map[string]string{{"HostIp": c.settings.HostBindIP, "HostPort": strconv.Itoa(s.Component.HostPort)}}}
 	}
-	input := map[string]any{"Image": imageID, "Labels": labels, "ExposedPorts": map[string]any{port: map[string]any{}}, "HostConfig": host, "NetworkingConfig": map[string]any{"EndpointsConfig": map[string]any{network: map[string]any{"Aliases": []string{s.Component.Name}}}}}
+	env := []string{}
+	for key, value := range s.Component.Env {
+		env = append(env, key+"="+value)
+	}
+	sort.Strings(env)
+	input := map[string]any{"Env": env, "Image": imageID, "Labels": labels, "ExposedPorts": map[string]any{port: map[string]any{}}, "HostConfig": host, "NetworkingConfig": map[string]any{"EndpointsConfig": map[string]any{network: map[string]any{"Aliases": []string{s.Component.Name}}}}}
 	var result struct {
 		ID string `json:"Id"`
 	}
@@ -194,3 +202,17 @@ func (c *Client) Stop(ctx context.Context, ref string) error {
 }
 
 var _ operator.Adapter = (*Client)(nil)
+
+func (c *Client) Restart(ctx context.Context, ref string) (string, error) {
+	active, e := c.inspectContainer(ctx, ref)
+	if e != nil {
+		return "", e
+	}
+	if !c.owned(active) || active.Config.Labels[prefix+"reference"] != ref {
+		return "", errors.New("instance is outside this target")
+	}
+	if e = c.request(ctx, "POST", "/containers/"+url.PathEscape(active.ID)+"/restart?t=10", nil, nil); e != nil {
+		return "", e
+	}
+	return active.ID, nil
+}

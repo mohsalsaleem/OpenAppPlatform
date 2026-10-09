@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -18,6 +19,27 @@ func main() {
 		version = "dev"
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /upstream", func(w http.ResponseWriter, r *http.Request) {
+		endpoint := os.Getenv("UPSTREAM_URL")
+		if endpoint == "" {
+			http.Error(w, "upstream is not configured", 503)
+			return
+		}
+		request, e := http.NewRequestWithContext(r.Context(), "GET", endpoint, nil)
+		if e != nil {
+			http.Error(w, "invalid upstream", 502)
+			return
+		}
+		response, e := (&http.Client{Timeout: 3 * time.Second}).Do(request)
+		if e != nil {
+			http.Error(w, "upstream unavailable", 502)
+			return
+		}
+		defer response.Body.Close()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(response.StatusCode)
+		io.Copy(w, io.LimitReader(response.Body, 4096))
+	})
 	mux.HandleFunc("GET /health/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]bool{"ready": true})

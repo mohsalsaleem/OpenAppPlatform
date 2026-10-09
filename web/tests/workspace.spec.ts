@@ -23,6 +23,16 @@ test("authentication, application setup, release confirmation, and target discov
   await page.getByLabel("Application name", { exact: true }).fill(name);
   await page.getByRole("button", { name: "Add component" }).click();
   await page.getByLabel("Component name", { exact: true }).nth(1).fill("api");
+  await page.getByLabel("Environment variables for web").fill('{"unfinished":');
+  await expect(
+    page.getByRole("button", { name: "Create application" }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Remove component 1" }).click();
+  await expect(
+    page.getByRole("button", { name: "Create application" }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Add component" }).click();
+  await page.getByLabel("Component name", { exact: true }).nth(1).fill("web");
   await page.getByRole("button", { name: "Create application" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
   await expect(page.getByText("Ready for your first deployment")).toBeVisible();
@@ -119,6 +129,18 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     .getByLabel("Container image", { exact: true })
     .fill(process.env.OAP_TEST_DOCKER_IMAGE!);
   await page.getByLabel("Internal port", { exact: true }).fill("8080");
+  await page
+    .getByLabel("Environment variables for web")
+    .fill('{"OAP_TEST_MESSAGE":');
+  await expect(
+    page.getByRole("button", { name: "Create application" }),
+  ).toBeDisabled();
+  await page
+    .getByLabel("Environment variables for web")
+    .fill('{"OAP_TEST_MESSAGE":"browser-v1"}');
+  await page
+    .getByLabel("Service connections for web")
+    .fill('{"UPSTREAM_URL":"web"}');
   await page.getByRole("button", { name: "Create application" }).click();
   await deployAndWait();
   await page.getByRole("tab", { name: "Overview" }).click();
@@ -135,6 +157,9 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     .getByLabel("Container image for web")
     .fill(process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!);
   await page.getByLabel("Internal port for web").fill("8025");
+  await page
+    .getByLabel("Environment variables for web")
+    .fill('{"OAP_TEST_MESSAGE":"browser-v2"}');
   await page.getByRole("button", { name: "Save configuration" }).click();
   await expect(
     page.getByText("Configuration saved. Deploy when you are ready."),
@@ -157,8 +182,49 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     })
     .toBe(process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!);
   await expect(page.locator(".release-banner")).toContainText("succeeded");
+  await page
+    .getByRole("button", { name: "Restart web / 1", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Saved configuration changes are not applied",
+  );
+  const queuedRestart = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/restarts"),
+  );
+  await page.getByRole("button", { name: "Restart now", exact: true }).click();
+  const response = await queuedRestart;
+  expect(response.status()).toBe(202);
+  const restarted = await response.json();
+  expect(restarted.steps[0].action).toBe("restart");
+  await expect
+    .poll(
+      async () => {
+        const current = await page.request.get(
+          `/api/v1/deployments/${restarted.id}`,
+          { headers: { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` } },
+        );
+        return (await current.json()).state;
+      },
+      { timeout: 60000 },
+    )
+    .toBe("succeeded");
+  await page.getByRole("tab", { name: "Overview" }).click();
+  await expect(page.locator(".release-banner")).toContainText("succeeded");
+  await expect(live).toContainText("running:healthy");
   await page.screenshot({
     path: "../.local/ui-live-instances.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+  await page.screenshot({
+    path: "../.local/ui-runtime-mobile.png",
     fullPage: true,
   });
 });

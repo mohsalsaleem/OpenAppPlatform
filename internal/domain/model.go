@@ -20,14 +20,16 @@ var digestSuffix = regexp.MustCompile(`@sha256:[a-f0-9]{64}$`)
 var slug = regexp.MustCompile(`^[a-z][a-z0-9-]{0,47}$`)
 
 type Component struct {
-	Name       string `json:"name"`
-	Kind       string `json:"kind"`
-	Image      string `json:"image"`
-	Port       int    `json:"port"`
-	HostPort   int    `json:"hostPort,omitempty"`
-	Instances  int    `json:"instances"`
-	Strategy   string `json:"strategy"`
-	ResourceID string `json:"resourceId,omitempty"`
+	Env        map[string]string `json:"env,omitempty"`
+	Services   map[string]string `json:"services,omitempty"`
+	Name       string            `json:"name"`
+	Kind       string            `json:"kind"`
+	Image      string            `json:"image"`
+	Port       int               `json:"port"`
+	HostPort   int               `json:"hostPort,omitempty"`
+	Instances  int               `json:"instances"`
+	Strategy   string            `json:"strategy"`
+	ResourceID string            `json:"resourceId,omitempty"`
 }
 type Manifest struct {
 	Name        string      `json:"name"`
@@ -87,6 +89,15 @@ func (m *Manifest) Validate() error {
 			return errors.New("image is required")
 		}
 	}
+	components := map[string]Component{}
+	for _, c := range m.Components {
+		components[c.Name] = c
+	}
+	for _, c := range m.Components {
+		if err := validateRuntime(c, components); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -120,6 +131,7 @@ type Application struct {
 	Version   int64     `json:"version"`
 }
 type Step struct {
+	Action               string     `json:"action,omitempty"`
 	RecoveryPhase        string     `json:"recoveryPhase,omitempty"`
 	ObservationStartedAt *time.Time `json:"observationStartedAt,omitempty"`
 	Component            string     `json:"component"`

@@ -13,5 +13,6 @@ curl http://127.0.0.1:8790/health/ready
 
 Publish the image through your registry workflow and use its digest in a web
 component with port 8080. The optional VERSION environment variable identifies
-the build when supplied by your deployment operator. The first platform
-milestone does not manage component environment variables yet.
+the component when supplied through a Docker component's `env` configuration.
+`UPSTREAM_URL` enables `/upstream`, which forwards a bounded request to another
+component. See the [connected example](../docker-connected/application.json).

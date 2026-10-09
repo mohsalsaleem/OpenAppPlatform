@@ -103,3 +103,15 @@ The retained Coolify staging fixture also passed the updated release lifecycle,
 image-digest check, and HTTPS verification using deployment history scoped by
 resource UUID. The installed API omits numeric IDs from application projections;
 correlation therefore checks bounded resource-specific history instead.
+
+## Runtime configuration, connections, and restart coverage
+
+The isolated Docker suite exercises two components communicating over the
+application network, configuration injection and replacement, following an
+upstream port change, and scaling the private API to two instances. Restart
+checks distinguish a changed process boot from a replacement container and
+verify that saved future configuration is not applied. PostgreSQL tests verify
+restart scope, idempotency, stale versions, and capability rejection. Browser
+coverage includes variable editing, invalid-input blocking, and restart review.
+The retained Coolify staging fixture passed native restart and provider-operation
+observation in addition to its deployment and HTTPS checks.

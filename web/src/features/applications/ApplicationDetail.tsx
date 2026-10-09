@@ -12,6 +12,7 @@ import {
   type Application,
   type Deployment,
   type Instance,
+  type Capabilities,
 } from "../../api";
 import { DeploymentDialog } from "../../components/DeploymentDialog";
 import { RecoveryPanel } from "./RecoveryPanel";
@@ -33,6 +34,7 @@ export function ApplicationDetail() {
   const [logs, setLogs] = useState("");
   const [logInstance, setLogInstance] = useState("");
   const [logError, setLogError] = useState("");
+  const [restartReview, setRestartReview] = useState<Instance | null>(null);
   const app = useQuery({
     queryKey: ["application", id],
     queryFn: () => api<Application>(`/applications/${id}`),
@@ -58,6 +60,36 @@ export function ApplicationDetail() {
       setReview(null);
       setTab("deployments");
       client.invalidateQueries({ queryKey: ["deployments", id] });
+    },
+  });
+  const capabilities = useQuery({
+    queryKey: ["capabilities", app.data?.manifest.targetId],
+    queryFn: () =>
+      api<Capabilities>(`/targets/${app.data!.manifest.targetId}/capabilities`),
+    enabled: !!app.data,
+  });
+  const restart = useMutation({
+    mutationFn: ({
+      instance,
+      version,
+    }: {
+      instance: Instance;
+      version: number;
+    }) =>
+      api<Deployment>(`/applications/${id}/restarts`, {
+        method: "POST",
+        headers: { "Idempotency-Key": crypto.randomUUID() },
+        body: JSON.stringify({
+          component: instance.component,
+          ordinal: instance.ordinal,
+          expectedVersion: version,
+        }),
+      }),
+    onSuccess: () => {
+      setRestartReview(null);
+      setTab("deployments");
+      client.invalidateQueries({ queryKey: ["deployments", id] });
+      client.invalidateQueries({ queryKey: ["instances", id] });
     },
   });
   async function showLogs(component: string, ordinal = 1) {
@@ -163,8 +195,9 @@ export function ApplicationDetail() {
                     {c.instances > 1 ? "s" : ""} · port {c.port}
                   </p>
                   <code className="image-ref">
-                    {latest?.manifest.components.find((v) => v.name === c.name)
-                      ?.image || c.image}
+                    {instances.data?.find(
+                      (v) => v.component === c.name && v.resource?.image,
+                    )?.resource?.image || c.image}
                   </code>
                 </div>
                 <span className="small muted">{c.instances} configured</span>
@@ -222,6 +255,15 @@ export function ApplicationDetail() {
                     )}
                 </div>
                 <Status value={instance.status} />
+                {capabilities.data?.restart && (
+                  <button
+                    className="secondary"
+                    disabled={!!active || !instance.resourceId}
+                    onClick={() => setRestartReview(instance)}
+                  >
+                    Restart {instance.component} / {instance.ordinal}
+                  </button>
+                )}
                 <button
                   className="icon-button"
                   aria-label={`View ${instance.component} instance ${instance.ordinal} logs`}
@@ -262,6 +304,7 @@ export function ApplicationDetail() {
                   <div>
                     <strong>
                       {s.component} / {s.ordinal}
+                      {s.action === "restart" ? " · restart" : ""}
                     </strong>
                     <p className="small muted">
                       {s.resourceId
@@ -309,6 +352,37 @@ export function ApplicationDetail() {
             {logs || "Select a deployed component to fetch its logs."}
           </pre>
         </section>
+      )}
+      {restartReview && (
+        <DeploymentDialog onClose={() => setRestartReview(null)}>
+          <h2 id="deploy-title">
+            Restart {restartReview.component} / {restartReview.ordinal}?
+          </h2>
+          <p>
+            This restarts the existing instance and can interrupt requests.
+            Saved configuration changes are not applied. Other instances keep
+            running.
+          </p>
+          <ErrorBox error={restart.error} />
+          <div className="form-actions">
+            <button
+              className="secondary"
+              disabled={restart.isPending}
+              onClick={() => setRestartReview(null)}
+            >
+              Cancel
+            </button>
+            <button
+              className="primary"
+              disabled={restart.isPending}
+              onClick={() =>
+                restart.mutate({ instance: restartReview, version: a.version })
+              }
+            >
+              {restart.isPending ? "Queuing…" : "Restart now"}
+            </button>
+          </div>
+        </DeploymentDialog>
       )}
       {review && (
         <DeploymentDialog onClose={() => setReview(null)}>

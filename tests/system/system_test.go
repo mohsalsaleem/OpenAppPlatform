@@ -53,7 +53,7 @@ func (f *fake) Ensure(_ context.Context, s operator.Spec) (operator.Resource, er
 			return r, nil
 		}
 	}
-	r := operator.Resource{ID: domain.NewID(), Name: s.Name, Image: s.Component.Image, ArtifactKind: "image"}
+	r := operator.Resource{ID: domain.NewID(), Name: s.Name, Description: s.Ownership, Image: s.Component.Image, ArtifactKind: "image"}
 	f.resources[r.ID] = r
 	if s.Component.Name == "api" {
 		f.failedID = r.ID
@@ -376,6 +376,26 @@ func TestLiveCoolifyLifecycle(t *testing.T) {
 		t.Fatalf("logs: %d %s", status, raw)
 	}
 	// Fixture retention avoids destructive cleanup. Its ID is recorded for manual inspection.
+	restart, e := c.EnqueueRestart(ctx, app.ID, "live-fixture-restart", controller.RestartRequest{Component: "web", Ordinal: 1}, app.Version)
+	if e != nil {
+		t.Fatal(e)
+	}
+	restartDeadline := time.Now().Add(90 * time.Second)
+	for time.Now().Before(restartDeadline) {
+		restart, e = c.Store.Deployment(ctx, restart.ID)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if domain.Terminal(restart.State) {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
+	if restart.State != "succeeded" {
+		t.Fatalf("Coolify restart failed %+v", restart)
+	}
+	t.Logf("verified retained staging restart deployment=%s", restart.Steps[0].RemoteDeploymentID)
+
 }
 
 func TestAdoptionCannotBindResourceToTwoApplications(t *testing.T) {
@@ -420,7 +440,7 @@ func TestReleaseSnapshotsDigestAndRejectsIdempotencyPayloadMismatch(t *testing.T
 }
 
 func TestExampleManifestsValidate(t *testing.T) {
-	for _, name := range []string{"hello-web", "two-components"} {
+	for _, name := range []string{"hello-web", "two-components", "docker-hello", "docker-connected"} {
 		t.Run(name, func(t *testing.T) {
 			b, e := os.ReadFile("../../examples/" + name + "/application.json")
 			if e != nil {

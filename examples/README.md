@@ -59,3 +59,27 @@ Use [docker-target.json](docker-target.json), set your local Unix socket path,
 and build [Hello API](hello-api/README.md). Then create and deploy the
 [docker-hello definition](docker-hello/application.json). With pullPolicy never,
 this path uses cached images and requires no registry access.
+
+## Connected Docker components
+
+Build the Hello API image, configure the `docker-local` target, and deploy:
+
+```sh
+docker build -t oap-hello-api:dev examples/hello-api
+python3 scripts/run-local.py python3 scripts/example.py examples/docker-connected/application.json --deploy
+curl http://127.0.0.1:8792/upstream
+```
+
+The frontend receives `UPSTREAM_URL=http://api:8080` from its `services` map.
+The API stays private and receives `VERSION=api-v1` from `env`. Its response
+through the frontend demonstrates actual DNS connectivity between components.
+In Configuration, increase API instances to 2 and deploy to scale up; the frontend
+continues using the same component alias. Docker DNS is not a health-aware load
+balancer. Restart one instance from its overview row to restart its existing
+configuration without applying saved changes.
+
+`env` is plain non-secret configuration stored in definitions and release
+snapshots. Keep credentials out of these manifests. Managed variables and
+application DNS connections currently require the Docker adapter; Coolify
+variables and endpoints remain managed in Coolify. Native restart is available
+on both adapters. Scale-down and stateful volumes remain subsequent work.

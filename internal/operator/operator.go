@@ -2,10 +2,14 @@ package operator
 
 import (
 	"context"
+	"fmt"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 )
 
 type Capabilities struct {
+	Restart         bool `json:"restart"`
+	Environment     bool `json:"environment"`
+	ApplicationDNS  bool `json:"applicationDns"`
 	Standard        bool `json:"standard"`
 	Rolling         bool `json:"rolling"`
 	BlueGreen       bool `json:"blueGreen"`
@@ -42,3 +46,20 @@ type Adapter interface {
 	Logs(context.Context, string, int) (string, error)
 }
 type Factory func(domain.Target) (Adapter, error)
+
+// Restarter restarts an existing runtime without applying a new definition.
+type Restarter interface {
+	Restart(context.Context, string) (string, error)
+}
+
+func ValidateRuntime(m domain.Manifest, caps Capabilities) error {
+	for _, c := range m.Components {
+		if len(c.Env) > 0 && !caps.Environment {
+			return fmt.Errorf("target does not support managed environment variables for %s", c.Name)
+		}
+		if len(c.Services) > 0 && !caps.ApplicationDNS {
+			return fmt.Errorf("target does not support application DNS connections for %s; configure an operator endpoint instead", c.Name)
+		}
+	}
+	return nil
+}

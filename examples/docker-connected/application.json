@@ -1,0 +1,17 @@
+{
+  "name": "docker-connected",
+  "environment": "staging",
+  "targetId": "docker-local",
+  "components": [
+    {
+      "name": "api", "kind": "web", "image": "oap-hello-api:dev",
+      "port": 8080, "instances": 1, "strategy": "standard",
+      "env": {"VERSION": "api-v1"}
+    },
+    {
+      "name": "frontend", "kind": "web", "image": "oap-hello-api:dev",
+      "port": 8080, "hostPort": 8792, "instances": 1, "strategy": "standard",
+      "services": {"UPSTREAM_URL": "api"}
+    }
+  ]
+}

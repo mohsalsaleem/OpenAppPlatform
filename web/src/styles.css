@@ -789,3 +789,25 @@ details summary {
   gap: 0.6rem;
   margin-top: 1rem;
 }
+
+.runtime-variables {
+  margin-top: 1rem;
+}
+.runtime-variables textarea {
+  width: 100%;
+  font-family: monospace;
+  resize: vertical;
+}
+
+@media (max-width: 640px) {
+  .step {
+    flex-wrap: wrap;
+  }
+  .step .grow {
+    flex-basis: 100%;
+  }
+  .title-line h1 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+}

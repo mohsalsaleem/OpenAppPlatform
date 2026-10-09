@@ -38,7 +38,7 @@ func New(t domain.Target, token string) (*Client, error) {
 	return &Client{base: strings.TrimRight(t.URL, "/"), token: token, target: t, http: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) Capabilities() operator.Capabilities {
-	return operator.Capabilities{Standard: true, Discovery: true, ImmutableImages: true}
+	return operator.Capabilities{Standard: true, Discovery: true, ImmutableImages: true, Restart: true}
 }
 func (c *Client) request(ctx context.Context, method, path string, input, output any) error {
 	var body io.Reader
@@ -159,6 +159,9 @@ func splitImage(image string) (string, string) {
 	return image, "latest"
 }
 func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource, error) {
+	if len(s.Component.Env) > 0 || len(s.Component.Services) > 0 {
+		return operator.Resource{}, errors.New("managed runtime variables are not supported by this adapter yet")
+	}
 	resources, e := c.Discover(ctx)
 	if e != nil {
 		return operator.Resource{}, e
@@ -277,4 +280,20 @@ func (c *Client) Logs(ctx context.Context, id string, lines int) (string, error)
 		return "", e
 	}
 	return strings.ReplaceAll(res.Logs, c.token, "[REDACTED]"), nil
+}
+
+func (c *Client) Restart(ctx context.Context, id string) (string, error) {
+	if _, e := c.Inspect(ctx, id); e != nil {
+		return "", e
+	}
+	var result struct {
+		UUID string `json:"deployment_uuid"`
+	}
+	if e := c.request(ctx, "POST", "/applications/"+url.PathEscape(id)+"/restart", nil, &result); e != nil {
+		return "", e
+	}
+	if result.UUID == "" {
+		return "", errors.New("Coolify did not return a restart deployment ID")
+	}
+	return result.UUID, nil
 }

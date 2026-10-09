@@ -237,3 +237,21 @@ func (s *Store) SaveDeploymentTx(ctx context.Context, tx pgx.Tx, d *domain.Deplo
 	}
 	return tx.QueryRow(ctx, "UPDATE oap_deployments SET state=$2,steps=$3,updated_at=now() WHERE id=$1 RETURNING updated_at", d.ID, d.State, b).Scan(&d.UpdatedAt)
 }
+
+func (s *Store) TargetTx(ctx context.Context, tx pgx.Tx, id string) (domain.Target, error) {
+	var t domain.Target
+	var spec []byte
+	var env string
+	e := tx.QueryRow(ctx, "SELECT spec,token_env FROM oap_targets WHERE id=$1", id).Scan(&spec, &env)
+	if e != nil {
+		return t, mapError(e)
+	}
+	e = json.Unmarshal(spec, &t)
+	t.TokenEnv = env
+	return t, e
+}
+func (s *Store) BindingTx(ctx context.Context, tx pgx.Tx, id, component string, ordinal int) (string, error) {
+	var ref string
+	e := tx.QueryRow(ctx, "SELECT resource_id FROM oap_bindings WHERE application_id=$1 AND component=$2 AND ordinal=$3", id, component, ordinal).Scan(&ref)
+	return ref, mapError(e)
+}

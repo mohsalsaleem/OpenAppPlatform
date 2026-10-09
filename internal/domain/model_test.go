@@ -27,3 +27,53 @@ func TestManifestValidation(t *testing.T) {
 		t.Fatal("defaults missing")
 	}
 }
+
+func TestRuntimeConfigurationValidation(t *testing.T) {
+	cases := []struct {
+		name string
+		edit func(*Manifest)
+	}{
+		{"invalid variable", func(m *Manifest) { m.Components[0].Env = map[string]string{"BAD=KEY": "x"} }},
+		{"NUL value", func(m *Manifest) { m.Components[0].Env = map[string]string{"KEY": "\x00"} }},
+		{"unknown service", func(m *Manifest) { m.Components[0].Services = map[string]string{"API_URL": "missing"} }},
+		{"duplicate source", func(m *Manifest) {
+			m.Components[0].Env = map[string]string{"API_URL": "x"}
+			m.Components[0].Services = map[string]string{"API_URL": "web"}
+		}},
+		{"adopted variables", func(m *Manifest) {
+			m.Components[0].ResourceID = "external"
+			m.Components[0].Env = map[string]string{"MODE": "test"}
+		}},
+		{"adopted service target", func(m *Manifest) {
+			m.Components = append(m.Components, Component{Name: "api", Image: "image:v1", Port: 8080, ResourceID: "external"})
+			m.Components[0].Services = map[string]string{"API_URL": "api"}
+		}},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			m := valid()
+			tt.edit(&m)
+			if m.Validate() == nil {
+				t.Fatal("invalid runtime accepted")
+			}
+		})
+	}
+	m := valid()
+	m.Components = append(m.Components, Component{Name: "api", Image: "image:v1", Port: 8080})
+	m.Components[0].Env = map[string]string{"MODE": "preview"}
+	m.Components[0].Services = map[string]string{"API_URL": "api"}
+	if e := m.Validate(); e != nil {
+		t.Fatal(e)
+	}
+	runtime, e := RuntimeComponent(m, "web")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if runtime.Env["API_URL"] != "http://api:8080" || runtime.Env["MODE"] != "preview" {
+		t.Fatal(runtime.Env)
+	}
+	runtime.Env["MODE"] = "changed"
+	if m.Components[0].Env["MODE"] != "preview" {
+		t.Fatal("runtime resolution mutated the definition")
+	}
+}

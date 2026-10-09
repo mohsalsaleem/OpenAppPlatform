@@ -1127,6 +1127,183 @@
           }
         }
       }
+    },
+    "/api/v1/targets/{id}/capabilities": {
+      "get": {
+        "summary": "Inspect target capabilities",
+        "operationId": "getTargetCapabilities",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capabilities"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/applications/{id}/restarts": {
+      "post": {
+        "summary": "Queue restart of one existing instance",
+        "operationId": "restartInstance",
+        "responses": {
+          "202": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Restart"
+              }
+            }
+          }
+        },
+        "description": "Restarts the bound runtime without applying saved future configuration. Serialized with deployments and guarded by definition version and idempotency key. Uncertain dispatch enters attention."
+      }
     }
   },
   "components": {
@@ -1204,6 +1381,23 @@
               }
             ],
             "description": "Zero keeps a component private. A fixed host port requires one instance."
+          },
+          "env": {
+            "type": "object",
+            "description": "Plain non-secret Docker runtime variables; stored in release snapshots.",
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 4096
+            },
+            "maxProperties": 64
+          },
+          "services": {
+            "type": "object",
+            "description": "Docker app-local HTTP connections: environment variable to managed component name.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "maxProperties": 64
           }
         },
         "required": [
@@ -1415,6 +1609,13 @@
           "observationStartedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "restart"
+            ],
+            "description": "Absent for ordinary deployment steps."
           }
         },
         "required": [
@@ -1540,6 +1741,59 @@
             "type": "boolean"
           }
         }
+      },
+      "Capabilities": {
+        "type": "object",
+        "properties": {
+          "standard": {
+            "type": "boolean"
+          },
+          "rolling": {
+            "type": "boolean"
+          },
+          "blueGreen": {
+            "type": "boolean"
+          },
+          "discovery": {
+            "type": "boolean"
+          },
+          "immutableImages": {
+            "type": "boolean"
+          },
+          "restart": {
+            "type": "boolean"
+          },
+          "environment": {
+            "type": "boolean"
+          },
+          "applicationDns": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Restart": {
+        "type": "object",
+        "required": [
+          "component",
+          "ordinal",
+          "expectedVersion"
+        ],
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "additionalProperties": false
       }
     }
   }
