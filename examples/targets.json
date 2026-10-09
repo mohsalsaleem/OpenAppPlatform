@@ -1,0 +1,12 @@
+[
+  {
+    "id": "coolify-staging",
+    "name": "My Coolify staging",
+    "operator": "coolify",
+    "url": "https://coolify.example.com",
+    "tokenEnv": "COOLIFY_TOKEN",
+    "projectId": "REPLACE_WITH_TEST_PROJECT_UUID",
+    "serverId": "REPLACE_WITH_SERVER_UUID",
+    "environment": "staging"
+  }
+]

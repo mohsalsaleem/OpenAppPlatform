@@ -7,3 +7,9 @@ dist/
 bin/
 coverage/
 *.log
+.local/
+web/node_modules/
+web/dist/
+playwright-report/
+test-results/
+*.tsbuildinfo

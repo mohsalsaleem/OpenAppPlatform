@@ -1,0 +1,103 @@
+import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import {
+  ArrowUpRight,
+  Box,
+  Component as ComponentIcon,
+  Layers3,
+  Plus,
+} from "lucide-react";
+import { api, type Application, type Target } from "../../api";
+import { ErrorBox, Loading } from "../../components/Feedback";
+export function Applications() {
+  const q = useQuery({
+    queryKey: ["applications"],
+    queryFn: () => api<Application[]>("/applications"),
+  });
+  const targets = useQuery({
+    queryKey: ["targets"],
+    queryFn: () => api<Target[]>("/targets"),
+  });
+  return (
+    <>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">BUILD ON YOUR OWN TERMS</p>
+          <h1>Your applications</h1>
+          <p className="muted">
+            Everything that makes your product run, together.
+          </p>
+        </div>
+        <Link className="button primary" to="/applications/new">
+          <Plus size={17} /> New application
+        </Link>
+      </div>
+      <div className="summary">
+        <div>
+          <span>Applications</span>
+          <strong>{q.data?.length ?? "—"}</strong>
+        </div>
+        <div>
+          <span>Connected targets</span>
+          <strong>{targets.data?.length ?? "—"}</strong>
+        </div>
+        <div>
+          <span>Deployment policy</span>
+          <strong className="summary-text">Your choice</strong>
+          <small>Standard available · advanced strategies planned</small>
+        </div>
+      </div>
+      <div className="section-heading">
+        <h2>Application directory</h2>
+        <span className="small muted">
+          Organized by product, deployed on your infrastructure
+        </span>
+      </div>
+      <ErrorBox error={q.error} />
+      {q.isPending ? (
+        <Loading />
+      ) : q.data?.length === 0 ? (
+        <div className="empty">
+          <Box size={38} />
+          <h2>Start with one application</h2>
+          <p>Group your web services under one release and one overview.</p>
+          <Link to="/applications/new" className="button primary">
+            <Plus size={16} /> Create application
+          </Link>
+        </div>
+      ) : (
+        <div className="app-grid">
+          {q.data?.map((a) => (
+            <Link to={`/applications/${a.id}`} className="app-card" key={a.id}>
+              <div className="card-top">
+                <span className="app-icon">
+                  <Box size={22} />
+                </span>
+                <span className="environment">{a.manifest.environment}</span>
+              </div>
+              <h2>{a.manifest.name}</h2>
+              <p>{a.manifest.components.map((c) => c.name).join(" · ")}</p>
+              <div className="card-footer">
+                <span>
+                  <ComponentIcon size={14} /> {a.manifest.components.length}{" "}
+                  components
+                </span>
+                <ArrowUpRight size={18} />
+              </div>
+            </Link>
+          ))}
+        </div>
+      )}
+      <div className="note">
+        <Layers3 size={20} />
+        <div>
+          <strong>A common application layer. Your existing operator.</strong>
+          <p>
+            Coolify runs your workloads. OpenAppPlatform keeps their
+            configuration and release progress together.
+          </p>
+        </div>
+      </div>
+    </>
+  );
+}

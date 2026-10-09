@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: oap
+      POSTGRES_USER: oap
+      POSTGRES_PASSWORD: oap-local
+    ports:
+      - '127.0.0.1:55438:5432'
+    volumes:
+      - oap-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U oap']
+      interval: 2s
+      timeout: 3s
+      retries: 20
+volumes:
+  oap-postgres:

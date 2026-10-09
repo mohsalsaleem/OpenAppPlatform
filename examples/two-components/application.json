@@ -1,0 +1,9 @@
+{
+  "name": "two-components",
+  "environment": "staging",
+  "targetId": "coolify-staging",
+  "components": [
+    {"name": "frontend", "kind": "web", "image": "nginx:1.27-alpine", "port": 80, "instances": 1, "strategy": "standard"},
+    {"name": "api", "kind": "web", "image": "nginx:1.27-alpine", "port": 80, "instances": 1, "strategy": "standard"}
+  ]
+}

@@ -1,0 +1,37 @@
+version: 1
+application:
+  name: OpenAppPlatform
+  build:
+    type: dockerfile
+    dockerfile: Dockerfile
+  healthcheck:
+    path: /healthz
+# The platform itself runs locally; no platform deployment is provisioned yet.
+environments:
+  staging:
+    branch: main
+    status: unprovisioned
+    coolify_application_uuid: ""
+    database:
+      engine: postgresql
+      database_name: openappplatform_staging
+      role_name: openappplatform_staging
+    uploads:
+      strategy: none
+    required_secrets:
+      - DATABASE_URL
+      - OAP_API_TOKEN
+      - COOLIFY_TOKEN
+integration:
+  context: mac-studio
+  project_uuid: z4qk4dpkc9gqlcwymb3bimrg
+  environment: staging
+  server_uuid: xswco0g
+  fixture_application_uuid: ibgspvrw2hvvm6aa2a9sblmv
+  fixture_url: https://ibgspvrw2hvvm6aa2a9sblmv.mohsal.dev
+  fixture_image: axllent/mailpit@sha256:df6c2541907e1be6fac21f509927cf6ed771617a1f4b361ef66d97bd05593d2d
+  additional_fixture_application_uuid: 74gq6dmjkkdyjhqw9pmn0nwe
+  additional_fixture_url: https://74gq6dmjkkdyjhqw9pmn0nwe.mohsal.dev
+  lifecycle: retained_for_inspection
+promotion:
+  require_human_approval: true
