@@ -286,9 +286,24 @@ Notifications use deduplicated events for failed releases, stale states, unhealt
 components, backup failures, approvals, security exceptions, and recovery. Support
 owner-configured destinations, suppression, escalation, and delivery failures.
 
+### Opt-in feedback and diagnostic sharing
+
+Feedback submission and outbound diagnostic uploads are disabled by default.
+Keep their consent controls independent of product telemetry and AI context
+sharing. Local diagnostics remain available without external sharing or AI.
+
+Feedback is user-initiated, with optional contact details and attachments. Before
+sending a diagnostic bundle, let the owner select the logs and time window,
+preview its contents, and redact data. Exclude secrets, personal data, and
+application content by default; keep aggregate diagnostics separate from
+identifiable feedback. State the destination, purpose, and retention before
+consent. Consent can be revoked, and enabling sharing must not upload historical
+backlogs without explicit consent. Do not automatically submit tickets or send
+messages on the owner's behalf.
+
 **Exit gate:** trace a failed request or release across relevant logs/events, export
-analytics to a chosen sink, and disable outbound telemetry without losing local
-operability.
+analytics to a chosen sink, preview and redact an explicitly requested diagnostic
+export, and disable all outbound sharing without losing local operability.
 
 ## M5 Multi server coordination and policy metadata
 
@@ -373,6 +388,7 @@ workloads on eligible targets.
 | Notifications | M1 event foundation, M2/M4 delivery and workflows |
 | Per-app analytics; custom analytics backend | M4 |
 | Optional telemetry | M4 |
+| Opt-in feedback and diagnostic sharing | M4; independent consent, preview/redaction, local diagnosis |
 | OAP taints and annotations | M5, sensitive app policies begin in M1/M2 |
 | Multi-server support where applicable | M5 |
 | Non-Docker platforms and Firecracker | M6 |
