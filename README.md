@@ -1,6 +1,6 @@
 # OpenAppPlatform
 
-An application-first control plane for Docker infrastructure. Group web services
+An application-first control plane for self-hosted runtimes and deployment operators. Group web services
 into applications, track releases, and keep your existing deployment operator.
 The product experience is inspired by DigitalOcean App Platform.
 
@@ -91,6 +91,8 @@ PostgreSQL service and runs the core suite and dashboard build; it does not
 mutate an external Coolify installation. Live fixtures are retained, not deleted.
 
 ## Documentation
+
+- [Roadmap](ROADMAP.md)
 
 - [Product and architecture](docs/product-and-architecture.md)
 - [System design](docs/architecture/system-design.md)

@@ -23,7 +23,7 @@ tests/system          PostgreSQL, HTTP, durable jobs, and opt-in real operator t
 
 Domain has no database, HTTP, or provider imports. The operator interface imports
 only domain. Controller orchestrates persistence and adapters; UI code never
-calls Coolify directly. A future Docker adapter implements the same port.
+calls Coolify directly. The direct Docker adapter implements the same port.
 
 ## Process and persistence
 
@@ -47,8 +47,9 @@ workflow service.
 
 Standard releases use a frozen manifest. The API can provide component image
 overrides by immutable digest for CI releases without editing the application's
-base definition. The idempotency hash covers the effective release manifest.
-A repeated key with different artifacts is rejected.
+base definition. New idempotency hashes bind the declared release request and preserve retries
+after definition edits. Legacy manifest hashes remain readable. A repeated key
+with a different request is rejected.
 
 A new release without overrides uses the application's base definition; it is
 not an implicit rollback or redeployment of the latest artifact override. UI
