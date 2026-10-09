@@ -28,6 +28,12 @@ jobs:
           go-version-file: go.mod
       - run: go test -race -timeout 120s ./...
       - run: go vet ./...
+      - name: Build cached fixture for Docker adapter
+        run: docker build -t oap-hello-api:dev examples/hello-api
+      - name: Docker adapter lifecycle
+        env:
+          OAP_TEST_DOCKER_SOCKET: /var/run/docker.sock
+        run: go test -v ./tests/system -run TestLiveDockerLifecycleOffline -count=1 -timeout=3m
   dashboard:
     runs-on: ubuntu-latest
     timeout-minutes: 10

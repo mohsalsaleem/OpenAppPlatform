@@ -57,7 +57,7 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
-		if s.Token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(s.Token)) != 1 {
+		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") || s.Token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(s.Token)) != 1 {
 			write(w, 401, map[string]string{"code": "unauthorized", "message": "A valid platform access token is required"})
 			return
 		}
@@ -104,7 +104,7 @@ func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	c := s.Controller
 	mux.HandleFunc("GET /api/v1/meta", func(w http.ResponseWriter, r *http.Request) {
-		write(w, 200, map[string]any{"name": "OpenAppPlatform", "version": "0.1.0-dev", "strategies": []string{"standard"}, "adapters": []string{"coolify"}})
+		write(w, 200, map[string]any{"name": "OpenAppPlatform", "version": "0.2.0-dev", "strategies": []string{"standard"}, "adapters": []string{"coolify", "docker"}})
 	})
 	mux.HandleFunc("GET /api/v1/targets", func(w http.ResponseWriter, r *http.Request) {
 		x, e := c.Store.Targets(r.Context())
@@ -164,6 +164,26 @@ func (s *Server) routes() http.Handler {
 		}
 		write(w, 200, a)
 	})
+	mux.HandleFunc("PUT /api/v1/applications/{id}", func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Manifest        domain.Manifest `json:"manifest"`
+			ExpectedVersion int64           `json:"expectedVersion"`
+		}
+		if e := decode(w, r, &request); e != nil {
+			write(w, 400, map[string]string{"code": "invalid_configuration", "message": e.Error()})
+			return
+		}
+		app, e := c.UpdateApplication(r.Context(), r.PathValue("id"), request.Manifest, request.ExpectedVersion)
+		if e != nil {
+			if errors.Is(e, domain.ErrConflict) || errors.Is(e, domain.ErrNotFound) {
+				fail(w, e)
+			} else {
+				write(w, 422, map[string]string{"code": "configuration_rejected", "message": e.Error()})
+			}
+			return
+		}
+		write(w, 200, app)
+	})
 	mux.HandleFunc("GET /api/v1/applications/{id}/deployments", func(w http.ResponseWriter, r *http.Request) {
 		if _, e := c.Store.Application(r.Context(), r.PathValue("id")); e != nil {
 			fail(w, e)
@@ -178,7 +198,8 @@ func (s *Server) routes() http.Handler {
 	})
 	mux.HandleFunc("POST /api/v1/applications/{id}/deployments", func(w http.ResponseWriter, r *http.Request) {
 		var request struct {
-			Images map[string]string `json:"images"`
+			Images          map[string]string `json:"images"`
+			ExpectedVersion int64             `json:"expectedVersion"`
 		}
 		if r.ContentLength != 0 {
 			if e := decode(w, r, &request); e != nil {
@@ -186,7 +207,7 @@ func (s *Server) routes() http.Handler {
 				return
 			}
 		}
-		d, e := c.EnqueueImages(r.Context(), r.PathValue("id"), r.Header.Get("Idempotency-Key"), request.Images)
+		d, e := c.EnqueueVersion(r.Context(), r.PathValue("id"), r.Header.Get("Idempotency-Key"), request.Images, request.ExpectedVersion)
 		if e != nil {
 			if errors.Is(e, domain.ErrConflict) || errors.Is(e, domain.ErrNotFound) {
 				fail(w, e)

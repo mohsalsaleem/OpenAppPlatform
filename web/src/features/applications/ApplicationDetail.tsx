@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { api, type Application, type Deployment } from "../../api";
 import { DeploymentDialog } from "../../components/DeploymentDialog";
+import { ConfigurationEditor } from "./ConfigurationEditor";
 import { Status } from "../../components/Status";
 import { ErrorBox, Loading } from "../../components/Feedback";
 const when = (s: string) =>
@@ -30,7 +31,7 @@ export function ApplicationDetail() {
   const { id } = useParams();
   const client = useQueryClient();
   const [tab, setTab] = useState("overview");
-  const [confirm, setConfirm] = useState(false);
+  const [review, setReview] = useState<Application | null>(null);
   const [logs, setLogs] = useState("");
   const [logError, setLogError] = useState("");
   const app = useQuery({
@@ -43,13 +44,14 @@ export function ApplicationDetail() {
     refetchInterval: 2000,
   });
   const deploy = useMutation({
-    mutationFn: () =>
+    mutationFn: (definitionVersion: number) =>
       api<Deployment>(`/applications/${id}/deployments`, {
         method: "POST",
+        body: JSON.stringify({ expectedVersion: definitionVersion }),
         headers: { "Idempotency-Key": crypto.randomUUID() },
       }),
     onSuccess: () => {
-      setConfirm(false);
+      setReview(null);
       setTab("deployments");
       client.invalidateQueries({ queryKey: ["deployments", id] });
     },
@@ -84,13 +86,15 @@ export function ApplicationDetail() {
             <span className="environment">{a.manifest.environment}</span>
           </div>
           <p className="muted">
-            {a.manifest.components.length} component{a.manifest.components.length === 1 ? "" : "s"} · {a.manifest.targetId}
+            {a.manifest.components.length} component
+            {a.manifest.components.length === 1 ? "" : "s"} ·{" "}
+            {a.manifest.targetId}
           </p>
         </div>
         <button
           className="primary"
           disabled={!!active}
-          onClick={() => setConfirm(true)}
+          onClick={() => setReview(structuredClone(a))}
         >
           <ArrowUpRight size={17} />
           {latest?.state === "attention"
@@ -187,7 +191,9 @@ export function ApplicationDetail() {
               <div className="section-heading">
                 <div>
                   <strong>Release {d.id.slice(0, 8)}</strong>
-                  <p className="small muted">{when(d.createdAt)}</p>
+                  <p className="small muted">
+                    {when(d.createdAt)} · definition v{d.definitionVersion}
+                  </p>
                 </div>
                 <Status value={d.state} />
               </div>
@@ -212,16 +218,7 @@ export function ApplicationDetail() {
           ))}
         </section>
       )}
-      {tab === "configuration" && (
-        <section className="panel">
-          <h2>Application definition</h2>
-          <p className="muted">
-            Each release snapshots this definition. Editing is planned for a
-            later milestone.
-          </p>
-          <pre>{JSON.stringify(a.manifest, null, 2)}</pre>
-        </section>
-      )}
+      {tab === "configuration" && <ConfigurationEditor application={a} />}
       {tab === "logs" && (
         <section className="panel">
           <div className="section-heading">
@@ -247,12 +244,14 @@ export function ApplicationDetail() {
           </pre>
         </section>
       )}
-      {confirm && (
-        <DeploymentDialog onClose={() => setConfirm(false)}>
+      {review && (
+        <DeploymentDialog onClose={() => setReview(null)}>
           <h2 id="deploy-title">Deploy {a.manifest.name}?</h2>
           <p>
-            This starts standard deployments for {a.manifest.components.length}{" "}
-            components on <strong>{a.manifest.targetId}</strong>.
+            This starts standard deployments for{" "}
+            {review.manifest.components.length} components on{" "}
+            <strong>{review.manifest.targetId}</strong> using definition v
+            {review.version}.
           </p>
           <p className="muted">
             Existing managed instances may restart. Standard deployment can
@@ -262,14 +261,14 @@ export function ApplicationDetail() {
           <div className="form-actions">
             <button
               className="secondary"
-              onClick={() => setConfirm(false)}
+              onClick={() => setReview(null)}
               disabled={deploy.isPending}
             >
               Cancel
             </button>
             <button
               className="primary"
-              onClick={() => deploy.mutate()}
+              onClick={() => deploy.mutate(review.version)}
               disabled={deploy.isPending}
             >
               {deploy.isPending ? "Queuing…" : "Deploy now"}

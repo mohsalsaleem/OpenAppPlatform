@@ -20,6 +20,7 @@ type Resource struct {
 	URL          string `json:"url,omitempty"`
 	Image        string `json:"image,omitempty"`
 	ArtifactKind string `json:"artifactKind,omitempty"`
+	Port         int    `json:"port,omitempty"`
 	Environment  string `json:"environment,omitempty"`
 	ProjectID    string `json:"projectId,omitempty"`
 }

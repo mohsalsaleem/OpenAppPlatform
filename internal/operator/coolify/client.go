@@ -89,6 +89,7 @@ type application struct {
 	Image         string `json:"docker_registry_image_name"`
 	Tag           string `json:"docker_registry_image_tag"`
 	BuildPack     string `json:"build_pack"`
+	Ports         string `json:"ports_exposes"`
 	EnvironmentID int    `json:"environment_id"`
 }
 
@@ -97,11 +98,12 @@ func resource(a application) operator.Resource {
 	if a.Tag != "" && (!strings.Contains(image, "@") || strings.HasSuffix(image, "@sha256")) {
 		image += ":" + a.Tag
 	}
+	port, _ := strconv.Atoi(strings.Split(a.Ports, ",")[0])
 	kind := "source"
 	if a.BuildPack == "dockerimage" {
 		kind = "image"
 	}
-	return operator.Resource{ArtifactKind: kind, ID: a.UUID, Name: a.Name, Description: a.Description, Status: a.Status, URL: a.FQDN, Image: image}
+	return operator.Resource{Port: port, ArtifactKind: kind, ID: a.UUID, Name: a.Name, Description: a.Description, Status: a.Status, URL: a.FQDN, Image: image}
 }
 func (c *Client) Discover(ctx context.Context) ([]operator.Resource, error) {
 	var env struct {
@@ -180,7 +182,10 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 			return operator.Resource{}, errors.New("owned resource build strategy changed; reconciliation required")
 		}
 		// Adopted resources never enter this path. Only controller-owned image workloads can be patched.
-		data := map[string]any{"docker_registry_image_name": image, "docker_registry_image_tag": tag, "ports_exposes": strconv.Itoa(s.Component.Port)}
+		data := map[string]any{"docker_registry_image_name": image, "docker_registry_image_tag": tag, "ports_exposes": strconv.Itoa(s.Component.Port), "ports_mappings": ""}
+		if s.Component.HostPort != 0 {
+			data["ports_mappings"] = fmt.Sprintf("%d:%d", s.Component.HostPort, s.Component.Port)
+		}
 		if e = c.request(ctx, "PATCH", "/applications/"+url.PathEscape(found.ID), data, nil); e != nil {
 			return operator.Resource{}, e
 		}
@@ -189,6 +194,9 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	data := map[string]any{"name": s.Name, "description": s.Ownership, "project_uuid": c.target.ProjectID, "server_uuid": c.target.ServerID, "environment_name": c.target.Environment, "docker_registry_image_name": image, "ports_exposes": strconv.Itoa(s.Component.Port), "instant_deploy": false, "limits_memory": "128m", "limits_cpus": "0.25"}
 	if tag != "" {
 		data["docker_registry_image_tag"] = tag
+	}
+	if s.Component.HostPort != 0 {
+		data["ports_mappings"] = fmt.Sprintf("%d:%d", s.Component.HostPort, s.Component.Port)
 	}
 	var result struct {
 		UUID string `json:"uuid"`

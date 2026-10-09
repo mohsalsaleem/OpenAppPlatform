@@ -1,68 +1,58 @@
-# Bare Docker compatibility
+# Bare Docker targets
 
-OpenAppPlatform will run applications directly on Docker Engine as a first-class
-target. Coolify, Dokploy, Dokku, Portainer, Swarm, and Kubernetes are not required.
-This is a design specification; the runtime and adapters are not yet implemented.
+OpenAppPlatform now deploys web components directly on Docker Engine without
+Coolify, Dokploy, Dokku, Portainer, Swarm, or Kubernetes. The same application,
+release, and instance-binding model is used for Coolify and Docker.
 
-## Responsibilities
+## Connect
 
-The direct Docker adapter will manage image pulls, explicitly owned containers,
-application networks, environment configuration, mounts, resource limits, restart
-policies, health inspection, bounded logs, and lifecycle operations.
+Use examples/docker-target.json and set the URL to the local Docker Unix socket.
+Linux commonly uses unix:///var/run/docker.sock. Docker Desktop on this Mac uses
+unix:///Users/samsal/.docker/run/docker.sock. Remote SSH and mutually authenticated
+TLS transports are not implemented yet.
 
-The controller provides application grouping, webhook handling, release records,
-deployment serialization, and reconciliation, using the same model as operator
-targets.
+The adapter uses Engine API v1.45 and requires a compatible daemon. Socket access
+is privileged; configure targets on the server rather than accepting arbitrary
+socket paths from application manifests.
 
-## Connection modes
+## Offline example
 
-Support local Unix socket access first. Remote connections can use SSH or
-mutually authenticated TLS after their compatibility and authorization are tested.
-Docker access grants substantial host privileges; do not expose an
-unauthenticated Docker API. Scope deployment credentials to trusted targets.
+Build the Hello API example and keep pulling disabled:
 
-## Artifacts and deployment
+```sh
+docker build -t oap-hello-api:dev examples/hello-api
+python3 scripts/run-local.py python3 scripts/example.py examples/docker-hello/application.json --deploy
+```
 
-Start with prebuilt immutable images identified by digest. An operator build or
-external CI can produce the artifact. Building from source directly on a bare
-Docker target is a separate future capability.
+The example publishes port 8791 on loopback. Host port 0 keeps the component
+private. Fixed host ports require one instance; multi-instance routing is not
+implemented. Docker networks provide component aliases but are not health-aware
+load balancers.
 
-Standard deployment is an explicit stop-and-replace lifecycle and may cause
-downtime. Rolling and blue-green strategies remain optional future capabilities
-requiring supported routing and spare capacity.
+pullPolicy defaults to never. if-missing enables public registry pulling; private
+registry authentication is a future capability. Existing cached images can be
+used without any registry connection. Image tags are convenient for development;
+use digest references for portable artifact identity.
 
-## Networking
+## Standard replacement
 
-Use an application and environment-specific user-defined Docker network with
-stable component aliases. Alias-based discovery alone is not a health-aware load
-balancer. Explicit host port mappings support the initial standard lifecycle;
-domains, TLS, and advanced replacement strategies require a routing integration.
+Instances use stable resource references rather than container IDs. Ensure
+creates a stopped candidate when runtime configuration differs. Deploy stops the
+active instance, retains it under a previous name, promotes the candidate, and
+starts it. Observation verifies the resulting container ID and Docker health.
+An unchanged configuration reuses the active instance.
 
-Docker bridge networks are local to one host. This target does not create a
-cross-host cluster or provide recovery from host failure.
+This is standard replacement and can cause downtime. It is not blue-green.
+Previous stopped containers are retained for inspection, not exposed as an
+automatic rollback guarantee. Uncertain dispatch is handled by the controller's
+attention state rather than blind retry.
 
-## Resource ownership and persistence
+Discovery and mutation require target, environment, reference, and ownership
+labels. Unrelated containers are never adopted implicitly. Container cleanup
+never requests volume deletion. Mount configuration and durable upload/storage
+management are not implemented yet; do not use this milestone to provision
+stateful services.
 
-Label managed resources with application, environment, component, instance, and
-release identifiers. Discover and reconcile only owned or explicitly adopted
-resources. Never take control of resources managed by another operator implicitly.
-
-Named volumes and bind mounts outlive container replacement. Adopt existing
-storage by explicit reference. Normal stop, replacement, release cleanup, and
-rollback must retain durable volumes; destructive storage removal is a separate
-authorized action.
-
-Inject secrets at runtime from secret references and exclude values from
-manifests, logs, API output, and AI context. Docker environment values are visible
-to privileged host users; they are not a secret vault.
-
-## Initial acceptance criteria
-
-- Deploy a prebuilt application on a server running only Docker Engine.
-- Track the exact image digest and report actual container and health state.
-- Expose configured ports and discover internal components by network alias.
-- Support bounded logs, stop, restart, and standard replacement.
-- Recover from controller restart and lost Docker API responses without duplicates.
-- Preserve mounted data through replacement and retirement.
-- Leave unrelated containers, networks, and storage untouched.
-- Keep existing workloads running when the controller is unavailable.
+Application networks are scoped by target and application identity. Networks do
+not extend across hosts. Engine restart policies provide local process recovery;
+the controller does not provide recovery from host failure or automatic scaling.

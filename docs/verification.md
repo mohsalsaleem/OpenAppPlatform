@@ -71,3 +71,19 @@ This is a single-owner preview. Production identity, roles, audit retention,
 versioned upgrade migrations, backup and restore verification, and explicit
 attention-state resolution remain required before production rollout. The
 repository's license choice is also outstanding.
+
+## Follow up offline milestone
+
+The direct Docker adapter passed a real cached-image lifecycle on Docker Desktop:
+create, deploy, HTTP readiness, discovery, logs, repeat deployment, artifact
+replacement with a changed internal port, stable resource identity, and stop.
+No registry pulls were enabled. Fixtures were left stopped for inspection.
+
+Configuration editing passed HTTP, PostgreSQL, concurrent-edit, stale-version,
+and frozen-release tests. Migrations passed idempotency and checksum checks.
+Deployment admission now records definition versions and preserves idempotent
+retries after configuration changes.
+
+The read-only MCP server passed unit tests plus a real stdio handshake, tool
+discovery, and authenticated application read against the isolated offline
+workspace. This does not imply full conformance testing against every MCP client.

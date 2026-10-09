@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+
 	"errors"
 	"flag"
 	"log/slog"
@@ -13,11 +13,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/config"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/controller"
-	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/httpapi"
-	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
-	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator/coolify"
+
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/operators"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 )
 
@@ -53,29 +53,15 @@ func run() error {
 		if e != nil {
 			return e
 		}
-		var targets []domain.Target
-		// TokenEnv is intentionally excluded from API responses, so decode bootstrap separately.
-		var raw []struct {
-			ID          string `json:"id"`
-			Name        string `json:"name"`
-			Operator    string `json:"operator"`
-			URL         string `json:"url"`
-			TokenEnv    string `json:"tokenEnv"`
-			ProjectID   string `json:"projectId"`
-			ServerID    string `json:"serverId"`
-			Environment string `json:"environment"`
-		}
-		if e = json.Unmarshal(b, &raw); e != nil {
+		targets, e := config.Targets(b)
+		if e != nil {
 			return e
-		}
-		for _, r := range raw {
-			targets = append(targets, domain.Target{ID: r.ID, Name: r.Name, Operator: r.Operator, URL: r.URL, TokenEnv: r.TokenEnv, ProjectID: r.ProjectID, ServerID: r.ServerID, Environment: r.Environment})
 		}
 		for _, t := range targets {
 			if e = t.Validate(); e != nil {
 				return e
 			}
-			if _, e = coolify.New(t, os.Getenv(t.TokenEnv)); e != nil {
+			if _, e = operators.New(t); e != nil {
 				return e
 			}
 			if e = s.SaveTarget(ctx, t); e != nil {
@@ -83,13 +69,8 @@ func run() error {
 			}
 		}
 	}
-	factory := func(t domain.Target) (operator.Adapter, error) {
-		if t.Operator != "coolify" {
-			return nil, errors.New("unsupported operator")
-		}
-		return coolify.New(t, os.Getenv(t.TokenEnv))
-	}
-	c, e := controller.New(ctx, s, factory)
+
+	c, e := controller.New(ctx, s, operators.New)
 	if e != nil {
 		return e
 	}

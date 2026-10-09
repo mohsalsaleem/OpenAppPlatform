@@ -4,6 +4,7 @@ package domain
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -23,6 +24,7 @@ type Component struct {
 	Kind       string `json:"kind"`
 	Image      string `json:"image"`
 	Port       int    `json:"port"`
+	HostPort   int    `json:"hostPort,omitempty"`
 	Instances  int    `json:"instances"`
 	Strategy   string `json:"strategy"`
 	ResourceID string `json:"resourceId,omitempty"`
@@ -72,6 +74,12 @@ func (m *Manifest) Validate() error {
 		if c.Strategy != "standard" {
 			return errors.New("only standard deployment is supported; rolling and blue-green are not silently downgraded")
 		}
+		if c.HostPort != 0 && (c.HostPort < 1024 || c.HostPort > 65535) {
+			return errors.New("hostPort must be zero or between 1024 and 65535")
+		}
+		if c.HostPort != 0 && c.Instances != 1 {
+			return errors.New("hostPort requires one instance; shared port routing is not implemented")
+		}
 		if c.Port < 1 || c.Port > 65535 {
 			return errors.New("port must be between 1 and 65535")
 		}
@@ -83,25 +91,23 @@ func (m *Manifest) Validate() error {
 }
 
 type Target struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Operator    string `json:"operator"`
-	URL         string `json:"url"`
-	TokenEnv    string `json:"-"`
-	ProjectID   string `json:"projectId"`
-	ServerID    string `json:"serverId"`
-	Environment string `json:"environment"`
+	ID          string          `json:"id"`
+	Name        string          `json:"name"`
+	Operator    string          `json:"operator"`
+	URL         string          `json:"url"`
+	TokenEnv    string          `json:"-"`
+	ProjectID   string          `json:"projectId"`
+	ServerID    string          `json:"serverId"`
+	Environment string          `json:"environment"`
+	Settings    json.RawMessage `json:"settings,omitempty"`
 }
 
 func (t Target) Validate() error {
-	if !slug.MatchString(t.ID) || t.Name == "" {
-		return errors.New("target id and name are required")
+	if !slug.MatchString(t.ID) || t.Name == "" || !slug.MatchString(t.Operator) {
+		return errors.New("target id, name and operator are required")
 	}
-	if t.Operator != "coolify" {
-		return errors.New("only the Coolify adapter is implemented in this milestone")
-	}
-	if t.ProjectID == "" || t.ServerID == "" || t.Environment == "" {
-		return errors.New("projectId, serverId and environment are required")
+	if !slug.MatchString(t.Environment) || t.URL == "" {
+		return errors.New("target URL and environment are required")
 	}
 	return nil
 }
@@ -110,6 +116,8 @@ type Application struct {
 	ID        string    `json:"id"`
 	Manifest  Manifest  `json:"manifest"`
 	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	Version   int64     `json:"version"`
 }
 type Step struct {
 	Component          string `json:"component"`
@@ -121,13 +129,14 @@ type Step struct {
 	Error              string `json:"error,omitempty"`
 }
 type Deployment struct {
-	ID            string    `json:"id"`
-	ApplicationID string    `json:"applicationId"`
-	State         string    `json:"state"`
-	Manifest      Manifest  `json:"manifest"`
-	Steps         []Step    `json:"steps"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
+	ID                string    `json:"id"`
+	ApplicationID     string    `json:"applicationId"`
+	DefinitionVersion int64     `json:"definitionVersion"`
+	State             string    `json:"state"`
+	Manifest          Manifest  `json:"manifest"`
+	Steps             []Step    `json:"steps"`
+	CreatedAt         time.Time `json:"createdAt"`
+	UpdatedAt         time.Time `json:"updatedAt"`
 }
 
 func NewID() string {

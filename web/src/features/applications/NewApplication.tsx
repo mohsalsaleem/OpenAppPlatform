@@ -25,6 +25,7 @@ export function NewApplication() {
       image: "nginx:1.27-alpine",
       port: 80,
       instances: 1,
+      hostPort: 0,
       strategy: "standard",
       kind: "web",
       resourceId: "",
@@ -130,6 +131,7 @@ export function NewApplication() {
                     image: "nginx:1.27-alpine",
                     port: 80,
                     instances: 1,
+                    hostPort: 0,
                     strategy: "standard",
                     kind: "web",
                     resourceId: "",
@@ -193,6 +195,7 @@ export function NewApplication() {
                                 resourceId: e.target.value,
                                 image: r?.image || v.image,
                                 instances: r ? 1 : v.instances,
+                                port: r?.port || v.port,
                               }
                             : v,
                         ),
@@ -265,6 +268,27 @@ export function NewApplication() {
                       }
                     />
                   </div>
+                </div>
+                <div>
+                  <label htmlFor={`host-port-${i}`}>Host port</label>
+                  <input
+                    id={`host-port-${i}`}
+                    type="number"
+                    min="0"
+                    max="65535"
+                    value={c.hostPort}
+                    onChange={(e) =>
+                      setComponents(
+                        components.map((v, n) =>
+                          n === i ? { ...v, hostPort: +e.target.value } : v,
+                        ),
+                      )
+                    }
+                  />
+                  <small className="muted">
+                    0 keeps the component private. A fixed host port requires
+                    one instance.
+                  </small>
                 </div>
               </div>
             </div>

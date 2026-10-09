@@ -52,3 +52,10 @@ publishing an image is a separate registry workflow.
 [GitHub Actions](github-actions.yml) shows how to submit an immutable image release
 from CI. Rename the example web component key if your application uses another
 component name, and poll the returned deployment ID before declaring success.
+
+## Bare Docker
+
+Use [docker-target.json](docker-target.json), set your local Unix socket path,
+and build [Hello API](hello-api/README.md). Then create and deploy the
+[docker-hello definition](docker-hello/application.json). With pullPolicy never,
+this path uses cached images and requires no registry access.

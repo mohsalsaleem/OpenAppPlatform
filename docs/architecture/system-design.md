@@ -2,7 +2,7 @@
 
 OpenAppPlatform is an application control plane. This milestone implements a
 single-workspace API, dashboard, PostgreSQL persistence, durable standard
-release execution, and a Coolify adapter. It is intended for local evaluation
+release execution, Coolify and Docker adapters, versioned configuration, and read-only MCP tools. It is intended for local evaluation
 and isolated staging, not unattended production adoption.
 
 ## Boundaries and dependency direction
@@ -89,8 +89,9 @@ confer ownership: generated resources must have the expected ownership marker.
 Adopted resources retain provider configuration and cannot have their artifact
 changed through release overrides yet.
 
-Bare Docker remains a first-class design target; its runtime adapter is not
-implemented in this milestone. Dokploy, Dokku, and Portainer are also planned.
+Bare Docker is implemented over a local Unix socket. It manages labeled
+containers and application networks using cached images or an explicit public
+pull policy. Dokploy, Dokku, and Portainer are also planned.
 Unsupported strategies or operators return explicit errors.
 
 ## Security and operational limits

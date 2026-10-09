@@ -96,12 +96,51 @@ func (c *Controller) Enqueue(ctx context.Context, appID, key string) (domain.Dep
 	return c.EnqueueImages(ctx, appID, key, nil)
 }
 func (c *Controller) EnqueueImages(ctx context.Context, appID, key string, images map[string]string) (domain.Deployment, error) {
+	return c.EnqueueVersion(ctx, appID, key, images, 0)
+}
+func (c *Controller) EnqueueVersion(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64) (domain.Deployment, error) {
 	if len(key) < 8 || len(key) > 128 {
 		return domain.Deployment{}, errors.New("Idempotency-Key must contain 8 to 128 characters")
 	}
-	a, e := c.Store.Application(ctx, appID)
+	tx, e := c.Store.Pool.Begin(ctx)
 	if e != nil {
 		return domain.Deployment{}, e
+	}
+	defer tx.Rollback(ctx)
+	// Serialize enqueue and give duplicate deliveries the original deployment.
+	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", appID); e != nil {
+		return domain.Deployment{}, e
+	}
+	a, e := c.Store.ApplicationTx(ctx, tx, appID)
+	if e != nil {
+		return domain.Deployment{}, e
+	}
+	if expectedVersion < 0 {
+		return domain.Deployment{}, errors.New("expectedVersion cannot be negative")
+	}
+	if len(images) == 0 {
+		images = nil
+	}
+	requestBody, _ := json.Marshal(struct {
+		Images  map[string]string `json:"images"`
+		Version int64             `json:"expectedVersion"`
+	}{images, expectedVersion})
+	requestSum := sha256.Sum256(requestBody)
+	requestHash := hex.EncodeToString(requestSum[:])
+	var existingID, oldHash string
+	var hashVersion int
+	existingErr := tx.QueryRow(ctx, "SELECT id,request_hash,request_hash_version FROM oap_deployments WHERE application_id=$1 AND idempotency_key=$2", appID, key).Scan(&existingID, &oldHash, &hashVersion)
+	if existingErr == nil && hashVersion == 2 {
+		if oldHash != requestHash {
+			return domain.Deployment{}, domain.ErrConflict
+		}
+		return c.Store.DeploymentTx(ctx, tx, existingID)
+	}
+	if existingErr != nil && !errors.Is(existingErr, pgx.ErrNoRows) {
+		return domain.Deployment{}, existingErr
+	}
+	if expectedVersion > 0 && a.Version != expectedVersion {
+		return domain.Deployment{}, domain.ErrConflict
 	}
 	for name, image := range images {
 		found := false
@@ -131,25 +170,11 @@ func (c *Controller) EnqueueImages(ctx context.Context, appID, key string, image
 	}
 	sum := sha256.Sum256(spec)
 	hash := hex.EncodeToString(sum[:])
-	tx, e := c.Store.Pool.Begin(ctx)
-	if e != nil {
-		return domain.Deployment{}, e
-	}
-	defer tx.Rollback(ctx)
-	// Serialize enqueue and give duplicate deliveries the original deployment.
-	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", appID); e != nil {
-		return domain.Deployment{}, e
-	}
-	var existingID, oldHash string
-	e = tx.QueryRow(ctx, "SELECT id,request_hash FROM oap_deployments WHERE application_id=$1 AND idempotency_key=$2", appID, key).Scan(&existingID, &oldHash)
-	if e == nil {
+	if existingErr == nil {
 		if oldHash != hash {
 			return domain.Deployment{}, domain.ErrConflict
 		}
 		return c.Store.DeploymentTx(ctx, tx, existingID)
-	}
-	if !errors.Is(e, pgx.ErrNoRows) {
-		return domain.Deployment{}, e
 	}
 	var active bool
 	if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM oap_deployments WHERE application_id=$1 AND state IN ('queued','running','attention'))", appID).Scan(&active); e != nil {
@@ -158,9 +183,9 @@ func (c *Controller) EnqueueImages(ctx context.Context, appID, key string, image
 	if active {
 		return domain.Deployment{}, domain.ErrConflict
 	}
-	d := domain.Deployment{ID: domain.NewID(), ApplicationID: appID, Manifest: a.Manifest, State: "queued", Steps: domain.InitialSteps(a.Manifest)}
+	d := domain.Deployment{ID: domain.NewID(), ApplicationID: appID, Manifest: a.Manifest, DefinitionVersion: a.Version, State: "queued", Steps: domain.InitialSteps(a.Manifest)}
 	steps, _ := json.Marshal(d.Steps)
-	e = tx.QueryRow(ctx, "INSERT INTO oap_deployments(id,application_id,state,spec,steps,idempotency_key,request_hash) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING created_at,updated_at", d.ID, appID, d.State, spec, steps, key, hash).Scan(&d.CreatedAt, &d.UpdatedAt)
+	e = tx.QueryRow(ctx, "INSERT INTO oap_deployments(id,application_id,state,spec,steps,idempotency_key,request_hash,definition_version,request_hash_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,2) RETURNING created_at,updated_at", d.ID, appID, d.State, spec, steps, key, requestHash, a.Version).Scan(&d.CreatedAt, &d.UpdatedAt)
 	if e != nil {
 		return d, e
 	}

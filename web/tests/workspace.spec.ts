@@ -34,7 +34,16 @@ test("authentication, application setup, release confirmation, and target discov
   await page.getByRole("button", { name: "Deploy application" }).click();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("tab", { name: "Configuration" }).click();
-  await expect(page.locator("pre")).toContainText("standard");
+  await expect(
+    page.getByRole("heading", { name: "Runtime configuration" }),
+  ).toBeVisible();
+  await page.getByLabel("Container image for web").fill("nginx:1.28-alpine");
+  await page.getByRole("button", { name: "Save configuration" }).click();
+  await expect(
+    page.getByText("Configuration saved. Deploy when you are ready."),
+  ).toBeVisible();
+  await page.getByText("View application definition").click();
+  await expect(page.locator("pre")).toContainText("nginx:1.28-alpine");
   await page.screenshot({
     path: "../.local/ui-configuration.png",
     fullPage: true,

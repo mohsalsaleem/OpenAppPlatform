@@ -3,6 +3,7 @@ export interface Component {
   kind: string;
   image: string;
   port: number;
+  hostPort?: number;
   instances: number;
   strategy: string;
   resourceId?: string;
@@ -17,6 +18,8 @@ export interface Application {
   id: string;
   manifest: Manifest;
   createdAt: string;
+  updatedAt: string;
+  version: number;
 }
 export interface Target {
   id: string;
@@ -37,6 +40,7 @@ export interface Step {
 export interface Deployment {
   id: string;
   applicationId: string;
+  definitionVersion: number;
   state: string;
   manifest: Manifest;
   steps: Step[];
@@ -48,6 +52,7 @@ export interface Resource {
   name: string;
   status: string;
   artifactKind?: string;
+  port?: number;
   image?: string;
   url?: string;
 }

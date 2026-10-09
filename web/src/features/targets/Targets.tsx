@@ -36,10 +36,10 @@ export function Targets() {
       <div className="note">
         <Server size={20} />
         <div>
-          <strong>Bare Docker is a first-class planned target.</strong>
+          <strong>Bare Docker and Coolify are supported targets.</strong>
           <p>
-            This milestone implements Coolify. Direct Docker and other operator
-            adapters will use the same application contract.
+            Direct Docker uses owned containers and application networks. Other
+            operator adapters will use the same application contract.
           </p>
         </div>
       </div>

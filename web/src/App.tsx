@@ -98,7 +98,7 @@ export function App() {
         </nav>
         <div className="sidebar-bottom">
           <span className="small">
-            <span className="dot" /> Core preview · v0.1
+            <span className="dot" /> Core preview · v0.2
           </span>
           <button
             className="text-button"

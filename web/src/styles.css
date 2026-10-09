@@ -760,3 +760,20 @@ dialog.modal {
 dialog.modal::backdrop {
   background: #10261970;
 }
+
+.configuration-fields {
+  margin-top: 20px;
+}
+.saved-message {
+  background: #edf5e7;
+  color: #35613c;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+details summary {
+  font-size: 12px;
+  cursor: pointer;
+  color: #607553;
+  padding: 10px 0;
+}

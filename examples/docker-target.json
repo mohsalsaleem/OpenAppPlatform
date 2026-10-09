@@ -1,0 +1,10 @@
+[
+  {
+    "id": "docker-local",
+    "name": "Local Docker",
+    "operator": "docker",
+    "url": "unix:///var/run/docker.sock",
+    "environment": "staging",
+    "settings": {"pullPolicy": "never", "hostBindIP": "127.0.0.1"}
+  }
+]

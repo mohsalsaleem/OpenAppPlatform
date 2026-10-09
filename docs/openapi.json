@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "OpenAppPlatform API",
-    "version": "0.1.0-dev",
+    "version": "0.2.0-dev",
     "description": "Single-workspace preview. HTTP 202 means a release was queued; poll its deployment ID for completion."
   },
   "servers": [
@@ -469,6 +469,106 @@
             }
           }
         ]
+      },
+      "put": {
+        "operationId": "put_update_configuration",
+        "summary": "Update future release configuration without restarting workloads",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "manifest",
+                  "expectedVersion"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "manifest": {
+                    "$ref": "#/components/schemas/Manifest"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/applications/{id}/deployments": {
@@ -649,6 +749,11 @@
                       "type": "string",
                       "pattern": "@sha256:[a-f0-9]{64}$"
                     }
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "description": "If positive, reject a new release when this definition version has changed."
                   }
                 },
                 "required": [],
@@ -902,6 +1007,22 @@
           },
           "resourceId": {
             "type": "string"
+          },
+          "hostPort": {
+            "oneOf": [
+              {
+                "type": "integer",
+                "enum": [
+                  0
+                ]
+              },
+              {
+                "type": "integer",
+                "minimum": 1024,
+                "maximum": 65535
+              }
+            ],
+            "description": "Zero keeps a component private. A fixed host port requires one instance."
           }
         },
         "required": [
@@ -952,12 +1073,22 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         },
         "required": [
           "id",
           "manifest",
-          "createdAt"
+          "createdAt",
+          "version",
+          "updatedAt"
         ],
         "additionalProperties": false
       },
@@ -973,7 +1104,8 @@
           "operator": {
             "type": "string",
             "enum": [
-              "coolify"
+              "coolify",
+              "docker"
             ]
           },
           "url": {
@@ -987,6 +1119,22 @@
           },
           "environment": {
             "type": "string"
+          },
+          "settings": {
+            "type": "object",
+            "properties": {
+              "pullPolicy": {
+                "type": "string",
+                "enum": [
+                  "never",
+                  "if-missing"
+                ]
+              },
+              "hostBindIP": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
           }
         },
         "required": [
@@ -1033,6 +1181,11 @@
               "image",
               "source"
             ]
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65535
           }
         },
         "required": [
@@ -1118,6 +1271,10 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "minimum": 1
           }
         },
         "required": [
@@ -1127,7 +1284,8 @@
           "manifest",
           "steps",
           "createdAt",
-          "updatedAt"
+          "updatedAt",
+          "definitionVersion"
         ],
         "additionalProperties": false
       }

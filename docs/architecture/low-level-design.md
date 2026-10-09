@@ -13,9 +13,9 @@
 JSONB stores bounded manifests and instance steps while ownership and release
 concurrency use relational constraints. All SQL parameters are bound values.
 Migration execution is serialized by a database advisory lock and performed in
-a transaction. The current idempotent bootstrap SQL is appropriate for the
-initial schema; versioned upgrade migrations must replace it before schema
-changes ship to existing production installations.
+a transaction. SQL migrations are versioned and checksummed. Existing previews run the
+idempotent first migration before additive upgrades. Applied migration contents
+cannot change silently.
 
 ## Instance deployment state machine
 
@@ -123,3 +123,15 @@ PostgreSQL connections or session-mode pooling, not transaction-mode PgBouncer.
 System tests constrain the application query pool to four connections and include
 concurrent duplicate deliveries and concurrent application releases. This guards
 against failures hidden by a larger developer-machine connection pool.
+
+## Definition versions and idempotency
+
+Configuration edits and release admission share an application transaction lock.
+The release snapshot is read inside that transaction, so an edit cannot race its
+capture. Updates compare an expected definition version. New releases record
+that version and can reject stale plans.
+
+New idempotency fingerprints bind the declared request, not the latest mutable
+definition. A retry of an already admitted request returns its original release
+even after configuration edits. Earlier manifest-based fingerprints remain
+readable through the legacy compatibility path.

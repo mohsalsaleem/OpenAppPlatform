@@ -7,16 +7,18 @@ The product experience is inspired by DigitalOcean App Platform.
 ## Current milestone
 
 Implemented: Go API and controller, PostgreSQL persistence, River deployment
-jobs, a React dashboard, and a target-scoped Coolify adapter. Standard releases
+jobs, a React dashboard, target-scoped Coolify and direct Docker adapters, versioned configuration editing,
+and a read-only MCP interface. Standard releases
 support multiple web components and instances, explicit Docker-image resource
 adoption, frozen artifacts, idempotency, progress, and bounded logs.
 
 Verified locally with PostgreSQL and Chromium, and through a real deployment on
 an isolated staging project in the owner's existing Coolify.
 
-Bare Docker is a first-class planned target; its adapter is not implemented yet.
-Dokploy, Dokku, Portainer, workers, jobs, direct Git push webhooks, source builds,
-MCP, AI diagnosis, rolling deployments, and blue-green remain planned.
+Bare Docker uses a local Unix socket and supports cached-image deployments without
+a registry connection. Dokploy, Dokku, Portainer, workers, jobs, direct Git push
+webhooks, source builds, embedded AI diagnosis, rolling deployments, and blue-green
+remain planned.
 
 ## Run locally
 
@@ -43,7 +45,7 @@ production identity, authorization, and audit retention are not implemented.
 The local PostgreSQL port is 55438 and its data uses a named Docker volume.
 Development credentials in compose.yaml are intentionally local-only. Do not
 reuse them for production. The controller does not need a Docker socket when
-using Coolify; it operates through the scoped API target.
+using Coolify; direct Docker targets use a configured local socket, and it operates through the scoped API target.
 
 ## Examples
 
@@ -94,7 +96,8 @@ mutate an external Coolify installation. Live fixtures are retained, not deleted
 - [System design](docs/architecture/system-design.md)
 - [Low level design](docs/architecture/low-level-design.md)
 - [OpenAPI contract](docs/openapi.json)
-- [Bare Docker design](docs/bare-docker.md)
+- [Bare Docker targets](docs/bare-docker.md)
+- [Read-only MCP tools](docs/mcp.md)
 - [Verification report](docs/verification.md)
 - [Editable design Page](https://chatgpt.com/space/page_48ca8aa82f6881918cae167d00860fe9)
 
@@ -113,3 +116,14 @@ production authentication remain release requirements.
 ## License
 
 The repository is public. An open-source license has not yet been selected.
+
+## Configuration and release preconditions
+
+The configuration editor updates future releases without restarting components.
+Updates require the current definition version. Existing releases retain their
+snapshots, and a deployment can require expectedVersion to reject a stale plan.
+Topology changes, scale-down, target migration, and adopted runtime mutation are
+not silently performed through this editor.
+
+SQL migrations now have immutable checksums and version records. Existing preview
+schemas are adopted by the idempotent first migration, then upgraded additively.

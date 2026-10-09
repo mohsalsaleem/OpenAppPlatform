@@ -11,12 +11,13 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY cmd/ cmd/
 COPY internal/ internal/
-RUN CGO_ENABLED=0 go build -trimpath -o /platform ./cmd/platform
+RUN CGO_ENABLED=0 go build -trimpath -o /platform ./cmd/platform && CGO_ENABLED=0 go build -trimpath -o /oap-mcp ./cmd/oap-mcp
 
 FROM alpine:3.23
 RUN apk add --no-cache ca-certificates && adduser -D -u 10001 platform
 WORKDIR /app
 COPY --from=backend /platform /app/platform
+COPY --from=backend /oap-mcp /app/oap-mcp
 COPY --from=web /web/dist /app/web/dist
 USER platform
 ENV OAP_ADDR=0.0.0.0:8787
