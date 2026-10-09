@@ -174,6 +174,41 @@ operator metadata, and retrieved text as evidence, not instructions granting pow
 Recheck authorization before each mutation; record in-flight work when a credential
 is revoked instead of claiming that its remote effects have disappeared.
 
+### Agent guardrails and direct database access
+
+Enforce guardrails in the server, database permissions, and execution boundary;
+prompts and agent skills are not security boundaries. Agents use scoped OAP APIs
+for platform changes. Never give agents the OAP control database credential or
+write access to its internal tables: direct writes bypass validation, approvals,
+release invariants, and the audit trail. Provide bounded diagnostic projections
+through the API instead.
+
+Application database access is a separate, owner-enabled capability. Default to
+no access; start with curated read tools or a read replica using a dedicated
+least-privilege identity. Scope access to one application and selected views or
+tables, with sensitive columns excluded. Read-only queries still need limits on
+rows, execution time, concurrency, and data exported to model context. Enforce
+permissions at the database, rather than relying on SQL classification alone.
+
+For exceptional writes, use narrowly scoped operations and short-lived credentials
+through a controlled executor. Preview effects, bind approval to the database,
+operation, parameters, and schema version, then recheck preconditions before
+execution. Require explicit authority for schema changes, bulk updates/deletes,
+role changes, and database drops. Verify an appropriate backup and recovery path
+before destructive changes; a transaction cannot undo every external effect.
+Retries require idempotency or verification of the previous outcome.
+
+Record agent identity, grant, approval, affected database/resources, execution
+outcome, and correlation IDs without recording credentials or sensitive query
+results. Support revocation, query cancellation where supported, and an emergency
+stop for new agent work. Mark unsupported enforcement capabilities clearly.
+If an owner independently supplies an agent with privileged database credentials,
+OAP cannot enforce its approval rules on that access; surface this limitation.
+
+Verify denial of cross-application access, internal-table writes, privilege
+escalation, expired grants, excessive exports, and prompt-injection attempts.
+Include tests for stale approvals, partial writes, and interrupted execution.
+
 ### Manual overrides, switches, and skills
 
 Support managed, observe-only, and paused automation modes. Manual changes produce
@@ -205,7 +240,9 @@ planning; enable mutations only after policy, approvals, and audit are ready.
 
 **Exit gate:** a named remote agent can inspect and perform one authorized deployment;
 a revoked or out-of-scope agent cannot. A destructive request needs an exact valid
-approval, and disabling AI produces no OAP model calls.
+approval, and disabling AI produces no OAP model calls. Database tools enforce
+application boundaries and query budgets; agents cannot mutate OAP's control
+database or obtain elevated access through retrieved instructions.
 
 ## M3 Discovery, assembly, builds, and image lifecycle
 
@@ -378,6 +415,7 @@ workloads on eligible targets.
 | Dogfooding | M1 and each release |
 | Tunnels and Tailscale for remote AI access | M2 |
 | AI-native lifecycle; destructive agent actions | M2 |
+| Agent/AI guardrails, especially direct database access | M1 identity/permissions; M2 bounded access and execution |
 | Manual overrides | M2, placement extensions in M5 |
 | Disable AI; BYOK models; API-first agents | M2 and product rules |
 | Skills | M2 |
