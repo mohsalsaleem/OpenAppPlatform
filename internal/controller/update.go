@@ -30,6 +30,13 @@ func (c *Controller) UpdateApplication(ctx context.Context, id string, m domain.
 	if e != nil {
 		return domain.Application{}, e
 	}
+	var retiring bool
+	if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM oap_deployments WHERE application_id=$1 AND operation='scale-down' AND state IN ('queued','running','attention'))", id).Scan(&retiring); e != nil {
+		return domain.Application{}, e
+	}
+	if retiring {
+		return domain.Application{}, domain.ErrConflict
+	}
 	if current.Version != version {
 		return domain.Application{}, domain.ErrConflict
 	}

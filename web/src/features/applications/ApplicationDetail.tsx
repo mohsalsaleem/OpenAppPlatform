@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -15,6 +15,7 @@ import {
   type Capabilities,
 } from "../../api";
 import { DeploymentDialog } from "../../components/DeploymentDialog";
+import { ScaleDownDialog } from "./ScaleDownDialog";
 import { RecoveryPanel } from "./RecoveryPanel";
 import { ConfigurationEditor } from "./ConfigurationEditor";
 import { Status } from "../../components/Status";
@@ -30,6 +31,11 @@ export function ApplicationDetail() {
   const { id } = useParams();
   const client = useQueryClient();
   const [tab, setTab] = useState("overview");
+  const [scaleReview, setScaleReview] = useState<{
+    component: string;
+    instances: number;
+    version: number;
+  } | null>(null);
   const [review, setReview] = useState<Application | null>(null);
   const [logs, setLogs] = useState("");
   const [logInstance, setLogInstance] = useState("");
@@ -49,6 +55,13 @@ export function ApplicationDetail() {
     queryFn: () => api<Instance[]>(`/applications/${id}/instances`),
     refetchInterval: 5000,
   });
+  useEffect(() => {
+    const latest = releases.data?.[0];
+    if (latest?.state === "succeeded" && latest.operation === "scale-down") {
+      client.invalidateQueries({ queryKey: ["application", id] });
+      client.invalidateQueries({ queryKey: ["instances", id] });
+    }
+  }, [releases.data?.[0]?.id, releases.data?.[0]?.state, client, id]);
   const deploy = useMutation({
     mutationFn: (definitionVersion: number) =>
       api<Deployment>(`/applications/${id}/deployments`, {
@@ -201,6 +214,23 @@ export function ApplicationDetail() {
                   </code>
                 </div>
                 <span className="small muted">{c.instances} configured</span>
+                {capabilities.data?.retirement &&
+                  c.instances > 1 &&
+                  !c.resourceId && (
+                    <button
+                      className="secondary"
+                      disabled={!!active}
+                      onClick={() =>
+                        setScaleReview({
+                          component: c.name,
+                          instances: c.instances,
+                          version: a.version,
+                        })
+                      }
+                    >
+                      Scale down {c.name}
+                    </button>
+                  )}
                 <button
                   className="icon-button"
                   title={`View ${c.name} logs`}
@@ -236,6 +266,7 @@ export function ApplicationDetail() {
                 <div className="grow">
                   <strong>
                     {instance.component} / {instance.ordinal}
+                    {instance.retired ? " · retained after retirement" : ""}
                   </strong>
                   <p className="small muted">
                     Checked {when(instance.checkedAt)}
@@ -258,7 +289,9 @@ export function ApplicationDetail() {
                 {capabilities.data?.restart && (
                   <button
                     className="secondary"
-                    disabled={!!active || !instance.resourceId}
+                    disabled={
+                      !!active || !instance.resourceId || instance.retired
+                    }
                     onClick={() => setRestartReview(instance)}
                   >
                     Restart {instance.component} / {instance.ordinal}
@@ -304,7 +337,7 @@ export function ApplicationDetail() {
                   <div>
                     <strong>
                       {s.component} / {s.ordinal}
-                      {s.action === "restart" ? " · restart" : ""}
+                      {s.action ? ` · ${s.action}` : ""}
                     </strong>
                     <p className="small muted">
                       {s.resourceId
@@ -352,6 +385,19 @@ export function ApplicationDetail() {
             {logs || "Select a deployed component to fetch its logs."}
           </pre>
         </section>
+      )}
+      {scaleReview && (
+        <ScaleDownDialog
+          applicationId={id!}
+          component={scaleReview.component}
+          instances={scaleReview.instances}
+          version={scaleReview.version}
+          onClose={() => setScaleReview(null)}
+          onQueued={() => {
+            setScaleReview(null);
+            setTab("deployments");
+          }}
+        />
       )}
       {restartReview && (
         <DeploymentDialog onClose={() => setRestartReview(null)}>

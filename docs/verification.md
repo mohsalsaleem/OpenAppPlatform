@@ -115,3 +115,16 @@ restart scope, idempotency, stale versions, and capability rejection. Browser
 coverage includes variable editing, invalid-input blocking, and restart review.
 The retained Coolify staging fixture passed native restart and provider-operation
 observation in addition to its deployment and HTTPS checks.
+
+## Instance retirement coverage
+
+PostgreSQL tests cover highest-ordinal retirement, unchanged counts until stop
+confirmation, exclusion of concurrent configuration/deployment operations,
+idempotency after completion, exclusive retained bindings, reactivation, uncertain
+stop recovery, finalization-only retries, and retired runtime drift. Docker tests
+verify exact container identities, preserved survivors' start times, retained
+stopped containers, continued component connectivity, and subsequent reuse.
+Browser coverage reviews retirement and verifies the committed count and retained
+instance row. Migration 004 adds reserved retirement state and operation kinds;
+existing deployment/restart records remain compatible. Docker supports retirement;
+Coolify does not advertise that capability yet.

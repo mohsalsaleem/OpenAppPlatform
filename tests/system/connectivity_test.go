@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/controller"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
@@ -154,6 +156,63 @@ func TestDockerComponentConnectivityConfigurationScalingAndRestart(t *testing.T)
 	if fixtureJSON(t, web.URL)["message"] != "future-web-config" {
 		t.Fatal("deployment did not apply saved configuration")
 	}
+
+	survivor := inspectFixtureContainer(t, socket, domain.ResourceName(app.ID, "api", 1))
+	retiredBefore := inspectFixtureContainer(t, socket, domain.ResourceName(app.ID, "api", 2))
+	retirement, e := c.EnqueueScaleDown(ctx, app.ID, "connected-scale-down", controller.ScaleDownRequest{Component: "api", Instances: 1}, current.Version)
+	if e != nil {
+		t.Fatal(e)
+	}
+	retirement = waitRelease(t, c, retirement.ID)
+	kept := inspectFixtureContainer(t, socket, domain.ResourceName(app.ID, "api", 1))
+	stopped := inspectFixtureContainer(t, socket, domain.ResourceName(app.ID, "api", 2))
+	if !kept.State.Running || kept.ID != survivor.ID || kept.State.StartedAt != survivor.State.StartedAt {
+		t.Fatal("scale-down interrupted survivor")
+	}
+	if stopped.State.Running || stopped.ID != retiredBefore.ID || retirement.Steps[0].RemoteDeploymentID != stopped.ID {
+		t.Fatal("scale-down deleted/replaced the retired instance")
+	}
+	fixtureJSON(t, web.URL+"/upstream")
+	current, e = c.Store.Application(ctx, app.ID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if current.Manifest.Components[0].Instances != 1 {
+		t.Fatal("count not committed after retirement")
+	}
+	instances, e = c.Instances(ctx, app.ID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if len(instances) != 3 || !instances[1].Retired || instances[1].Status != "retired" {
+		t.Fatal("retained instance hidden", instances)
+	}
+	current.Manifest.Components[0].Instances = 2
+	current, e = c.UpdateApplication(ctx, app.ID, current.Manifest, current.Version)
+	if e != nil {
+		t.Fatal(e)
+	}
+	reactivation, e := c.EnqueueVersion(ctx, app.ID, "connected-reactivation", nil, current.Version)
+	if e != nil {
+		t.Fatal(e)
+	}
+	reactivation = waitRelease(t, c, reactivation.ID)
+	if reactivation.Steps[1].RemoteDeploymentID != stopped.ID {
+		t.Fatal("scale-up did not reuse retained instance")
+	}
+	kept = inspectFixtureContainer(t, socket, domain.ResourceName(app.ID, "api", 1))
+	if kept.State.StartedAt != survivor.State.StartedAt {
+		t.Fatal("reactivation restarted survivor")
+	}
+	instances, e = c.Instances(ctx, app.ID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, instance := range instances {
+		if instance.Retired || !controller.Healthy(instance.Status) {
+			t.Fatal("reactivation incomplete", instances)
+		}
+	}
 	stored, e := c.Store.Deployment(ctx, initial.ID)
 	if e != nil {
 		t.Fatal(e)
@@ -161,4 +220,33 @@ func TestDockerComponentConnectivityConfigurationScalingAndRestart(t *testing.T)
 	if stored.Manifest.Components[0].Port != 8080 || stored.Manifest.Components[0].Env["OAP_TEST_MESSAGE"] != "config-v1" {
 		t.Fatal("earlier release configuration changed")
 	}
+}
+
+type containerState struct {
+	ID    string `json:"Id"`
+	State struct {
+		Running   bool   `json:"Running"`
+		StartedAt string `json:"StartedAt"`
+	} `json:"State"`
+}
+
+func inspectFixtureContainer(t *testing.T, socket, ref string) containerState {
+	t.Helper()
+	transport := &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+		return (&net.Dialer{Timeout: 5 * time.Second}).DialContext(ctx, "unix", socket)
+	}}
+	defer transport.CloseIdleConnections()
+	response, e := (&http.Client{Transport: transport, Timeout: 5 * time.Second}).Get("http://docker/v1.45/containers/" + url.PathEscape(ref) + "/json")
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != 200 {
+		t.Fatal(response.StatusCode)
+	}
+	var state containerState
+	if e = json.NewDecoder(response.Body).Decode(&state); e != nil {
+		t.Fatal(e)
+	}
+	return state
 }

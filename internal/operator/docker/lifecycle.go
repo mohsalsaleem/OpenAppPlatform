@@ -216,3 +216,33 @@ func (c *Client) Restart(ctx context.Context, ref string) (string, error) {
 	}
 	return active.ID, nil
 }
+
+func (c *Client) Retire(ctx context.Context, ref, owner string) (string, error) {
+	active, e := c.inspectContainer(ctx, ref)
+	if e != nil {
+		return "", e
+	}
+	if !c.owned(active) || active.Config.Labels[prefix+"reference"] != ref || active.Config.Labels[prefix+"owner"] != owner {
+		return "", errors.New("instance ownership changed before retirement")
+	}
+	if active.State.Running {
+		if e = c.request(ctx, "POST", "/containers/"+url.PathEscape(active.ID)+"/stop?t=10", nil, nil); e != nil {
+			return "", e
+		}
+	}
+	return active.ID, nil
+}
+func (c *Client) ObserveRetirement(ctx context.Context, remote, ref, owner string) (operator.DeploymentStatus, error) {
+	active, e := c.inspectContainer(ctx, ref)
+	if e != nil {
+		return operator.DeploymentStatus{}, e
+	}
+	if !c.owned(active) || active.ID != remote || active.Config.Labels[prefix+"reference"] != ref || active.Config.Labels[prefix+"owner"] != owner {
+		return operator.DeploymentStatus{}, errors.New("instance identity changed during retirement")
+	}
+	state := "running"
+	if !active.State.Running && (active.State.Status == "exited" || active.State.Status == "created" || active.State.Status == "dead") {
+		state = "succeeded"
+	}
+	return operator.DeploymentStatus{State: state, ResourceStatus: c.projection(active).Status}, nil
+}

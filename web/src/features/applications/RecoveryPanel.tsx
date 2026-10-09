@@ -11,11 +11,13 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
       ordinal,
       remoteDeploymentId,
       retryPreparation,
+      retryFinalization,
     }: {
-      component: string;
-      ordinal: number;
+      component?: string;
+      ordinal?: number;
       remoteDeploymentId?: string;
       retryPreparation?: boolean;
+      retryFinalization?: boolean;
     }) =>
       api<Deployment>(`/deployments/${deployment.id}/recover`, {
         method: "POST",
@@ -24,6 +26,7 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
           ordinal,
           remoteDeploymentId,
           retryPreparation,
+          retryFinalization,
           expectedUpdatedAt: deployment.updatedAt,
         }),
       }),
@@ -40,12 +43,22 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
     <div className="recovery-panel">
       <h3>Recover observation</h3>
       <p className="small muted">
-        Recheck the exact provider deployment. This does not deploy again. If
-        its ID was lost, inspect the operator and enter the ID belonging to this
-        instance. Other unfinished instances resume only after every attention
-        state is resolved.
+        Recheck the exact provider deployment. This does not dispatch the
+        operation again. If its ID was lost, inspect the operator and enter the
+        ID belonging to this instance. Other unfinished instances resume only
+        after every attention state is resolved.
       </p>
       <ErrorBox error={recovery.error} />
+      {deployment.operation === "scale-down" &&
+        deployment.steps.every((s) => s.phase === "succeeded") && (
+          <button
+            className="secondary"
+            disabled={recovery.isPending}
+            onClick={() => recovery.mutate({ retryFinalization: true })}
+          >
+            Retry saving replica count
+          </button>
+        )}
       {deployment.steps
         .filter((s) => s.phase === "attention")
         .map((s) => {

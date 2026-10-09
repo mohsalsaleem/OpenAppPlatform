@@ -248,6 +248,27 @@ func (s *Server) routes() http.Handler {
 		}
 		write(w, 202, d)
 	})
+	mux.HandleFunc("POST /api/v1/applications/{id}/scale-down", func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Component       string `json:"component"`
+			Instances       int    `json:"instances"`
+			ExpectedVersion int64  `json:"expectedVersion"`
+		}
+		if e := decode(w, r, &request); e != nil {
+			write(w, 400, map[string]string{"code": "invalid_scale_down", "message": e.Error()})
+			return
+		}
+		d, e := c.EnqueueScaleDown(r.Context(), r.PathValue("id"), r.Header.Get("Idempotency-Key"), controller.ScaleDownRequest{Component: request.Component, Instances: request.Instances}, request.ExpectedVersion)
+		if e != nil {
+			if errors.Is(e, domain.ErrConflict) || errors.Is(e, domain.ErrNotFound) {
+				fail(w, e)
+			} else {
+				write(w, 422, map[string]string{"code": "scale_down_rejected", "message": e.Error()})
+			}
+			return
+		}
+		write(w, 202, d)
+	})
 	mux.HandleFunc("GET /api/v1/deployments/{id}", func(w http.ResponseWriter, r *http.Request) {
 		d, e := c.Store.Deployment(r.Context(), r.PathValue("id"))
 		if e != nil {

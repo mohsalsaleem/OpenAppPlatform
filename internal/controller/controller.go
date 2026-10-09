@@ -102,7 +102,7 @@ func (c *Controller) EnqueueImages(ctx context.Context, appID, key string, image
 	return c.EnqueueVersion(ctx, appID, key, images, 0)
 }
 func (c *Controller) EnqueueVersion(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64) (domain.Deployment, error) {
-	return c.enqueueOperation(ctx, appID, key, images, expectedVersion, nil)
+	return c.enqueueOperation(ctx, appID, key, images, expectedVersion, nil, nil)
 }
 
 type RestartRequest struct {
@@ -114,9 +114,9 @@ func (c *Controller) EnqueueRestart(ctx context.Context, appID, key string, requ
 	if request.Component == "" || request.Ordinal < 1 || version < 1 {
 		return domain.Deployment{}, errors.New("component, ordinal and expectedVersion are required")
 	}
-	return c.enqueueOperation(ctx, appID, key, nil, version, &request)
+	return c.enqueueOperation(ctx, appID, key, nil, version, &request, nil)
 }
-func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64, restart *RestartRequest) (domain.Deployment, error) {
+func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64, restart *RestartRequest, scaleDown *ScaleDownRequest) (domain.Deployment, error) {
 	if len(key) < 8 || len(key) > 128 {
 		return domain.Deployment{}, errors.New("Idempotency-Key must contain 8 to 128 characters")
 	}
@@ -140,10 +140,11 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		images = nil
 	}
 	requestBody, _ := json.Marshal(struct {
-		Images  map[string]string `json:"images"`
-		Version int64             `json:"expectedVersion"`
-		Restart *RestartRequest   `json:"restart,omitempty"`
-	}{images, expectedVersion, restart})
+		Images    map[string]string `json:"images"`
+		Version   int64             `json:"expectedVersion"`
+		Restart   *RestartRequest   `json:"restart,omitempty"`
+		ScaleDown *ScaleDownRequest `json:"scaleDown,omitempty"`
+	}{images, expectedVersion, restart, scaleDown})
 	requestSum := sha256.Sum256(requestBody)
 	requestHash := hex.EncodeToString(requestSum[:])
 	var existingID, oldHash string
@@ -190,7 +191,7 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	sum := sha256.Sum256(spec)
 	hash := hex.EncodeToString(sum[:])
 	if existingErr == nil {
-		if restart != nil || oldHash != hash {
+		if restart != nil || scaleDown != nil || oldHash != hash {
 			return domain.Deployment{}, domain.ErrConflict
 		}
 		return c.Store.DeploymentTx(ctx, tx, existingID)
@@ -202,7 +203,7 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	if active {
 		return domain.Deployment{}, domain.ErrConflict
 	}
-	d := domain.Deployment{ID: domain.NewID(), ApplicationID: appID, Manifest: a.Manifest, DefinitionVersion: a.Version, State: "queued", Steps: domain.InitialSteps(a.Manifest)}
+	d := domain.Deployment{Operation: "deploy", ID: domain.NewID(), ApplicationID: appID, Manifest: a.Manifest, DefinitionVersion: a.Version, State: "queued", Steps: domain.InitialSteps(a.Manifest)}
 	target, e := c.Store.TargetTx(ctx, tx, a.Manifest.TargetID)
 	if e != nil {
 		return d, e
@@ -211,11 +212,48 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	if e != nil {
 		return d, e
 	}
-	if restart == nil {
+	if restart == nil && scaleDown == nil {
 		if e = operator.ValidateRuntime(a.Manifest, adapter.Capabilities()); e != nil {
 			return d, e
 		}
+	} else if scaleDown != nil {
+		if !adapter.Capabilities().Retirement {
+			return d, errors.New("target does not support instance retirement")
+		}
+		if _, ok := adapter.(operator.Retirer); !ok {
+			return d, errors.New("target does not implement retirement")
+		}
+		found := false
+		for i := range d.Manifest.Components {
+			comp := &d.Manifest.Components[i]
+			if comp.Name != scaleDown.Component {
+				continue
+			}
+			found = true
+			if comp.ResourceID != "" || scaleDown.Instances >= comp.Instances {
+				return d, errors.New("scale-down requires a managed component and a lower positive instance count")
+			}
+			d.Steps = []domain.Step{}
+			for ordinal := comp.Instances; ordinal > scaleDown.Instances; ordinal-- {
+				var ref string
+				err := tx.QueryRow(ctx, "SELECT resource_id FROM oap_bindings WHERE application_id=$1 AND component=$2 AND ordinal=$3", appID, comp.Name, ordinal).Scan(&ref)
+				if errors.Is(err, pgx.ErrNoRows) {
+					continue
+				}
+				if err != nil {
+					return d, err
+				}
+				d.Steps = append(d.Steps, domain.Step{Component: comp.Name, Ordinal: ordinal, ResourceID: ref, Phase: "pending", Action: "retire"})
+			}
+			comp.Instances = scaleDown.Instances
+			break
+		}
+		if !found {
+			return d, errors.New("unknown component")
+		}
+		d.Operation = "scale-down"
 	} else {
+		d.Operation = "restart"
 		if !adapter.Capabilities().Restart {
 			return d, errors.New("target does not support restart")
 		}
@@ -237,8 +275,12 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		}
 		d.Steps = []domain.Step{{Component: restart.Component, Ordinal: restart.Ordinal, ResourceID: ref, Phase: "pending", Action: "restart"}}
 	}
+	spec, e = json.Marshal(d.Manifest)
+	if e != nil {
+		return d, e
+	}
 	steps, _ := json.Marshal(d.Steps)
-	e = tx.QueryRow(ctx, "INSERT INTO oap_deployments(id,application_id,state,spec,steps,idempotency_key,request_hash,definition_version,request_hash_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8,2) RETURNING created_at,updated_at", d.ID, appID, d.State, spec, steps, key, requestHash, a.Version).Scan(&d.CreatedAt, &d.UpdatedAt)
+	e = tx.QueryRow(ctx, "INSERT INTO oap_deployments(id,application_id,state,spec,steps,idempotency_key,request_hash,definition_version,request_hash_version,operation) VALUES($1,$2,$3,$4,$5,$6,$7,$8,2,$9) RETURNING created_at,updated_at", d.ID, appID, d.State, spec, steps, key, requestHash, a.Version, d.Operation).Scan(&d.CreatedAt, &d.UpdatedAt)
 	if e != nil {
 		return d, e
 	}
@@ -323,7 +365,7 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 		if step.Phase == "succeeded" || step.Phase == "failed" || step.Phase == "attention" {
 			continue
 		}
-		if step.Action != "" && step.Action != "restart" {
+		if (step.Action == "retire" && d.Operation != "scale-down") || (step.Action != "" && step.Action != "restart" && step.Action != "retire") {
 			return fail(step, "attention", errors.New("unknown operation action"))
 		}
 		var comp domain.Component
@@ -334,13 +376,13 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 		}
 		switch step.Phase {
 		case "pending":
-			if step.Action == "restart" {
+			if step.Action == "restart" || step.Action == "retire" {
 				resource, e := a.Inspect(ctx, step.ResourceID)
 				if e != nil {
 					return fail(step, "failed", e)
 				}
 				if comp.ResourceID == "" && resource.Description != "OpenAppPlatform:"+d.ApplicationID+":"+comp.Name {
-					return fail(step, "attention", errors.New("managed resource ownership changed; inspect provider before restarting"))
+					return fail(step, "attention", errors.New("managed resource ownership changed; inspect provider before this operation"))
 				}
 			} else if comp.ResourceID != "" {
 				resource, inspectErr := a.Inspect(ctx, comp.ResourceID)
@@ -362,8 +404,10 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 				}
 				step.ResourceID = r.ID
 			}
-			if e = c.Store.Bind(ctx, d.Manifest.TargetID, step.ResourceID, d.ApplicationID, comp.Name, step.Ordinal); e != nil {
-				return fail(step, "attention", errors.New("resource is already bound to another component"))
+			if step.Action != "retire" {
+				if e = c.Store.Bind(ctx, d.Manifest.TargetID, step.ResourceID, d.ApplicationID, comp.Name, step.Ordinal); e != nil {
+					return fail(step, "attention", errors.New("resource is already bound to another component"))
+				}
 			}
 			step.Phase = "prepared"
 			if e = c.Store.SaveDeployment(ctx, d); e != nil {
@@ -377,7 +421,13 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 				return e
 			}
 			var remote string
-			if step.Action == "restart" {
+			if step.Action == "retire" {
+				retirer, ok := a.(operator.Retirer)
+				if !ok {
+					return fail(step, "attention", errors.New("retirement capability unavailable"))
+				}
+				remote, e = retirer.Retire(ctx, step.ResourceID, retirementOwner(d, *step))
+			} else if step.Action == "restart" {
 				restarter, ok := a.(operator.Restarter)
 				if !ok {
 					return fail(step, "attention", errors.New("restart capability is unavailable"))
@@ -407,7 +457,12 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 			if time.Since(started) > 15*time.Minute {
 				return fail(step, "attention", errors.New("deployment observation exceeded 15 minutes; provider may still be running"))
 			}
-			status, e := a.Observe(ctx, step.RemoteDeploymentID, step.ResourceID)
+			var status operator.DeploymentStatus
+			if step.Action == "retire" {
+				status, e = retirementStatus(ctx, a, d, *step, step.RemoteDeploymentID)
+			} else {
+				status, e = a.Observe(ctx, step.RemoteDeploymentID, step.ResourceID)
+			}
 			if e != nil {
 				return e
 			}
@@ -415,10 +470,15 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 			if status.State == "failed" {
 				step.Phase = "failed"
 				step.Error = "provider deployment failed"
-			} else if status.State == "succeeded" && Healthy(status.ResourceStatus) {
+			} else if status.State == "succeeded" && (step.Action == "retire" || Healthy(status.ResourceStatus)) {
 				step.Phase = "succeeded"
 			}
-			if e = c.Store.SaveDeployment(ctx, d); e != nil {
+			if step.Action == "retire" && step.Phase == "succeeded" {
+				e = c.confirmRetirement(ctx, &d, step)
+			} else {
+				e = c.Store.SaveDeployment(ctx, d)
+			}
+			if e != nil {
 				return e
 			}
 			return river.JobSnooze(c.PollInterval)
@@ -436,6 +496,9 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 			d.State = "failed"
 			break
 		}
+	}
+	if d.Operation == "scale-down" && d.State == "succeeded" {
+		return c.finishRetirement(ctx, &d)
 	}
 	return c.Store.SaveDeployment(ctx, d)
 }

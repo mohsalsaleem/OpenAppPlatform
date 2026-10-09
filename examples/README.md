@@ -82,4 +82,10 @@ configuration without applying saved changes.
 snapshots. Keep credentials out of these manifests. Managed variables and
 application DNS connections currently require the Docker adapter; Coolify
 variables and endpoints remain managed in Coolify. Native restart is available
-on both adapters. Scale-down and stateful volumes remain subsequent work.
+on both adapters. Docker scale-down is available from the overview; stateful volumes remain subsequent work.
+
+After scaling the connected API to two instances, choose **Scale down api** and
+retain one instance. `/upstream` continues using the remaining API. The retired
+instance remains visible and its logs are readable. Increase the count and deploy
+again to reactivate it. Scale-down does not implement traffic draining or delete
+containers or volumes.

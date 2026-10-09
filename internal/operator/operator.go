@@ -7,6 +7,7 @@ import (
 )
 
 type Capabilities struct {
+	Retirement      bool `json:"retirement"`
 	Restart         bool `json:"restart"`
 	Environment     bool `json:"environment"`
 	ApplicationDNS  bool `json:"applicationDns"`
@@ -62,4 +63,10 @@ func ValidateRuntime(m domain.Manifest, caps Capabilities) error {
 		}
 	}
 	return nil
+}
+
+// Retirer stops exact owned instances and verifies their identity without deleting them.
+type Retirer interface {
+	Retire(context.Context, string, string) (string, error)
+	ObserveRetirement(context.Context, string, string, string) (DeploymentStatus, error)
 }

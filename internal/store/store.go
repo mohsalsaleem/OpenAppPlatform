@@ -116,6 +116,10 @@ func (s *Store) Bind(ctx context.Context, targetID, resourceID, appID, component
 	if owner != appID || comp != component || number != ordinal {
 		return domain.ErrConflict
 	}
+	_, e = s.Pool.Exec(ctx, "UPDATE oap_bindings SET retired_at=NULL WHERE target_id=$1 AND resource_id=$2 AND application_id=$3 AND component=$4 AND ordinal=$5", targetID, resourceID, appID, component, ordinal)
+	if e != nil {
+		return e
+	}
 	return nil
 }
 
@@ -151,7 +155,7 @@ func (s *Store) Applications(ctx context.Context) ([]domain.Application, error) 
 func ScanDeployment(row pgx.Row) (domain.Deployment, error) {
 	var d domain.Deployment
 	var spec, steps []byte
-	e := row.Scan(&d.ID, &d.ApplicationID, &d.State, &spec, &steps, &d.CreatedAt, &d.UpdatedAt, &d.DefinitionVersion)
+	e := row.Scan(&d.ID, &d.ApplicationID, &d.State, &spec, &steps, &d.CreatedAt, &d.UpdatedAt, &d.DefinitionVersion, &d.Operation)
 	if e != nil {
 		return d, mapError(e)
 	}
@@ -162,7 +166,7 @@ func ScanDeployment(row pgx.Row) (domain.Deployment, error) {
 	return d, e
 }
 
-const deploymentColumns = "id,application_id,state,spec,steps,created_at,updated_at,definition_version"
+const deploymentColumns = "id,application_id,state,spec,steps,created_at,updated_at,definition_version,operation"
 
 // DeploymentTx reuses the enqueue transaction connection while its advisory lock is held.
 func (s *Store) DeploymentTx(ctx context.Context, tx pgx.Tx, id string) (domain.Deployment, error) {
@@ -209,13 +213,14 @@ func (s *Store) UpdateApplicationTx(ctx context.Context, tx pgx.Tx, id string, m
 
 // Bindings are the current instance references, independent of release history.
 type Binding struct {
+	Retired    bool
 	Component  string
 	Ordinal    int
 	ResourceID string
 }
 
 func (s *Store) Bindings(ctx context.Context, id string) ([]Binding, error) {
-	rows, e := s.Pool.Query(ctx, "SELECT component,ordinal,resource_id FROM oap_bindings WHERE application_id=$1 ORDER BY component,ordinal", id)
+	rows, e := s.Pool.Query(ctx, "SELECT component,ordinal,resource_id,retired_at IS NOT NULL FROM oap_bindings WHERE application_id=$1 ORDER BY component,ordinal", id)
 	if e != nil {
 		return nil, e
 	}
@@ -223,7 +228,7 @@ func (s *Store) Bindings(ctx context.Context, id string) ([]Binding, error) {
 	out := []Binding{}
 	for rows.Next() {
 		var b Binding
-		if e = rows.Scan(&b.Component, &b.Ordinal, &b.ResourceID); e != nil {
+		if e = rows.Scan(&b.Component, &b.Ordinal, &b.ResourceID, &b.Retired); e != nil {
 			return nil, e
 		}
 		out = append(out, b)
@@ -252,6 +257,17 @@ func (s *Store) TargetTx(ctx context.Context, tx pgx.Tx, id string) (domain.Targ
 }
 func (s *Store) BindingTx(ctx context.Context, tx pgx.Tx, id, component string, ordinal int) (string, error) {
 	var ref string
-	e := tx.QueryRow(ctx, "SELECT resource_id FROM oap_bindings WHERE application_id=$1 AND component=$2 AND ordinal=$3", id, component, ordinal).Scan(&ref)
+	e := tx.QueryRow(ctx, "SELECT resource_id FROM oap_bindings WHERE application_id=$1 AND component=$2 AND ordinal=$3 AND retired_at IS NULL", id, component, ordinal).Scan(&ref)
 	return ref, mapError(e)
+}
+
+func (s *Store) RetireBindingTx(ctx context.Context, tx pgx.Tx, target, ref, app, component string, ordinal int) error {
+	command, e := tx.Exec(ctx, "UPDATE oap_bindings SET retired_at=COALESCE(retired_at,now()) WHERE target_id=$1 AND resource_id=$2 AND application_id=$3 AND component=$4 AND ordinal=$5", target, ref, app, component, ordinal)
+	if e != nil {
+		return e
+	}
+	if command.RowsAffected() != 1 {
+		return domain.ErrConflict
+	}
+	return nil
 }

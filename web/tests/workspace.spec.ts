@@ -213,6 +213,53 @@ test("deploy, inspect live instances, read logs, and update a Docker application
   await page.getByRole("tab", { name: "Overview" }).click();
   await expect(page.locator(".release-banner")).toContainText("succeeded");
   await expect(live).toContainText("running:healthy");
+
+  await page.getByRole("tab", { name: "Configuration" }).click();
+  await page.getByLabel("Instances for web").fill("2");
+  await page.getByRole("button", { name: "Save configuration" }).click();
+  await expect(
+    page.getByText("Configuration saved. Deploy when you are ready."),
+  ).toBeVisible();
+  await deployAndWait();
+  await page.getByRole("tab", { name: "Overview" }).click();
+  await page
+    .getByRole("button", { name: "Scale down web", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Containers and volumes are retained",
+  );
+  await expect(page.getByRole("dialog")).toContainText("web / 2");
+  const queuedRetirement = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/scale-down"),
+  );
+  await page
+    .getByRole("button", { name: "Retire instances", exact: true })
+    .click();
+  const retirementResponse = await queuedRetirement;
+  expect(retirementResponse.status()).toBe(202);
+  const retirement = await retirementResponse.json();
+  expect(retirement.operation).toBe("scale-down");
+  await expect
+    .poll(
+      async () => {
+        const response = await page.request.get(
+          `/api/v1/deployments/${retirement.id}`,
+          { headers: { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` } },
+        );
+        return (await response.json()).state;
+      },
+      { timeout: 60000 },
+    )
+    .toBe("succeeded");
+  await page.getByRole("tab", { name: "Overview" }).click();
+  await expect(page.getByText("1 configured", { exact: true })).toBeVisible();
+  await expect(live).toContainText("retained after retirement");
+  await expect(
+    page.getByRole("button", { name: "Restart web / 2", exact: true }),
+  ).toBeDisabled();
+  await expect(page.locator(".release-banner")).toContainText("succeeded");
   await page.screenshot({
     path: "../.local/ui-live-instances.png",
     fullPage: true,

@@ -1304,6 +1304,105 @@
         },
         "description": "Restarts the bound runtime without applying saved future configuration. Serialized with deployments and guarded by definition version and idempotency key. Uncertain dispatch enters attention."
       }
+    },
+    "/api/v1/applications/{id}/scale-down": {
+      "post": {
+        "summary": "Retire highest instance ordinals and commit a lower desired count",
+        "operationId": "scaleDownComponent",
+        "responses": {
+          "202": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScaleDown"
+              }
+            }
+          }
+        },
+        "description": "Docker managed components only. Requires a lower positive count, definition version, and idempotency key. Stops selected instances without deleting resources or volumes; count changes only after all stops are confirmed. Configuration edits and other operations are blocked during retirement. Bindings remain reserved and can be reactivated by deployment."
+      }
     }
   },
   "components": {
@@ -1613,7 +1712,8 @@
           "action": {
             "type": "string",
             "enum": [
-              "restart"
+              "restart",
+              "retire"
             ],
             "description": "Absent for ordinary deployment steps."
           }
@@ -1664,6 +1764,14 @@
           "definitionVersion": {
             "type": "integer",
             "minimum": 1
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "deploy",
+              "restart",
+              "scale-down"
+            ]
           }
         },
         "required": [
@@ -1684,7 +1792,8 @@
           "component",
           "ordinal",
           "status",
-          "checkedAt"
+          "checkedAt",
+          "retired"
         ],
         "additionalProperties": false,
         "properties": {
@@ -1710,6 +1819,10 @@
           "checkedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "retired": {
+            "type": "boolean",
+            "description": "Retained instance reserved for this application after confirmed stop."
           }
         }
       },
@@ -1717,8 +1830,6 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "component",
-          "ordinal",
           "expectedUpdatedAt"
         ],
         "properties": {
@@ -1727,7 +1838,7 @@
           },
           "ordinal": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 0
           },
           "expectedUpdatedAt": {
             "type": "string",
@@ -1739,8 +1850,60 @@
           },
           "retryPreparation": {
             "type": "boolean"
+          },
+          "retryFinalization": {
+            "type": "boolean"
           }
-        }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "component",
+              "ordinal"
+            ],
+            "properties": {
+              "component": {
+                "minLength": 1
+              },
+              "ordinal": {
+                "minimum": 1
+              },
+              "retryFinalization": {
+                "enum": [
+                  false
+                ]
+              }
+            }
+          },
+          {
+            "required": [
+              "retryFinalization"
+            ],
+            "properties": {
+              "retryFinalization": {
+                "enum": [
+                  true
+                ]
+              },
+              "component": {
+                "maxLength": 0
+              },
+              "ordinal": {
+                "enum": [
+                  0
+                ]
+              },
+              "remoteDeploymentId": {
+                "maxLength": 0
+              },
+              "retryPreparation": {
+                "enum": [
+                  false
+                ]
+              }
+            }
+          }
+        ]
       },
       "Capabilities": {
         "type": "object",
@@ -1768,6 +1931,9 @@
           },
           "applicationDns": {
             "type": "boolean"
+          },
+          "retirement": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -1794,6 +1960,30 @@
           }
         },
         "additionalProperties": false
+      },
+      "ScaleDown": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "component",
+          "instances",
+          "expectedVersion"
+        ],
+        "properties": {
+          "component": {
+            "type": "string",
+            "minLength": 1
+          },
+          "instances": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
       }
     }
   }

@@ -166,8 +166,8 @@ export function ConfigurationEditor({
                   onChange={(e) => change(i, "instances", +e.target.value)}
                 />
                 <small className="muted">
-                  Increase instances and deploy to scale up. Scale-down requires
-                  explicit instance retirement and is not supported yet.
+                  Increase instances and deploy to scale up. Use Scale down in
+                  the overview to retire instances where supported.
                 </small>
               </div>
             </div>

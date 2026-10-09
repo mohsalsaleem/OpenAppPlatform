@@ -81,5 +81,11 @@ reissued. No prepared replacement is promoted by restart.
 
 Scale up from the configuration editor and deploy. Existing unchanged containers
 are reused and new ordinals receive their own instances. Fixed host ports still
-require one instance. Scale-down, traffic draining, and replica routing are not
-implemented yet.
+require one instance. Explicit scale-down is available from the overview. Traffic draining and replica
+routing are not implemented.
+
+Scale-down retains containers, volumes, and instance bindings. The definition's
+count is committed only after every selected container is stopped and identified.
+Partial progress stays visible; uncertain stop outcomes require observation
+recovery. Stopped bindings remain reserved and can be reactivated during later
+scale-up. Retired instances started directly in Docker are shown as drift.

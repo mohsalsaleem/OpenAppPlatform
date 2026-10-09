@@ -12,7 +12,7 @@ and a read-only MCP interface. Standard releases
 support multiple web components and instances, explicit Docker-image resource
 adoption, frozen artifacts, idempotency, progress, live instance inspection,
 per-instance bounded logs, explicit observation recovery, per-instance restart,
-and Docker runtime variables and application DNS connections.
+and Docker runtime variables, application DNS connections, and explicit instance retirement.
 
 Verified locally with PostgreSQL and Chromium, and through a real deployment on
 an isolated staging project in the owner's existing Coolify.
@@ -166,3 +166,26 @@ checked when configurations and operations are admitted. Native restart is
 supported by Docker and Coolify; managed `env` and `services` configuration is
 currently supported by Docker. Unsupported fields are rejected rather than
 silently ignored. See the [connected Docker example](examples/README.md#connected-docker-components).
+
+## Scale down and retained instances
+
+Managed Docker components with multiple instances have a **Scale down** action in
+the overview. Review the highest ordinals to retire and the remaining count.
+OAP stops only those instances, confirms their container identities, and then
+commits the new count as a new application definition version. Remaining instances
+keep their current configuration. Traffic draining is not implemented.
+
+Retired instances and logs remain visible. Their bindings stay reserved, preventing
+accidental adoption by another application. To scale up again, increase the count
+in Configuration and deploy; unchanged retained containers can be reused. Restart
+cannot reactivate a retired binding. Unexpectedly running retired instances are
+reported as drift rather than hidden or automatically stopped.
+
+`POST /api/v1/applications/{id}/scale-down` accepts `component`, `instances`, and
+`expectedVersion` with an `Idempotency-Key`. Desired counts remain unchanged until
+all stops succeed. A partial or uncertain retirement blocks competing operations
+and definition edits. Recovery rechecks the exact stopped container without
+another stop; if every stop completed but final persistence failed, use
+`retryFinalization: true` with the current `expectedUpdatedAt` on the recovery API.
+The operation's `definitionVersion` identifies the admission version, while its
+manifest records the intended lower count. Coolify retirement remains unsupported.

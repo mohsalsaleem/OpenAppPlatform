@@ -1,7 +1,7 @@
 export function Status({ value }: { value: string }) {
   const good = value === "succeeded" || value.startsWith("running:healthy");
   const bad =
-    ["failed", "attention"].includes(value) ||
+    ["failed", "attention", "retired:running"].includes(value) ||
     value.includes("unhealthy") ||
     value.startsWith("exited");
   return (

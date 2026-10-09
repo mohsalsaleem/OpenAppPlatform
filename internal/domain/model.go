@@ -143,6 +143,7 @@ type Step struct {
 	Error                string     `json:"error,omitempty"`
 }
 type Deployment struct {
+	Operation         string    `json:"operation,omitempty"`
 	ID                string    `json:"id"`
 	ApplicationID     string    `json:"applicationId"`
 	DefinitionVersion int64     `json:"definitionVersion"`

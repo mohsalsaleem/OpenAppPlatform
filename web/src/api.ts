@@ -34,7 +34,7 @@ export interface Step {
   component: string;
   ordinal: number;
   phase: string;
-  action?: "restart";
+  action?: "restart" | "retire";
   recoveryPhase?: string;
   resourceId?: string;
   remoteDeploymentId?: string;
@@ -42,6 +42,7 @@ export interface Step {
   error?: string;
 }
 export interface Deployment {
+  operation?: "deploy" | "restart" | "scale-down";
   id: string;
   applicationId: string;
   definitionVersion: number;
@@ -79,6 +80,7 @@ export async function api<T>(
 }
 
 export interface Instance {
+  retired: boolean;
   component: string;
   ordinal: number;
   resourceId?: string;
@@ -89,6 +91,7 @@ export interface Instance {
 }
 
 export interface Capabilities {
+  retirement: boolean;
   restart: boolean;
   environment: boolean;
   applicationDns: boolean;

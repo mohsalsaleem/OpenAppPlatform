@@ -115,3 +115,41 @@ func TestRestartNeverMutatesForeignOrCandidateContainers(t *testing.T) {
 		})
 	}
 }
+
+func TestRetirementPreservesContainerAndVerifiesIdentity(t *testing.T) {
+	running := true
+	stops := 0
+	c := fakeClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" && r.URL.Path == "/v1.45/containers/container-id/stop" {
+			running = false
+			stops++
+			w.WriteHeader(204)
+			return
+		}
+		if r.Method != "GET" {
+			t.Errorf("unexpected destructive mutation %s %s", r.Method, r.URL.Path)
+		}
+		status := "running"
+		if !running {
+			status = "exited"
+		}
+		json.NewEncoder(w).Encode(map[string]any{"Id": "container-id", "Config": map[string]any{"Labels": map[string]string{prefix + "target": "fixture", prefix + "environment": "staging", prefix + "owner": "expected-owner", prefix + "reference": "active"}}, "State": map[string]any{"Running": running, "Status": status}})
+	})
+	if _, e := c.Retire(context.Background(), "active", "another-owner"); e == nil || stops != 0 {
+		t.Fatal("wrong owner allowed retirement")
+	}
+	remote, e := c.Retire(context.Background(), "active", "expected-owner")
+	if e != nil || remote != "container-id" || stops != 1 {
+		t.Fatal(remote, e, stops)
+	}
+	if _, e = c.Retire(context.Background(), "active", "expected-owner"); e != nil || stops != 1 {
+		t.Fatal("retirement repeated stop")
+	}
+	if _, e = c.ObserveRetirement(context.Background(), "replaced-container", "active", "expected-owner"); e == nil {
+		t.Fatal("changed identity accepted")
+	}
+	status, e := c.ObserveRetirement(context.Background(), remote, "active", "expected-owner")
+	if e != nil || status.State != "succeeded" {
+		t.Fatal(status, e)
+	}
+}

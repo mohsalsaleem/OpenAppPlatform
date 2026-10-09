@@ -3,10 +3,12 @@ package controller
 import (
 	"context"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
+	"strings"
 	"time"
 )
 
 type Instance struct {
+	Retired    bool               `json:"retired"`
 	Component  string             `json:"component"`
 	Ordinal    int                `json:"ordinal"`
 	ResourceID string             `json:"resourceId,omitempty"`
@@ -31,11 +33,18 @@ func (c *Controller) Instances(ctx context.Context, id string) ([]Instance, erro
 	}
 	out := []Instance{}
 	for _, comp := range app.Manifest.Components {
-		for ordinal := 1; ordinal <= comp.Instances; ordinal++ {
+		maximum := comp.Instances
+		for _, b := range bindings {
+			if b.Component == comp.Name && b.Ordinal > maximum {
+				maximum = b.Ordinal
+			}
+		}
+		for ordinal := 1; ordinal <= maximum; ordinal++ {
 			item := Instance{Component: comp.Name, Ordinal: ordinal, Status: "not deployed", CheckedAt: time.Now().UTC()}
 			for _, b := range bindings {
 				if b.Component == comp.Name && b.Ordinal == ordinal {
 					item.ResourceID = b.ResourceID
+					item.Retired = b.Retired
 					break
 				}
 			}
@@ -48,6 +57,13 @@ func (c *Controller) Instances(ctx context.Context, id string) ([]Instance, erro
 				} else {
 					item.Status = resource.Status
 					item.Resource = &resource
+					if item.Retired {
+						item.Status = "retired"
+						if strings.HasPrefix(resource.Status, "running") || resource.Status == "restarting" {
+							item.Status = "retired:running"
+							item.Error = "Retired instance is running again; inspect the operator."
+						}
+					}
 				}
 			}
 			out = append(out, item)
