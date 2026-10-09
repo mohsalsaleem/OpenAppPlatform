@@ -20,7 +20,10 @@ Chromium, local Docker, and the existing Coolify mac-studio context.
 System tests exercise a durable job after controller reconstruction, concurrent
 duplicate requests, overlapping-release rejection, immutable release snapshots,
 exclusive adoption, an interrupted dispatch, and a mixed successful/failed
-component release. Ambiguous dispatch blocks further releases until inspected
+component release. Tests use a four-connection query pool and also run four
+application releases concurrently. CI exposed a pool-starvation deadlock in the
+initial duplicate-delivery path; transaction reuse and dedicated lock sessions
+fix it, with regression coverage. Ambiguous dispatch blocks further releases until inspected
 and reconciled.
 
 ## Real Coolify fixtures

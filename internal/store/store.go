@@ -181,6 +181,10 @@ func ScanDeployment(row pgx.Row) (domain.Deployment, error) {
 
 const deploymentColumns = "id,application_id,state,spec,steps,created_at,updated_at"
 
+// DeploymentTx reuses the enqueue transaction connection while its advisory lock is held.
+func (s *Store) DeploymentTx(ctx context.Context, tx pgx.Tx, id string) (domain.Deployment, error) {
+	return ScanDeployment(tx.QueryRow(ctx, "SELECT "+deploymentColumns+" FROM oap_deployments WHERE id=$1", id))
+}
 func (s *Store) Deployment(ctx context.Context, id string) (domain.Deployment, error) {
 	return ScanDeployment(s.Pool.QueryRow(ctx, "SELECT "+deploymentColumns+" FROM oap_deployments WHERE id=$1", id))
 }

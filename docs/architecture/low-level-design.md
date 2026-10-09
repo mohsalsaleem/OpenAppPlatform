@@ -109,3 +109,17 @@ provider completion, running status, logs, and an externally reachable HTTP URL.
 Fixtures remain available for inspection rather than deleting operator resources.
 Browser tests exercise authentication, multi-component setup, confirmation,
 configuration, scoped discovery, and mobile overflow on the real local API.
+
+## Connection pool constraints
+
+Duplicate enqueue requests read the existing deployment through their current
+transaction rather than checking out another connection while holding its
+advisory lock. Deployment execution uses a dedicated, bounded-lifetime PostgreSQL
+session for the advisory lock, leaving the query pool available to workers and
+HTTP requests. Four execution workers can therefore add at most four lock
+sessions above the configured query pool. Session advisory locks require direct
+PostgreSQL connections or session-mode pooling, not transaction-mode PgBouncer.
+
+System tests constrain the application query pool to four connections and include
+concurrent duplicate deliveries and concurrent application releases. This guards
+against failures hidden by a larger developer-machine connection pool.

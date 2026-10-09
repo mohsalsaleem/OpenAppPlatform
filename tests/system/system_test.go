@@ -101,7 +101,7 @@ func testStore(t *testing.T) *store.Store {
 	if strings.Contains(url, "?") {
 		sep = "&"
 	}
-	s, e := store.Open(ctx, url+sep+"search_path="+schema)
+	s, e := store.Open(ctx, url+sep+"search_path="+schema+"&pool_max_conns=4")
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -435,4 +435,47 @@ func TestExampleManifestsValidate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConcurrentApplicationsProgressWithSmallConnectionPool(t *testing.T) {
+	f := &fake{resources: map[string]operator.Resource{}}
+	c, _ := setup(t, f)
+	ctx := context.Background()
+	ids := []string{}
+	for n := range 4 {
+		m := manifest()
+		m.Name = fmt.Sprintf("parallel-%d", n)
+		m.Components[0].Instances = 1
+		a, e := c.CreateApplication(ctx, m)
+		if e != nil {
+			t.Fatal(e)
+		}
+		d, e := c.Enqueue(ctx, a.ID, "parallel-release")
+		if e != nil {
+			t.Fatal(e)
+		}
+		ids = append(ids, d.ID)
+	}
+	if e := c.Jobs.Start(ctx); e != nil {
+		t.Fatal(e)
+	}
+	defer c.Jobs.Stop(ctx)
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		done := true
+		for _, id := range ids {
+			d, e := c.Store.Deployment(ctx, id)
+			if e != nil {
+				t.Fatal(e)
+			}
+			if d.State != "succeeded" {
+				done = false
+			}
+		}
+		if done {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Fatal("parallel releases did not progress with a four-connection pool")
 }

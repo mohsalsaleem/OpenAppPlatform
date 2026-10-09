@@ -146,7 +146,7 @@ func (c *Controller) EnqueueImages(ctx context.Context, appID, key string, image
 		if oldHash != hash {
 			return domain.Deployment{}, domain.ErrConflict
 		}
-		return c.Store.Deployment(ctx, existingID)
+		return c.Store.DeploymentTx(ctx, tx, existingID)
 	}
 	if !errors.Is(e, pgx.ErrNoRows) {
 		return domain.Deployment{}, e
@@ -201,11 +201,17 @@ func (w *Worker) Work(ctx context.Context, job *river.Job[DeployArgs]) error {
 }
 func (c *Controller) Advance(ctx context.Context, id string) error {
 	// A session lock fences concurrent workers and is released if the connection dies.
-	conn, e := c.Store.Pool.Acquire(ctx)
+	// Session locks use a dedicated connection so concurrent workers cannot drain
+	// the query pool while waiting for their own state reads.
+	conn, e := pgx.ConnectConfig(ctx, c.Store.Pool.Config().ConnConfig.Copy())
 	if e != nil {
-		return e
+		return errors.New("cannot open deployment lock connection")
 	}
-	defer conn.Release()
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		conn.Close(closeCtx)
+	}()
 	var locked bool
 	if e = conn.QueryRow(ctx, "SELECT pg_try_advisory_lock(hashtext($1))", id).Scan(&locked); e != nil {
 		return e
@@ -213,7 +219,7 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 	if !locked {
 		return river.JobSnooze(c.PollInterval)
 	}
-	defer conn.Exec(context.Background(), "SELECT pg_advisory_unlock(hashtext($1))", id)
+	// Closing the dedicated session releases the advisory lock.
 	d, e := c.Store.Deployment(ctx, id)
 	if e != nil {
 		return e
