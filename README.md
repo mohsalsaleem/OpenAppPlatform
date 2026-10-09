@@ -65,6 +65,11 @@ controller-owned releases. A 202 response is not deployment success.
 
 ## Tests
 
+GitHub CI is disabled for now. The required pre-push check is `make test-local`,
+which starts fresh PostgreSQL, a separate Docker daemon, and the browser runner.
+See [reproducible local testing](docs/local-testing.md). Install its Git hook with
+`make install-test-hook`.
+
 ```sh
 make test                   # unit tests and PostgreSQL system tests, with -race
 make test-system            # focused core system tests
@@ -86,9 +91,8 @@ make test-live
 ```
 
 Without TEST_DATABASE_URL, database system tests explicitly skip. Without
-OAP_LIVE_COOLIFY=1, the real operator test explicitly skips. CI provides a local
-PostgreSQL service and runs the core suite and dashboard build; it does not
-mutate an external Coolify installation. Live fixtures are retained, not deleted.
+OAP_LIVE_COOLIFY=1, the real operator test explicitly skips. The isolated local harness supplies PostgreSQL and Docker without developer
+credentials. It does not mutate an external Coolify installation. Live fixtures are retained, not deleted.
 
 ## Documentation
 
@@ -101,6 +105,7 @@ mutate an external Coolify installation. Live fixtures are retained, not deleted
 - [Bare Docker targets](docs/bare-docker.md)
 - [Read-only MCP tools](docs/mcp.md)
 - [Verification report](docs/verification.md)
+- [Reproducible local test environment](docs/local-testing.md)
 - [Editable design Page](https://chatgpt.com/space/page_48ca8aa82f6881918cae167d00860fe9)
 
 ## Deployment

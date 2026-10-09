@@ -1,0 +1,1 @@
+[{"id":"test-docker","name":"Isolated test Docker","operator":"docker","url":"unix:///run/oap-test/docker.sock","environment":"staging","settings":{"pullPolicy":"never","hostBindIP":"127.0.0.1"}}]

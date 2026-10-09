@@ -13,3 +13,5 @@ web/dist/
 playwright-report/
 test-results/
 *.tsbuildinfo
+__pycache__/
+*.pyc

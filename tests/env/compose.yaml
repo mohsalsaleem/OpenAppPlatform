@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: ${OAP_TEST_POSTGRES_IMAGE:?}
+    environment:
+      POSTGRES_DB: oap_test
+      POSTGRES_USER: oap
+      POSTGRES_PASSWORD: oap-test-only
+    tmpfs:
+      - /var/lib/postgresql/data:rw,size=268435456
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U oap -d oap_test']
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    networks: [isolated]
+  docker:
+    image: ${OAP_TEST_ENGINE_IMAGE:?}
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ''
+    command: ['dockerd', '--host=unix:///run/oap-test/docker.sock', '--storage-driver=overlay2']
+    volumes:
+      - docker-socket:/run/oap-test
+    tmpfs:
+      - /var/lib/docker:exec,size=1073741824
+    healthcheck:
+      test: ['CMD', 'docker', '--host', 'unix:///run/oap-test/docker.sock', 'info']
+      interval: 1s
+      timeout: 5s
+      retries: 40
+    networks: [isolated]
+  runner:
+    image: ${OAP_TEST_RUNNER_IMAGE:?}
+    network_mode: service:docker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      docker:
+        condition: service_healthy
+    environment:
+      TEST_DATABASE_URL: postgres://oap:oap-test-only@postgres:5432/oap_test?sslmode=disable
+      OAP_TEST_DOCKER_SOCKET: /run/oap-test/docker.sock
+      OAP_TEST_DOCKER_IMAGE: ${OAP_TEST_FIXTURE_V1:?}
+      OAP_TEST_DOCKER_REPLACEMENT_IMAGE: ${OAP_TEST_FIXTURE_V2:?}
+      OAP_BASE_URL: http://127.0.0.1:8787
+      DATABASE_URL: postgres://oap:oap-test-only@postgres:5432/oap_test?sslmode=disable
+    volumes:
+      - docker-socket:/run/oap-test
+      - ${OAP_TEST_RUN_DIR:?}:/report
+    shm_size: 1gb
+    init: true
+networks:
+  isolated:
+    internal: true
+volumes:
+  docker-socket:

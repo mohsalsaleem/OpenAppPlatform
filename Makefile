@@ -16,3 +16,9 @@ test-live:
 .PHONY: test-docker
 test-docker:
 	OAP_TEST_DOCKER_SOCKET=$${OAP_TEST_DOCKER_SOCKET:-/var/run/docker.sock} python3 scripts/run-local.py go test -v ./tests/system -run TestLiveDockerLifecycleOffline -count=1 -timeout=3m
+
+.PHONY: test-local install-test-hook
+test-local:
+	python3 scripts/test-env.py run
+install-test-hook:
+	python3 scripts/test-env.py install-hook
