@@ -47,7 +47,9 @@ func TestReleaseComparisonIsSanitizedScopedAndOperatorIndependent(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := c.CreateApplication(ctx, manifest())
+	otherManifest := manifest()
+	otherManifest.Name = "comparison-other"
+	other, err := c.CreateApplication(ctx, otherManifest)
 	if err != nil {
 		t.Fatal(err)
 	}
