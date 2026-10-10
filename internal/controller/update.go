@@ -69,7 +69,7 @@ func (c *Controller) UpdateApplication(ctx context.Context, id string, m domain.
 		if comp.Instances < old.Instances {
 			return domain.Application{}, errors.New("scale-down requires explicit instance retirement")
 		}
-		if old.ResourceID != "" && (comp.Image != old.Image || comp.Port != old.Port || comp.HostPort != old.HostPort || !maps.Equal(comp.Env, old.Env) || !maps.Equal(comp.Services, old.Services)) {
+		if old.ResourceID != "" && (comp.Image != old.Image || comp.Port != old.Port || comp.HostPort != old.HostPort || !maps.Equal(comp.Env, old.Env) || !maps.Equal(comp.Services, old.Services) || !maps.Equal(comp.ServiceEndpoints, old.ServiceEndpoints)) {
 			return domain.Application{}, errors.New("adopted resource runtime configuration must be changed through the operator")
 		}
 	}

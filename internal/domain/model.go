@@ -20,16 +20,17 @@ var digestSuffix = regexp.MustCompile(`@sha256:[a-f0-9]{64}$`)
 var slug = regexp.MustCompile(`^[a-z][a-z0-9-]{0,47}$`)
 
 type Component struct {
-	Env        map[string]string `json:"env,omitempty"`
-	Services   map[string]string `json:"services,omitempty"`
-	Name       string            `json:"name"`
-	Kind       string            `json:"kind"`
-	Image      string            `json:"image"`
-	Port       int               `json:"port"`
-	HostPort   int               `json:"hostPort,omitempty"`
-	Instances  int               `json:"instances"`
-	Strategy   string            `json:"strategy"`
-	ResourceID string            `json:"resourceId,omitempty"`
+	ServiceEndpoints map[string]string `json:"serviceEndpoints,omitempty"`
+	Env              map[string]string `json:"env,omitempty"`
+	Services         map[string]string `json:"services,omitempty"`
+	Name             string            `json:"name"`
+	Kind             string            `json:"kind"`
+	Image            string            `json:"image"`
+	Port             int               `json:"port"`
+	HostPort         int               `json:"hostPort,omitempty"`
+	Instances        int               `json:"instances"`
+	Strategy         string            `json:"strategy"`
+	ResourceID       string            `json:"resourceId,omitempty"`
 }
 type Manifest struct {
 	Name        string      `json:"name"`

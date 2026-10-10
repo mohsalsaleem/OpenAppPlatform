@@ -811,3 +811,7 @@ details summary {
     overflow-wrap: anywhere;
   }
 }
+
+.runtime-variables .endpoint-field {
+  grid-column: 1 / -1;
+}

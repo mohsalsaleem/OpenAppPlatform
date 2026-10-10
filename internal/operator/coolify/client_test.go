@@ -12,7 +12,7 @@ import (
 )
 
 func TestImageReferences(t *testing.T) {
-	for _, tt := range []struct{ in, name, tag string }{{"nginx:1.27", "nginx", "1.27"}, {"registry:5000/team/api:v1", "registry:5000/team/api", "v1"}, {"registry:5000/team/api", "registry:5000/team/api", "latest"}, {"nginx@sha256:abc", "nginx@sha256:abc", ""}} {
+	for _, tt := range []struct{ in, name, tag string }{{"nginx:1.27", "nginx", "1.27"}, {"registry:5000/team/api:v1", "registry:5000/team/api", "v1"}, {"registry:5000/team/api", "registry:5000/team/api", "latest"}, {"nginx@sha256:abc", "nginx@sha256", "abc"}} {
 		n, tag := splitImage(tt.in)
 		if n != tt.name || tag != tt.tag {
 			t.Fatalf("%s: %s %s", tt.in, n, tag)

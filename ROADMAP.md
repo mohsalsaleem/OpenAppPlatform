@@ -71,21 +71,24 @@ one reviewable slice at a time. This queue implements the original application
 platform design; it does not make every later roadmap integration a prerequisite.
 Auth and AI work remain deferred until these everyday workflows are usable.
 
-### Current slice: Coolify runtime configuration and connections
+### Completed slice: Coolify runtime configuration and explicit connections
 
-Finish capability-aware, controller-owned Coolify configuration updates and
-component connections. Preserve operator-managed secrets and adopted runtime
-configuration. Verify supported endpoints and variable update/removal behavior
-against the installed operator; do not guess Docker networking from resource
-names. If private connectivity requires a node agent or unsupported changes,
-report the limitation and offer an explicit existing endpoint configuration.
-Keep Docker and Coolify capability differences visible. Coolify instance
-retirement is still unsupported and needs separate API/ownership verification.
+Controller-owned Coolify runtime variables now use recorded provider IDs, value
+hashes, and pending intents. Add/update/removal, literal values, unrelated operator
+variable preservation, and two-component webhook delivery passed live staging
+verification on 10 October 2026. Preview copies remain operator-managed; adopted
+configuration is unchanged. Known update/removal outcomes reconcile safely;
+ambiguous variable creation without a provider identity remains owner-reviewed.
 
-**Exit gate:** a two-component staging application receives the intended runtime
-configuration, communicates through its declared supported connection, updates
-without changing unrelated variables/resources, and retains a verified recovery
-path. Unsupported behavior is rejected. Docker regressions continue to pass.
+Connections use explicitly supplied `serviceEndpoints`. Application-scoped private
+DNS and network mutation are not advertised by Coolify. Existing endpoints remain
+operator/owner-managed. Docker supports both app-local DNS and explicit endpoints.
+Coolify retirement remains unsupported. Local Docker, PostgreSQL, browser/mobile,
+and MCP regression checks continue to pass.
+
+**Current slice:** M0 batch 1, guided discovery and manual application assembly.
+Complete that acceptance gate before starting GitHub release ownership. The
+ordered batches below are unchanged.
 
 ### Next ordered batches
 
@@ -522,8 +525,7 @@ workloads on eligible targets.
 
 ## Next implementation slice
 
-Finish the current Coolify runtime configuration/connection slice. Then start
-M0 batch 1, guided discovery and manual application assembly, followed by the
+Start M0 batch 1, guided discovery and manual application assembly, followed by the
 ordered queue above. Source-backed management handoff and GitHub sequencing must
 be verified before disabling an existing operator trigger. Preserve the KISS stack,
 local pre-push gate, and capability-aware behavior. Auth, remote agents, AI guardrails,

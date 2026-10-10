@@ -7,15 +7,16 @@ import (
 )
 
 type Capabilities struct {
-	Retirement      bool `json:"retirement"`
-	Restart         bool `json:"restart"`
-	Environment     bool `json:"environment"`
-	ApplicationDNS  bool `json:"applicationDns"`
-	Standard        bool `json:"standard"`
-	Rolling         bool `json:"rolling"`
-	BlueGreen       bool `json:"blueGreen"`
-	Discovery       bool `json:"discovery"`
-	ImmutableImages bool `json:"immutableImages"`
+	Retirement       bool `json:"retirement"`
+	Restart          bool `json:"restart"`
+	Environment      bool `json:"environment"`
+	ServiceEndpoints bool `json:"serviceEndpoints"`
+	ApplicationDNS   bool `json:"applicationDns"`
+	Standard         bool `json:"standard"`
+	Rolling          bool `json:"rolling"`
+	BlueGreen        bool `json:"blueGreen"`
+	Discovery        bool `json:"discovery"`
+	ImmutableImages  bool `json:"immutableImages"`
 }
 type Resource struct {
 	ID           string `json:"id"`
@@ -32,6 +33,7 @@ type Resource struct {
 type Spec struct {
 	Name, Ownership string
 	Component       domain.Component
+	Variables       VariableJournal `json:"-"`
 }
 type DeploymentStatus struct {
 	State          string
@@ -58,8 +60,13 @@ func ValidateRuntime(m domain.Manifest, caps Capabilities) error {
 		if len(c.Env) > 0 && !caps.Environment {
 			return fmt.Errorf("target does not support managed environment variables for %s", c.Name)
 		}
-		if len(c.Services) > 0 && !caps.ApplicationDNS {
-			return fmt.Errorf("target does not support application DNS connections for %s; configure an operator endpoint instead", c.Name)
+		if len(c.ServiceEndpoints) > 0 && !caps.ServiceEndpoints {
+			return fmt.Errorf("target does not support explicit service endpoints for %s", c.Name)
+		}
+		for _, name := range c.Services {
+			if !caps.ApplicationDNS && (!caps.ServiceEndpoints || c.ServiceEndpoints[name] == "") {
+				return fmt.Errorf("target requires an explicit endpoint for service %s in %s", name, c.Name)
+			}
 		}
 	}
 	return nil
@@ -69,4 +76,13 @@ func ValidateRuntime(m domain.Manifest, caps Capabilities) error {
 type Retirer interface {
 	Retire(context.Context, string, string) (string, error)
 	ObserveRetirement(context.Context, string, string, string) (DeploymentStatus, error)
+}
+
+type VariableOwnership struct{ UUID, Hash, Intent string }
+type VariableJournal interface {
+	Reserve(context.Context, string) error
+	Variables(context.Context, string) (map[string]VariableOwnership, error)
+	Begin(context.Context, string, string, string, string) error
+	Commit(context.Context, string, string, string, string) error
+	Forget(context.Context, string, string, string) error
 }

@@ -163,8 +163,9 @@ remains blocked; automatic provider-history reconciliation is still planned.
 
 Target capabilities are exposed at `GET /api/v1/targets/{id}/capabilities` and
 checked when configurations and operations are admitted. Native restart is
-supported by Docker and Coolify; managed `env` and `services` configuration is
-currently supported by Docker. Unsupported fields are rejected rather than
+supported by Docker and Coolify; managed `env` configuration is supported by Docker and controller-owned Coolify
+resources. Docker supports application DNS; Coolify connections require explicit
+`serviceEndpoints` for referenced components. Unsupported fields are rejected rather than
 silently ignored. See the [connected Docker example](examples/README.md#connected-docker-components).
 
 ## Scale down and retained instances
@@ -189,3 +190,25 @@ another stop; if every stop completed but final persistence failed, use
 `retryFinalization: true` with the current `expectedUpdatedAt` on the recovery API.
 The operation's `definitionVersion` identifies the admission version, while its
 manifest records the intended lower count. Coolify retirement remains unsupported.
+
+## Coolify runtime variables and connections
+
+OAP records provider variable IDs and value hashes before updating owned Coolify
+runtime configuration. Existing operator variables are not taken over, even when
+their values match. Shared, hidden, preview, renamed, or externally changed
+variables are protected. Only previously recorded OAP production-runtime variables
+can be removed. Coolify may create preview copies; those remain operator-managed.
+Adopted resource configuration is unchanged.
+
+`services` maps a variable to a component. On Coolify, also supply
+`serviceEndpoints`, for example `{"api":"https://api.example.com"}`. OAP injects
+that explicit URL; it does not infer private DNS, modify networks, or create a
+route. URLs must not contain credentials, queries, or fragments. Endpoints remain
+under operator/owner management. Docker may use either its application DNS or
+an explicit endpoint.
+
+Preparation verifies applied values and preserves unrelated variables. Known
+variable IDs and recorded intents allow safe update/removal retries. An ambiguous
+creation without a captured provider ID remains blocked for operator review;
+inspect and resolve the unverified key through Coolify before retrying preparation.
+The ownership ledger is part of OAP metadata and must be included in backups.

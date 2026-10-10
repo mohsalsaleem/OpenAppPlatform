@@ -193,7 +193,13 @@ export function ConfigurationEditor({
             onChange={(field, value) => change(i, field, value)}
             onValidity={(valid) => setInvalid({ ...invalid, [c.name]: !valid })}
             environmentSupported={!!capabilities.data?.environment}
-            connectionsSupported={!!capabilities.data?.applicationDns}
+            connectionsSupported={
+              !!(
+                capabilities.data?.applicationDns ||
+                capabilities.data?.serviceEndpoints
+              )
+            }
+            endpointsSupported={!!capabilities.data?.serviceEndpoints}
           />
         </div>
       ))}

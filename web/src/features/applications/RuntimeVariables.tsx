@@ -7,23 +7,29 @@ export function RuntimeVariables({
   onValidity,
   environmentSupported,
   connectionsSupported,
+  endpointsSupported,
 }: {
   component: Component;
-  onChange: (field: "env" | "services", value: Record<string, string>) => void;
+  onChange: (
+    field: "env" | "services" | "serviceEndpoints",
+    value: Record<string, string>,
+  ) => void;
   onValidity: (valid: boolean) => void;
   environmentSupported: boolean;
   connectionsSupported: boolean;
+  endpointsSupported: boolean;
 }) {
   const [values, setValues] = useState({
     env: JSON.stringify(component.env || {}, null, 2),
     services: JSON.stringify(component.services || {}, null, 2),
+    serviceEndpoints: JSON.stringify(component.serviceEndpoints || {}, null, 2),
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   useEffect(
     () => onValidity(Object.keys(errors).length === 0),
     [errors, component.name],
   );
-  function edit(field: "env" | "services", text: string) {
+  function edit(field: "env" | "services" | "serviceEndpoints", text: string) {
     setValues({ ...values, [field]: text });
     const next = { ...errors };
     try {
@@ -80,7 +86,7 @@ export function RuntimeVariables({
         />
         <small className="muted">
           {connectionsSupported
-            ? 'Map a variable to a managed component: {"API_URL":"api"}. OAP supplies its private HTTP endpoint. DNS does not provide health-aware balancing.'
+            ? 'Map a variable to a managed component: {"API_URL":"api"}. OAP uses application DNS where supported, or the explicit endpoint below. DNS does not provide health-aware balancing.'
             : "Application DNS connections are not supported by this target yet."}
         </small>
         {errors.services && (
@@ -89,6 +95,30 @@ export function RuntimeVariables({
           </p>
         )}
       </div>
+      {endpointsSupported && (
+        <div className="endpoint-field">
+          <label htmlFor={`endpoints-${component.name}`}>
+            Service endpoints for {component.name}
+          </label>
+          <textarea
+            id={`endpoints-${component.name}`}
+            rows={3}
+            value={values.serviceEndpoints}
+            readOnly={!!component.resourceId}
+            onChange={(e) => edit("serviceEndpoints", e.target.value)}
+          />
+          <small className="muted">
+            Map a referenced component to its existing HTTP(S) URL, for example{" "}
+            {JSON.stringify({ api: "https://api.example.com" })}. Required where
+            application DNS is unavailable. Keep credentials out of URLs.
+          </small>
+          {errors.serviceEndpoints && (
+            <p role="alert" className="error-inline">
+              {errors.serviceEndpoints}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

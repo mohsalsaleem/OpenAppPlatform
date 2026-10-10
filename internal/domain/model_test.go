@@ -77,3 +77,23 @@ func TestRuntimeConfigurationValidation(t *testing.T) {
 		t.Fatal("runtime resolution mutated the definition")
 	}
 }
+
+func TestExplicitServiceEndpointsValidateAndResolve(t *testing.T) {
+	m := valid()
+	m.Components = append(m.Components, Component{Name: "api", Image: "image:v1", Port: 8080, ResourceID: "adopted"})
+	m.Components[0].Services = map[string]string{"API_URL": "api"}
+	m.Components[0].ServiceEndpoints = map[string]string{"api": "https://api.example.com/base"}
+	if e := m.Validate(); e != nil {
+		t.Fatal(e)
+	}
+	runtime, e := RuntimeComponent(m, "web")
+	if e != nil || runtime.Env["API_URL"] != "https://api.example.com/base" {
+		t.Fatal(runtime, e)
+	}
+	for _, endpoint := range []string{"https://user:pass@example.com", "https://example.com/?token=x", "file:///etc/passwd", "https://example.com/#secret"} {
+		m.Components[0].ServiceEndpoints["api"] = endpoint
+		if m.Validate() == nil {
+			t.Fatal("unsafe endpoint accepted")
+		}
+	}
+}

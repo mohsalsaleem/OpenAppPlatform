@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 )
@@ -28,10 +29,23 @@ func validateRuntime(c Component, components map[string]Component) error {
 		if _, exists := c.Env[variable]; exists {
 			return errors.New("a variable cannot be both environment configuration and a service connection")
 		}
-		if c.ResourceID != "" || target.ResourceID != "" {
+		if c.ResourceID != "" || (target.ResourceID != "" && c.ServiceEndpoints[name] == "") {
 			return errors.New("service connections require managed components")
 		}
 		bytes += len(variable) + len(name)
+	}
+	for name, endpoint := range c.ServiceEndpoints {
+		u, e := url.Parse(endpoint)
+		used := false
+		for _, service := range c.Services {
+			if service == name {
+				used = true
+			}
+		}
+		if !used || e != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || len(endpoint) > 2048 {
+			return errors.New("service endpoints require a referenced component and an HTTP(S) URL without credentials, query, or fragment")
+		}
+		bytes += len(name) + len(endpoint)
 	}
 	if bytes > 16<<10 {
 		return errors.New("runtime configuration exceeds 16 KiB")
@@ -65,7 +79,10 @@ func RuntimeComponent(m Manifest, name string) (Component, error) {
 		resolved := false
 		for _, c := range m.Components {
 			if c.Name == target {
-				env[variable] = fmt.Sprintf("http://%s:%d", c.Name, c.Port)
+				env[variable] = component.ServiceEndpoints[target]
+				if env[variable] == "" {
+					env[variable] = fmt.Sprintf("http://%s:%d", c.Name, c.Port)
+				}
 				resolved = true
 				break
 			}

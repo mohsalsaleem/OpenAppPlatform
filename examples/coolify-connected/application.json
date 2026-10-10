@@ -1,0 +1,34 @@
+{
+  "name": "coolify-connected",
+  "environment": "staging",
+  "targetId": "coolify-staging",
+  "components": [
+    {
+      "name": "source",
+      "kind": "web",
+      "image": "axllent/mailpit@sha256:df6c2541907e1be6fac21f509927cf6ed771617a1f4b361ef66d97bd05593d2d",
+      "port": 8025,
+      "instances": 1,
+      "strategy": "standard",
+      "env": {
+        "MP_LABEL": "example-source",
+        "MP_DISABLE_VERSION_CHECK": "true"
+      },
+      "services": {
+        "MP_WEBHOOK_URL": "receiver"
+      },
+      "serviceEndpoints": {
+        "receiver": "https://replace-with-existing-receiver.example.com"
+      }
+    },
+    {
+      "name": "receiver",
+      "kind": "web",
+      "image": "mendhak/http-https-echo@sha256:f55000d9196bd3c853d384af7315f509d21ffb85de315c26e9874033b9f83e15",
+      "port": 8080,
+      "instances": 1,
+      "strategy": "standard",
+      "resourceId": "replace-with-existing-receiver-uuid"
+    }
+  ]
+}

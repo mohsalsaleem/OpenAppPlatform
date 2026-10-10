@@ -128,3 +128,18 @@ Browser coverage reviews retirement and verifies the committed count and retaine
 instance row. Migration 004 adds reserved retirement state and operation kinds;
 existing deployment/restart records remain compatible. Docker supports retirement;
 Coolify does not advertise that capability yet.
+
+## Coolify runtime configuration coverage
+
+Unit tests cover provider-ID ownership, operator-key conflicts, literal values,
+flag/identity/value drift, hidden and preview protection, idempotent sync, lost
+update-response recovery, and verified removals. Migration 005 stores provider
+identities, value hashes, and pending intents without copying operator secrets.
+Explicit service endpoints are validated independently of application DNS.
+
+The opt-in `TestLiveCoolifyRuntimeConfiguration` creates owned staging fixtures,
+configures a test-only receiver health check/route, injects plain runtime values,
+and verifies a synthetic Mailpit webhook reaches the receiver. It updates/removes
+OAP variables while preserving a separately created operator variable. Preview
+copies are checked separately from production variables. No external email relay
+is configured. Fixtures are retained and CI remains disabled.

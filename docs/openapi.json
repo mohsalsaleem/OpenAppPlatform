@@ -1483,7 +1483,7 @@
           },
           "env": {
             "type": "object",
-            "description": "Plain non-secret Docker runtime variables; stored in release snapshots.",
+            "description": "Plain non-secret runtime variables. Coolify mutates only recorded OAP-owned production variables; unrelated and preview variables remain operator-managed.",
             "additionalProperties": {
               "type": "string",
               "maxLength": 4096
@@ -1492,11 +1492,20 @@
           },
           "services": {
             "type": "object",
-            "description": "Docker app-local HTTP connections: environment variable to managed component name.",
+            "description": "Environment variable to component name. Uses application DNS on Docker or a supplied explicit endpoint; adopted targets require an explicit endpoint.",
             "additionalProperties": {
               "type": "string"
             },
             "maxProperties": 64
+          },
+          "serviceEndpoints": {
+            "type": "object",
+            "description": "Referenced component name to explicit operator-managed HTTP(S) endpoint. Required for Coolify connections; no credentials, query, or fragment.",
+            "additionalProperties": {
+              "type": "string",
+              "format": "uri",
+              "maxLength": 2048
+            }
           }
         },
         "required": [
@@ -1933,6 +1942,9 @@
             "type": "boolean"
           },
           "retirement": {
+            "type": "boolean"
+          },
+          "serviceEndpoints": {
             "type": "boolean"
           }
         },

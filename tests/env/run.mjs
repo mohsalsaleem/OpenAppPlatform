@@ -4,7 +4,7 @@ import { readFile, writeFile, readdir, copyFile } from 'node:fs/promises';
 import { createReadStream as streamFile } from 'node:fs';
 import http from 'node:http';
 
-const report={status:'running',startedAt:new Date().toISOString(),steps:[],expectedSkips:['TestLiveCoolifyLifecycle']};
+const report={status:'running',startedAt:new Date().toISOString(),steps:[],expectedSkips:['TestLiveCoolifyLifecycle','TestLiveCoolifyRuntimeConfiguration']};
 const env={...process.env,OAP_API_TOKEN:randomBytes(32).toString('base64url'),OAP_ADDR:'127.0.0.1:8787'};
 delete env.COOLIFY_TOKEN;delete env.COOLIFY_URL;delete env.OAP_LIVE_COOLIFY;
 let platform;

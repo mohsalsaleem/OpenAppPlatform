@@ -1,4 +1,5 @@
 export interface Component {
+  serviceEndpoints?: Record<string, string>;
   env?: Record<string, string>;
   services?: Record<string, string>;
   name: string;
@@ -91,6 +92,7 @@ export interface Instance {
 }
 
 export interface Capabilities {
+  serviceEndpoints: boolean;
   retirement: boolean;
   restart: boolean;
   environment: boolean;

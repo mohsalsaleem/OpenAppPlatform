@@ -38,7 +38,7 @@ func New(t domain.Target, token string) (*Client, error) {
 	return &Client{base: strings.TrimRight(t.URL, "/"), token: token, target: t, http: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) Capabilities() operator.Capabilities {
-	return operator.Capabilities{Standard: true, Discovery: true, ImmutableImages: true, Restart: true}
+	return operator.Capabilities{Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Environment: true, ServiceEndpoints: true}
 }
 func (c *Client) request(ctx context.Context, method, path string, input, output any) error {
 	var body io.Reader
@@ -149,8 +149,8 @@ func (c *Client) Inspect(ctx context.Context, id string) (operator.Resource, err
 	return r, nil
 }
 func splitImage(image string) (string, string) {
-	if strings.Contains(image, "@") {
-		return image, ""
+	if before, digest, ok := strings.Cut(image, "@sha256:"); ok {
+		return before + "@sha256", digest
 	}
 	i := strings.LastIndex(image, ":")
 	if i > strings.LastIndex(image, "/") {
@@ -159,9 +159,7 @@ func splitImage(image string) (string, string) {
 	return image, "latest"
 }
 func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource, error) {
-	if len(s.Component.Env) > 0 || len(s.Component.Services) > 0 {
-		return operator.Resource{}, errors.New("managed runtime variables are not supported by this adapter yet")
-	}
+
 	resources, e := c.Discover(ctx)
 	if e != nil {
 		return operator.Resource{}, e
@@ -183,6 +181,9 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	if found != nil {
 		if found.ArtifactKind != "image" {
 			return operator.Resource{}, errors.New("owned resource build strategy changed; reconciliation required")
+		}
+		if e = c.syncVariables(ctx, found.ID, s); e != nil {
+			return operator.Resource{}, e
 		}
 		// Adopted resources never enter this path. Only controller-owned image workloads can be patched.
 		data := map[string]any{"docker_registry_image_name": image, "docker_registry_image_tag": tag, "ports_exposes": strconv.Itoa(s.Component.Port), "ports_mappings": ""}
@@ -209,6 +210,9 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	}
 	if result.UUID == "" {
 		return operator.Resource{}, errors.New("Coolify create returned no resource id")
+	}
+	if e = c.syncVariables(ctx, result.UUID, s); e != nil {
+		return operator.Resource{}, e
 	}
 	return operator.Resource{ID: result.UUID, Name: s.Name, Description: s.Ownership, Image: s.Component.Image}, nil
 }

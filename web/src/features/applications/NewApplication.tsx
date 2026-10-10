@@ -321,7 +321,13 @@ export function NewApplication() {
                   }))
                 }
                 environmentSupported={!!capabilities.data?.environment}
-                connectionsSupported={!!capabilities.data?.applicationDns}
+                connectionsSupported={
+                  !!(
+                    capabilities.data?.applicationDns ||
+                    capabilities.data?.serviceEndpoints
+                  )
+                }
+                endpointsSupported={!!capabilities.data?.serviceEndpoints}
               />
             </div>
           ))}

@@ -32,6 +32,14 @@ integration:
   fixture_image: axllent/mailpit@sha256:df6c2541907e1be6fac21f509927cf6ed771617a1f4b361ef66d97bd05593d2d
   additional_fixture_application_uuid: 74gq6dmjkkdyjhqw9pmn0nwe
   additional_fixture_url: https://74gq6dmjkkdyjhqw9pmn0nwe.mohsal.dev
+  runtime_configuration:
+    application_id: fd82b2f2b75274b5552cd6944a6a9f72
+    source_application_uuid: vytryxcpfdth6kprz7ivqdrm
+    receiver_application_uuid: v2ar4bldwzyhfezk1amm1pf2
+    source_url: http://vytryxcpfdth6kprz7ivqdrm.mohsal.dev
+    receiver_url: http://v2ar4bldwzyhfezk1amm1pf2.mohsal.dev/oap-hook
+    receiver_image: mendhak/http-https-echo@sha256:f55000d9196bd3c853d384af7315f509d21ffb85de315c26e9874033b9f83e15
+    verified: 2026-10-10
   lifecycle: retained_for_inspection
 promotion:
   require_human_approval: true

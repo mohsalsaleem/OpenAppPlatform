@@ -79,9 +79,9 @@ balancer. Restart one instance from its overview row to restart its existing
 configuration without applying saved changes.
 
 `env` is plain non-secret configuration stored in definitions and release
-snapshots. Keep credentials out of these manifests. Managed variables and
-application DNS connections currently require the Docker adapter; Coolify
-variables and endpoints remain managed in Coolify. Native restart is available
+snapshots. Keep credentials out of these manifests. Managed variables work on Docker and controller-owned Coolify resources.
+Application DNS requires Docker; Coolify connections use explicit operator-managed
+endpoints. Native restart is available
 on both adapters. Docker scale-down is available from the overview; stateful volumes remain subsequent work.
 
 After scaling the connected API to two instances, choose **Scale down api** and
@@ -89,3 +89,15 @@ retain one instance. `/upstream` continues using the remaining API. The retired
 instance remains visible and its logs are readable. Increase the count and deploy
 again to reactivate it. Scale-down does not implement traffic draining or delete
 containers or volumes.
+
+## Coolify connections
+
+The [Coolify connection definition](coolify-connected/application.json) demonstrates
+runtime variables, component references, and explicit endpoints. Replace its
+endpoint and resource-ID placeholders with an existing Docker-image HTTP receiver
+and its actual route before deployment. The receiver is adopted without changing
+its configuration. Register
+routes and health checks in Coolify where needed; this example does not provision
+a webhook receiver or domains. Mailpit's webhook URL must point to a real HTTP
+receiver. Runtime variables are non-secret and snapshotted; keep secrets and
+preview variables in the operator. Adoption does not grant environment mutation.

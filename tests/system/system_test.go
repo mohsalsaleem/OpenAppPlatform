@@ -440,7 +440,7 @@ func TestReleaseSnapshotsDigestAndRejectsIdempotencyPayloadMismatch(t *testing.T
 }
 
 func TestExampleManifestsValidate(t *testing.T) {
-	for _, name := range []string{"hello-web", "two-components", "docker-hello", "docker-connected"} {
+	for _, name := range []string{"hello-web", "two-components", "docker-hello", "docker-connected", "coolify-connected"} {
 		t.Run(name, func(t *testing.T) {
 			b, e := os.ReadFile("../../examples/" + name + "/application.json")
 			if e != nil {
