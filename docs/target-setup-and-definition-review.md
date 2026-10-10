@@ -73,3 +73,28 @@ The slice is deployed in Coolify staging. Live scope/layout verification and
 failed-scope persistence checks passed; successful owner registration and browser
 reuse/diff behavior were exercised against isolated local fixtures.
 See [verification](verification.md) for the exact build and evidence limits.
+
+## Workflow ownership and adapter support
+
+Application overviews describe build, deployment, restart, configuration and
+management handoff for each component. Observed components retain the existing
+workflow; OAP does not start their builds or deployments. Managed components use
+image releases coordinated by OAP and executed by the target. An optional builder
+requires separate configuration. Saving configuration remains separate from deployment.
+
+After a read-only connection check, target cards list adapter support for standard
+releases, restart, retirement, variables, service DNS/endpoints, image handoff, native
+source observation, rolling and blue-green. These are adapter declarations, not a
+claim that every resource is eligible or that the current user can mutate it.
+Native source commands and source handoff remain unavailable. Deploy is disabled
+until standard release support is loaded; existing API authorization stays authoritative.
+
+Verified staging release: `a98365a403156705f6a0e3057ef7b0cc0ce34697`, deployment
+`vtojokj23sjb5koi34ssunes`, healthy at https://oap-staging.mohsal.dev. Local exact-tree
+run `20261010-210926-dae2f5ed` passed unit, system, isolated Docker and browser checks.
+A live browser verified owner sign-in, managed component ownership and the read-only
+Coolify capability check. The retained source release and both replica digests stayed
+unchanged and healthy. Observed-component ownership was tested in the local fixture.
+Schema remains at migration 010; the previous staging image and tested database
+backup remain available. This completes the presentation slice of M0 batch 3, not
+native lifecycle handoff or configuration promotion.
