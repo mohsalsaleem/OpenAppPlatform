@@ -36,3 +36,23 @@ Unit/system tests verify deterministic diffs, masking of all runtime map values,
 immutable-vs-mutable reference flags, same-ID rejection, scoped/cross-application
 boundaries, unchanged release state and zero adapter calls. Browser tests compare two
 actual isolated Docker releases with different images, ports and environment values.
+
+## Verification
+
+Comparison backend, scope/masking and Docker browser acceptance passed in local run
+`20261010-220446-027d1f3e`. The subsequent compact UI pins selected from/to IDs so
+automatic activity refresh cannot silently change the comparison selection. The
+browser regression also introduces a newly arrived history record and verifies the
+chosen IDs remain selected. It does not create a provider operation to test refresh.
+
+Deployed comparison UI commit `816a11d17472e904bae7e8632c5c518e68f40b63`,
+Coolify staging deployment `gngploptvgom195xfdx7qjru`, healthy runtime. A live owner
+browser compared the retained application's two recorded releases, signed out and
+verified zero application mutations. The retained signed-source release and its
+two replica digests remain unchanged and healthy. No schema migration, hosted
+workload release, builder change or trigger handoff was required. Final repository
+verification is rerun after recording this evidence, as required by the pre-push gate.
+
+The earlier staging image and tested metadata backup remain retained. Older controller
+versions do not enforce readiness/dependency policy, so runtime rollback planning
+must review semantic compatibility rather than just metadata readability.

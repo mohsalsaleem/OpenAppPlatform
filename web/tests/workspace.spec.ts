@@ -260,6 +260,34 @@ test("deploy, inspect live instances, read logs, and update a Docker application
   await expect(comparison).toContainText("8025");
   await expect(comparison).toContainText("Changed (value hidden)");
   await expect(comparison).not.toContainText("browser-v2");
+  const selectedFrom = await page
+    .getByLabel("From release", { exact: true })
+    .inputValue();
+  const selectedTo = await page
+    .getByLabel("To release", { exact: true })
+    .inputValue();
+  const historyPattern = `**/api/v1/applications/${page.url().split("/").at(-1)}/deployments`;
+  await page.route(historyPattern, async (route) => {
+    const response = await route.fetch();
+    const history = await response.json();
+    await route.fulfill({
+      response,
+      json: [
+        { ...history[0], id: "11111111111111111111111111111111" },
+        ...history,
+      ],
+    });
+  });
+  await expect(
+    page.getByLabel("From release", { exact: true }).locator("option").first(),
+  ).toHaveAttribute("value", "11111111111111111111111111111111");
+  await expect(page.getByLabel("From release", { exact: true })).toHaveValue(
+    selectedFrom,
+  );
+  await expect(page.getByLabel("To release", { exact: true })).toHaveValue(
+    selectedTo,
+  );
+  await page.unroute(historyPattern);
   await comparison.screenshot({ path: "../.local/ui-release-comparison.png" });
   await page.getByRole("tab", { name: "Overview" }).click();
   await page
