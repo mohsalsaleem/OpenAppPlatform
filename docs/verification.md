@@ -181,3 +181,19 @@ Setup and Access screenshots contain only synthetic account information and no
 visible setup secrets or issued tokens. The harness collects evidence on failure.
 Real Coolify checks are unchanged and remain separately opt-in; auth verification
 uses isolated local operators and does not alter production resources.
+
+## GitHub release intake and native source evidence
+
+Local source tests verify HMAC rejection, branch/repository identity, duplicate
+payload conflicts, selected-component releases, digest reuse across replicas,
+uncertain-build recovery, revoked credentials and out-of-order/superseded holds.
+Native adapter tests enforce read-only resource/repository/branch/commit scoping.
+
+On 10 October 2026, the opt-in native test passed on Coolify 4.4.6 using the existing
+saleem-personal GitHub App, repository ID 1411193511, fixture
+lf1ggsrabuf3qifyj305kreo, and commit add41068b125a136d0e544b5c1533e411a99209d.
+Provider deployment 69vq60zbyqtvtf6krvhnxryw completed and reached healthy runtime.
+OAP observed the exact commit/operation without changing management mode. The
+fixture keeps auto-deploy disabled. This explicit API staging test proves native
+GitHub App clone/build behavior, not a new live webhook ownership handoff.
+The initial inline-Dockerfile fixture remains retained; it lacked repository context.

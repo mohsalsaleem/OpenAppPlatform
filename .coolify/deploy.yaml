@@ -49,7 +49,10 @@ native_github_verification:
   github_app_name: saleem-personal
   repository: mohsalsaleem/OpenAppPlatform
   repository_id: 1411193511
-  source_application_uuid: r9uzce0z9mnunfftgocit3sj
+  source_application_uuid: lf1ggsrabuf3qifyj305kreo
   auto_deploy_enabled: false
   dockerfile_location: /examples/github-source/Dockerfile
-  status: pending-source-context-verification
+  status: source-context-verified
+  failed_inline_fixture_uuid: r9uzce0z9mnunfftgocit3sj
+  verified_commit: add41068b125a136d0e544b5c1533e411a99209d
+  provider_deployment_uuid: 69vq60zbyqtvtf6krvhnxryw

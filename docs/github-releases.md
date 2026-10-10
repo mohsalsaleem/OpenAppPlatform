@@ -31,8 +31,9 @@ Read-only preflight on 10 October 2026 confirmed Coolify 4.4.6, the configured
 `saleem-personal` GitHub App (local source ID 2), and access to repository
 `mohsalsaleem/OpenAppPlatform` (ID 1411193511). The official current
 [GitHub App handler](https://github.com/coollabsio/coolify/blob/main/app/Http/Controllers/Webhook/Github.php)
-queues the webhook `after` commit. This source review is not a live source-build
-verification on the installed version. Existing operator triggers are unchanged.
+queues the webhook `after` commit. A separate isolated native source build on Coolify 4.4.6 subsequently passed at
+commit add41068b125a136d0e544b5c1533e411a99209d, with matching provider history
+and healthy runtime observed. Existing operator triggers are unchanged.
 See [GitHub App setup](https://coolify.io/docs/applications/sources/github/app).
 
 ## Optional explicit immutable-image builder
@@ -84,8 +85,10 @@ uncertain-build holds/recovery, revoked credentials, native read-only observatio
 and source/repository scope. Existing Docker/owner/UI/MCP suites stay required.
 
 M0 batch 2 remains active. Before a native management handoff or changing triggers,
-verify an isolated real GitHub App source deployment on the installed Coolify
-version and correlate its exact commit/runtime. Before advertising immutable-image
+retain the isolated native source evidence and verify signed push sequencing
+under the proposed ownership contract. Exact-commit source build/runtime observation
+is verified, while the live test uses an explicit staging deployment rather than
+changing the GitHub App webhook or existing triggers. Before advertising immutable-image
 build deployment, configure and exercise a real trusted builder/registry locally
 and in staging. Git credentials and registry credentials are separate. No native
 source management or private-registry provisioning is claimed by this slice.
@@ -98,3 +101,11 @@ probe proved that Coolify uses an empty build context for that mode, so it canno
 verify source checkout. Native source verification therefore uses the committed
 `examples/github-source/Dockerfile` with the repository root as context. The real
 source test is separately opt-in and must succeed before claiming the native gate.
+
+Native source-context verification passed on 10 October 2026 with fixture
+`lf1ggsrabuf3qifyj305kreo`, provider deployment `69vq60zbyqtvtf6krvhnxryw`, and
+commit `add41068b125a136d0e544b5c1533e411a99209d`. The existing `saleem-personal`
+GitHub App cloned the repository, built its committed Dockerfile, and reached
+healthy runtime. OAP registered an observe-only application and matched the exact
+provider operation. No management handoff, trigger changes, or registry credentials
+were required. The failed inline fixture is retained separately for diagnostics.
