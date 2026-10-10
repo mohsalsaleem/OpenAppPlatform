@@ -3,6 +3,7 @@ import {
   releaseOperation,
   operatorName,
 } from "./runtimeSummary";
+import { ConfigurationRestoreReview } from "./ConfigurationRestoreReview";
 import { healthCheckSummary } from "./HealthCheckFields";
 import { ReleaseControls } from "./ReleaseControls";
 import { RollbackReview } from "./RollbackReview";
@@ -589,6 +590,11 @@ export function ApplicationDetail() {
                     release={d}
                     onQueued={() => setTab("deployments")}
                   />
+                )}
+              {d.state === "succeeded" &&
+                (d.operation || "deploy") === "deploy" &&
+                !observed && (
+                  <ConfigurationRestoreReview application={a} release={d} />
                 )}
               {d.state === "attention" && <RecoveryPanel deployment={d} />}
               <ReleaseControls deployment={d} />

@@ -104,6 +104,26 @@ func TestDockerComponentConnectivityConfigurationScalingAndRestart(t *testing.T)
 	if restart.Steps[0].RemoteDeploymentID != initial.Steps[1].RemoteDeploymentID {
 		t.Fatal("restart replaced the container")
 	}
+
+	recoveredPlan, e := c.PlanConfigurationRestore(ctx, app.ID, initial.ID, current.Version)
+	if e != nil {
+		t.Fatal(e)
+	}
+	current, e = c.RestoreConfiguration(ctx, app.ID, controller.ConfigurationRestoreRequest{ReleaseID: initial.ID, PlanHash: recoveredPlan.PlanHash, AcknowledgeEffects: true}, current.Version)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if fixtureJSON(t, web.URL)["boot"] != after["boot"] {
+		t.Fatal("configuration restore restarted runtime")
+	}
+	applied, e := c.EnqueueVersion(ctx, app.ID, "connected-config-recovery", nil, current.Version)
+	if e != nil {
+		t.Fatal(e)
+	}
+	waitRelease(t, c, applied.ID)
+	if fixtureJSON(t, web.URL)["message"] != "" {
+		t.Fatal("recovered configuration did not apply")
+	}
 	current.Manifest.Components[0].Instances = 2
 	current, e = c.UpdateApplication(ctx, app.ID, current.Manifest, current.Version)
 	if e != nil {
@@ -140,6 +160,7 @@ func TestDockerComponentConnectivityConfigurationScalingAndRestart(t *testing.T)
 	current.Manifest.Components[0].Port = 8025
 	current.Manifest.Components[0].Image = replacement
 	current.Manifest.Components[0].Env = map[string]string{"OAP_TEST_MESSAGE": "config-v2"}
+	current.Manifest.Components[1].Env = map[string]string{"OAP_TEST_MESSAGE": "future-web-config"}
 	current, e = c.UpdateApplication(ctx, app.ID, current.Manifest, current.Version)
 	if e != nil {
 		t.Fatal(e)

@@ -38,6 +38,8 @@ function auditAction(action: string) {
   if (path.includes("/access/credentials"))
     return method === "DELETE" ? "Revoke Agent Token" : "Create Agent Token";
   if (path.includes("/access/members")) return "Update Member Access";
+  if (path.endsWith("/configuration-restores"))
+    return "Restore Saved Configuration";
   if (path.endsWith("/rollbacks")) return "Roll Back Images";
   if (path.endsWith("/restarts")) return "Restart Instance";
   if (path.endsWith("/deployments")) return "Deploy Application";

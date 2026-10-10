@@ -431,6 +431,43 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     page.getByRole("button", { name: "Restart web / 2", exact: true }),
   ).toBeDisabled();
   await expect(page.locator(".release-banner")).toContainText("Completed");
+
+  await page.getByRole("tab", { name: "Activity" }).click();
+  await page
+    .getByRole("button", {
+      name: `Review Configuration from ${selectedFrom.slice(0, 8)}`,
+      exact: true,
+    })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Current saved images stay selected",
+  );
+  await expect(
+    page.getByRole("button", {
+      name: "Restore Saved Configuration",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await page.getByRole("dialog").getByRole("checkbox").check();
+  const configurationSaved = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/configuration-restores"),
+  );
+  await page
+    .getByRole("button", { name: "Restore Saved Configuration", exact: true })
+    .click();
+  const savedResponse = await configurationSaved;
+  expect(savedResponse.status()).toBe(200);
+  const restoredDefinition = await savedResponse.json();
+  expect(restoredDefinition.manifest.components[0].port).toBe(8080);
+  expect(restoredDefinition.manifest.components[0].image).toBe(
+    process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE,
+  );
+  await page.getByRole("tab", { name: "Settings" }).click();
+  await expect(page.getByLabel("Internal Port for web")).toHaveValue("8080");
+  await page.getByRole("tab", { name: "Overview" }).click();
+  await expect(live).toContainText("Healthy");
   await page.screenshot({
     path: "../.local/ui-live-instances.png",
     fullPage: true,

@@ -57,8 +57,9 @@ transaction across OAP and the runtime.
 
 Desired configuration, source event cursors and historical releases are not rewound.
 After rollback, a later ordinary deployment can reapply the current desired images.
-Configuration rollback, schema compatibility automation, native source rollback,
-stateful reconstruction and cancellation/abandonment remain future work. Older
+Reviewed saved-configuration recovery is available separately; it does not apply
+runtime changes. Schema compatibility automation, native source rollback and stateful
+reconstruction remain future work. Cancellation/abandonment use release controls. Older
 controllers do not enforce the new rollback preconditions; metadata readability alone
 is not execution compatibility.
 
@@ -89,3 +90,35 @@ source event and both rollback/return terminal records and provenance were verif
 Existing backups/databases remain retained. No application data/schema restore or
 controller-binary rollback was performed. These tests establish the stateless image-only
 contract, not compatibility for stateful workloads or migrations.
+
+## Reviewed saved-configuration recovery
+
+A successful, fully health-verified deployment can supply configuration for the
+next release through `GET /api/v1/applications/{id}/configuration-restore-plan`
+with `releaseId` and `expectedVersion`. The plan shows masked setting changes;
+variable values and endpoint addresses are excluded. It preserves the current
+saved image references. OAP-owned component identities, ownership, target,
+environment and replica counts must match. Unverified or partial snapshots,
+observed/adopted resources and active/attention work are rejected.
+
+`POST /api/v1/applications/{id}/configuration-restores` accepts `releaseId`,
+`expectedVersion`, `planHash` and `acknowledgeEffects: true`. Application locking,
+version checks, target authority hashing, scoped operate access and mutation audit
+protect the save. Repeated submissions with the old version conflict; inspect the
+current definition after an uncertain response rather than blindly retrying.
+A stale target or changed definition requires a fresh review.
+
+The restore saves a new desired configuration version. It neither dispatches an
+operator operation nor rewinds source-event cursors or release history. Review
+and deploy separately to apply runtime settings; current images remain selected
+and must be compatible with the recovered ports, variables and health settings.
+An absent historical managed health override is represented explicitly as image
+health checking when removing a current override.
+
+Application data and database schema remain outside this operation. Before a
+stateful recovery, establish image/configuration/schema compatibility, quiesce
+writers through the native operator, select an independently verified backup and
+restore through that system's documented procedure. OAP does not infer that an
+older image or configuration reverses a migration, reconstructs volumes, or
+restores external secrets. Native source workflows retain their operator-owned
+recovery path. Automatic stateful/schema recovery is not delivered by this slice.

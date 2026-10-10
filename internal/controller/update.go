@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"github.com/jackc/pgx/v5"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
 	"maps"
 
@@ -23,6 +24,16 @@ func (c *Controller) UpdateApplication(ctx context.Context, id string, m domain.
 		return domain.Application{}, e
 	}
 	defer tx.Rollback(ctx)
+
+	updated, e := c.updateApplicationTx(ctx, tx, id, m, version)
+	if e != nil {
+		return domain.Application{}, e
+	}
+	return updated, tx.Commit(ctx)
+}
+
+func (c *Controller) updateApplicationTx(ctx context.Context, tx pgx.Tx, id string, m domain.Manifest, version int64) (domain.Application, error) {
+	var e error
 	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", id); e != nil {
 		return domain.Application{}, e
 	}
@@ -80,5 +91,5 @@ func (c *Controller) UpdateApplication(ctx context.Context, id string, m domain.
 	if e != nil {
 		return domain.Application{}, e
 	}
-	return updated, tx.Commit(ctx)
+	return updated, nil
 }

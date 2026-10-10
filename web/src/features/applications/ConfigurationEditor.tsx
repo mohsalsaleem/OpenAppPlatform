@@ -36,6 +36,13 @@ export function ConfigurationEditor({
   const dirty = JSON.stringify(draft) !== JSON.stringify(base.manifest);
   const stale = app.version !== base.version;
   useEffect(() => {
+    if (stale && !dirty && !Object.values(invalid).some(Boolean)) {
+      setBase(app);
+      setDraft(structuredClone(app.manifest));
+      setSaved(false);
+    }
+  }, [app, stale, dirty, invalid]);
+  useEffect(() => {
     if (!dirty && !Object.values(invalid).some(Boolean)) return;
     const prevent = (event: BeforeUnloadEvent) => {
       event.preventDefault();

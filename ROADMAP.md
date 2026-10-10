@@ -162,8 +162,11 @@ review/acknowledgement and metadata restore checks passed. Cancellation before d
 local cancellation, restart, fence, provider reconciliation, concurrency, permissions
 and browser checks passed. The controller is healthy in staging; completed-release controls
 reject with 409 and the hosted review UI passed without changing stored release state.
-Configuration/data/schema rollback remains
-in this batch. See [release controls](docs/release-controls.md). See [controlled image rollback](docs/image-rollback.md). Batch 4 stays active.
+Configuration recovery now has a reviewed, version/hash-checked saved-definition
+restore path from a fully verified release. It preserves current saved images,
+requires unchanged component identities/replica counts, blocks active/uncertain work,
+and keeps deployment separate. Runtime/data/schema restoration and stateful recovery
+remain in this batch; this first configuration slice does not complete batch 4. See [release controls](docs/release-controls.md). See [controlled image rollback](docs/image-rollback.md). Batch 4 stays active.
 Readiness and dependency slices passed local/native Docker and staging UI verification;
 comparison passed local snapshot/scope/masking and staging UI/API verification. Native HTTP
 probes were subsequently provisioned on the separate health-check fixture. The later image-only rollback test deliberately redeployed the
