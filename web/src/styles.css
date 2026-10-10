@@ -1548,3 +1548,8 @@ summary {
     flex-shrink: 0;
   }
 }
+
+.release-banner > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

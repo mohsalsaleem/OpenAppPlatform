@@ -37,6 +37,12 @@ const release = {
   definitionVersion: 3,
   state: "succeeded",
   operation: "deploy",
+  source: {
+    repository: "mohsalsaleem/OpenAppPlatform",
+    commit: "a".repeat(40),
+    ref: "refs/heads/main",
+    deliveryId: "audit-delivery",
+  },
   manifest: {
     ...app.manifest,
     components: [{ ...app.manifest.components[0], image }],
@@ -149,9 +155,17 @@ async function fixtures(page: Page, preview = false) {
           id: "event",
           action:
             "POST /api/v1/applications/" + "a".repeat(90) + "/deployments",
-          subject: "member",
+          subject: "Audit Owner",
           kind: "session",
           status: 202,
+          createdAt: "2026-10-10T12:00:00Z",
+        },
+        {
+          id: "public-login",
+          action: "auth.login",
+          subject: "Anonymous",
+          kind: "",
+          status: 200,
           createdAt: "2026-10-10T12:00:00Z",
         },
       ],
@@ -280,14 +294,25 @@ test("workspace settings, readable mobile navigation and long audit details stay
   ).toBeVisible();
   await expect(page.locator(".topbar")).toContainText("Workspace Access");
   await page.getByRole("button", { name: "Audit Log", exact: true }).click();
+  const auditPanel = page.locator(".panel").filter({
+    has: page.getByRole("heading", { name: "Audit Log", exact: true }),
+  });
+  await expect(auditPanel).toContainText("Audit Owner");
+  await expect(auditPanel).toContainText("Anonymous");
+  await expect(auditPanel.getByText("Sign In", { exact: true })).toBeVisible();
   await expect(
     page.getByText("Deploy Application", { exact: true }),
   ).toBeVisible();
-  await page.getByText("Request Details", { exact: true }).click();
-  await expect(page.locator("code")).toContainText("a".repeat(90));
+  const deployAudit = auditPanel
+    .locator(".step")
+    .filter({ has: page.getByText("Deploy Application", { exact: true }) });
+  await deployAudit.getByText("Request Details", { exact: true }).click();
+  await expect(deployAudit.locator("code")).toContainText("a".repeat(90));
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
     ),
   ).toBeTruthy();
   await page.screenshot({
@@ -311,7 +336,9 @@ test("workspace settings, readable mobile navigation and long audit details stay
   await expect(page.getByLabel("Select Already Grouped Web")).toBeDisabled();
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
     ),
   ).toBeTruthy();
   await page.screenshot({
@@ -338,7 +365,9 @@ test("preview navigation, instance rows and long images fit on mobile", async ({
     [...document.querySelectorAll("body *")]
       .filter((el) => {
         const r = el.getBoundingClientRect();
-        return r.width > 0 && r.right > innerWidth + 1;
+        return (
+          r.width > 0 && r.right > document.documentElement.clientWidth + 1
+        );
       })
       .slice(0, 8)
       .map((el) => ({
@@ -350,7 +379,9 @@ test("preview navigation, instance rows and long images fit on mobile", async ({
   expect(overflow).toEqual([]);
   expect(
     await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth,
     ),
   ).toBeTruthy();
   await page.screenshot({

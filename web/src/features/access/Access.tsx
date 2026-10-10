@@ -27,6 +27,7 @@ type Event = {
   createdAt: string;
 };
 function auditAction(action: string) {
+  if (action === "auth.login") return "Sign In";
   if (action.startsWith("github.push")) return "GitHub Push";
   const [method, path = ""] = action.split(" ");
   if (path.endsWith("/auth/setup")) return "Create Owner Account";
@@ -340,15 +341,9 @@ export function Access() {
                 </p>
               </details>
               <p className="small muted">
-                {members.data?.find((m) => m.id === event.subject)?.name ||
-                  (event.kind === "agent"
-                    ? event.credentialName || "Agent"
-                    : event.action.startsWith("github.push")
-                      ? "GitHub"
-                      : "Unknown Actor")}
                 {event.kind === "agent"
-                  ? ` · Agent: ${event.credentialName}`
-                  : ""}{" "}
+                  ? `Agent: ${event.credentialName || event.subject || "Unnamed Agent"}`
+                  : event.subject || "Unknown Actor"}{" "}
                 · {new Date(event.createdAt).toLocaleString()}
               </p>
             </div>
