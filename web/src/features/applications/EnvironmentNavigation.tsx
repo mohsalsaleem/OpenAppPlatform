@@ -70,7 +70,13 @@ export function EnvironmentNavigation({
       client.invalidateQueries({ queryKey: ["applications"] });
     },
   });
-  if (!group) return null;
+  if (
+    !group ||
+    (organization &&
+      (!canLink ||
+        (group.environments.length === 1 && candidates.length === 0)))
+  )
+    return null;
   if (!organization)
     return (
       <nav

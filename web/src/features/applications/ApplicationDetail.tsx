@@ -11,7 +11,7 @@ import { WorkflowOwnership } from "./WorkflowOwnership";
 import { EnvironmentNavigation } from "./EnvironmentNavigation";
 import { SourceEvents } from "./SourceEvents";
 import { useCanOperate } from "../../access";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -54,6 +54,8 @@ export function ApplicationDetail() {
   } | null>(null);
   const [review, setReview] = useState<Application | null>(null);
   const [logs, setLogs] = useState("");
+  const [logLoading, setLogLoading] = useState(false);
+  const logRequest = useRef(0);
   const [logInstance, setLogInstance] = useState("");
   const [logError, setLogError] = useState("");
   const [restartReview, setRestartReview] = useState<Instance | null>(null);
@@ -140,17 +142,21 @@ export function ApplicationDetail() {
     },
   });
   async function showLogs(component: string, ordinal = 1) {
+    const request = ++logRequest.current;
+    setTab("logs");
+    setLogLoading(true);
+    setLogError("");
+    setLogs("");
+    setLogInstance(`${component} / ${ordinal}`);
     try {
-      setLogError("");
-      setLogs("");
-      setLogInstance(`${component} / ${ordinal}`);
       const x = await api<{ logs: string }>(
         `/applications/${id}/logs/${component}?ordinal=${ordinal}`,
       );
-      setLogs(x.logs);
-      setTab("logs");
+      if (request === logRequest.current) setLogs(x.logs);
     } catch (e) {
-      setLogError((e as Error).message);
+      if (request === logRequest.current) setLogError((e as Error).message);
+    } finally {
+      if (request === logRequest.current) setLogLoading(false);
     }
   }
   if (app.isPending) return <Loading />;
@@ -621,7 +627,14 @@ export function ApplicationDetail() {
             . Logs can include application data.
           </p>
           <pre className="log-output">
-            {logs || "Select a deployed component to fetch its logs."}
+            {logLoading
+              ? "Fetching logs…"
+              : logs ||
+                (logError
+                  ? "Logs could not be loaded. Select the instance to retry."
+                  : logInstance
+                    ? "No log lines returned for this instance."
+                    : "Select a deployed component to fetch its logs.")}
           </pre>
         </section>
       </div>
@@ -716,9 +729,13 @@ export function ApplicationDetail() {
           <h2 id="deploy-title">Deploy {a.manifest.name}?</h2>
           <p>
             This starts standard deployments for{" "}
-            {review.manifest.components.length} components on{" "}
-            <strong>{review.manifest.targetId}</strong> using definition v
-            {review.version}.
+            {review.manifest.components.length} component
+            {review.manifest.components.length === 1 ? "" : "s"} on{" "}
+            <strong>
+              {targets.data?.find((t) => t.id === review.manifest.targetId)
+                ?.name || review.manifest.targetId}
+            </strong>{" "}
+            using definition v{review.version}.
           </p>
           <p className="muted">
             Existing managed instances may restart. Standard deployment can

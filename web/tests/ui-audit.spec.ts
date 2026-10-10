@@ -105,7 +105,7 @@ async function fixtures(page: Page, preview = false) {
           commit: "a".repeat(40),
           definitionVersion: 3,
           binding: { repository: "team/web", branch: "main" },
-          builds: { web: { id: "build", state: "succeeded", image } },
+          builds: { web: { id: "build", state: "built", image } },
           updatedAt: "2026-10-10T12:00:00Z",
         },
       ],
@@ -192,6 +192,7 @@ test("operational hierarchy, deployment image differences, source result, keyboa
     dialog.getByRole("region", { name: "Deployment image changes" }),
   ).toContainText(image);
   await expect(dialog).toContainText(proposed);
+  await expect(dialog).toContainText("1 component on Staging Coolify");
   await page.keyboard.press("Escape");
   const overview = page.getByRole("tab", { name: "Overview" });
   await overview.focus();
@@ -209,7 +210,13 @@ test("operational hierarchy, deployment image differences, source result, keyboa
     page.getByLabel("From Release").locator("option").first(),
   ).toContainText("Rollback");
   await expect(page.locator(".recovery-panel")).toHaveCount(0);
+  await expect(page.getByRole("tabpanel", { name: "Activity" })).toContainText(
+    "Built",
+  );
   await page.getByRole("tab", { name: "Settings" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Environment Organization" }),
+  ).toHaveCount(0);
   await page.getByLabel("Health Check Mode for web").selectOption("http");
   await expect(page.getByLabel("Require Healthy Status for web")).toBeChecked();
   await expect(
@@ -350,4 +357,52 @@ test("preview navigation, instance rows and long images fit on mobile", async ({
     path: "../.local/ui-audit-fixed-runtime-mobile.png",
     fullPage: true,
   });
+});
+
+test("delayed log responses preserve navigation and the latest selected instance", async ({
+  page,
+}) => {
+  await fixtures(page);
+  let completeFirst: (() => void) | undefined;
+  const first = new Promise<void>((resolve) => {
+    completeFirst = resolve;
+  });
+  let requestStarted: (() => void) | undefined;
+  const started = new Promise<void>((resolve) => {
+    requestStarted = resolve;
+  });
+  await page.route(
+    `**/api/v1/applications/${app.id}/logs/web?ordinal=1`,
+    async (route) => {
+      requestStarted!();
+      await first;
+      await route.fulfill({ json: { logs: "older instance response" } });
+    },
+  );
+  await page.route(
+    `**/api/v1/applications/${app.id}/logs/web?ordinal=2`,
+    (route) => route.fulfill({ json: { logs: "latest instance response" } }),
+  );
+  await page.goto(`/applications/${app.id}`);
+  await page.getByRole("tab", { name: "Logs" }).click();
+  await page.getByRole("button", { name: "web / 1", exact: true }).click();
+  await started;
+  await expect(page.locator(".log-output")).toHaveText("Fetching logs…");
+  await page.getByRole("button", { name: "web / 2", exact: true }).click();
+  await expect(page.locator(".log-output")).toHaveText(
+    "latest instance response",
+  );
+  await page.getByRole("tab", { name: "Settings" }).click();
+  const finished = page.waitForResponse((response) =>
+    response.url().endsWith("/logs/web?ordinal=1"),
+  );
+  completeFirst!();
+  await finished;
+  await expect(page.getByRole("tab", { name: "Settings" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.locator(".log-output")).toHaveText(
+    "latest instance response",
+  );
 });

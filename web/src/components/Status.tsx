@@ -24,8 +24,12 @@ export function statusLabel(value: string) {
     "retired:running": "Retired · Still Running",
     released: "Deployment Created",
     building: "Building",
+    built: "Built",
   };
-  return labels[value] || value.replaceAll("_", " ");
+  return (
+    labels[value] ||
+    value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase())
+  );
 }
 export function Status({ value }: { value: string }) {
   const good = value === "succeeded" || value === "running:healthy";

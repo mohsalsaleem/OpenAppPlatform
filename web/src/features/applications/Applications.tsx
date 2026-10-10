@@ -46,10 +46,11 @@ export function Applications() {
       </div>
       <div className="section-heading application-list-heading">
         <span className="small muted">
-          {q.data?.length ?? "—"} applications
+          {q.data?.length ?? "—"} application{q.data?.length === 1 ? "" : "s"}
         </span>
         <span className="small muted">
-          {targets.data?.length ?? "—"} deployment targets
+          {targets.data?.length ?? "—"} deployment target
+          {targets.data?.length === 1 ? "" : "s"}
         </span>
       </div>
       <ErrorBox error={q.error} />

@@ -158,7 +158,7 @@ export function App() {
                 My Workspace
                 <small>
                   {identity.data
-                    ? `${identity.data.name} · ${identity.data.role}`
+                    ? `${identity.data.name} · ${({ owner: "Owner", operator: "Operator", viewer: "Viewer" } as Record<string, string>)[identity.data.role] || identity.data.role}`
                     : "Self-hosted"}
                 </small>
               </div>

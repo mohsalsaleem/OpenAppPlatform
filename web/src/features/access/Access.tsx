@@ -324,7 +324,8 @@ export function Access() {
       <section className="panel" hidden={section !== "audit"}>
         <h2>Audit Log</h2>
         <p className="muted">
-          Latest 100 mutation attempts. Request bodies and secrets are excluded.
+          Latest 100 actions and request outcomes. Open application Activity for
+          deployment progress.
         </p>
         {audit.data?.map((event) => (
           <div className="step" key={event.id}>
@@ -342,7 +343,9 @@ export function Access() {
                 {members.data?.find((m) => m.id === event.subject)?.name ||
                   (event.kind === "agent"
                     ? event.credentialName || "Agent"
-                    : "Workspace Member")}
+                    : event.action.startsWith("github.push")
+                      ? "GitHub"
+                      : "Unknown Actor")}
                 {event.kind === "agent"
                   ? ` · Agent: ${event.credentialName}`
                   : ""}{" "}
@@ -352,9 +355,13 @@ export function Access() {
             <span className="environment">
               {!event.status
                 ? "Pending"
-                : event.status < 400
-                  ? "Succeeded"
-                  : "Rejected"}
+                : event.status === 202
+                  ? "Accepted"
+                  : event.status >= 500
+                    ? "Failed"
+                    : event.status < 400
+                      ? "Succeeded"
+                      : "Rejected"}
             </span>
           </div>
         ))}
