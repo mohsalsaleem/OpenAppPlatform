@@ -1173,24 +1173,29 @@ input.inline-checkbox {
   overflow-x: auto;
   margin-top: 12px;
 }
-.configuration-diff table {
+.configuration-diff table,
+.release-comparison table {
   width: 100%;
   border-collapse: collapse;
 }
 .configuration-diff th,
-.configuration-diff td {
+.configuration-diff td,
+.release-comparison th,
+.release-comparison td {
   text-align: left;
   padding: 9px 12px;
   border-bottom: 1px solid var(--border);
   vertical-align: top;
   overflow-wrap: anywhere;
 }
-.configuration-diff th {
+.configuration-diff th,
+.release-comparison th {
   color: #64748b;
   font-size: 12px;
   font-weight: 500;
 }
-.configuration-diff td {
+.configuration-diff td,
+.release-comparison td {
   font-size: 13px;
 }
 

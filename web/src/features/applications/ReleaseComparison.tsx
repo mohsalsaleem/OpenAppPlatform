@@ -40,7 +40,10 @@ export function ReleaseComparison({
   const fromId = from || releases[1]?.id || "",
     toId = to || releases[0]?.id || "";
   return (
-    <section className="panel" aria-label="Release comparison">
+    <section
+      className="panel release-comparison"
+      aria-label="Release comparison"
+    >
       <h2>Compare releases</h2>
       <p className="small muted">
         Compare frozen requested definitions and image references. This does not
@@ -55,7 +58,7 @@ export function ReleaseComparison({
         <>
           <div className="form-grid compact">
             <div>
-              <label htmlFor="compare-from">Earlier release</label>
+              <label htmlFor="compare-from">From release</label>
               <select
                 id="compare-from"
                 value={fromId}
@@ -73,7 +76,7 @@ export function ReleaseComparison({
               </select>
             </div>
             <div>
-              <label htmlFor="compare-to">Later release</label>
+              <label htmlFor="compare-to">To release</label>
               <select
                 id="compare-to"
                 value={toId}
@@ -96,7 +99,11 @@ export function ReleaseComparison({
             disabled={
               !fromId || !toId || fromId === toId || comparison.isPending
             }
-            onClick={() => comparison.mutate({ from: fromId, to: toId })}
+            onClick={() => {
+              setFrom(fromId);
+              setTo(toId);
+              comparison.mutate({ from: fromId, to: toId });
+            }}
           >
             {comparison.isPending ? "Comparing…" : "Compare selected releases"}
           </button>
@@ -110,8 +117,7 @@ export function ReleaseComparison({
               (release, index) => (
                 <div key={`${index}-${release.id}`}>
                   <h3>
-                    {index === 0 ? "Earlier" : "Later"} ·{" "}
-                    {release.id.slice(0, 8)}
+                    {index === 0 ? "From" : "To"} · {release.id.slice(0, 8)}
                   </h3>
                   <p className="small muted">
                     {release.operation} · definition v
@@ -143,8 +149,8 @@ export function ReleaseComparison({
                 <thead>
                   <tr>
                     <th>Field</th>
-                    <th>Earlier</th>
-                    <th>Later</th>
+                    <th>From</th>
+                    <th>To</th>
                   </tr>
                 </thead>
                 <tbody>
