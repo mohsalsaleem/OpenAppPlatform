@@ -112,8 +112,11 @@ PostgreSQL, Docker, browser/MCP regressions and owner/mobile workflows passed on
 selected-component immutable-image release plumbing, explicit uncertain-build
 recovery, and read-only existing Coolify GitHub App tracking are implemented.
 Native GitHub App source build/exact-commit/healthy runtime observation passed
-on Coolify 4.4.6 using the existing personal GitHub App. Signed trigger ownership
-and real builder/registry staging evidence remain acceptance requirements. Existing triggers stay unchanged. See
+on Coolify 4.4.6 using the existing personal GitHub App. Signed push intake through the real SSH builder/registry and two healthy Coolify
+replicas passed isolated staging verification. Duplicate delivery and saved-build
+receipt reuse passed. The payload was test-signed, not a new GitHub-origin delivery;
+live repository hook activation and hosted builder installation remain explicit
+operator configuration. Existing triggers stay unchanged. See
 [GitHub releases](docs/github-releases.md). Do not advance to batch 3 yet.
 
 ### Next ordered batches

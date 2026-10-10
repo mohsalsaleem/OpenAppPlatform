@@ -90,7 +90,7 @@ under the proposed ownership contract. Exact-commit source build/runtime observa
 is verified, while the live test uses an explicit staging deployment rather than
 changing the GitHub App webhook or existing triggers. Before advertising immutable-image
 build deployment, configure and exercise a real trusted builder/registry locally
-and in staging. Git credentials and registry credentials are separate. No native
+and in staging. The signed server-build staging test below now supplies that evidence. Git credentials and registry credentials are separate. No native
 source management or private-registry provisioning is claimed by this slice.
 
 ### Native staging fixture
@@ -133,3 +133,25 @@ commit provenance, saved build receipt reuse, two replicas sharing one registry
 digest, healthy runtime and completed redelivery. It sends a signed test payload;
 it does not register a GitHub repository hook or change existing App triggers.
 Do not run it against production or the hosted controller's live database.
+
+### Signed immutable-image staging evidence
+
+On 10 October 2026, `TestLiveSignedServerBuildCoolifyReplicas` passed in 35.74
+seconds using commit `e610d2f91139dfe8d85087b78b67d5be43d81d61`. Signed intake
+created event `4517dd3f5fdee32c678a6d3799ff1ec3` and release
+`62dd6adbf5390d8acea621662f9b4587`. The server build ID was
+`e40fdb28ef755ab8395b01dc8f1edb1d`. Its immutable artifact was
+`127.0.0.1:5001/openappplatform/signed-staging@sha256:731095ddc173afad23718e449b9b8fb4d5a9f28c7b1bd751ed40e262961385e4`.
+Both retained Coolify fixtures (`gt9jqss5zwln3ysrwlo30wbx`,
+`7pednplu78ftyjf02zioon3e`) reported that digest and healthy runtime. Signature
+rejection, duplicate event/release identity and completed builder receipt reuse
+passed. The controller and isolated test schema ran locally; the server build,
+registry and workloads were real. Test-schema metadata is removed after the test,
+and the non-secret receipt retains its provenance.
+
+This closes the real builder/registry staging verification gate. It does not
+claim a delivery originated at GitHub: the test signs a push-shaped payload.
+Enabling a live repository webhook is an explicit configuration step for an
+owner-selected application/branch. Existing GitHub App webhook ownership stays
+unchanged. The hosted staging controller has no installed image-builder command;
+this test does not grant it SSH keys or Docker socket access.

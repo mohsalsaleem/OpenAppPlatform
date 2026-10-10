@@ -208,3 +208,13 @@ operation, mount workaround, manual backup/restore and restart evidence are in
 invalid bootstrap rejection were checked over validated HTTPS. Real owner signup
 and authenticated live product journeys await the owner's account; local owner
 browser integration coverage remains the evidence for those flows.
+
+## Signed source-to-replica staging verification
+
+The opt-in `TestLiveSignedServerBuildCoolifyReplicas` passed on 10 October 2026
+with a real SSH server build, loopback registry and two healthy Coolify replicas
+sharing one digest. Invalid signatures, duplicate intake, completed redelivery
+and repeated builder receipt reuse passed. Source commit, event/release IDs,
+image digest, retained resources and scope limits are recorded in
+[GitHub releases](github-releases.md). This is a signed test payload through a
+local controller, not a claim of GitHub-origin delivery to the hosted controller.
