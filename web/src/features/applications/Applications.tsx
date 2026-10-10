@@ -4,7 +4,6 @@ import {
   ArrowUpRight,
   Box,
   Component as ComponentIcon,
-  Layers3,
   Plus,
 } from "lucide-react";
 import { api, type Application, type Target } from "../../api";
@@ -25,7 +24,7 @@ export function Applications() {
           <p className="eyebrow">BUILD ON YOUR OWN TERMS</p>
           <h1>Your applications</h1>
           <p className="muted">
-            Everything that makes your product run, together.
+            Manage components, configuration, and releases.
           </p>
         </div>
         <Link className="button primary" to="/applications/new">
@@ -69,35 +68,21 @@ export function Applications() {
         <div className="app-grid">
           {q.data?.map((a) => (
             <Link to={`/applications/${a.id}`} className="app-card" key={a.id}>
-              <div className="card-top">
-                <span className="app-icon">
-                  <Box size={22} />
-                </span>
-                <span className="environment">{a.manifest.environment}</span>
+              <span className="app-icon"><Box size={18} /></span>
+              <div>
+                <h2>{a.manifest.name}</h2>
+                <p>{a.manifest.components.map((c) => c.name).join(" · ")}</p>
               </div>
-              <h2>{a.manifest.name}</h2>
-              <p>{a.manifest.components.map((c) => c.name).join(" · ")}</p>
-              <div className="card-footer">
-                <span>
-                  <ComponentIcon size={14} /> {a.manifest.components.length}{" "}
-                  components
-                </span>
-                <ArrowUpRight size={18} />
-              </div>
+              <span className="environment">{a.manifest.environment}</span>
+              <span className="application-count">
+                <ComponentIcon size={14} /> {a.manifest.components.length} components
+              </span>
+              <ArrowUpRight className="application-arrow" size={16} />
             </Link>
           ))}
         </div>
       )}
-      <div className="note">
-        <Layers3 size={20} />
-        <div>
-          <strong>A common application layer. Your existing operator.</strong>
-          <p>
-            Coolify runs your workloads. OpenAppPlatform keeps their
-            configuration and release progress together.
-          </p>
-        </div>
-      </div>
+
     </>
   );
 }
