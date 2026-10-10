@@ -55,3 +55,24 @@ system tests cover frozen policy through definition changes, controller restart,
 timeout and exact-operation recovery without redispatch. Browser tests exercise
 settings and the readable diff. HTTP probe configuration, dependency ordering,
 release comparison, rollback and cancellation remain later slices of batch 4.
+
+## Staging verification and compatibility
+
+Deployed `831c59924ba0c99443d82ba57fd5674afb2abb15` to existing staging through
+Coolify deployment `bwntrrgovn5pkv4gfqacuq6d`; runtime and health endpoint passed.
+Local exact-tree run `20261010-213725-f1911a18` passed unit, PostgreSQL system,
+native Docker lifecycle/health and browser tests. The live owner UI verified legacy
+defaults, editing/diff, reload and sign-out without saving application changes. The
+retained source release and both replicas remain healthy with their original digest.
+Strict gate/timeout/recovery behavior was tested locally; no new hosted workload
+release or native health-check change was used for this verification.
+
+Database schema remains at migration 010; the tested staging backup and previous
+healthy image remain retained. Older controller binaries do not enforce the new
+policy. Metadata readability alone is not semantic rollback compatibility: do not
+use a pre-readiness controller to process releases that require the new gate without
+an explicit compatibility review. Runtime release rollback remains future batch 4
+work and will not restore application data.
+
+The same observation deadline also bounds retirement waiting; retirement continues
+to use stopped-state verification rather than the healthy requirement.

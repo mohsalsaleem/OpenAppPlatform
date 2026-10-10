@@ -13,9 +13,9 @@ environments:
     status: healthy
     coolify_application_uuid: 2bs31xhjzmfi3w0aulusi7zy
     url: https://oap-staging.mohsal.dev
-    image: 127.0.0.1:5001/openappplatform/staging@sha256:a6f67c1cd5eba203e89cb78ed8999d5a59185754a27a804fe80cc44321fcc2f3
-    commit: a98365a403156705f6a0e3057ef7b0cc0ce34697
-    provider_deployment_uuid: vtojokj23sjb5koi34ssunes
+    image: 127.0.0.1:5001/openappplatform/staging@sha256:cbd21cf79df24a9216fbc58c4cc4b1bb0ecfc7e6646bfa155a443cd171a15a48
+    commit: 831c59924ba0c99443d82ba57fd5674afb2abb15
+    provider_deployment_uuid: bwntrrgovn5pkv4gfqacuq6d
     auth_mode: owner
     owner_setup: complete
     configuration_storage_uuid: a2q7lc8ehu6twekwj1bcng8m

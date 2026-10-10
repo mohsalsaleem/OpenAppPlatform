@@ -140,7 +140,7 @@ See [application environments](docs/application-environments.md) and
 
 **Next slice:** M0 batch 4, release verification and recovery controls. Start with
 configurable readiness and the release snapshot/recovery contract; keep native
-observed workloads read-only. The acceptance work queued this batch; the readiness slice is now in progress. Full configuration promotion, native source authority transitions and the M1
+observed workloads read-only. The acceptance work queued this batch; the first readiness slice is delivered. Full configuration promotion, native source authority transitions and the M1
 credential vault remain separate follow-up work. The initial reusable definition
 contract is sanitized naming/layout reuse, not secret or runtime cloning.
 
@@ -149,6 +149,8 @@ observation deadlines are frozen with release definitions and honored by recover
 Legacy definitions retain running/health acceptance and a 15-minute window.
 This does not configure native HTTP probes. Dependency ordering, release comparison,
 rollback and cancellation/abandonment remain in this batch. Batch 4 stays active.
+The slice passed local/native Docker and staging UI verification. No native HTTP
+probe was provisioned and no retained workload was redeployed by these checks.
 See [release readiness](docs/release-readiness.md).
 
 **Accepted operator-first correction:** primary onboarding is configure/connect
