@@ -13,9 +13,9 @@ environments:
     status: healthy
     coolify_application_uuid: 2bs31xhjzmfi3w0aulusi7zy
     url: https://oap-staging.mohsal.dev
-    image: 127.0.0.1:5001/openappplatform/staging@sha256:ee746e5db0c92997387d0815d563900a914f54644bcf64451d29ed8474897389
-    commit: d7b2b0d2e4b7535a35963017e354acd69e38f6ad
-    provider_deployment_uuid: jhsguq4282vnxwzgplrfgjjf
+    image: 127.0.0.1:5001/openappplatform/staging@sha256:c95ed1b0bf0be93e1153524096f0b75d432125eb172753f19bb6e845387a9a20
+    commit: 09801982e325178f8c0e62c8ece87dd1f6a4007c
+    provider_deployment_uuid: 0yatraphzfxotpkerayadr9m
     auth_mode: owner
     owner_setup: complete
     configuration_storage_uuid: a2q7lc8ehu6twekwj1bcng8m
@@ -120,3 +120,17 @@ release_control_verification:
   hosted_review_application_writes: 0
   existing_source_release: preserved
   existing_source_replicas: healthy
+
+native_health_check_verification:
+  verified: 2026-10-10
+  platform_commit: 09801982e325178f8c0e62c8ece87dd1f6a4007c
+  local_run: 20261010-234238-50d9aa22
+  logical_application_id: 9fa43bc72bd0e228561ec1d707aa9769
+  native_resource_uuid: xzuvc4porsxzryja7ohefynu
+  http_release_id: fe1c5f20d1ad44bc76e37da73c10d297
+  image_check_release_id: bf4a134501f7419de789bc1a105be21a
+  final_health_check_mode: image
+  runtime: healthy
+  fixture: retained_for_repeatable_staging_e2e
+  metadata_backup: /home/saleem/.local/share/openappplatform/backups/staging-20261010T195007Z.dump
+  restore_check_database: openappplatform_staging_health_restore_check

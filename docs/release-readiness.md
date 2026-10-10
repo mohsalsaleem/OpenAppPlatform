@@ -53,7 +53,7 @@ No migration is required: the additive optional field lives in existing JSON
 manifests. Unit tests cover defaults/bounds/statuses and Docker runtime identity;
 system tests cover frozen policy through definition changes, controller restart,
 timeout and exact-operation recovery without redispatch. Browser tests exercise
-settings and the readable diff. Dependency ordering, release comparison, image-only rollback and release controls are delivered. Native HTTP health check implementation is undergoing local end-to-end verification; broader configuration/data rollback remains in batch 4.
+settings and the readable diff. Dependency ordering, release comparison, image-only rollback and release controls are delivered. Native HTTP health checks passed local and Coolify staging end-to-end verification; broader configuration/data rollback remains in batch 4.
 
 ## Staging verification and compatibility
 
@@ -104,7 +104,7 @@ This is release/start ordering, not continuous dependency monitoring, a transact
 across services, parallel orchestration, reverse shutdown ordering or a promise that
 health cannot change after a check. Selected dependencies use their recorded release
 verification; unselected ones use live checks. A race between check and provider
-dispatch remains possible. HTTP probes and runtime rollback are still later work.
+dispatch remains possible. Native HTTP probes and image-only rollback are delivered; broader configuration/data rollback remains in batch 4.
 
 Settings exposes dependency selection and a readable graph diff; release review and
 activity show frozen edges. The connected Docker example waits for API native health

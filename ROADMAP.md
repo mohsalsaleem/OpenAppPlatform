@@ -147,7 +147,11 @@ contract is sanitized naming/layout reuse, not secret or runtime cloning.
 **Batch 4 progress:** optional per-component operator-health gates and bounded
 observation deadlines are frozen with release definitions and honored by recovery.
 Legacy definitions retain running/health acceptance and a 15-minute window.
-Native HTTP health check configuration is implemented for OAP-owned image workloads on Docker/Coolify; reproducible verification is in progress. Explicit dependency ordering now gates preparation/dispatch, verifies all selected
+Native HTTP health check configuration is delivered for OAP-owned image workloads on
+Docker/Coolify. Reproducible native Docker endpoint success/failure/image-return,
+controller drift/restart/recovery, browser deployment, and real Coolify HTTP/image-return
+checks passed. A single reusable stateless staging fixture is retained; frozen probe
+metadata passed backup/restore verification. See [native health checks](docs/native-health-checks.md). Explicit dependency ordering now gates preparation/dispatch, verifies all selected
 replicas first, and inspects unselected bound dependencies without redeploying them.
 Pre-dispatch dependency holds can resume without repeating an uncertain dispatch.
 Read-only frozen release/artifact comparison now includes masked runtime-key diffs
@@ -161,8 +165,8 @@ reject with 409 and the hosted review UI passed without changing stored release 
 Configuration/data/schema rollback remains
 in this batch. See [release controls](docs/release-controls.md). See [controlled image rollback](docs/image-rollback.md). Batch 4 stays active.
 Readiness and dependency slices passed local/native Docker and staging UI verification;
-comparison passed local snapshot/scope/masking and staging UI/API verification. No native HTTP
-probe was provisioned. The later image-only rollback test deliberately redeployed the
+comparison passed local snapshot/scope/masking and staging UI/API verification. Native HTTP
+probes were subsequently provisioned on the separate health-check fixture. The later image-only rollback test deliberately redeployed the
 dedicated stateless fixture and returned both replicas to their original digest.
 See [release readiness](docs/release-readiness.md) and
 [release comparison](docs/release-comparison.md).
