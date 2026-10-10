@@ -18,9 +18,12 @@ import (
 )
 
 type Server struct {
-	Controller *controller.Controller
-	Token      string
-	WebDir     string
+	Preview      bool
+	SetupToken   string
+	SecureCookie bool
+	Controller   *controller.Controller
+	Token        string
+	WebDir       string
 }
 
 func (s *Server) Handler() http.Handler {
@@ -34,6 +37,12 @@ func (s *Server) Handler() http.Handler {
 		}
 		write(w, 200, map[string]string{"status": "ok"})
 	})
+	mux.HandleFunc("GET /api/v1/auth/status", s.publicAccess)
+	if !s.Preview {
+		mux.HandleFunc("POST /api/v1/auth/setup", s.publicAccess)
+		mux.HandleFunc("POST /api/v1/auth/login", s.publicAccess)
+		mux.HandleFunc("POST /api/v1/auth/invitations/accept", s.publicAccess)
+	}
 	mux.Handle("/api/", s.auth(s.routes()))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if s.WebDir == "" {
@@ -56,6 +65,9 @@ func (s *Server) Handler() http.Handler {
 	})
 }
 func (s *Server) auth(next http.Handler) http.Handler {
+	if !s.Preview {
+		return s.ownerAuth(next)
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") || s.Token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(s.Token)) != 1 {
@@ -103,9 +115,12 @@ func decode(w http.ResponseWriter, r *http.Request, dst any) error {
 }
 func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
+	if !s.Preview {
+		s.accessRoutes(mux)
+	}
 	c := s.Controller
 	mux.HandleFunc("GET /api/v1/meta", func(w http.ResponseWriter, r *http.Request) {
-		write(w, 200, map[string]any{"name": "OpenAppPlatform", "version": "0.2.0-dev", "strategies": []string{"standard"}, "adapters": []string{"coolify", "docker"}})
+		write(w, 200, map[string]any{"name": "OpenAppPlatform", "version": "0.2.0-dev", "workspaceId": "default", "strategies": []string{"standard"}, "adapters": []string{"coolify", "docker"}})
 	})
 	mux.HandleFunc("GET /api/v1/targets", func(w http.ResponseWriter, r *http.Request) {
 		x, e := c.Store.Targets(r.Context())

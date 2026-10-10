@@ -1,3 +1,4 @@
+import { useCanOperate } from "../../access";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +15,7 @@ import {
 import { RuntimeVariables } from "./RuntimeVariables";
 import { ErrorBox, Loading } from "../../components/Feedback";
 export function NewApplication() {
+  const canOperate = useCanOperate();
   const navigate = useNavigate();
   const client = useQueryClient();
   const targets = useQuery({
@@ -356,6 +358,7 @@ export function NewApplication() {
           <button
             className="primary"
             disabled={
+              !canOperate ||
               !selected ||
               mutation.isPending ||
               components.some((c) => invalid[c.editorId])

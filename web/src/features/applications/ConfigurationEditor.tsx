@@ -1,3 +1,4 @@
+import { useCanOperate } from "../../access";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Save, RotateCcw } from "lucide-react";
@@ -15,6 +16,7 @@ export function ConfigurationEditor({
 }: {
   application: Application;
 }) {
+  const canOperate = useCanOperate();
   const client = useQueryClient();
   const [base, setBase] = useState(app);
   const [draft, setDraft] = useState<Manifest>(() =>
@@ -91,6 +93,7 @@ export function ConfigurationEditor({
             className="primary"
             onClick={() => save.mutate()}
             disabled={
+              !canOperate ||
               !dirty ||
               stale ||
               save.isPending ||

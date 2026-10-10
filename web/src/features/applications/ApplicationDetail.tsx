@@ -1,3 +1,4 @@
+import { useCanOperate } from "../../access";
 import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,6 +29,7 @@ const when = (s: string) =>
     minute: "2-digit",
   });
 export function ApplicationDetail() {
+  const canOperate = useCanOperate();
   const { id } = useParams();
   const client = useQueryClient();
   const [handoff, setHandoff] = useState("");
@@ -162,7 +164,7 @@ export function ApplicationDetail() {
         </div>
         <button
           className="primary"
-          disabled={!!active || observed}
+          disabled={!canOperate || !!active || observed}
           onClick={() => setReview(structuredClone(a))}
         >
           <ArrowUpRight size={17} />
@@ -263,7 +265,7 @@ export function ApplicationDetail() {
                     <button
                       className="secondary"
                       onClick={() => setHandoff(c.name)}
-                      disabled={!!active}
+                      disabled={!canOperate || !!active}
                     >
                       Enable management for {c.name}
                     </button>
@@ -273,7 +275,7 @@ export function ApplicationDetail() {
                   !c.resourceId && (
                     <button
                       className="secondary"
-                      disabled={!!active}
+                      disabled={!canOperate || !!active}
                       onClick={() =>
                         setScaleReview({
                           component: c.name,
@@ -344,6 +346,7 @@ export function ApplicationDetail() {
                   <button
                     className="secondary"
                     disabled={
+                      !canOperate ||
                       !!active ||
                       !instance.resourceId ||
                       instance.retired ||

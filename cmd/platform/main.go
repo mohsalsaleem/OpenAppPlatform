@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/access"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/config"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/controller"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/httpapi"
@@ -33,7 +34,11 @@ func run() error {
 	flag.Parse()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
-	if len(os.Getenv("OAP_API_TOKEN")) < 24 {
+	preview := os.Getenv("OAP_AUTH_MODE") == "preview"
+	if mode := os.Getenv("OAP_AUTH_MODE"); mode != "" && mode != "owner" && mode != "preview" {
+		return errors.New("OAP_AUTH_MODE must be owner or preview")
+	}
+	if preview && len(os.Getenv("OAP_API_TOKEN")) < 24 {
 		return errors.New("OAP_API_TOKEN must contain at least 24 characters")
 	}
 	url := os.Getenv("DATABASE_URL")
@@ -47,6 +52,16 @@ func run() error {
 	defer s.Pool.Close()
 	if e = s.Migrate(ctx); e != nil {
 		return e
+	}
+	ownerExists, e := (access.Service{Pool: s.Pool}).HasOwner(ctx)
+	if e != nil {
+		return e
+	}
+	if preview && ownerExists {
+		return errors.New("preview mode is disabled once an owner account exists")
+	}
+	if !preview && !ownerExists && len(os.Getenv("OAP_SETUP_TOKEN")) < 24 {
+		return errors.New("first-run owner setup requires OAP_SETUP_TOKEN with at least 24 characters")
 	}
 	if *targetFile != "" {
 		b, e := os.ReadFile(*targetFile)
@@ -74,6 +89,7 @@ func run() error {
 	if e != nil {
 		return e
 	}
+	c.RequireIdentity = !preview
 	if e = c.Jobs.Start(ctx); e != nil {
 		return e
 	}
@@ -86,7 +102,13 @@ func run() error {
 	if addr == "" {
 		addr = "127.0.0.1:8787"
 	}
-	server := &http.Server{Addr: addr, Handler: (&httpapi.Server{Controller: c, Token: os.Getenv("OAP_API_TOKEN"), WebDir: *web}).Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 45 * time.Second, IdleTimeout: 60 * time.Second}
+	if preview || os.Getenv("OAP_COOKIE_SECURE") == "false" {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil || net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback() {
+			return errors.New("preview mode or insecure local cookies require a loopback bind address")
+		}
+	}
+	server := &http.Server{Addr: addr, Handler: (&httpapi.Server{Preview: preview, SetupToken: os.Getenv("OAP_SETUP_TOKEN"), SecureCookie: os.Getenv("OAP_COOKIE_SECURE") != "false", Controller: c, Token: os.Getenv("OAP_API_TOKEN"), WebDir: *web}).Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 45 * time.Second, IdleTimeout: 60 * time.Second}
 	listener, e := net.Listen("tcp", addr)
 	if e != nil {
 		return e

@@ -5,7 +5,7 @@ import { createReadStream as streamFile } from 'node:fs';
 import http from 'node:http';
 
 const report={status:'running',startedAt:new Date().toISOString(),steps:[],expectedSkips:['TestLiveCoolifyLifecycle','TestLiveCoolifyRuntimeConfiguration','TestLiveCoolifyObserveOnlyAssembly']};
-const env={...process.env,OAP_API_TOKEN:randomBytes(32).toString('base64url'),OAP_ADDR:'127.0.0.1:8787'};
+const env={...process.env,OAP_API_TOKEN:randomBytes(32).toString('base64url'),OAP_ADDR:'127.0.0.1:8787',OAP_AUTH_MODE:'preview'};
 delete env.COOLIFY_TOKEN;delete env.COOLIFY_URL;delete env.OAP_LIVE_COOLIFY;
 let platform;
 async function persist(){await writeFile('/report/suite.json',JSON.stringify(report,null,2)+'\n');}
@@ -52,7 +52,7 @@ try{
  platform=spawn('/opt/oap/platform',['-targets','/workspace/.local/observed-targets.json','-web','/workspace/web/dist'],{env,stdio:['ignore','pipe','pipe']});
  let platformLog='';platform.stdout.on('data',b=>platformLog+=b);platform.stderr.on('data',b=>platformLog+=b);
  await waitReady();
- await run('browser','node',['node_modules/@playwright/test/cli.js','test'],'/workspace/web');
+ await run('browser','node',['node_modules/@playwright/test/cli.js','test','tests/workspace.spec.ts'],'/workspace/web');
  for(const name of await readdir('/workspace/.local'))if(name.endsWith('.png'))await copyFile('/workspace/.local/'+name,'/report/'+name);
  const input=[{jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2024-11-05',capabilities:{},clientInfo:{name:'local-test',version:'1'}}},{jsonrpc:'2.0',id:2,method:'tools/list'},{jsonrpc:'2.0',id:3,method:'tools/call',params:{name:'list_applications',arguments:{}}}].map(v=>JSON.stringify(v)+'\n').join('');
  const mcp=spawn('/opt/oap/oap-mcp',['-url',env.OAP_BASE_URL],{env,stdio:['pipe','pipe','pipe']});let output='';mcp.stdout.on('data',b=>output+=b);mcp.stdin.end(input);const mcpCode=await new Promise((r,j)=>{mcp.on('error',j);mcp.on('close',r)});const messages=output.trim().split('\n').map(JSON.parse);
@@ -60,6 +60,14 @@ try{
  report.steps.push({name:'mcp-smoke',exitCode:0});
  platform.kill('SIGTERM');await new Promise(r=>platform.on('close',r));platform=null;
  await writeFile('/report/platform.log',platformLog);
+ env.OAP_AUTH_MODE='owner';env.OAP_SETUP_TOKEN=randomBytes(32).toString('base64url');env.OAP_COOKIE_SECURE='false';delete env.OAP_API_TOKEN;
+ platform=spawn('/opt/oap/platform',['-targets','/workspace/.local/observed-targets.json','-web','/workspace/web/dist'],{env,stdio:['ignore','pipe','pipe']});
+ let ownerLog='';platform.stdout.on('data',b=>ownerLog+=b);platform.stderr.on('data',b=>ownerLog+=b);
+ await waitReady();
+ await run('owner-browser','node',['node_modules/@playwright/test/cli.js','test','tests/auth.spec.ts'],'/workspace/web');
+ platform.kill('SIGTERM');await new Promise(r=>platform.on('close',r));platform=null;
+ await writeFile('/report/owner-platform.log',ownerLog);
+ for(const name of await readdir('/workspace/.local'))if(name.endsWith('.png'))await copyFile('/workspace/.local/'+name,'/report/'+name);
  report.status='passed';
 }catch(error){report.status='failed';report.error=error.message;console.error(error);process.exitCode=1}
-finally{if(platform)platform.kill('SIGTERM');report.finishedAt=new Date().toISOString();await persist();console.log(`\n[local-test] ${report.status}`)}
+finally{try{for(const name of await readdir('/workspace/.local'))if(name.endsWith('.png'))await copyFile('/workspace/.local/'+name,'/report/'+name)}catch{};if(platform)platform.kill('SIGTERM');report.finishedAt=new Date().toISOString();await persist();console.log(`\n[local-test] ${report.status}`)}

@@ -1036,10 +1036,9 @@ pre {
   margin-bottom: 12px;
 }
 .app-card {
-  grid-template-columns: 36px minmax(0, 1fr) 90px minmax(
-      100px,
-      160px
-    ) 120px 20px;
+  grid-template-columns:
+    36px minmax(0, 1fr) 90px minmax(100px, 160px)
+    120px 20px;
 }
 .application-target {
   color: #64748b;
@@ -1104,4 +1103,35 @@ pre {
 .tabs > span {
   padding: 10px 0;
   font-size: 13px;
+}
+
+.connect-card form label:not(:first-child) {
+  margin-top: 12px;
+}
+.account-switch {
+  color: #2563eb;
+  margin-top: 16px;
+}
+.access-select {
+  width: 130px;
+}
+.one-time-secret {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .sidebar-bottom {
+    display: flex;
+    margin: 0;
+    padding: 0;
+  }
+  .sidebar-bottom > span {
+    display: none;
+  }
+  .sidebar-bottom button {
+    font-size: 0;
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+  }
 }

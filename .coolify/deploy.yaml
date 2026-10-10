@@ -20,7 +20,7 @@ environments:
       strategy: none
     required_secrets:
       - DATABASE_URL
-      - OAP_API_TOKEN
+      - OAP_SETUP_TOKEN
       - COOLIFY_TOKEN
 integration:
   context: mac-studio

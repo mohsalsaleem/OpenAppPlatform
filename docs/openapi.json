@@ -3,7 +3,7 @@
   "info": {
     "title": "OpenAppPlatform API",
     "version": "0.2.0-dev",
-    "description": "Single-workspace preview. HTTP 202 means a release was queued; poll its deployment ID for completion."
+    "description": "Single self-hosted workspace with owner sessions, invite-only roles, app-scoped agents and mutation audit. HTTP 202 queues a release; poll its ID. Preview mode is isolated/local only."
   },
   "servers": [
     {
@@ -13,6 +13,9 @@
   "security": [
     {
       "BearerAuth": []
+    },
+    {
+      "SessionCookie": []
     }
   ],
   "paths": {
@@ -1461,6 +1464,586 @@
           }
         }
       }
+    },
+    "/api/v1/auth/status": {
+      "get": {
+        "summary": "Owner setup status",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Missing or expired credential"
+          },
+          "403": {
+            "description": "Role, scope or CSRF rejected"
+          },
+          "409": {
+            "description": "Already configured or conflicting account"
+          },
+          "422": {
+            "description": "Invalid input"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/auth/setup": {
+      "post": {
+        "summary": "Create the first owner using the installation setup secret",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Missing or expired credential"
+          },
+          "403": {
+            "description": "Role, scope or CSRF rejected"
+          },
+          "409": {
+            "description": "Already configured or conflicting account"
+          },
+          "422": {
+            "description": "Invalid input"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-OAP-CSRF",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required for browser-cookie and public account writes."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 256
+                  }
+                },
+                "required": [
+                  "email",
+                  "name",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "SetupSecret": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "summary": "Sign in and issue an HttpOnly session cookie",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Missing or expired credential"
+          },
+          "403": {
+            "description": "Role, scope or CSRF rejected"
+          },
+          "409": {
+            "description": "Already configured or conflicting account"
+          },
+          "422": {
+            "description": "Invalid input"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-OAP-CSRF",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required for browser-cookie and public account writes."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/auth/invitations/accept": {
+      "post": {
+        "summary": "Accept an email-bound one-time invitation",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Missing or expired credential"
+          },
+          "403": {
+            "description": "Role, scope or CSRF rejected"
+          },
+          "409": {
+            "description": "Already configured or conflicting account"
+          },
+          "422": {
+            "description": "Invalid input"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-OAP-CSRF",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required for browser-cookie and public account writes."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 256
+                  },
+                  "invite": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "name",
+                  "password",
+                  "invite"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "summary": "Get current credential identity and workspace",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Missing or expired credential"
+          },
+          "403": {
+            "description": "Role, scope or CSRF rejected"
+          },
+          "409": {
+            "description": "Already configured or conflicting account"
+          },
+          "422": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "summary": "Revoke current session",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Missing or expired credential"
+          },
+          "403": {
+            "description": "Role, scope or CSRF rejected"
+          },
+          "409": {
+            "description": "Already configured or conflicting account"
+          },
+          "422": {
+            "description": "Invalid input"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-OAP-CSRF",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required for browser-cookie and public account writes."
+          }
+        ]
+      }
+    },
+    "/api/v1/access/members": {
+      "get": {
+        "summary": "List workspace members (owner sessions only)",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Missing or expired credential"
+          },
+          "403": {
+            "description": "Role, scope or CSRF rejected"
+          },
+          "409": {
+            "description": "Already configured or conflicting account"
+          },
+          "422": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
+    "/api/v1/access/members/{id}": {
+      "patch": {
+        "summary": "Change role or disable a non-owner member",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Missing or expired credential"
+          },
+          "403": {
+            "description": "Role, scope or CSRF rejected"
+          },
+          "409": {
+            "description": "Already configured or conflicting account"
+          },
+          "422": {
+            "description": "Invalid input"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-OAP-CSRF",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required for browser-cookie and public account writes."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "viewer",
+                      "operator"
+                    ]
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "role",
+                  "active"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access/invitations": {
+      "post": {
+        "summary": "Create an invitation, returned once",
+        "responses": {
+          "401": {
+            "description": "Missing or expired credential"
+          },
+          "403": {
+            "description": "Role, scope or CSRF rejected"
+          },
+          "409": {
+            "description": "Already configured or conflicting account"
+          },
+          "422": {
+            "description": "Invalid input"
+          },
+          "201": {
+            "description": "Success"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-OAP-CSRF",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required for browser-cookie and public account writes."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "viewer",
+                      "operator"
+                    ]
+                  }
+                },
+                "required": [
+                  "email",
+                  "role"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access/credentials": {
+      "post": {
+        "summary": "Issue a named app-scoped agent token, returned once",
+        "responses": {
+          "401": {
+            "description": "Missing or expired credential"
+          },
+          "403": {
+            "description": "Role, scope or CSRF rejected"
+          },
+          "409": {
+            "description": "Already configured or conflicting account"
+          },
+          "422": {
+            "description": "Invalid input"
+          },
+          "201": {
+            "description": "Success"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-OAP-CSRF",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required for browser-cookie and public account writes."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "read",
+                      "operate"
+                    ]
+                  },
+                  "applicationId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "scope",
+                  "applicationId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List agent metadata without token values (owner sessions only)",
+        "responses": {
+          "200": {
+            "description": "Latest 100 agent credentials"
+          }
+        }
+      }
+    },
+    "/api/v1/access/credentials/{id}": {
+      "delete": {
+        "summary": "Revoke an agent credential",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Missing or expired credential"
+          },
+          "403": {
+            "description": "Role, scope or CSRF rejected"
+          },
+          "409": {
+            "description": "Already configured or conflicting account"
+          },
+          "422": {
+            "description": "Invalid input"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-OAP-CSRF",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required for browser-cookie and public account writes."
+          }
+        ]
+      }
+    },
+    "/api/v1/access/audit": {
+      "get": {
+        "summary": "Latest 100 audit intents/results, excluding request bodies",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Missing or expired credential"
+          },
+          "403": {
+            "description": "Role, scope or CSRF rejected"
+          },
+          "409": {
+            "description": "Already configured or conflicting account"
+          },
+          "422": {
+            "description": "Invalid input"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1468,6 +2051,18 @@
       "BearerAuth": {
         "type": "http",
         "scheme": "bearer"
+      },
+      "SessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-oap-session",
+        "description": "HttpOnly browser session. Writes require X-OAP-CSRF: 1 and a permitted Origin. Local HTTP uses oap-session instead."
+      },
+      "SetupSecret": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "First-run bootstrap header: Setup <OAP_SETUP_TOKEN>."
       }
     },
     "schemas": {

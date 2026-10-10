@@ -27,10 +27,11 @@ type DeployArgs struct {
 func (DeployArgs) Kind() string { return "oap_deploy" }
 
 type Controller struct {
-	Store        *store.Store
-	Factory      operator.Factory
-	Jobs         *river.Client[pgx.Tx]
-	PollInterval time.Duration
+	RequireIdentity bool
+	Store           *store.Store
+	Factory         operator.Factory
+	Jobs            *river.Client[pgx.Tx]
+	PollInterval    time.Duration
 }
 type Worker struct {
 	river.WorkerDefaults[DeployArgs]
@@ -294,6 +295,9 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	if e != nil {
 		return d, e
 	}
+	if e = c.recordCredential(ctx, tx, d.ID, appID); e != nil {
+		return d, e
+	}
 	if _, e = c.Jobs.InsertTx(ctx, tx, DeployArgs{d.ID}, &river.InsertOpts{MaxAttempts: 10}); e != nil {
 		return d, e
 	}
@@ -387,6 +391,9 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 		if comp.Management == "observe" {
 			return fail(step, "attention", errors.New("observe-only component cannot execute lifecycle operations"))
 		}
+		if e = c.authorizeRelease(ctx, d); e != nil {
+			return fail(step, "attention", e)
+		}
 		switch step.Phase {
 		case "pending":
 			if step.Action == "restart" || step.Action == "retire" {
@@ -411,6 +418,9 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 				if e != nil {
 					return fail(step, "failed", e)
 				}
+				if e = c.authorizeRelease(ctx, d); e != nil {
+					return fail(step, "attention", e)
+				}
 				r, e := a.Ensure(ctx, operator.Spec{Name: domain.ResourceName(d.ApplicationID, comp.Name, step.Ordinal), Ownership: "OpenAppPlatform:" + d.ApplicationID + ":" + comp.Name, Component: runtime, Variables: c.Store.VariableJournal(d.Manifest.TargetID, d.ApplicationID, comp.Name, step.Ordinal)})
 				if e != nil {
 					return e
@@ -428,6 +438,9 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 			}
 			return river.JobSnooze(c.PollInterval)
 		case "prepared":
+			if e = c.authorizeRelease(ctx, d); e != nil {
+				return fail(step, "attention", e)
+			}
 			// Durable dispatch intent prevents automatic reissue after an uncertain response.
 			step.Phase = "dispatching"
 			if e = c.Store.SaveDeployment(ctx, d); e != nil {

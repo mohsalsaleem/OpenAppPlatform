@@ -97,10 +97,12 @@ Unsupported strategies or operators return explicit errors.
 
 ## Security and operational limits
 
-API authentication uses one configured access token with constant-time
-comparison. It is suitable for a local single-owner preview; teams, roles, OIDC,
-credential rotation, and production audit retention are future work. The UI
-stores the platform token in sessionStorage for the current browser tab.
+API authentication defaults to owner sessions, invite-only workspace roles and
+application-scoped agent credentials. Workspace ownership is enforced for the
+single installation; additional tenants are explicitly unsupported. Legacy shared
+preview tokens require a loopback-only mode that refuses an initialized owner
+installation. See [owner access](../owner-access.md) for CSRF, revocation, audit,
+queued-operation checks and host recovery.
 
 Provider connections require HTTPS except localhost. Redirects are not followed.
 Responses and logs are bounded. Provider errors exclude upstream response bodies

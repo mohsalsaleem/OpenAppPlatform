@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import { NavLink, Link, Routes, Route, useLocation } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
   ArrowUpRight,
@@ -9,6 +9,9 @@ import {
   Layers3,
   Server,
 } from "lucide-react";
+import { OperationAccess } from "./access";
+import { AccountGate } from "./components/AccountGate";
+import { Access } from "./features/access/Access";
 import { api, token } from "./api";
 import { ErrorBox } from "./components/Feedback";
 import { Applications } from "./features/applications/Applications";
@@ -18,11 +21,41 @@ import { AssembleApplication } from "./features/applications/AssembleApplication
 import { Targets } from "./features/targets/Targets";
 
 export function App() {
-  const [connected, setConnected] = useState(!!token());
+  const [connected, setConnected] = useState(false);
   const [accessToken, setAccessToken] = useState("");
   const [error, setError] = useState("");
   const client = useQueryClient();
   const location = useLocation();
+  const authStatus = useQuery({
+    queryKey: ["auth-status"],
+    queryFn: async () => {
+      const r = await fetch("/api/v1/auth/status");
+      if (!r.ok) throw new Error("Cannot connect to the platform");
+      return r.json() as Promise<{ mode: string; setupRequired: boolean }>;
+    },
+  });
+  const identity = useQuery({
+    queryKey: ["identity"],
+    queryFn: () => api<{ name: string; role: string }>("/auth/me"),
+    enabled: authStatus.data?.mode === "owner",
+    retry: false,
+  });
+  useEffect(() => {
+    if (authStatus.data?.mode === "preview" && token())
+      api("/meta")
+        .then(() => setConnected(true))
+        .catch(() => sessionStorage.removeItem("oap-token"));
+  }, [authStatus.data?.mode]);
+
+  useEffect(() => {
+    const expired = () => {
+      sessionStorage.removeItem("oap-token");
+      setConnected(false);
+      client.setQueryData(["identity"], null);
+    };
+    window.addEventListener("oap-session-expired", expired);
+    return () => window.removeEventListener("oap-session-expired", expired);
+  }, [client]);
   const pageName =
     location.pathname === "/targets"
       ? "Deployment targets"
@@ -43,7 +76,21 @@ export function App() {
       setError((e as Error).message);
     }
   }
-  if (!connected)
+  if (authStatus.isPending) return <p className="content">Connecting…</p>;
+  if (authStatus.error)
+    return (
+      <div className="content">
+        <ErrorBox error={authStatus.error} />
+      </div>
+    );
+  if (!connected && !identity.data && authStatus.data?.mode === "owner")
+    return (
+      <AccountGate
+        setup={authStatus.data.setupRequired}
+        onConnected={() => setConnected(true)}
+      />
+    );
+  if (!connected && !identity.data)
     return (
       <div className="connect-page">
         <div className="connect-card">
@@ -81,81 +128,112 @@ export function App() {
       </div>
     );
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <Link to="/" className="brand">
-          <span className="brand-icon">
-            <Layers3 size={21} />
-          </span>
-          <span>
-            Open App<span className="brand-sub">Platform</span>
-          </span>
-        </Link>
-        <div className="workspace">
-          <span className="workspace-avatar">W</span>
-          <div>
-            My workspace<small>Self-hosted</small>
+    <OperationAccess.Provider value={identity.data?.role !== "viewer"}>
+      <div className="shell">
+        <aside className="sidebar">
+          <Link to="/" className="brand">
+            <span className="brand-icon">
+              <Layers3 size={21} />
+            </span>
+            <span>
+              Open App<span className="brand-sub">Platform</span>
+            </span>
+          </Link>
+          <div className="workspace">
+            <span className="workspace-avatar">W</span>
+            <div>
+              My workspace
+              <small>
+                {identity.data
+                  ? `${identity.data.name} · ${identity.data.role}`
+                  : "Self-hosted"}
+              </small>
+            </div>
           </div>
-        </div>
-        <p className="nav-label">WORKSPACE</p>
-        <nav>
-          <NavLink to="/" end>
-            <Box size={18} /> Applications
-          </NavLink>
-          <NavLink to="/targets">
-            <Server size={18} /> Deployment targets
-          </NavLink>
-        </nav>
-        <div className="sidebar-bottom">
-          <span className="small">
-            <span className="dot" /> Core preview · v0.2
-          </span>
-          <button
-            className="text-button"
-            onClick={() => {
-              sessionStorage.removeItem("oap-token");
-              client.clear();
-              setConnected(false);
-            }}
-          >
-            <ArrowLeft size={15} /> Disconnect
-          </button>
-        </div>
-      </aside>
-      <main className="main">
-        <header className="topbar">
-          <span>
-            Workspace <span className="slash">/</span> {pageName}
-          </span>
-          <a
-            href="https://github.com/mohsalsaleem/OpenAppPlatform"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <CircleHelp size={16} /> Project docs
-          </a>
-        </header>
-        <div className="content">
-          <Routes>
-            <Route path="/" element={<Applications />} />
-            <Route path="/applications/new" element={<NewApplication />} />
-            <Route path="/applications/:id" element={<ApplicationDetail />} />
-            <Route
-              path="/targets/:id/assemble"
-              element={<AssembleApplication />}
-            />
-            <Route path="/targets" element={<Targets />} />
-            <Route
-              path="*"
-              element={
-                <p>
-                  Page not found. <Link to="/">Go to applications</Link>
-                </p>
-              }
-            />
-          </Routes>
-        </div>
-      </main>
-    </div>
+          <p className="nav-label">WORKSPACE</p>
+          <nav>
+            <NavLink to="/" end>
+              <Box size={18} /> Applications
+            </NavLink>
+            {identity.data?.role === "owner" && (
+              <NavLink to="/access">
+                <Server size={18} /> Workspace access
+              </NavLink>
+            )}
+            <NavLink to="/targets">
+              <Server size={18} /> Deployment targets
+            </NavLink>
+          </nav>
+          <div className="sidebar-bottom">
+            <span className="small">
+              <span className="dot" /> Core preview · v0.2
+            </span>
+            <button
+              className="text-button"
+              onClick={async () => {
+                if (authStatus.data?.mode === "owner") {
+                  try {
+                    await api("/auth/logout", { method: "POST" });
+                  } catch {
+                    return;
+                  }
+                  client.setQueryData(["identity"], null);
+                }
+                sessionStorage.removeItem("oap-token");
+                client.clear();
+                setConnected(false);
+              }}
+            >
+              <ArrowLeft size={15} />{" "}
+              {authStatus.data?.mode === "owner" ? "Sign out" : "Disconnect"}
+            </button>
+          </div>
+        </aside>
+        <main className="main">
+          <header className="topbar">
+            <span>
+              Workspace <span className="slash">/</span> {pageName}
+            </span>
+            <a
+              href="https://github.com/mohsalsaleem/OpenAppPlatform"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <CircleHelp size={16} /> Project docs
+            </a>
+          </header>
+          <div className="content">
+            <Routes>
+              <Route path="/" element={<Applications />} />
+              <Route
+                path="/access"
+                element={
+                  identity.data?.role === "owner" ? (
+                    <Access />
+                  ) : (
+                    <p>Owner access is required.</p>
+                  )
+                }
+              />
+              <Route path="/applications/new" element={<NewApplication />} />
+              <Route path="/applications/:id" element={<ApplicationDetail />} />
+              <Route
+                path="/targets/:id/assemble"
+                element={<AssembleApplication />}
+              />
+              <Route path="/targets" element={<Targets />} />
+              <Route
+                path="*"
+                element={
+                  <p>
+                    Page not found. <Link to="/">Go to applications</Link>
+                  </p>
+                }
+              />
+            </Routes>
+          </div>
+        </main>
+      </div>
+    </OperationAccess.Provider>
   );
 }

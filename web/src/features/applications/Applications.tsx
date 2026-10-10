@@ -1,3 +1,4 @@
+import { useCanOperate } from "../../access";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -9,6 +10,7 @@ import {
 import { api, type Application, type Target } from "../../api";
 import { ErrorBox, Loading } from "../../components/Feedback";
 export function Applications() {
+  const canOperate = useCanOperate();
   const q = useQuery({
     queryKey: ["applications"],
     queryFn: () => api<Application[]>("/applications"),
@@ -27,13 +29,20 @@ export function Applications() {
             Manage components, configuration, and releases.
           </p>
         </div>
-        <Link className="button primary" to="/applications/new">
-          <Plus size={17} /> New application
-        </Link>
+        {canOperate && (
+          <Link className="button primary" to="/applications/new">
+            <Plus size={17} /> New application
+          </Link>
+        )}
       </div>
       <div className="section-heading application-list-heading">
-        <h2>Applications <span className="list-count">{q.data?.length ?? "—"}</span></h2>
-        <span className="small muted">{targets.data?.length ?? "—"} deployment targets</span>
+        <h2>
+          Applications{" "}
+          <span className="list-count">{q.data?.length ?? "—"}</span>
+        </h2>
+        <span className="small muted">
+          {targets.data?.length ?? "—"} deployment targets
+        </span>
       </div>
       <ErrorBox error={q.error} />
       {q.isPending ? (
@@ -51,22 +60,27 @@ export function Applications() {
         <div className="app-grid">
           {q.data?.map((a) => (
             <Link to={`/applications/${a.id}`} className="app-card" key={a.id}>
-              <span className="app-icon"><Box size={18} /></span>
+              <span className="app-icon">
+                <Box size={18} />
+              </span>
               <div>
                 <h2>{a.manifest.name}</h2>
                 <p>{a.manifest.components.map((c) => c.name).join(" · ")}</p>
               </div>
               <span className="environment">{a.manifest.environment}</span>
-              <span className="application-target">{targets.data?.find((t) => t.id === a.manifest.targetId)?.name ?? a.manifest.targetId}</span>
+              <span className="application-target">
+                {targets.data?.find((t) => t.id === a.manifest.targetId)
+                  ?.name ?? a.manifest.targetId}
+              </span>
               <span className="application-count">
-                <ComponentIcon size={14} /> {a.manifest.components.length} components
+                <ComponentIcon size={14} /> {a.manifest.components.length}{" "}
+                components
               </span>
               <ArrowUpRight className="application-arrow" size={16} />
             </Link>
           ))}
         </div>
       )}
-
     </>
   );
 }

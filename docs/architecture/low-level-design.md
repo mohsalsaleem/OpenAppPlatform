@@ -135,3 +135,21 @@ New idempotency fingerprints bind the declared request, not the latest mutable
 definition. A retry of an already admitted request returns its original release
 even after configuration edits. Earlier manifest-based fingerprints remain
 readable through the legacy compatibility path.
+
+## Owner identity foundation
+
+Migration 006 adds the single `default` workspace and explicit workspace foreign
+keys/checks on targets, applications, bindings and releases. Users represent
+memberships in that one workspace, with owner/operator/viewer roles. Opaque
+session/agent credentials store only hashes, kind, app scope, expiry and revocation.
+Invitations store email/role-bound hashes with one-time acceptance. No public
+workspace creation or signup API exists.
+
+HTTP authorization checks current credential and membership state, CSRF/origin,
+role and app scope before routing. Mutations persist an audit intent before running.
+Enqueue binds its credential in the same transaction as the release/job. Owner-mode
+workers recheck that live credential before release preparation and dispatch;
+revocation/expiry/demotion holds work for explicit authorized recovery. Legacy
+completed releases and resource IDs remain unchanged. Scope enforcement for
+multiple tenants requires a future explicit migration; singleton checks currently
+refuse that unsupported topology rather than silently mixing tenants.

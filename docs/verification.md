@@ -163,3 +163,21 @@ environment on 10 October 2026: two existing services, live health and bounded l
 unchanged image/port/description/URL, and no release dispatch. This test is an
 expected skip in the offline suite; its real staging run is separate. It creates
 only temporary local OAP metadata, not remote resources. CI remains disabled.
+
+## Owner access coverage
+
+Password tests check salted storage, successful/wrong-password comparison and
+invalid encodings. PostgreSQL system coverage checks bootstrap protection, a
+single owner, shared-token rejection in owner mode, workspace rejection, viewer
+writes/access administration denial, app-scoped read/operate credentials,
+revocation before queued provider preparation, member disablement, CSRF, logout
+revocation and audit content without secrets.
+
+The reproducible harness runs the existing preview application/browser/MCP checks,
+stops that controller, then starts owner mode against the same isolated database.
+Owner browser coverage performs setup, invite acceptance, read-only UI checks,
+app-scope isolation, session persistence, logout/sign-in and mobile rendering.
+Setup and Access screenshots contain only synthetic account information and no
+visible setup secrets or issued tokens. The harness collects evidence on failure.
+Real Coolify checks are unchanged and remain separately opt-in; auth verification
+uses isolated local operators and does not alter production resources.

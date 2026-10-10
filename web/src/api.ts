@@ -75,12 +75,17 @@ export async function api<T>(
     ...options,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token()}`,
+      ...(token() ? { Authorization: `Bearer ${token()}` } : {}),
+      "X-OAP-CSRF": "1",
       ...options.headers,
     },
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Request failed");
+  if (!res.ok) {
+    if (res.status === 401 && !path.startsWith("/auth/"))
+      window.dispatchEvent(new Event("oap-session-expired"));
+    throw new Error(data.message || "Request failed");
+  }
   return data;
 }
 

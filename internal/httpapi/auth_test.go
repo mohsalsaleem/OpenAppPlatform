@@ -9,7 +9,7 @@ import (
 
 func TestAuthenticationRequiresBearerScheme(t *testing.T) {
 	token := strings.Repeat("s", 32)
-	handler := (&Server{Token: token}).Handler()
+	handler := (&Server{Preview: true, Token: token}).Handler()
 	for _, header := range []string{"", token, "Basic " + token, "Bearer wrong"} {
 		req := httptest.NewRequest("GET", "/api/v1/meta", nil)
 		req.Header.Set("Authorization", header)

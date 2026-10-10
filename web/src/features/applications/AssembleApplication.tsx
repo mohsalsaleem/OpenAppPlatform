@@ -1,3 +1,4 @@
+import { useCanOperate } from "../../access";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -7,6 +8,7 @@ import { ErrorBox, Loading } from "../../components/Feedback";
 import { Status } from "../../components/Status";
 
 export function AssembleApplication() {
+  const canOperate = useCanOperate();
   const { id } = useParams();
   const navigate = useNavigate();
   const client = useQueryClient();
@@ -213,7 +215,7 @@ export function AssembleApplication() {
             </button>
             <button
               className="primary"
-              disabled={!valid || save.isPending}
+              disabled={!canOperate || !valid || save.isPending}
               onClick={() => save.mutate()}
             >
               <Plus size={16} />

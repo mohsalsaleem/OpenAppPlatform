@@ -39,10 +39,11 @@ npm --prefix web run build
 make dev
 ```
 
-Open http://127.0.0.1:8787 and connect using OAP_API_TOKEN from your local
-configuration. Use a random token of at least 24 characters. The UI stores it in
-sessionStorage for that browser tab. This is a single-owner local preview;
-production identity, authorization, and audit retention are not implemented.
+Open http://127.0.0.1:8787 and create the owner account using the private
+OAP_SETUP_TOKEN from your local configuration. Use a random setup secret of at
+least 24 characters. Subsequent visits use email/password sign-in with an HttpOnly
+session cookie. Local HTTP uses OAP_COOKIE_SECURE=false; hosted installations
+retain secure cookies and HTTPS. See [owner access](docs/owner-access.md).
 
 The local PostgreSQL port is 55438 and its data uses a named Docker volume.
 Development credentials in compose.yaml are intentionally local-only. Do not
@@ -113,7 +114,7 @@ credentials. It does not mutate an external Coolify installation. Live fixtures 
 ## Deployment
 
 The Dockerfile builds the UI and Go binary into a non-root image. Supply a
-PostgreSQL database, API token, operator credentials, and a mounted target config;
+PostgreSQL database, first-run setup secret, operator credentials, and a mounted target config;
 pass -targets /path/to/targets.json. The controller can run through Coolify or on
 Docker directly. Running the controller on bare Docker is distinct from the
 future adapter that manages application workloads on bare Docker.
@@ -225,3 +226,15 @@ See [discovery and assembly](docs/discovery-and-assembly.md) for API semantics,
 Docker observation scope, compatibility, and verification. Examples that combine
 new managed components with existing resources require handoff of supported
 observed components before application-wide deployment.
+
+## Owner setup and access
+
+The platform now defaults to owner mode. Configure a private `OAP_SETUP_TOKEN`
+(at least 24 characters) before first launch, then create the owner account in the
+UI. Public signup is disabled; members join with owner-issued invitation codes.
+Workspace access provides roles, application-scoped agent tokens, revocation and
+audit. Existing resources remain in the installation's single workspace.
+
+See [owner access](docs/owner-access.md) for local HTTP configuration, session and
+role behavior, agent scopes, legacy preview compatibility and password recovery.
+`OAP_API_TOKEN` no longer grants platform access in owner mode.

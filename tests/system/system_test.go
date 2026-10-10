@@ -123,7 +123,7 @@ func setup(t *testing.T, f operator.Adapter) (*controller.Controller, *httptest.
 		t.Fatal(e)
 	}
 	c.PollInterval = 20 * time.Millisecond
-	srv := httptest.NewServer((&httpapi.Server{Controller: c, Token: platformToken}).Handler())
+	srv := httptest.NewServer((&httpapi.Server{Preview: true, Controller: c, Token: platformToken}).Handler())
 	t.Cleanup(srv.Close)
 	return c, srv
 }

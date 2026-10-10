@@ -45,8 +45,8 @@ Implemented and tested:
 - Local Docker lifecycle and replacement tests, database/race/browser tests, and
   isolated Coolify staging verification.
 
-The current access token is a local single-owner preview mechanism. Agent identity,
-production authorization, complete stale-state recovery, stateful workload
+Owner setup/sign-in, workspace roles, app-scoped agent credentials, and baseline
+audit are available. Full multi-tenant isolation, complete stale-state recovery, stateful workload
 management, and automatic discovery/assembly are not complete.
 
 ## Delivery sequence
@@ -96,9 +96,20 @@ Read-only live staging verification grouped two existing services without a rele
 or provider configuration mutation. Source-backed handoff remains deferred.
 See [discovery and assembly](docs/discovery-and-assembly.md).
 
-**Current slice:** M0 batch 2, GitHub-triggered release ownership. Complete that
-acceptance gate before application/environment organization. The ordered batches
-below are unchanged.
+**Accepted priority change:** establish the minimal owner-auth/workspace foundation
+before GitHub release ownership, as requested on 10 October 2026. The original M0
+queue otherwise stays in order. Full M1 hardening remains separate.
+
+**Completed priority slice:** owner setup/sign-in, invite-only roles,
+single-workspace ownership, scoped/revocable app credentials, baseline mutation
+audit, queued-operation authorization, and offline password recovery. Local
+PostgreSQL, Docker, browser/MCP regressions and owner/mobile workflows passed on
+10 October 2026. See [owner access](docs/owner-access.md).
+
+**Current slice:** M0 batch 2, GitHub-triggered release ownership.
+
+**Next:** return to M0 batch 2, GitHub-triggered release ownership, before
+application/environment organization.
 
 ### Next ordered batches
 
@@ -160,7 +171,8 @@ and external analytics/model services are not dependencies of the M0 stack.
 
 ### Authentication and agent identity
 
-Replace the shared preview token with owner authentication and separately issued
+The minimal owner/session and scoped-agent foundation is now implemented. Extend
+owner authentication and separately issued
 agent/service credentials. Support revocation, expiry, and scopes for applications,
 environments, targets, and actions. Store credential verifiers rather than raw
 bearer tokens. A secure browser session must not expose operator credentials.
@@ -535,8 +547,8 @@ workloads on eligible targets.
 
 ## Next implementation slice
 
-Start M0 batch 2, GitHub-triggered release ownership, followed by the ordered queue
-above. Source-backed management handoff and GitHub sequencing must
+Resume M0 batch 2, GitHub-triggered release ownership, followed by the ordered
+queue above. Source-backed management handoff and GitHub sequencing must
 be verified before disabling an existing operator trigger. Preserve the KISS stack,
 local pre-push gate, and capability-aware behavior. Auth, remote agents, AI guardrails,
 and generative UI remain deferred; production exposure still requires M1 gates.

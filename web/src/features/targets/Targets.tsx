@@ -1,3 +1,4 @@
+import { useCanOperate } from "../../access";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -48,6 +49,7 @@ export function Targets() {
   );
 }
 function TargetCard({ target: t }: { target: Target }) {
+  const canOperate = useCanOperate();
   const [discover, setDiscover] = useState(false);
   const q = useQuery({
     queryKey: ["resources", t.id],
@@ -64,9 +66,11 @@ function TargetCard({ target: t }: { target: Target }) {
           </p>
         </div>
         <div className="log-buttons">
-          <Link className="button primary" to={`/targets/${t.id}/assemble`}>
-            Group services
-          </Link>
+          {canOperate && (
+            <Link className="button primary" to={`/targets/${t.id}/assemble`}>
+              Group services
+            </Link>
+          )}
           <button
             className="secondary"
             onClick={() => {

@@ -50,6 +50,9 @@ func (c *Controller) Recover(ctx context.Context, id string, request Recovery) (
 	if err != nil {
 		return d, err
 	}
+	if err = c.recordCredential(ctx, tx, id, d.ApplicationID); err != nil {
+		return d, err
+	}
 	if d.State != "attention" || !d.UpdatedAt.Equal(request.ExpectedUpdatedAt) {
 		return d, domain.ErrConflict
 	}
