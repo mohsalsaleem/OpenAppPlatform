@@ -153,3 +153,47 @@ func TestRetirementPreservesContainerAndVerifiesIdentity(t *testing.T) {
 		t.Fatal(status, e)
 	}
 }
+
+func TestExternalObservationCannotMutateContainers(t *testing.T) {
+	id := strings.Repeat("a", 64)
+	mutations := 0
+	c := fakeClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			mutations++
+			w.WriteHeader(500)
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "/containers/json") {
+			json.NewEncoder(w).Encode([]any{})
+			return
+		}
+		if strings.HasSuffix(r.URL.Path, "-next/json") {
+			w.WriteHeader(404)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"Id": id, "Name": "/external", "Config": map[string]any{"Image": "nginx:alpine", "Labels": map[string]string{}}, "State": map[string]any{"Status": "running", "Running": true}, "NetworkSettings": map[string]any{"Ports": map[string]any{"80/tcp": nil}}})
+	})
+	c.settings.ObserveContainers = []string{id}
+	resources, err := c.Discover(context.Background())
+	if err != nil || len(resources) != 1 || resources[0].ID != id || resources[0].Port != 80 {
+		t.Fatalf("discovery %+v %v", resources, err)
+	}
+	if _, err = c.Inspect(context.Background(), id); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = c.Inspect(context.Background(), "external"); err == nil {
+		t.Fatal("mutable name accepted")
+	}
+	if _, err = c.Restart(context.Background(), id); err == nil {
+		t.Fatal("external restart accepted")
+	}
+	if _, err = c.Deploy(context.Background(), id); err == nil {
+		t.Fatal("external deploy accepted")
+	}
+	if err = c.Stop(context.Background(), id); err == nil {
+		t.Fatal("external stop accepted")
+	}
+	if mutations != 0 {
+		t.Fatal("external container mutated")
+	}
+}

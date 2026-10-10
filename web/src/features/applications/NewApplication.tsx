@@ -72,6 +72,7 @@ export function NewApplication() {
       components: components.map(({ editorId: _editorId, ...c }) => ({
         ...c,
         resourceId: c.resourceId || undefined,
+        management: c.resourceId ? "observe" : undefined,
       })),
     });
   }
@@ -208,6 +209,10 @@ export function NewApplication() {
                                 resourceId: e.target.value,
                                 image: r?.image || v.image,
                                 instances: r ? 1 : v.instances,
+                                hostPort: r ? 0 : v.hostPort,
+                                env: {},
+                                services: {},
+                                serviceEndpoints: {},
                                 port: r?.port || v.port,
                               }
                             : v,
@@ -219,10 +224,15 @@ export function NewApplication() {
                       Create a new managed resource on deployment
                     </option>
                     {resources.data
-                      ?.filter((r) => r.image && r.artifactKind === "image")
+                      ?.filter(
+                        (r) =>
+                          !r.applicationId &&
+                          r.image &&
+                          r.artifactKind === "image",
+                      )
                       .map((r) => (
                         <option key={r.id} value={r.id}>
-                          Adopt {r.name}
+                          Observe {r.name}
                         </option>
                       ))}
                   </select>

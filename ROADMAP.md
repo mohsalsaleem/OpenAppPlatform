@@ -86,9 +86,19 @@ operator/owner-managed. Docker supports both app-local DNS and explicit endpoint
 Coolify retirement remains unsupported. Local Docker, PostgreSQL, browser/mobile,
 and MCP regression checks continue to pass.
 
-**Current slice:** M0 batch 1, guided discovery and manual application assembly.
-Complete that acceptance gate before starting GitHub release ownership. The
-ordered batches below are unchanged.
+### Completed slice: guided discovery and manual application assembly
+
+Existing Coolify image/source services and explicitly scoped Docker containers
+can be grouped through Select → Review → Create observed application. Target-scoped
+reservations, health/logs, blocked lifecycle actions, and separate image-backed
+Coolify handoff passed local system/browser verification on 10 October 2026.
+Read-only live staging verification grouped two existing services without a release
+or provider configuration mutation. Source-backed handoff remains deferred.
+See [discovery and assembly](docs/discovery-and-assembly.md).
+
+**Current slice:** M0 batch 2, GitHub-triggered release ownership. Complete that
+acceptance gate before application/environment organization. The ordered batches
+below are unchanged.
 
 ### Next ordered batches
 
@@ -525,8 +535,8 @@ workloads on eligible targets.
 
 ## Next implementation slice
 
-Start M0 batch 1, guided discovery and manual application assembly, followed by the
-ordered queue above. Source-backed management handoff and GitHub sequencing must
+Start M0 batch 2, GitHub-triggered release ownership, followed by the ordered queue
+above. Source-backed management handoff and GitHub sequencing must
 be verified before disabling an existing operator trigger. Preserve the KISS stack,
 local pre-push gate, and capability-aware behavior. Auth, remote agents, AI guardrails,
 and generative UI remain deferred; production exposure still requires M1 gates.

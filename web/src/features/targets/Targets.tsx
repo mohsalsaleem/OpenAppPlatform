@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Server } from "lucide-react";
@@ -62,15 +63,20 @@ function TargetCard({ target: t }: { target: Target }) {
             {t.operator} · {t.environment} · {t.url}
           </p>
         </div>
-        <button
-          className="secondary"
-          onClick={() => {
-            setDiscover(true);
-            if (discover) q.refetch();
-          }}
-        >
-          Inspect resources
-        </button>
+        <div className="log-buttons">
+          <Link className="button primary" to={`/targets/${t.id}/assemble`}>
+            Group services
+          </Link>
+          <button
+            className="secondary"
+            onClick={() => {
+              setDiscover(true);
+              if (discover) q.refetch();
+            }}
+          >
+            Inspect resources
+          </button>
+        </div>
       </div>
       <ErrorBox error={q.error} />
       {discover &&

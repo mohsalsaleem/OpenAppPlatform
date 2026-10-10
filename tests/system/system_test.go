@@ -34,7 +34,7 @@ type fake struct {
 }
 
 func (f *fake) Capabilities() operator.Capabilities {
-	return operator.Capabilities{Standard: true, Discovery: true}
+	return operator.Capabilities{ManagementHandoff: true, Standard: true, Discovery: true}
 }
 func (f *fake) Discover(context.Context) ([]operator.Resource, error) {
 	f.mu.Lock()
@@ -302,12 +302,14 @@ func TestLiveCoolifyLifecycle(t *testing.T) {
 	if m.Components[0].Image == "" {
 		t.Fatal("COOLIFY_TEST_IMAGE is required; use an immutable image digest")
 	}
-	status, raw := request(t, srv, "POST", "/api/v1/applications", "", m)
-	if status != 201 {
-		t.Fatalf("create: %d %s", status, raw)
+	// Restore the existing managed fixture as a legacy application. New imports
+	// now start observe-only and use the separately tested handoff workflow.
+	app, e := c.Store.CreateApplication(context.Background(), m)
+	if e != nil {
+		t.Fatal(e)
 	}
-	var app domain.Application
-	json.Unmarshal(raw, &app)
+	var status int
+	var raw []byte
 	status, raw = request(t, srv, "POST", "/api/v1/applications/"+app.ID+"/deployments", "live-first-release", nil)
 	if status != 202 {
 		t.Fatalf("deploy: %d %s", status, raw)
@@ -404,6 +406,7 @@ func TestAdoptionCannotBindResourceToTwoApplications(t *testing.T) {
 	m := manifest()
 	m.Components[0].Instances = 1
 	m.Components[0].ResourceID = "existing"
+	m.Components[0].Port = 0
 	if _, e := c.CreateApplication(context.Background(), m); e != nil {
 		t.Fatal(e)
 	}

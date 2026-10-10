@@ -275,3 +275,72 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     fullPage: true,
   });
 });
+
+test("group existing Docker services without deploying or restarting", async ({
+  page,
+}) => {
+  test.skip(
+    !process.env.OAP_TEST_OBSERVED_RESOURCE,
+    "Requires isolated observation fixture",
+  );
+  await page.goto("/");
+  await page
+    .getByLabel("Platform access token")
+    .fill(process.env.OAP_API_TOKEN!);
+  await page.getByRole("button", { name: "Connect to workspace" }).click();
+  await page.getByRole("link", { name: "Deployment targets" }).click();
+  await page.getByRole("link", { name: "Group services" }).click();
+  await page.getByLabel("Select existing-observation-fixture").check();
+  await page.getByRole("button", { name: "Review 1 services" }).click();
+  await page
+    .getByLabel("Application name", { exact: true })
+    .fill(`observed-browser-${Date.now()}`);
+  await page
+    .getByLabel("Component name for existing-observation-fixture")
+    .fill("web");
+  await page.screenshot({
+    path: "../.local/ui-assembly-review.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Create observed application" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Observing existing services" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Observe-only application" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Restart web / 1", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.locator(".step").filter({ hasText: "web / 1" }),
+  ).toContainText("running");
+  await page.getByRole("button", { name: "View web instance 1 logs" }).click();
+  await expect(page.locator(".log-output")).not.toContainText(
+    "Select a deployed component",
+  );
+  await page.getByRole("tab", { name: "Activity" }).click();
+  await expect(page.getByText("No deployments yet.")).toBeVisible();
+  await page.getByRole("tab", { name: "Overview" }).click();
+  await page.screenshot({
+    path: "../.local/ui-observed-application.png",
+    fullPage: true,
+  });
+  await page.getByRole("link", { name: "Deployment targets" }).click();
+  await page.getByRole("link", { name: "Group services" }).click();
+  await expect(
+    page.getByLabel("Select existing-observation-fixture"),
+  ).toBeDisabled();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({
+    path: "../.local/ui-assembly-mobile.png",
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBeTruthy();
+});

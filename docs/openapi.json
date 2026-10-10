@@ -1403,6 +1403,64 @@
         },
         "description": "Docker managed components only. Requires a lower positive count, definition version, and idempotency key. Stops selected instances without deleting resources or volumes; count changes only after all stops are confirmed. Configuration edits and other operations are blocked during retirement. Bindings remain reserved and can be reactivated by deployment."
       }
+    },
+    "/api/v1/applications/{id}/management": {
+      "post": {
+        "summary": "Enable lifecycle management for one observed Coolify image service; no provider mutation",
+        "operationId": "enableComponentManagement",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "component",
+                  "expectedVersion"
+                ],
+                "properties": {
+                  "component": {
+                    "type": "string"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Handoff recorded; definition version increased",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale definition or active operation"
+          },
+          "422": {
+            "description": "Unsupported handoff, source-backed resource, or configuration/ownership drift"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1446,8 +1504,9 @@
           },
           "port": {
             "type": "integer",
-            "minimum": 1,
-            "maximum": 65535
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "Zero allowed only for observe-only resources whose operator does not report a port."
           },
           "instances": {
             "type": "integer",
@@ -1506,6 +1565,13 @@
               "format": "uri",
               "maxLength": 2048
             }
+          },
+          "management": {
+            "type": "string",
+            "enum": [
+              "observe"
+            ],
+            "description": "New existing-resource registrations always start observe-only. Omitted on existing managed definitions. Enable lifecycle management using the explicit handoff endpoint."
           }
         },
         "required": [
@@ -1669,6 +1735,13 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 65535
+          },
+          "applicationId": {
+            "type": "string",
+            "description": "Existing OAP reservation, when present on discovery."
+          },
+          "component": {
+            "type": "string"
           }
         },
         "required": [
@@ -1945,6 +2018,9 @@
             "type": "boolean"
           },
           "serviceEndpoints": {
+            "type": "boolean"
+          },
+          "managementHandoff": {
             "type": "boolean"
           }
         },

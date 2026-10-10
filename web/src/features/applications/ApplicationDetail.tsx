@@ -30,6 +30,7 @@ const when = (s: string) =>
 export function ApplicationDetail() {
   const { id } = useParams();
   const client = useQueryClient();
+  const [handoff, setHandoff] = useState("");
   const [tab, setTab] = useState("overview");
   const [scaleReview, setScaleReview] = useState<{
     component: string;
@@ -105,6 +106,20 @@ export function ApplicationDetail() {
       client.invalidateQueries({ queryKey: ["instances", id] });
     },
   });
+  const enableManagement = useMutation({
+    mutationFn: () =>
+      api<Application>(`/applications/${id}/management`, {
+        method: "POST",
+        body: JSON.stringify({
+          component: handoff,
+          expectedVersion: app.data!.version,
+        }),
+      }),
+    onSuccess: () => {
+      setHandoff("");
+      client.invalidateQueries({ queryKey: ["application", id] });
+    },
+  });
   async function showLogs(component: string, ordinal = 1) {
     try {
       setLogError("");
@@ -123,6 +138,9 @@ export function ApplicationDetail() {
   if (!app.data) return <ErrorBox error={app.error} />;
   const a = app.data;
   const latest = releases.data?.[0];
+  const observed = a.manifest.components.some(
+    (c) => c.management === "observe",
+  );
   const active =
     latest && ["queued", "running", "attention"].includes(latest.state);
   return (
@@ -144,15 +162,17 @@ export function ApplicationDetail() {
         </div>
         <button
           className="primary"
-          disabled={!!active}
+          disabled={!!active || observed}
           onClick={() => setReview(structuredClone(a))}
         >
           <ArrowUpRight size={17} />
-          {latest?.state === "attention"
-            ? "Deployment needs review"
-            : active
-              ? "Deployment in progress"
-              : "Deploy application"}
+          {observed
+            ? "Observe-only application"
+            : latest?.state === "attention"
+              ? "Deployment needs review"
+              : active
+                ? "Deployment in progress"
+                : "Deploy application"}
         </button>
       </div>
       <div className="tabs" role="tablist">
@@ -164,7 +184,16 @@ export function ApplicationDetail() {
             key={t}
             onClick={() => setTab(t)}
           >
-            {({ overview: "Overview", deployments: "Activity", configuration: "Settings", logs: "Logs" } as Record<string, string>)[t]}
+            {
+              (
+                {
+                  overview: "Overview",
+                  deployments: "Activity",
+                  configuration: "Settings",
+                  logs: "Logs",
+                } as Record<string, string>
+              )[t]
+            }
           </button>
         ))}
       </div>
@@ -177,18 +206,24 @@ export function ApplicationDetail() {
               <h2>
                 {latest
                   ? `Release ${latest.id.slice(0, 8)}`
-                  : "Ready for your first deployment"}
+                  : observed
+                    ? "Observing existing services"
+                    : "Ready for your first deployment"}
               </h2>
               <p className="muted">
                 {latest
                   ? when(latest.createdAt)
-                  : "Your definition is saved. Deployment is a separate action."}
+                  : observed
+                    ? "Health and logs are available. Workloads remain managed by your operator."
+                    : "Your definition is saved. Deployment is a separate action."}
               </p>
             </div>
             {latest ? (
               <Status value={latest.state} />
             ) : (
-              <span className="status neutral">Not deployed</span>
+              <span className="status neutral">
+                {observed ? "Observe-only" : "Not deployed"}
+              </span>
             )}
           </section>
           <section className="panel">
@@ -212,7 +247,27 @@ export function ApplicationDetail() {
                     )?.resource?.image || c.image}
                   </code>
                 </div>
-                <span className="small muted">{c.instances} configured</span>
+                <span className="small muted">
+                  {c.management === "observe"
+                    ? "Observe-only"
+                    : `${c.instances} configured`}
+                </span>
+                {c.management === "observe" &&
+                  instances.data?.find((i) => i.component === c.name)?.resource
+                    ?.artifactKind === "image" &&
+                  !instances.data
+                    ?.find((i) => i.component === c.name)
+                    ?.resource?.description?.startsWith("OpenAppPlatform:") &&
+                  a.manifest.targetId &&
+                  capabilities.data?.managementHandoff && (
+                    <button
+                      className="secondary"
+                      onClick={() => setHandoff(c.name)}
+                      disabled={!!active}
+                    >
+                      Enable management for {c.name}
+                    </button>
+                  )}
                 {capabilities.data?.retirement &&
                   c.instances > 1 &&
                   !c.resourceId && (
@@ -289,7 +344,12 @@ export function ApplicationDetail() {
                   <button
                     className="secondary"
                     disabled={
-                      !!active || !instance.resourceId || instance.retired
+                      !!active ||
+                      !instance.resourceId ||
+                      instance.retired ||
+                      a.manifest.components.find(
+                        (c) => c.name === instance.component,
+                      )?.management === "observe"
                     }
                     onClick={() => setRestartReview(instance)}
                   >
@@ -384,6 +444,38 @@ export function ApplicationDetail() {
             {logs || "Select a deployed component to fetch its logs."}
           </pre>
         </section>
+      )}
+      {handoff && (
+        <DeploymentDialog onClose={() => setHandoff("")}>
+          <h2 id="deploy-title">Enable management for {handoff}?</h2>
+          <p>
+            Allow Open App Platform to deploy and restart this existing
+            image-backed service. This saves permission only; it does not change
+            or restart the workload.
+          </p>
+          <p className="muted">
+            Source, variables, routes, volumes, and native operator triggers
+            stay with the operator. Deploying can interrupt requests. An
+            application can deploy once all its components support management.
+          </p>
+          <ErrorBox error={enableManagement.error} />
+          <div className="form-actions">
+            <button
+              className="secondary"
+              disabled={enableManagement.isPending}
+              onClick={() => setHandoff("")}
+            >
+              Cancel
+            </button>
+            <button
+              className="primary"
+              disabled={enableManagement.isPending}
+              onClick={() => enableManagement.mutate()}
+            >
+              Confirm management handoff
+            </button>
+          </div>
+        </DeploymentDialog>
       )}
       {scaleReview && (
         <ScaleDownDialog

@@ -85,7 +85,7 @@ func managedInstances(t *testing.T, c *controller.Controller, f *retirementFake,
 	}
 	for ordinal := 1; ordinal <= count; ordinal++ {
 		ref := fmt.Sprintf("instance-%d", ordinal)
-		f.resources[ref] = operator.Resource{ID: ref, Name: domain.ResourceName(app.ID, "web", ordinal), Description: "OpenAppPlatform:" + app.ID + ":web", Image: m.Components[0].Image, ArtifactKind: "image", Status: "running:healthy"}
+		f.resources[ref] = operator.Resource{ID: ref, Name: domain.ResourceName(app.ID, "web", ordinal), Description: "OpenAppPlatform:" + app.ID + ":web", Image: m.Components[0].Image, Port: m.Components[0].Port, ArtifactKind: "image", Status: "running:healthy"}
 		if e = c.Store.Bind(context.Background(), "fixture", ref, app.ID, "web", ordinal); e != nil {
 			t.Fatal(e)
 		}

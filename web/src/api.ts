@@ -1,4 +1,5 @@
 export interface Component {
+  management?: "observe";
   serviceEndpoints?: Record<string, string>;
   env?: Record<string, string>;
   services?: Record<string, string>;
@@ -54,6 +55,9 @@ export interface Deployment {
   updatedAt: string;
 }
 export interface Resource {
+  description?: string;
+  applicationId?: string;
+  component?: string;
   id: string;
   name: string;
   status: string;
@@ -92,6 +96,8 @@ export interface Instance {
 }
 
 export interface Capabilities {
+  managementHandoff: boolean;
+  standard: boolean;
   serviceEndpoints: boolean;
   retirement: boolean;
   restart: boolean;

@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { readFile, writeFile, readdir, copyFile } from 'node:fs/promises';
+import { readFile, writeFile, readdir, copyFile, mkdir } from 'node:fs/promises';
 import { createReadStream as streamFile } from 'node:fs';
 import http from 'node:http';
 
-const report={status:'running',startedAt:new Date().toISOString(),steps:[],expectedSkips:['TestLiveCoolifyLifecycle','TestLiveCoolifyRuntimeConfiguration']};
+const report={status:'running',startedAt:new Date().toISOString(),steps:[],expectedSkips:['TestLiveCoolifyLifecycle','TestLiveCoolifyRuntimeConfiguration','TestLiveCoolifyObserveOnlyAssembly']};
 const env={...process.env,OAP_API_TOKEN:randomBytes(32).toString('base64url'),OAP_ADDR:'127.0.0.1:8787'};
 delete env.COOLIFY_TOKEN;delete env.COOLIFY_URL;delete env.OAP_LIVE_COOLIFY;
 let platform;
@@ -39,7 +39,17 @@ try{
   report.steps.at(-1).package=packages[index];report.steps.at(-1).skipped=skipped;await persist();
   if(skipped.some(name=>!report.expectedSkips.includes(name)))throw Error(`Unexpected test skip: ${skipped.join(', ')}`);
  }
- platform=spawn('/opt/oap/platform',['-targets','/workspace/tests/env/targets.json','-web','/workspace/web/dist'],{env,stdio:['ignore','pipe','pipe']});
+ async function dockerRequest(path,body) {
+  return await new Promise((resolve,reject)=>{ const req=http.request({socketPath:env.OAP_TEST_DOCKER_SOCKET,path:'/v1.45'+path,method:'POST',headers:{'Content-Type':'application/json'}},res=>{let raw='';res.on('data',b=>raw+=b);res.on('end',()=>{if(res.statusCode<200||res.statusCode>=300)return reject(Error('observation fixture HTTP '+res.statusCode));resolve(raw?JSON.parse(raw):{})})});req.on('error',reject);if(body)req.write(JSON.stringify(body));req.end(); });
+ }
+ const observed=await dockerRequest('/containers/create?name=existing-observation-fixture',{Image:env.OAP_TEST_DOCKER_IMAGE,ExposedPorts:{'8080/tcp':{}},Env:['OAP_TEST_MESSAGE=observe-me']});
+ await dockerRequest('/containers/'+observed.Id+'/start');
+ const targets=JSON.parse(await readFile('/workspace/tests/env/targets.json','utf8'));
+ targets.find(t=>t.id==='test-docker').settings.observeContainers=[observed.Id];
+ await mkdir('/workspace/.local',{recursive:true});
+ await writeFile('/workspace/.local/observed-targets.json',JSON.stringify(targets));
+ env.OAP_TEST_OBSERVED_RESOURCE=observed.Id;
+ platform=spawn('/opt/oap/platform',['-targets','/workspace/.local/observed-targets.json','-web','/workspace/web/dist'],{env,stdio:['ignore','pipe','pipe']});
  let platformLog='';platform.stdout.on('data',b=>platformLog+=b);platform.stderr.on('data',b=>platformLog+=b);
  await waitReady();
  await run('browser','node',['node_modules/@playwright/test/cli.js','test'],'/workspace/web');

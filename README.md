@@ -1,4 +1,4 @@
-# OpenAppPlatform
+# Open App Platform
 
 An application-first control plane for self-hosted runtimes and deployment operators. Group web services
 into applications, track releases, and keep your existing deployment operator.
@@ -212,3 +212,16 @@ variable IDs and recorded intents allow safe update/removal retries. An ambiguou
 creation without a captured provider ID remains blocked for operator review;
 inspect and resolve the unverified key through Coolify before retrying preparation.
 The ownership ledger is part of OAP metadata and must be included in backups.
+
+## Group existing services
+
+Deployment targets → Group services → Select → Review creates an observe-only
+application. Health and logs are available immediately; registration does not
+restart or deploy anything. Existing Coolify image services can receive lifecycle
+management through a separate reviewed handoff. Source-backed Coolify apps and
+explicitly scoped external Docker containers remain observe-only.
+
+See [discovery and assembly](docs/discovery-and-assembly.md) for API semantics,
+Docker observation scope, compatibility, and verification. Examples that combine
+new managed components with existing resources require handoff of supported
+observed components before application-wide deployment.

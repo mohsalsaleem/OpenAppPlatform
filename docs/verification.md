@@ -143,3 +143,23 @@ and verifies a synthetic Mailpit webhook reaches the receiver. It updates/remove
 OAP variables while preserving a separately created operator variable. Preview
 copies are checked separately from production variables. No external email relay
 is configured. Fixtures are retained and CI remains disabled.
+
+## Guided discovery and assembly coverage
+
+Local run `20261010-134324-7d9087a6` passed the full Go race/vet, PostgreSQL,
+Docker, three-browser-scenario, and MCP suite. The assembly scenario registers a
+real existing Docker fixture by immutable ID, previews mappings, checks live
+health/logs, confirms deploy/restart are disabled, checks empty release history,
+and verifies duplicate selection is unavailable. Desktop review, observed overview,
+and mobile screenshots are retained in the ignored run directory.
+
+System tests cover atomic reservation conflicts, image/source observation,
+versioned handoff, source handoff denial, image/port drift, foreign OAP ownership,
+and no queued releases or provider mutation during registration/handoff. Adapter
+tests reject external Docker deploy/restart/stop and mutable-name observation.
+
+`TestLiveCoolifyObserveOnlyAssembly` passed against the configured isolated staging
+environment on 10 October 2026: two existing services, live health and bounded logs,
+unchanged image/port/description/URL, and no release dispatch. This test is an
+expected skip in the offline suite; its real staging run is separate. It creates
+only temporary local OAP metadata, not remote resources. CI remains disabled.

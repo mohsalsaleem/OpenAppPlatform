@@ -20,6 +20,7 @@ var digestSuffix = regexp.MustCompile(`@sha256:[a-f0-9]{64}$`)
 var slug = regexp.MustCompile(`^[a-z][a-z0-9-]{0,47}$`)
 
 type Component struct {
+	Management       string            `json:"management,omitempty"`
 	ServiceEndpoints map[string]string `json:"serviceEndpoints,omitempty"`
 	Env              map[string]string `json:"env,omitempty"`
 	Services         map[string]string `json:"services,omitempty"`
@@ -56,6 +57,12 @@ func (m *Manifest) Validate() error {
 			return errors.New("component names must be unique lowercase slugs")
 		}
 		names[c.Name] = true
+		if c.Management != "" && c.Management != "observe" {
+			return errors.New("management must be observe or omitted for existing managed components")
+		}
+		if c.Management == "observe" && (c.ResourceID == "" || c.HostPort != 0 || len(c.Env)+len(c.Services)+len(c.ServiceEndpoints) > 0) {
+			return errors.New("observe-only components require a resourceId and cannot configure runtime settings")
+		}
 		if c.Kind == "" {
 			c.Kind = "web"
 		}
@@ -83,10 +90,10 @@ func (m *Manifest) Validate() error {
 		if c.HostPort != 0 && c.Instances != 1 {
 			return errors.New("hostPort requires one instance; shared port routing is not implemented")
 		}
-		if c.Port < 1 || c.Port > 65535 {
+		if (c.Port < 1 && !(c.Management == "observe" && c.Port == 0)) || c.Port > 65535 {
 			return errors.New("port must be between 1 and 65535")
 		}
-		if c.Image == "" || len(c.Image) > 512 || !imageCharacters.MatchString(c.Image) || (strings.Contains(c.Image, "@") && !digestSuffix.MatchString(c.Image)) {
+		if (c.Image == "" && c.Management != "observe") || len(c.Image) > 512 || (c.Image != "" && !imageCharacters.MatchString(c.Image)) || (strings.Contains(c.Image, "@") && !digestSuffix.MatchString(c.Image)) {
 			return errors.New("image is required")
 		}
 	}

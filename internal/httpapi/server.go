@@ -124,12 +124,7 @@ func (s *Server) routes() http.Handler {
 		write(w, 200, adapter.Capabilities())
 	})
 	mux.HandleFunc("GET /api/v1/targets/{id}/resources", func(w http.ResponseWriter, r *http.Request) {
-		a, e := c.Adapter(r.Context(), r.PathValue("id"))
-		if e != nil {
-			fail(w, e)
-			return
-		}
-		x, e := a.Discover(r.Context())
+		x, e := c.Discover(r.Context(), r.PathValue("id"))
 		if e != nil {
 			write(w, 502, map[string]string{"code": "operator_unavailable", "message": e.Error()})
 			return
@@ -164,6 +159,26 @@ func (s *Server) routes() http.Handler {
 			return
 		}
 		write(w, 201, a)
+	})
+	mux.HandleFunc("POST /api/v1/applications/{id}/management", func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Component       string `json:"component"`
+			ExpectedVersion int64  `json:"expectedVersion"`
+		}
+		if e := decode(w, r, &request); e != nil {
+			write(w, 400, map[string]string{"code": "invalid_handoff", "message": e.Error()})
+			return
+		}
+		app, e := c.EnableManagement(r.Context(), r.PathValue("id"), request.Component, request.ExpectedVersion)
+		if e != nil {
+			if errors.Is(e, domain.ErrConflict) || errors.Is(e, domain.ErrNotFound) {
+				fail(w, e)
+			} else {
+				write(w, 422, map[string]string{"code": "handoff_rejected", "message": e.Error()})
+			}
+			return
+		}
+		write(w, 200, app)
 	})
 	mux.HandleFunc("GET /api/v1/applications/{id}", func(w http.ResponseWriter, r *http.Request) {
 		a, e := c.Store.Application(r.Context(), r.PathValue("id"))

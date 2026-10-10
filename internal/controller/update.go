@@ -63,7 +63,7 @@ func (c *Controller) UpdateApplication(ctx context.Context, id string, m domain.
 	}
 	for _, comp := range m.Components {
 		old, ok := existing[comp.Name]
-		if !ok || old.Kind != comp.Kind || old.ResourceID != comp.ResourceID {
+		if !ok || old.Kind != comp.Kind || old.ResourceID != comp.ResourceID || old.Management != comp.Management {
 			return domain.Application{}, errors.New("component identity and resource adoption cannot change through configuration editing")
 		}
 		if comp.Instances < old.Instances {

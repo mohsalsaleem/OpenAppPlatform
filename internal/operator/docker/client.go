@@ -25,8 +25,9 @@ const prefix = "io.openappplatform."
 const apiVersion = "v1.45"
 
 type Settings struct {
-	PullPolicy string `json:"pullPolicy"`
-	HostBindIP string `json:"hostBindIP"`
+	ObserveContainers []string `json:"observeContainers,omitempty"`
+	PullPolicy        string   `json:"pullPolicy"`
+	HostBindIP        string   `json:"hostBindIP"`
 }
 type Client struct {
 	target   domain.Target
@@ -53,6 +54,14 @@ func New(t domain.Target) (*Client, error) {
 		d.DisallowUnknownFields()
 		if e = d.Decode(&settings); e != nil {
 			return nil, errors.New("invalid Docker target settings")
+		}
+	}
+	if len(settings.ObserveContainers) > 64 {
+		return nil, errors.New("observeContainers supports at most 64 explicit container IDs")
+	}
+	for _, id := range settings.ObserveContainers {
+		if len(id) != 64 || strings.Trim(id, "0123456789abcdef") != "" {
+			return nil, errors.New("observeContainers requires full immutable Docker container IDs")
 		}
 	}
 	if settings.PullPolicy != "never" && settings.PullPolicy != "if-missing" {
@@ -158,6 +167,26 @@ func (c *Client) projection(v container) operator.Resource {
 	}
 	return resource
 }
+
+// External containers are read-only and opt-in by full immutable ID.
+func (c *Client) observation(v container) (operator.Resource, bool) {
+	for _, id := range c.settings.ObserveContainers {
+		if v.ID == id {
+			r := c.projection(v)
+			r.ID = v.ID
+			r.Image = v.Config.Image
+			for key := range v.NetworkSettings.Ports {
+				port, _, _ := strings.Cut(key, "/")
+				n, _ := strconv.Atoi(port)
+				if n > 0 && (r.Port == 0 || n < r.Port) {
+					r.Port = n
+				}
+			}
+			return r, true
+		}
+	}
+	return operator.Resource{}, false
+}
 func (c *Client) Discover(ctx context.Context) ([]operator.Resource, error) {
 	filter, _ := json.Marshal(map[string][]string{"label": {prefix + "target=" + c.target.ID, prefix + "environment=" + c.target.Environment}})
 	var summaries []struct {
@@ -191,12 +220,32 @@ func (c *Client) Discover(ctx context.Context) ([]operator.Resource, error) {
 			out = append(out, c.projection(v))
 		}
 	}
+	for _, id := range c.settings.ObserveContainers {
+		v, e := c.inspectContainer(ctx, id)
+		if isStatus(e, 404) {
+			continue
+		}
+		if e != nil {
+			return nil, e
+		}
+		if c.owned(v) {
+			continue
+		}
+		if r, ok := c.observation(v); ok {
+			out = append(out, r)
+		}
+	}
 	return out, nil
 }
 func (c *Client) Inspect(ctx context.Context, ref string) (operator.Resource, error) {
 	v, e := c.inspectContainer(ctx, ref)
 	if e != nil {
 		return operator.Resource{}, e
+	}
+	if ref == v.ID {
+		if r, ok := c.observation(v); ok {
+			return r, nil
+		}
 	}
 	if !c.owned(v) || v.Config.Labels[prefix+"reference"] != ref || strings.TrimPrefix(v.Name, "/") != ref {
 		return operator.Resource{}, errors.New("container is outside this target or is not an active managed instance")

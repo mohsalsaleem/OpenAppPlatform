@@ -14,6 +14,7 @@ import { ErrorBox } from "./components/Feedback";
 import { Applications } from "./features/applications/Applications";
 import { NewApplication } from "./features/applications/NewApplication";
 import { ApplicationDetail } from "./features/applications/ApplicationDetail";
+import { AssembleApplication } from "./features/applications/AssembleApplication";
 import { Targets } from "./features/targets/Targets";
 
 export function App() {
@@ -22,7 +23,14 @@ export function App() {
   const [error, setError] = useState("");
   const client = useQueryClient();
   const location = useLocation();
-  const pageName = location.pathname === "/targets" ? "Deployment targets" : location.pathname === "/applications/new" ? "New application" : location.pathname.startsWith("/applications/") ? "Application" : "Applications";
+  const pageName =
+    location.pathname === "/targets"
+      ? "Deployment targets"
+      : location.pathname === "/applications/new"
+        ? "New application"
+        : location.pathname.startsWith("/applications/")
+          ? "Application"
+          : "Applications";
   async function connect(e: FormEvent) {
     e.preventDefault();
     sessionStorage.setItem("oap-token", accessToken);
@@ -132,6 +140,10 @@ export function App() {
             <Route path="/" element={<Applications />} />
             <Route path="/applications/new" element={<NewApplication />} />
             <Route path="/applications/:id" element={<ApplicationDetail />} />
+            <Route
+              path="/targets/:id/assemble"
+              element={<AssembleApplication />}
+            />
             <Route path="/targets" element={<Targets />} />
             <Route
               path="*"

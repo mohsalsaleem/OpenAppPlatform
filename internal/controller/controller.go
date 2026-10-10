@@ -60,6 +60,11 @@ func (c *Controller) Adapter(ctx context.Context, id string) (operator.Adapter, 
 	return c.Factory(t)
 }
 func (c *Controller) CreateApplication(ctx context.Context, m domain.Manifest) (domain.Application, error) {
+	for i := range m.Components {
+		if m.Components[i].ResourceID != "" && m.Components[i].Management == "" {
+			m.Components[i].Management = "observe"
+		}
+	}
 	if e := m.Validate(); e != nil {
 		return domain.Application{}, e
 	}
@@ -83,11 +88,11 @@ func (c *Controller) CreateApplication(ctx context.Context, m domain.Manifest) (
 			if e != nil {
 				return domain.Application{}, e
 			}
-			if r.ArtifactKind != "image" {
-				return domain.Application{}, errors.New("only Docker-image resources can be adopted in this milestone")
+			if r.ArtifactKind != "image" && r.ArtifactKind != "source" {
+				return domain.Application{}, errors.New("unsupported resource type for observation")
 			}
-			if r.Image != comp.Image {
-				return domain.Application{}, errors.New("adoption requires the existing image reference; this milestone does not mutate adopted source or image configuration")
+			if r.Image != comp.Image || r.Port != comp.Port {
+				return domain.Application{}, errors.New("resource configuration changed; refresh discovery")
 			}
 		}
 	}
@@ -161,6 +166,11 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	}
 	if expectedVersion > 0 && a.Version != expectedVersion {
 		return domain.Deployment{}, domain.ErrConflict
+	}
+	for _, comp := range a.Manifest.Components {
+		if comp.Management == "observe" && ((restart == nil && scaleDown == nil) || (restart != nil && restart.Component == comp.Name) || (scaleDown != nil && scaleDown.Component == comp.Name)) {
+			return domain.Deployment{}, errors.New("observe-only components require an explicit management handoff before lifecycle operations")
+		}
 	}
 	for name, image := range images {
 		found := false
@@ -373,6 +383,9 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 			if v.Name == step.Component {
 				comp = v
 			}
+		}
+		if comp.Management == "observe" {
+			return fail(step, "attention", errors.New("observe-only component cannot execute lifecycle operations"))
 		}
 		switch step.Phase {
 		case "pending":

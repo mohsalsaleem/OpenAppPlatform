@@ -38,7 +38,7 @@ func New(t domain.Target, token string) (*Client, error) {
 	return &Client{base: strings.TrimRight(t.URL, "/"), token: token, target: t, http: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) Capabilities() operator.Capabilities {
-	return operator.Capabilities{Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Environment: true, ServiceEndpoints: true}
+	return operator.Capabilities{ManagementHandoff: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Environment: true, ServiceEndpoints: true}
 }
 func (c *Client) request(ctx context.Context, method, path string, input, output any) error {
 	var body io.Reader

@@ -7,16 +7,17 @@ import (
 )
 
 type Capabilities struct {
-	Retirement       bool `json:"retirement"`
-	Restart          bool `json:"restart"`
-	Environment      bool `json:"environment"`
-	ServiceEndpoints bool `json:"serviceEndpoints"`
-	ApplicationDNS   bool `json:"applicationDns"`
-	Standard         bool `json:"standard"`
-	Rolling          bool `json:"rolling"`
-	BlueGreen        bool `json:"blueGreen"`
-	Discovery        bool `json:"discovery"`
-	ImmutableImages  bool `json:"immutableImages"`
+	ManagementHandoff bool `json:"managementHandoff"`
+	Retirement        bool `json:"retirement"`
+	Restart           bool `json:"restart"`
+	Environment       bool `json:"environment"`
+	ServiceEndpoints  bool `json:"serviceEndpoints"`
+	ApplicationDNS    bool `json:"applicationDns"`
+	Standard          bool `json:"standard"`
+	Rolling           bool `json:"rolling"`
+	BlueGreen         bool `json:"blueGreen"`
+	Discovery         bool `json:"discovery"`
+	ImmutableImages   bool `json:"immutableImages"`
 }
 type Resource struct {
 	ID           string `json:"id"`

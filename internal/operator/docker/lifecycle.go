@@ -195,6 +195,9 @@ func (c *Client) Stop(ctx context.Context, ref string) error {
 	if e != nil {
 		return e
 	}
+	if !c.owned(current) || current.Config.Labels[prefix+"reference"] != ref {
+		return errors.New("cannot stop an observe-only container")
+	}
 	if !current.State.Running {
 		return nil
 	}

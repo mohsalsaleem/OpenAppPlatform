@@ -97,3 +97,19 @@ func TestExplicitServiceEndpointsValidateAndResolve(t *testing.T) {
 		}
 	}
 }
+
+func TestObserveOnlySourceManifest(t *testing.T) {
+	m := Manifest{Name: "observed", Environment: "staging", TargetID: "fixture", Components: []Component{{Name: "api", Management: "observe", ResourceID: "source", Port: 0}}}
+	if err := m.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	m.Components[0].Management = ""
+	if err := m.Validate(); err == nil {
+		t.Fatal("managed source without image accepted")
+	}
+	m.Components[0].Management = "observe"
+	m.Components[0].Env = map[string]string{"SECRET": "value"}
+	if err := m.Validate(); err == nil {
+		t.Fatal("observe-only runtime configuration accepted")
+	}
+}

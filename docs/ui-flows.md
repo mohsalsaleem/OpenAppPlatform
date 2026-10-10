@@ -26,4 +26,4 @@ Deployment strategy should appear only when it changes an available decision. To
 
 ## Roadmap boundaries
 
-Guided discovery/manual assembly remains the next M0 core slice. Git/source workflows, multiple environments per logical app, workers, monitoring, domains, auth, and AI follow their existing roadmap gates. Do not add empty controls for these during UI polishing.
+Guided discovery/manual assembly is available through Deployment targets → Group services → Select → Review → Create observed application. Existing bindings are reserved atomically; observe-only components show live health and logs with lifecycle actions disabled. Image-backed Coolify components expose a separate reviewed management handoff; source-backed and external Docker components remain observe-only. Git/source workflows, multiple environments per logical app, workers, monitoring, domains, auth, and AI follow their existing roadmap gates. Do not add empty controls for these during UI polishing.
