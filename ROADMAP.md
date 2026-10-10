@@ -153,7 +153,8 @@ Pre-dispatch dependency holds can resume without repeating an uncertain dispatch
 Read-only frozen release/artifact comparison now includes masked runtime-key diffs
 and app-scope checks; it does not approve or execute rollback. Rollback and
 cancellation/abandonment remain in this batch. Batch 4 stays active.
-The slice passed local/native Docker and staging UI verification. No native HTTP
+Readiness and dependency slices passed local/native Docker and staging UI verification;
+comparison acceptance is running. No native HTTP
 probe was provisioned and no retained workload was redeployed by these checks.
 See [release readiness](docs/release-readiness.md) and
 [release comparison](docs/release-comparison.md).

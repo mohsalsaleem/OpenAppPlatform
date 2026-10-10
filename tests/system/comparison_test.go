@@ -86,7 +86,7 @@ func TestReleaseComparisonIsSanitizedScopedAndOperatorIndependent(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	scoped := httptest.NewServer((&httpapi.Server{Controller: c, AuthMode: "owner"}).Handler())
+	scoped := httptest.NewServer((&httpapi.Server{Controller: c}).Handler())
 	defer scoped.Close()
 	call := func(path string) int {
 		r, _ := http.NewRequest("GET", scoped.URL+path, nil)
