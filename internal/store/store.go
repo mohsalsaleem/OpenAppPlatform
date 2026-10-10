@@ -172,6 +172,14 @@ func ScanDeployment(row pgx.Row) (domain.Deployment, error) {
 		}
 	}
 	e = json.Unmarshal(steps, &d.Steps)
+	if e == nil && len(d.Steps) > 0 && d.Steps[0].Control != nil {
+		d.Control = d.Steps[0].Control
+		if d.Control.Mode == "cancel" {
+			d.State = "cancelled"
+		} else if d.Control.Mode == "abandon" {
+			d.State = "abandoned"
+		}
+	}
 	return d, e
 }
 
@@ -205,7 +213,7 @@ func (s *Store) SaveDeployment(ctx context.Context, d domain.Deployment) error {
 	if e != nil {
 		return e
 	}
-	_, e = s.Pool.Exec(ctx, "UPDATE oap_deployments SET state=$2,steps=$3,updated_at=now() WHERE id=$1", d.ID, d.State, b)
+	_, e = s.Pool.Exec(ctx, "UPDATE oap_deployments SET state=$2,steps=$3,updated_at=now() WHERE id=$1", d.ID, deploymentStorageState(d), b)
 	return e
 }
 
@@ -249,7 +257,7 @@ func (s *Store) SaveDeploymentTx(ctx context.Context, tx pgx.Tx, d *domain.Deplo
 	if e != nil {
 		return e
 	}
-	return tx.QueryRow(ctx, "UPDATE oap_deployments SET state=$2,steps=$3,updated_at=now() WHERE id=$1 RETURNING updated_at", d.ID, d.State, b).Scan(&d.UpdatedAt)
+	return tx.QueryRow(ctx, "UPDATE oap_deployments SET state=$2,steps=$3,updated_at=now() WHERE id=$1 RETURNING updated_at", d.ID, deploymentStorageState(*d), b).Scan(&d.UpdatedAt)
 }
 
 func (s *Store) TargetTx(ctx context.Context, tx pgx.Tx, id string) (domain.Target, error) {
@@ -279,4 +287,20 @@ func (s *Store) RetireBindingTx(ctx context.Context, tx pgx.Tx, target, ref, app
 		return domain.ErrConflict
 	}
 	return nil
+}
+
+func deploymentStorageState(d domain.Deployment) string {
+	if len(d.Steps) > 0 && d.Steps[0].Control != nil {
+		control := d.Steps[0].Control
+		if control.Mode == "cancel" {
+			return "failed"
+		}
+		if control.Mode == "abandon" {
+			if control.ResolvedAt == nil {
+				return "attention"
+			}
+			return "failed"
+		}
+	}
+	return d.State
 }

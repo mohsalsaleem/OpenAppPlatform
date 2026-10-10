@@ -54,6 +54,12 @@ export interface Step {
   error?: string;
 }
 export interface Deployment {
+  control?: {
+    mode: "cancel" | "abandon";
+    reason: string;
+    at: string;
+    resolvedAt?: string;
+  };
   source?: {
     repository: string;
     commit: string;

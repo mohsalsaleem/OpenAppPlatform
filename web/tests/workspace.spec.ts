@@ -485,3 +485,107 @@ test("group existing Docker services without deploying or restarting", async ({
     ),
   ).toBeTruthy();
 });
+
+test("release control review explains retained changes and abandonment fences", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByLabel("Platform access token")
+    .fill(process.env.OAP_API_TOKEN!);
+  await page.getByRole("button", { name: "Connect to workspace" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Your applications" }),
+  ).toBeVisible();
+  const headers = { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` };
+  const apps = await (
+    await page.request.get("/api/v1/applications", { headers })
+  ).json();
+  const app = apps.find((a: { manifest: { name: string } }) =>
+    /^browser-[0-9]/.test(a.manifest.name),
+  );
+  expect(app).toBeTruthy();
+  let release = {
+    id: "f".repeat(32),
+    applicationId: app.id,
+    definitionVersion: app.version,
+    state: "queued",
+    operation: "deploy",
+    manifest: app.manifest,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    steps: [{ component: "web", ordinal: 1, phase: "pending" }],
+    control: undefined as
+      undefined | { mode: string; reason: string; at: string },
+  };
+  await page.route(`**/api/v1/applications/${app.id}/deployments`, (route) =>
+    route.fulfill({ json: [release] }),
+  );
+  await page.route(
+    `**/api/v1/deployments/${release.id}/control`,
+    async (route) => {
+      const body = route.request().postDataJSON();
+      expect(body.mode).toBe("cancel");
+      expect(body.acknowledgePreparedChanges).toBeTruthy();
+      release = {
+        ...release,
+        state: "cancelled",
+        control: {
+          mode: "cancel",
+          reason: body.reason,
+          at: new Date().toISOString(),
+        },
+      };
+      await route.fulfill({ json: release });
+    },
+  );
+  await page.goto(`/applications/${app.id}`);
+  await page.getByRole("tab", { name: "Activity" }).click();
+  await page.getByRole("button", { name: "Review cancellation" }).click();
+  const dialog = page.getByRole("dialog", { name: "Cancel before dispatch" });
+  await expect(dialog).toContainText(
+    "Prepared resources and configuration may remain",
+  );
+  await expect(
+    dialog.getByRole("button", { name: "Confirm cancellation" }),
+  ).toBeDisabled();
+  await dialog.getByLabel("Reason").fill("Defer this release");
+  await dialog.getByRole("checkbox").check();
+  await expect(
+    dialog.getByRole("button", { name: "Confirm cancellation" }),
+  ).toBeEnabled();
+  await page.screenshot({
+    path: "../.local/ui-release-cancellation.png",
+    fullPage: true,
+  });
+  await dialog.getByRole("button", { name: "Confirm cancellation" }).click();
+  await expect(dialog).not.toBeVisible();
+  await expect(
+    page.getByText("Cancelled before dispatch. Prepared changes may remain.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  release = {
+    ...release,
+    state: "abandoned",
+    control: {
+      mode: "abandon",
+      reason: "Investigate uncertain operation",
+      at: new Date().toISOString(),
+    },
+  };
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Reconciliation required" }),
+  ).toBeDisabled();
+  await page.getByRole("tab", { name: "Activity" }).click();
+  await expect(
+    page.getByText("Application fenced until owner reconciliation.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Review reconciliation" }).click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "Every possible provider operation must be terminal",
+  );
+});

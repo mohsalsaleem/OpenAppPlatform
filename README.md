@@ -108,6 +108,7 @@ credentials. It does not mutate an external Coolify installation. Live fixtures 
 - [Product and architecture](docs/product-and-architecture.md)
 - [System design](docs/architecture/system-design.md)
 - [Low level design](docs/architecture/low-level-design.md)
+- [Release cancellation and abandonment](docs/release-controls.md)
 - [OpenAPI contract](docs/openapi.json)
 - [Bare Docker targets](docs/bare-docker.md)
 - [Read-only MCP tools](docs/mcp.md)

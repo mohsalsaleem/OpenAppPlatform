@@ -1,3 +1,4 @@
+import { ReleaseControls } from "./ReleaseControls";
 import { RollbackReview } from "./RollbackReview";
 import { ReleaseComparison } from "./ReleaseComparison";
 import { WorkflowOwnership } from "./WorkflowOwnership";
@@ -149,7 +150,9 @@ export function ApplicationDetail() {
     (c) => c.management === "observe",
   );
   const active =
-    latest && ["queued", "running", "attention"].includes(latest.state);
+    latest &&
+    (["queued", "running", "attention"].includes(latest.state) ||
+      (latest.state === "abandoned" && !latest.control?.resolvedAt));
   return (
     <>
       <Link className="back" to="/">
@@ -177,11 +180,13 @@ export function ApplicationDetail() {
           <ArrowUpRight size={17} />
           {observed
             ? "Observe-only application"
-            : latest?.state === "attention"
-              ? "Deployment needs review"
-              : active
-                ? "Deployment in progress"
-                : "Deploy application"}
+            : latest?.state === "abandoned" && !latest.control?.resolvedAt
+              ? "Reconciliation required"
+              : latest?.state === "attention"
+                ? "Deployment needs review"
+                : active
+                  ? "Deployment in progress"
+                  : "Deploy application"}
         </button>
       </div>
       <EnvironmentNavigation applicationId={id!} />
@@ -469,6 +474,7 @@ export function ApplicationDetail() {
                   />
                 )}
               {d.state === "attention" && <RecoveryPanel deployment={d} />}
+              <ReleaseControls deployment={d} />
             </article>
           ))}
         </section>

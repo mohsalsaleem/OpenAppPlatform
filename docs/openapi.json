@@ -2402,6 +2402,190 @@
           }
         }
       }
+    },
+    "/api/v1/deployments/{id}/control": {
+      "post": {
+        "summary": "Cancel before dispatch, or abandon tracking with a human owner session",
+        "operationId": "post_control",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or human owner session required"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "See docs/release-controls.md. Requires exact expectedUpdatedAt and explicit acknowledgments. Does not stop provider work or undo prepared changes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StopReleaseRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/deployments/{id}/reconcile-abandoned": {
+      "post": {
+        "summary": "Owner reconciles exact terminal provider operations and releases the application fence",
+        "operationId": "post_reconcile_abandoned",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient scope or human owner session required"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "See docs/release-controls.md. Requires exact expectedUpdatedAt and explicit acknowledgments. Does not stop provider work or undo prepared changes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileReleaseRequest"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3027,6 +3211,90 @@
           "expectedVersion": {
             "type": "integer",
             "minimum": 1
+          }
+        }
+      },
+      "StopReleaseRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "reason",
+          "expectedUpdatedAt",
+          "acknowledgePreparedChanges"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "cancel",
+              "abandon"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "At most 512 UTF-8 bytes, without control characters"
+          },
+          "expectedUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acknowledgePreparedChanges": {
+            "type": "boolean",
+            "const": true
+          },
+          "acknowledgeProviderMayContinue": {
+            "type": "boolean",
+            "description": "Must be true for abandonment"
+          }
+        }
+      },
+      "ReconcileReleaseRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedUpdatedAt",
+          "acknowledgeCurrentRuntime"
+        ],
+        "properties": {
+          "expectedUpdatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "acknowledgeCurrentRuntime": {
+            "type": "boolean",
+            "const": true
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "component",
+                "ordinal",
+                "remoteDeploymentId"
+              ],
+              "properties": {
+                "component": {
+                  "type": "string"
+                },
+                "ordinal": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "remoteDeploymentId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "state": {
+                  "type": "string",
+                  "description": "Ignored on input; provider state is always observed"
+                }
+              }
+            }
           }
         }
       }

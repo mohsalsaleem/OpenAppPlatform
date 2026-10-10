@@ -375,20 +375,8 @@ func (w *Worker) Work(ctx context.Context, job *river.Job[DeployArgs]) error {
 	if err != nil && job.Attempt >= job.MaxAttempts {
 		var snooze *river.JobSnoozeError
 		if !errors.As(err, &snooze) {
-			d, loadErr := w.Controller.Store.Deployment(ctx, job.Args.DeploymentID)
-			if loadErr == nil && !domain.Terminal(d.State) {
-				d.State = "attention"
-				for i := range d.Steps {
-					if d.Steps[i].Phase != "succeeded" && d.Steps[i].Phase != "failed" {
-						d.Steps[i].RecoveryPhase = d.Steps[i].Phase
-						d.Steps[i].Phase = "attention"
-						d.Steps[i].Error = "Adapter operation retries exhausted; inspect provider before retrying"
-						break
-					}
-				}
-				if saveErr := w.Controller.Store.SaveDeployment(ctx, d); saveErr != nil {
-					return saveErr
-				}
+			if saveErr := w.Controller.markRetriesExhausted(ctx, job.Args.DeploymentID); saveErr != nil {
+				return saveErr
 			}
 		}
 	}

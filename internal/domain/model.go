@@ -164,21 +164,39 @@ type Application struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 	Version   int64     `json:"version"`
 }
+type ProviderReconciliation struct {
+	Component          string `json:"component"`
+	Ordinal            int    `json:"ordinal"`
+	RemoteDeploymentID string `json:"remoteDeploymentId"`
+	State              string `json:"state,omitempty"`
+}
+type ReleaseControl struct {
+	Mode         string                   `json:"mode"`
+	Reason       string                   `json:"reason"`
+	At           time.Time                `json:"at"`
+	UserID       string                   `json:"userId,omitempty"`
+	CredentialID string                   `json:"credentialId,omitempty"`
+	RequestHash  string                   `json:"requestHash"`
+	TargetHash   string                   `json:"targetHash"`
+	ResolvedAt   *time.Time               `json:"resolvedAt,omitempty"`
+	Operations   []ProviderReconciliation `json:"operations,omitempty"`
+}
 type Step struct {
-	RollbackTargetHash    string     `json:"rollbackTargetHash,omitempty"`
-	RollbackFrom          string     `json:"rollbackFrom,omitempty"`
-	RollbackResourceID    string     `json:"rollbackResourceId,omitempty"`
-	RollbackExpectedImage string     `json:"rollbackExpectedImage,omitempty"`
-	Action                string     `json:"action,omitempty"`
-	RecoveryPhase         string     `json:"recoveryPhase,omitempty"`
-	ObservationStartedAt  *time.Time `json:"observationStartedAt,omitempty"`
-	Component             string     `json:"component"`
-	Ordinal               int        `json:"ordinal"`
-	Phase                 string     `json:"phase"`
-	ResourceID            string     `json:"resourceId,omitempty"`
-	RemoteDeploymentID    string     `json:"remoteDeploymentId,omitempty"`
-	Observed              string     `json:"observed,omitempty"`
-	Error                 string     `json:"error,omitempty"`
+	Control               *ReleaseControl `json:"control,omitempty"`
+	RollbackTargetHash    string          `json:"rollbackTargetHash,omitempty"`
+	RollbackFrom          string          `json:"rollbackFrom,omitempty"`
+	RollbackResourceID    string          `json:"rollbackResourceId,omitempty"`
+	RollbackExpectedImage string          `json:"rollbackExpectedImage,omitempty"`
+	Action                string          `json:"action,omitempty"`
+	RecoveryPhase         string          `json:"recoveryPhase,omitempty"`
+	ObservationStartedAt  *time.Time      `json:"observationStartedAt,omitempty"`
+	Component             string          `json:"component"`
+	Ordinal               int             `json:"ordinal"`
+	Phase                 string          `json:"phase"`
+	ResourceID            string          `json:"resourceId,omitempty"`
+	RemoteDeploymentID    string          `json:"remoteDeploymentId,omitempty"`
+	Observed              string          `json:"observed,omitempty"`
+	Error                 string          `json:"error,omitempty"`
 }
 type ReleaseSource struct {
 	EventID    string `json:"eventId,omitempty"`
@@ -189,16 +207,17 @@ type ReleaseSource struct {
 }
 
 type Deployment struct {
-	Source            *ReleaseSource `json:"source,omitempty"`
-	Operation         string         `json:"operation,omitempty"`
-	ID                string         `json:"id"`
-	ApplicationID     string         `json:"applicationId"`
-	DefinitionVersion int64          `json:"definitionVersion"`
-	State             string         `json:"state"`
-	Manifest          Manifest       `json:"manifest"`
-	Steps             []Step         `json:"steps"`
-	CreatedAt         time.Time      `json:"createdAt"`
-	UpdatedAt         time.Time      `json:"updatedAt"`
+	Control           *ReleaseControl `json:"control,omitempty"`
+	Source            *ReleaseSource  `json:"source,omitempty"`
+	Operation         string          `json:"operation,omitempty"`
+	ID                string          `json:"id"`
+	ApplicationID     string          `json:"applicationId"`
+	DefinitionVersion int64           `json:"definitionVersion"`
+	State             string          `json:"state"`
+	Manifest          Manifest        `json:"manifest"`
+	Steps             []Step          `json:"steps"`
+	CreatedAt         time.Time       `json:"createdAt"`
+	UpdatedAt         time.Time       `json:"updatedAt"`
 }
 
 func NewID() string {
@@ -225,5 +244,5 @@ func InitialSteps(m Manifest) []Step {
 	return steps
 }
 func Terminal(state string) bool {
-	return state == "succeeded" || state == "failed" || state == "attention"
+	return state == "succeeded" || state == "failed" || state == "attention" || state == "cancelled" || state == "abandoned"
 }

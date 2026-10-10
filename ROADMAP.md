@@ -154,8 +154,10 @@ Read-only frozen release/artifact comparison now includes masked runtime-key dif
 and app-scope checks; comparison itself does not approve or execute rollback. A separate, reviewed image-only
 rollback path is implemented for compatible verified snapshots and existing OAP-owned
 instances; native Docker and two-replica Coolify rollback/return, duplicate request,
-review/acknowledgement and metadata restore checks passed. Configuration/data/schema rollback and cancellation/abandonment remain
-in this batch. See [controlled image rollback](docs/image-rollback.md). Batch 4 stays active.
+review/acknowledgement and metadata restore checks passed. Cancellation before dispatch and owner abandonment/reconciliation are implemented;
+local cancellation, restart, fence, provider reconciliation, concurrency, permissions
+and browser checks passed. Configuration/data/schema rollback remains
+in this batch. See [release controls](docs/release-controls.md). See [controlled image rollback](docs/image-rollback.md). Batch 4 stays active.
 Readiness and dependency slices passed local/native Docker and staging UI verification;
 comparison passed local snapshot/scope/masking and staging UI/API verification. No native HTTP
 probe was provisioned. The later image-only rollback test deliberately redeployed the
