@@ -8,14 +8,15 @@ The [roadmap delivery queue](../ROADMAP.md#m0-core-workflow-delivery-queue)
 is the current execution order and separates implemented behavior from future
 contracts. Finish Coolify runtime configuration/connections, then prioritize guided
 assembly, GitHub release ownership, environment organization, readiness/recovery,
-and stable routing. Auth/agent/AI work follows the usable core. Technology choices
+and stable routing. Minimal owner auth and scoped agents are implemented; full M1 hardening and
+AI assistance follow the usable core. Technology choices
 below remain proposals where they differ from the implementation; additional
 frameworks or services are not required to satisfy the product model.
 
 
 ## Product direction
 
-Users should be able to connect repositories, define components, select an existing deployment target, and deploy a complete application. Existing resources can be adopted rather than recreated.
+The primary journey is connect an existing deployment operator, discover running resources, review mappings and group them into logical applications. Native builds, GitHub integrations, domains, volumes and secrets keep working. Users can also create new components or use bare Docker. Optional infrastructure fills verified operator gaps. See the [operator-first implementation audit](operator-first-audit.md).
 
 The platform groups frontend, API, workers, scheduled jobs, and linked dependencies under one application. It provides shared configuration, a coherent release view, combined health and logs, and application-level API, CLI, and MCP operations.
 
@@ -71,12 +72,13 @@ A release can be incomplete: the frontend may serve a new version while a failed
 
 ```mermaid
 flowchart TB
-    G[GitHub or CI] --> A[Application API]
+    G[GitHub] -->|Existing native build and deploy| P[Coolify Dokploy Dokku or Portainer]
+    G -. Optional activity notification .-> A[Application API]
     U[Dashboard CLI and MCP] --> A
     A --> D[(PostgreSQL)]
     D <--> C[Controller and release coordinator]
     C --> O[Target adapter]
-    O --> P[Coolify Dokploy Dokku or Portainer]
+    O -->|Supported authorized operations| P
     P --> I[Docker workloads]
     O --> E[Docker Engine API]
     E --> I
@@ -85,7 +87,7 @@ flowchart TB
     C -. Optional node agent .-> N[Host connectivity and inspection]
 ```
 
-The controller owns desired application state, resource mappings, release sequencing, and reconciliation. On operator-backed targets, operators own the underlying resources and their normal container lifecycle. On bare Docker targets, OpenAppPlatform manages explicitly owned containers and networks through Docker Engine; Docker restart policies provide local process recovery.
+The controller owns logical application definitions, resource mappings and authorized reconciliation. Release sequencing remains with the operator for observed native workflows; OAP owns it only for an explicitly selected managed workflow. On operator-backed targets, operators own the underlying resources and their normal container lifecycle. On bare Docker targets, OpenAppPlatform manages explicitly owned containers and networks through Docker Engine; Docker restart policies provide local process recovery.
 
 Routing is a separate adapter. A node agent is optional and fills verified API gaps; it must not independently recreate operator-owned containers. Neither routing nor a node agent is a prerequisite for the initial standard-deployment experience.
 
@@ -110,7 +112,7 @@ Desired state and observed state are separate. Releases track versions across co
 
 Adapters implement discovery, adoption, instance creation, deployment, inspection, endpoint resolution, stop, removal, and bounded logs. Each reports capabilities for the actual target and operator version.
 
-Capabilities include immutable artifact deployment, isolated replacement creation, private endpoint access, graceful shutdown configuration, deployment observation, network attachment, and native rolling updates.
+Capabilities distinguish native source observation/build, artifact retrieval/reuse, execution, restart, configuration, routing and retirement. Build and execution are separate contracts that the same operator may provide. These native action contracts are planned where absent from the current interface; do not infer them from discovery support. Other proposed capabilities include isolated replacement creation, private endpoint access, graceful shutdown, network attachment and native rolling updates.
 
 | Operator | Proposed integration | Mapping to validate |
 | --- | --- | --- |
@@ -126,11 +128,11 @@ Unsupported requested behavior produces a clear planning error. The platform mus
 
 ## GitHub and build lifecycle
 
-For adopted components, GitHub events enter the platform controller. Direct operator automatic deployment is disabled while the source connection is retained. Bare Docker targets use the same webhook and release coordinator without requiring another deployment platform. There must be one owner of release sequencing.
+Grouped native components retain their existing operator-owned GitHub build/deploy workflow. OAP can subscribe to separate read-only notifications and observe matching provider activity; grouping does not change webhook URLs or disable automatic deployment. An owner-selected managed workflow can give OAP release sequencing, with an explicit authority transition and rollback plan. There must be one automatic sequencer for each event; read-only observation is not a second sequencer.
 
 The controller verifies webhook signatures, deduplicates deliveries, maps repositories and branches to components, records the exact commit, and serializes deployments for a component.
 
-Build and deployment are separate contracts. Initially, Coolify can continue building where exact-version behavior is verified. The portable deployment contract is an immutable image digest produced once and reused across instances. CI builds are an optional evolution, not an initial migration requirement.
+Prefer verified native operator builds and deployment. The current Coolify integration observes native exact-commit builds but does not offer OAP-controlled native artifact extraction/reuse or source lifecycle handoff. Immutable digest reuse is the portable contract for the optional OAP-managed image lane; it is not a prerequisite for grouping native source applications. A custom builder/registry is explicitly selected when needed. Bare Docker can use that lane without an existing operator.
 
 Repository events affecting multiple components can create one release with an explicit affected-component set. Superseding queued releases and monorepo change detection remain policy decisions.
 

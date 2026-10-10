@@ -10,7 +10,7 @@ Deploy and restart are denied for observe-only components. An application-wide d
 
 `POST /api/v1/applications/{id}/management` with `{ "component": "api", "expectedVersion": 1 }` explicitly enables lifecycle management for an existing Coolify image service. This increments the definition version without changing provider ownership/source/routes/variables/volumes or dispatching a deployment. It checks adapter support, exact current image and port, existing OAP ownership markers, and absence of active/attention releases. Source-backed apps stay observed until the source-build contract is implemented. Native operator triggers remain operator-managed; avoid concurrent lifecycle commands from both systems.
 
-Legacy managed bindings and snapshots remain compatible; no migration rewrites old permissions. New registrations start observed. Full owner identity, scoped credentials and mutation audit remain M1 work.
+Legacy managed bindings and snapshots remain compatible; no migration rewrites old permissions. New registrations start observed. Owner identity, app-scoped credentials and baseline mutation audit are implemented; full M1 hardening remains separate.
 
 ## Bare Docker scope
 
@@ -36,4 +36,6 @@ Run `make test-local`. For the existing staging configuration, run:
 OAP_LIVE_COOLIFY=1 python3 scripts/run-local.py go test -v ./tests/system -run '^TestLiveCoolifyObserveOnlyAssembly$' -count=1 -timeout=3m
 ```
 
-This slice does not add target credential entry, owner signup, source builds, database imports, automatic grouping, or topology mutation. Those follow the existing roadmap.
+Grouping itself adds no target credential entry, database import, automatic grouping or topology mutation. Owner signup is separately implemented. Native Coolify source observation and the optional managed image-builder lane are separately verified. Native source lifecycle handoff remains unsupported.
+
+Grouping is the primary operator-backed onboarding path. It needs a configured target, not a custom builder, registry or additional repository webhook. Existing Coolify GitHub App workflows, domains, secrets and storage remain operator-owned. A separate signed OAP notification is needed only for the currently implemented exact-commit source-event tracking path. See the [operator-first audit](operator-first-audit.md) for remaining connection UX, per-action authority and environment organization work.

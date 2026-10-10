@@ -2,7 +2,10 @@
 
 An application-first control plane for self-hosted runtimes and deployment operators. Group web services
 into applications, track releases, and keep your existing deployment operator.
-The product experience is inspired by DigitalOcean App Platform.
+The product experience is inspired by DigitalOcean App Platform. The primary
+operator-backed journey is connect/configure your existing operator, discover
+running resources and group them into applications. Preserve native builds, GitHub
+triggers, domains, volumes and secrets. A custom builder is optional.
 
 ## Current milestone
 
@@ -18,9 +21,10 @@ Verified locally with PostgreSQL and Chromium, and through a real deployment on
 an isolated staging project in the owner's existing Coolify.
 
 Bare Docker uses a local Unix socket and supports cached-image deployments without
-a registry connection. Dokploy, Dokku, Portainer, workers, jobs, direct Git push
-webhooks, source builds, embedded AI diagnosis, rolling deployments, and blue-green
-remain planned.
+a registry connection. Dokploy, Dokku, Portainer, workers, jobs, embedded AI
+diagnosis, rolling deployments, and blue-green remain planned. Native Coolify source tracking
+and an optional signed immutable-image build lane are implemented and staged;
+native source lifecycle handoff and artifact reuse are not.
 
 ## Run locally
 
@@ -248,4 +252,6 @@ signed push notifications and correlate exact commits with resource-scoped provi
 history while keeping management observe-only. An optional trusted image-builder
 command supports durable build requests and selected-component digest releases.
 See [GitHub releases](docs/github-releases.md) and [examples](examples/github-sources).
-The live native/build artifact handoff gate remains open; CI stays disabled.
+The optional hosted image-builder lane passed a real GitHub push and redelivery.
+Native source handoff/artifact reuse remains unsupported; CI stays disabled.
+See the [operator-first audit and roadmap corrections](docs/operator-first-audit.md).

@@ -6,9 +6,11 @@ components. Secrets are environment references, never values in configuration.
 The receiver at `/api/v1/hooks/github/{id}` verifies HMAC SHA-256 over the exact
 body, bounds payload size, and deduplicates delivery IDs with payload hashes.
 Repository/branch mismatches and deletions are ignored. Signed ping is supported.
-No GitHub Actions workflow is required or enabled.
+No GitHub Actions workflow is required or enabled. Grouping an existing native
+application does not require an OAP webhook or image builder; the separate
+notification enables exact-commit activity tracking in the current implementation.
 
-## Existing Coolify GitHub App: preferred native lane
+## Existing Coolify GitHub App: primary operator-backed lane
 
 Use `examples/github-sources/coolify-app.json` with an already grouped observe-only
 source application. Coolify keeps its existing GitHub App and auto-deployment
@@ -84,7 +86,9 @@ selected-component releases, one successful build reused for two replicas,
 uncertain-build holds/recovery, revoked credentials, native read-only observation,
 and source/repository scope. Existing Docker/owner/UI/MCP suites stay required.
 
-M0 batch 2 remains active. Before a native management handoff or changing triggers,
+The initial batch 2 acceptance gates below have since been completed for the
+optional image lane (see hosted evidence below). Before a native management
+handoff or changing existing operator triggers,
 retain the isolated native source evidence and verify signed push sequencing
 under the proposed ownership contract. Exact-commit source build/runtime observation
 is verified, while the live test uses an explicit staging deployment rather than
@@ -185,3 +189,8 @@ do not grant general lifecycle access to other applications.
 This completes M0 batch 2's staged signed-release gate for the optional immutable
 image lane. Native source management handoff remains unsupported. Next is batch 3,
 application/environment organization, per the existing roadmap.
+
+The default product direction is operator-first. The hosted builder is an optional
+staging fixture and capability path; it is not required for Coolify discovery or
+grouping. Native controlled actions and artifact reuse require future validated
+capabilities. See [the implementation audit](operator-first-audit.md).

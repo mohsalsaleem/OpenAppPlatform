@@ -4,11 +4,22 @@ OpenAppPlatform should be a self-hosted application platform that one person can
 operate, manually or through authenticated agents. Its core must stay useful
 without AI, external cloud services, or a collection of infrastructure services.
 
-This roadmap captures the proposed priorities as of 9 October 2026. Phases are
+This roadmap captures priorities from 9 October 2026 and accepted updates through
+10 October 2026. Phases are
 sequenced by dependency and acceptance criteria, not delivery dates. Listed
 integrations are candidates; they are not installed or enabled by this document.
 
 ## Product rules
+
+- Lead with connecting an existing operator, discovering its resources and grouping
+  them into logical applications. OAP adds application-level management while native
+  builds, GitHub triggers, domains, volumes and secrets keep working.
+- Prefer the operator's verified native build/execution capabilities. A separate
+  builder, registry, webhook, router or agent is an explicit optional gap-filler,
+  never a prerequisite for grouping existing applications.
+- Declare authority per action (observe/build/deploy/restart/configure/route).
+  Grouping does not transfer authority or disable native automatic deployments.
+  One automatic release sequencer acts on each source event.
 
 - Keep the default stack to one Go service, its dashboard, PostgreSQL, and the
   selected deployment runtime. Reuse an existing operator where possible.
@@ -69,7 +80,8 @@ backup visibility belong in M1; richer analytics can wait until M4.
 This is the active execution order. Complete the current adapter work, then take
 one reviewable slice at a time. This queue implements the original application
 platform design; it does not make every later roadmap integration a prerequisite.
-Auth and AI work remain deferred until these everyday workflows are usable.
+Minimal owner auth/scoped credentials are implemented. Full M1 hardening and AI
+assistance remain separate from these everyday workflow batches.
 
 ### Completed slice: Coolify runtime configuration and explicit connections
 
@@ -110,14 +122,27 @@ PostgreSQL, Docker, browser/MCP regressions and owner/mobile workflows passed on
 
 **Current slice:** M0 batch 3, application and environment organization.
 
+**Accepted operator-first correction:** primary onboarding is configure/connect
+operator → discover → select/review → group → manage supported capabilities. Native
+Coolify build/deploy and GitHub App workflows remain operator-owned by default.
+Existing observe-only boundaries stay enforced until explicit native action
+capabilities and authority transitions exist. The hosted custom-builder fixture is
+optional fallback evidence, not the required Coolify architecture.
+See [implementation audit and gaps](docs/operator-first-audit.md).
+
+Batch 3 now includes an existing-resource entry flow, visible per-component workflow
+ownership/capabilities, and environment organization around existing native
+resources. Safe target connection UX remains a prerequisite; server-file configuration
+is the current implementation. Do not silently create another build system during
+onboarding. Later batches add native delegated actions with scope/drift checks.
+
 **Batch 2 progress:** signed/deduplicated GitHub intake, durable source requests,
 selected-component immutable-image release plumbing, explicit uncertain-build
 recovery, and read-only existing Coolify GitHub App tracking are implemented.
 Native GitHub App source build/exact-commit/healthy runtime observation passed
 on Coolify 4.4.6 using the existing personal GitHub App. Signed push intake through the real SSH builder/registry and two healthy Coolify
 replicas passed isolated staging verification. Duplicate delivery and saved-build
-receipt reuse passed. The payload was test-signed, not a new GitHub-origin delivery;
-The hosted staging builder and dedicated branch repository hook subsequently
+receipt reuse passed. The first payload was test-signed. The hosted staging builder and dedicated branch repository hook subsequently
 passed a real GitHub push, redelivery, two healthy replicas, builder/controller
 restart and database restore checks. Existing Coolify App triggers stay unchanged. See
 [GitHub releases](docs/github-releases.md). Batch 3 is next; native source
@@ -128,8 +153,8 @@ management handoff remains unsupported.
 | Order | Deliverable | Acceptance evidence |
 | --- | --- | --- |
 | 1 | Guided discovery and manual application assembly | Inspect an existing Coolify environment, select supported resources, preview ownership/configuration mappings, group them under one application, and inspect health/logs without a deployment or provider mutation. Explicit management handoff is separate; source-backed resources stay observe-only until their build/release contract exists. |
-| 2 | GitHub-triggered release ownership | Repository/branch-to-component mapping, signed event verification, delivery deduplication, exact commit recording, and affected-component releases. Verify an existing Coolify source-build path can build the requested commit; otherwise use an explicitly configured image build path. Build once and reuse an immutable digest for replicas. Test push, duplicate delivery, failure, and recovery locally before a staging handoff. |
-| 3 | Application and environment organization | One logical application with staging/production environments, separate targets/configuration, and clear navigation. Preserve existing application/resource/release IDs through a tested compatibility migration. Reusable definitions and a readable configuration diff reduce repeated setup. |
+| 2 | GitHub activity and explicit release ownership | Repository/branch-to-component mapping, signed event verification, delivery deduplication, exact commit recording, and affected-component releases. Preserve existing operator-owned source builds and observe the requested commit; use an explicitly selected image-builder lane only for OAP-managed workflows. Digest reuse across replicas is verified for that lane, not presumed for native source builds. Test push, duplicate delivery, failure, and recovery locally before a staging handoff. |
+| 3 | Application and environment organization | Existing-operator onboarding and grouping first; one logical application with staging/production mappings and visible native workflow ownership/capabilities. Preserve existing application/resource/release IDs, triggers, routes, volumes and secret references through a tested compatibility migration. No custom builder/registry is required for grouping. Reusable definitions and readable diffs reduce repeated setup. |
 | 4 | Release verification and recovery controls | Configurable readiness probes, dependency/start ordering, deploy only selected affected components, release/artifact comparison, explicit rollback to a compatible known-good runtime snapshot, and owner-visible cancellation/abandon/reconciliation paths. Exercise process crashes and stale workers without duplicate dispatches or database edits. Rollback does not rewind application data. |
 | 5 | Stable endpoints, domains, and replica routing | Reuse operator proxies where supported; add a small routing adapter only where necessary. Keep endpoints stable through replacement and scaling, verify domain/TLS setup, remove stopped backends, and define health-aware routing and draining. Surviving workloads/routes continue if the controller is down. Docker DNS alone is not the completion gate. |
 | 6 | First useful workload and configuration breadth | Worker lifecycle, linked existing databases/queues/storage, minimal runtime secret references, private registry access, and configurable resource limits. Add a single execution path at a time with real examples. Scheduled jobs require a durable schedule identity and proof that restart does not create duplicate active schedulers. Stateful provisioning waits for backup/restore and storage guarantees. |
