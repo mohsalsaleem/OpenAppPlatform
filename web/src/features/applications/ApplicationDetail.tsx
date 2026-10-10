@@ -1,3 +1,4 @@
+import { WorkflowOwnership } from "./WorkflowOwnership";
 import { EnvironmentNavigation } from "./EnvironmentNavigation";
 import { SourceEvents } from "./SourceEvents";
 import { useCanOperate } from "../../access";
@@ -166,7 +167,9 @@ export function ApplicationDetail() {
         </div>
         <button
           className="primary"
-          disabled={!canOperate || !!active || observed}
+          disabled={
+            !canOperate || !!active || observed || !capabilities.data?.standard
+          }
           onClick={() => setReview(structuredClone(a))}
         >
           <ArrowUpRight size={17} />
@@ -205,6 +208,8 @@ export function ApplicationDetail() {
       <ErrorBox error={releases.error || logError} />
       {tab === "overview" && (
         <>
+          <WorkflowOwnership application={a} capabilities={capabilities.data} />
+          <ErrorBox error={capabilities.error} />
           <section className="panel release-banner">
             <div>
               <p className="eyebrow">LATEST RELEASE</p>
@@ -251,7 +256,11 @@ export function ApplicationDetail() {
                       (v) => v.component === c.name && v.resource?.image,
                     )?.resource?.image || c.image}
                   </code>
-                  <p className="small muted">{c.management === "observe" ? "Build and deployment stay with the existing workflow." : "OAP coordinates image releases through the deployment target."}</p>
+                  <p className="small muted">
+                    {c.management === "observe"
+                      ? "Build and deployment stay with the existing workflow."
+                      : "OAP coordinates image releases through the deployment target."}
+                  </p>
                 </div>
                 <span className="small muted">
                   {c.management === "observe"

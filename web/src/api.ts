@@ -114,6 +114,8 @@ export interface Instance {
 }
 
 export interface Capabilities {
+  rolling: boolean;
+  blueGreen: boolean;
   managementHandoff: boolean;
   standard: boolean;
   serviceEndpoints: boolean;

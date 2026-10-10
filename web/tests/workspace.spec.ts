@@ -36,6 +36,12 @@ test("authentication, application setup, release confirmation, and target discov
   await page.getByRole("button", { name: "Create application" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
   await expect(page.getByText("Ready for your first deployment")).toBeVisible();
+  const workflow = page.getByRole("region", { name: "Workflow ownership" });
+  await workflow.getByText("web · OAP image releases", { exact: true }).click();
+  await expect(workflow).toContainText("Supply a built image");
+  await expect(workflow).toContainText(
+    "OAP coordinates standard image releases",
+  );
   await expect(page.getByText("api", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Deploy application" }).click();
   await expect(page.getByRole("dialog")).toContainText("can cause downtime");
@@ -102,6 +108,16 @@ test("authentication, application setup, release confirmation, and target discov
   await expect(
     page.getByRole("status").filter({ hasText: "Connection verified" }),
   ).toBeVisible();
+  await page.getByText("OAP adapter capabilities", { exact: true }).click();
+  const adapterCapabilities = page
+    .locator("details")
+    .filter({ hasText: "OAP adapter capabilities" });
+  await expect(adapterCapabilities).toContainText("Blue-green deployment");
+  await expect(adapterCapabilities).toContainText("Unavailable in OAP");
+  await page.screenshot({
+    path: "../.local/ui-adapter-capabilities.png",
+    fullPage: true,
+  });
   await page.getByRole("button", { name: "Inspect resources" }).click();
   await expect(
     page.getByText(/resources in this target environment/),
@@ -360,6 +376,16 @@ test("group existing Docker services without deploying or restarting", async ({
   await expect(
     page.getByRole("heading", { name: "Observing existing services" }),
   ).toBeVisible();
+  const observedWorkflow = page.getByRole("region", {
+    name: "Workflow ownership",
+  });
+  await observedWorkflow
+    .getByText("web · Existing workflow", { exact: true })
+    .click();
+  await expect(observedWorkflow).toContainText("OAP does not start builds");
+  await expect(observedWorkflow).toContainText(
+    "OAP restart is blocked while observing",
+  );
   await expect(
     page.getByRole("button", { name: "Observe-only application" }),
   ).toBeDisabled();

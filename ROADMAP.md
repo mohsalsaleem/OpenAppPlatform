@@ -129,8 +129,11 @@ link/unlink, environment navigation and grouped application cards are implemente
 The migration retains separate same-named legacy applications and supports older
 controller inserts. Scoped agents cannot enumerate siblings or change membership.
 See [application environments](docs/application-environments.md). Safe target
-connection UX, reusable definitions/diffs and fuller native authority/capability
-presentation remain in this batch; do not advance to batch 4 yet.
+connection UX and sanitized layout reuse/masked diffs are implemented. Application
+overviews now explain build/deploy/restart/configuration ownership per component;
+verified target checks expose adapter support, including unavailable rollout modes.
+Full configuration promotion and native authority transitions remain scoped separately;
+do not advance to batch 4 yet.
 
 
 **Batch 3 setup/review progress:** the Coolify guide generates a credential-reference

@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Server } from "lucide-react";
-import { api, type Target, type Resource } from "../../api";
+import { api, type Target, type Resource, type Capabilities } from "../../api";
 import { Status } from "../../components/Status";
 import { ErrorBox, Loading } from "../../components/Feedback";
 export function Targets() {
@@ -61,6 +61,7 @@ function TargetCard({ target: t }: { target: Target }) {
         checkedAt: string;
         resourceCount: number;
         nativeSourceObservation: boolean;
+        capabilities: Capabilities;
       }>(`/targets/${t.id}/connection`),
   });
 
@@ -109,6 +110,55 @@ function TargetCard({ target: t }: { target: Target }) {
           configured scope. Existing builds and deployment triggers are
           preserved.
         </p>
+      )}
+      {check.data && (
+        <details className="workflow-ownership">
+          <summary>OAP adapter capabilities</summary>
+          <p className="small muted">
+            Reported adapter support after a read-only connection check.
+            Resource eligibility and your access still apply.
+          </p>
+          <dl>
+            {(
+              [
+                ["Standard image releases", check.data.capabilities.standard],
+                ["Instance restart", check.data.capabilities.restart],
+                ["Retire owned instances", check.data.capabilities.retirement],
+                [
+                  "Managed environment variables",
+                  check.data.capabilities.environment,
+                ],
+                [
+                  "Application service DNS",
+                  check.data.capabilities.applicationDns,
+                ],
+                [
+                  "Explicit service endpoints",
+                  check.data.capabilities.serviceEndpoints,
+                ],
+                [
+                  "Image management handoff",
+                  check.data.capabilities.managementHandoff,
+                ],
+                [
+                  "Native source deployment observation",
+                  check.data.nativeSourceObservation,
+                ],
+                ["Rolling deployment", check.data.capabilities.rolling],
+                ["Blue-green deployment", check.data.capabilities.blueGreen],
+              ] as const
+            ).map(([name, supported]) => (
+              <div key={name}>
+                <dt>{name}</dt>
+                <dd>{supported ? "Supported" : "Unavailable in OAP"}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="small muted">
+            Native source build/deploy commands and source management handoff
+            are unavailable in OAP. Existing operator triggers remain in place.
+          </p>
+        </details>
       )}
       {discover &&
         (q.isPending ? (
