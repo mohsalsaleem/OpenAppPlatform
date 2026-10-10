@@ -46,6 +46,7 @@ func TestLiveDockerLifecycleOffline(t *testing.T) {
 	m.Components[0].Port = 8080
 	m.Components[0].HostPort = port
 	m.Components[0].Image = image
+	m.Components[0].Readiness = &domain.ReadinessPolicy{RequireHealthy: true, TimeoutSeconds: 60}
 	status, raw := request(t, srv, "POST", "/api/v1/applications", "", m)
 	if status != 201 {
 		t.Fatalf("create %d %s", status, raw)

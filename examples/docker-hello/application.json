@@ -3,6 +3,18 @@
   "environment": "staging",
   "targetId": "docker-local",
   "components": [
-    {"name":"web","kind":"web","image":"oap-hello-api:dev","port":8080,"hostPort":8791,"instances":1,"strategy":"standard"}
+    {
+      "name": "web",
+      "kind": "web",
+      "image": "oap-hello-api:dev",
+      "port": 8080,
+      "hostPort": 8791,
+      "instances": 1,
+      "strategy": "standard",
+      "readiness": {
+        "requireHealthy": true,
+        "timeoutSeconds": 120
+      }
+    }
   ]
 }

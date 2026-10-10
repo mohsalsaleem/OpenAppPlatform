@@ -40,8 +40,9 @@ Add resourceId to a component using an existing resource UUID from the target's
 Inspect resources view. Set image to the resource's existing image reference and
 instances to 1. Adoption preserves provider configuration; this milestone can
 redeploy the adopted image resource but does not edit its image or Git source.
-Disable any independent automatic deployment trigger before controller-managed
-releases. Application port must describe the actual existing workload port.
+Grouping observes the resource by default and preserves existing automatic triggers.
+Enable image management separately where supported; source-backed services stay
+observe-only. Application port must describe the actual existing workload port.
 
 ## Build your own API image
 
@@ -101,3 +102,11 @@ routes and health checks in Coolify where needed; this example does not provisio
 a webhook receiver or domains. Mailpit's webhook URL must point to a real HTTP
 receiver. Runtime variables are non-secret and snapshotted; keep secrets and
 preview variables in the operator. Adoption does not grant environment mutation.
+
+## Operator-reported readiness
+
+The Docker hello example requires an explicit healthy result within 120 seconds.
+Its image defines a native Docker HEALTHCHECK against `/health/ready`. OAP uses the
+reported result; the manifest does not install or rewrite the probe. See
+[release readiness](../docs/release-readiness.md) for default behavior, bounds and
+recovery.
