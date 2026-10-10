@@ -263,3 +263,18 @@ preserving resource IDs, native workflows, release histories and credential scop
 Owners explicitly link or separate environments through the dashboard. Existing
 flat application URLs/APIs stay compatible. Target configuration remains server-side.
 See [application environments](docs/application-environments.md).
+
+## Local test cache housekeeping
+
+The test build caches Go compilation independently of root documentation and UI
+changes. Test build stages carry `io.openappplatform.test-cache=true`, so obsolete
+dangling test layers can be reclaimed on the local Docker endpoint with:
+
+```sh
+docker image prune --filter label=io.openappplatform.test-cache=true
+```
+
+This targets unused untagged test images; it does not prune application volumes.
+Keep the latest test runner tag and recorded screenshots/results for reproducibility.
+Failed build containers can retain cache layers and should be inspected before
+removal. Do not use volume pruning as a general disk-cleanup command.
