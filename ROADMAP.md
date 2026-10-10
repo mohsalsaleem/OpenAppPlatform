@@ -156,7 +156,9 @@ rollback path is implemented for compatible verified snapshots and existing OAP-
 instances; native Docker and two-replica Coolify rollback/return, duplicate request,
 review/acknowledgement and metadata restore checks passed. Cancellation before dispatch and owner abandonment/reconciliation are implemented;
 local cancellation, restart, fence, provider reconciliation, concurrency, permissions
-and browser checks passed. Configuration/data/schema rollback remains
+and browser checks passed. The controller is healthy in staging; completed-release controls
+reject with 409 and the hosted review UI passed without changing stored release state.
+Configuration/data/schema rollback remains
 in this batch. See [release controls](docs/release-controls.md). See [controlled image rollback](docs/image-rollback.md). Batch 4 stays active.
 Readiness and dependency slices passed local/native Docker and staging UI verification;
 comparison passed local snapshot/scope/masking and staging UI/API verification. No native HTTP

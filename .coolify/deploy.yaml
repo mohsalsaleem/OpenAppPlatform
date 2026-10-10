@@ -13,9 +13,9 @@ environments:
     status: healthy
     coolify_application_uuid: 2bs31xhjzmfi3w0aulusi7zy
     url: https://oap-staging.mohsal.dev
-    image: 127.0.0.1:5001/openappplatform/staging@sha256:35ff2f6cb9afb162afbcda542e97afdf186c29422acf513d655cf633dc09f2e8
-    commit: eb505590dfc28690a8d0ca3bcf05d950cf48c856
-    provider_deployment_uuid: wpl6y93qhrpuzc490rogg72f
+    image: 127.0.0.1:5001/openappplatform/staging@sha256:ee746e5db0c92997387d0815d563900a914f54644bcf64451d29ed8474897389
+    commit: d7b2b0d2e4b7535a35963017e354acd69e38f6ad
+    provider_deployment_uuid: jhsguq4282vnxwzgplrfgjjf
     auth_mode: owner
     owner_setup: complete
     configuration_storage_uuid: a2q7lc8ehu6twekwj1bcng8m
@@ -110,3 +110,13 @@ image_rollback_verification:
   backup: /home/saleem/.local/share/openappplatform/backups/staging-20261010T184729Z.dump
   restored_database: openappplatform_staging_rollback_restore_check
   verified: 2026-10-10
+
+release_control_verification:
+  verified: 2026-10-10
+  platform_commit: d7b2b0d2e4b7535a35963017e354acd69e38f6ad
+  local_run: 20261010-232121-be9f1f7e
+  hosted_completed_release_controls: rejected_with_409
+  hosted_review_fixture: browser_interception_only
+  hosted_review_application_writes: 0
+  existing_source_release: preserved
+  existing_source_replicas: healthy
