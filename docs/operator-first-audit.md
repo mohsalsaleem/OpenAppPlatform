@@ -1,6 +1,6 @@
 # Operator-first implementation audit
 
-Reviewed against the repository on 10 October 2026, after hosted staging release
+Initial audit against the repository on 10 October 2026, after hosted staging release
 verification. This is a product/architecture correction and delivery plan; it does
 not change running operator resources or transfer deployment ownership.
 
@@ -84,7 +84,13 @@ never provision replacement infrastructure silently.
 
 ## Ordered roadmap follow-through
 
-Keep M0 batch 3 active. Its acceptance must exercise existing Coolify resources:
+The original batch 3 acceptance below has now passed its baseline: guided trusted
+setup, logical environment organization, reusable layouts/diffs, workflow ownership
+and guarded mixed image/source staging grouping. See
+[target setup and acceptance](target-setup-and-definition-review.md) for evidence
+and limits. Native delegated actions remain future work. Next is M0 batch 4.
+
+The acceptance contract remains:
 
 1. Put existing-service grouping first in onboarding/application empty states.
    Show configured target validation and preserve an honest manual setup path

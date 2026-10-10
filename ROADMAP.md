@@ -120,32 +120,30 @@ PostgreSQL, Docker, browser/MCP regressions and owner/mobile workflows passed on
 
 **Completed slice:** M0 batch 2, GitHub-triggered release ownership.
 
-**Current slice:** M0 batch 3, application and environment organization.
+**Completed slice:** M0 batch 3, application and environment organization.
 
-**Batch 3 progress:** existing-service grouping leads the application entry flow.
-An additive logical application layer groups existing environment records without
-changing their IDs, resources, histories or credential scopes. Owner-only versioned
-link/unlink, environment navigation and grouped application cards are implemented.
-The migration retains separate same-named legacy applications and supports older
-controller inserts. Scoped agents cannot enumerate siblings or change membership.
-See [application environments](docs/application-environments.md). Safe target
-connection UX and sanitized layout reuse/masked diffs are implemented. Application
-overviews now explain build/deploy/restart/configuration ownership per component;
-verified target checks expose adapter support, including unavailable rollout modes.
-Full configuration promotion and native authority transitions remain scoped separately;
-do not advance to batch 4 yet.
-The next acceptance gate is explicit mixed image/source Coolify grouping through a
-GET-only provider boundary, with native configuration fingerprints and blocked
-mutations, using a disposable OAP database.
+Existing-service grouping leads onboarding. Logical application groups preserve
+legacy environment/resource/release IDs and agent scopes. Owner-only versioned
+link/unlink, environment navigation, trusted additional-environment registration,
+server-assisted first-connection setup, sanitized component layout reuse, masked
+configuration diffs and per-component workflow/capability presentation are delivered.
+Local migration, concurrency, permission, Docker and browser checks passed.
 
+The explicit staging image/source acceptance passed on 10 October 2026 through a
+GET-only provider boundary and a disposable OAP database. Native source/trigger,
+domain, variable and storage fingerprints stayed unchanged; health/logs remained
+available; deploy/restart/source handoff were rejected with zero provider writes.
+Real staging acceptance covers one existing environment. Cross-environment linking
+is verified in local system/browser fixtures; no production resource was touched.
+See [application environments](docs/application-environments.md) and
+[target setup and acceptance](docs/target-setup-and-definition-review.md).
 
-**Batch 3 setup/review progress:** the Coolify guide generates a credential-reference
-recipe; configured targets have read-only scope checks. Human owners can connect
-another existing environment through a trusted operator without supplying an
-arbitrary URL or secret. Grouping reuses sanitized component layouts, and settings
-shows masked current/proposed configuration changes. Full credential/vault entry
-and full configuration promotion are separate work. See
-[target setup and definition review](docs/target-setup-and-definition-review.md).
+**Next slice:** M0 batch 4, release verification and recovery controls. Start with
+configurable readiness and the release snapshot/recovery contract; keep native
+observed workloads read-only. This batch is queued, not implemented by the acceptance
+work. Full configuration promotion, native source authority transitions and the M1
+credential vault remain separate follow-up work. The initial reusable definition
+contract is sanitized naming/layout reuse, not secret or runtime cloning.
 
 **Accepted operator-first correction:** primary onboarding is configure/connect
 operator → discover → select/review → group → manage supported capabilities. Native
@@ -155,10 +153,10 @@ capabilities and authority transitions exist. The hosted custom-builder fixture 
 optional fallback evidence, not the required Coolify architecture.
 See [implementation audit and gaps](docs/operator-first-audit.md).
 
-Batch 3 now includes an existing-resource entry flow, visible per-component workflow
-ownership/capabilities, and environment organization around existing native
-resources. Safe target connection UX remains a prerequisite; server-file configuration
-is the current implementation. Do not silently create another build system during
+Batch 3 includes an existing-resource entry flow, visible per-component workflow
+ownership/capabilities and environment organization around existing native resources.
+First connections use a guided server-file recipe; additional environment scopes
+inherit a trusted connection. Do not silently create another build system during
 onboarding. Later batches add native delegated actions with scope/drift checks.
 
 **Batch 2 progress:** signed/deduplicated GitHub intake, durable source requests,
@@ -170,7 +168,7 @@ replicas passed isolated staging verification. Duplicate delivery and saved-buil
 receipt reuse passed. The first payload was test-signed. The hosted staging builder and dedicated branch repository hook subsequently
 passed a real GitHub push, redelivery, two healthy replicas, builder/controller
 restart and database restore checks. Existing Coolify App triggers stay unchanged. See
-[GitHub releases](docs/github-releases.md). Batch 3 is next; native source
+[GitHub releases](docs/github-releases.md). Batch 3 acceptance is complete; native source
 management handoff remains unsupported.
 
 ### Next ordered batches

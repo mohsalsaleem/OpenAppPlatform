@@ -65,9 +65,9 @@ System/browser acceptance includes immutable target authority, no operator write
 create-only/duplicate rejection, forbidden credential references, scoped-token/viewer
 boundaries, sanitized layout export/reuse, masked diff values, guided recipe output
 and owner environment registration through a local read-only Coolify fixture.
-Full secret entry/vault, full configuration templates/promotion, native delegated
-source commands and richer per-operation capability presentation remain follow-up
-work. Batch 3 remains active until its remaining contracts are delivered.
+Full secret entry/vault, full configuration templates/promotion and native delegated
+source commands remain follow-up work. The baseline M0 batch 3 contract is complete
+with guided trusted setup, layout reuse, diff review and ownership presentation.
 
 The slice is deployed in Coolify staging. Live scope/layout verification and
 failed-scope persistence checks passed; successful owner registration and browser
@@ -124,3 +124,13 @@ No production scope, provider creation, trigger changes or metadata imports into
 hosted platform are performed. Multi-environment linking remains covered by local
 system/browser tests; this staging test verifies a mixed native application in its
 existing environment.
+
+Staging acceptance passed on 10 October 2026 using image resource
+`ibgspvrw2hvvm6aa2a9sblmv` and source resource `lf1ggsrabuf3qifyj305kreo`, both
+in the existing dedicated staging environment. Test
+`TestLiveCoolifyObserveOnlyAssembly` passed in 15.24 seconds with zero provider
+writes and zero OAP releases. Full local run `20261010-212147-667b34a3` also passed.
+No builder or registry was configured in the disposable controller. The test database
+and network were removed afterward; the hosted platform and provider fixtures were
+not redeployed. This is existing-resource acceptance, not a native lifecycle handoff
+or proof of cross-environment production behavior.
