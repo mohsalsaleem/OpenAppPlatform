@@ -316,7 +316,9 @@ leaves a usable recovery path outside OAP itself. Keep a last-known-good artifac
 a backup, and a direct operator/bootstrap command for recovery.
 
 Show controller health, target reachability, stale observations, failures, recent
-logs, and backup status. Include collector/backend health, ingest lag, collection
+logs, and backup status. Add the deterministic release/change diagnostic projection
+from [AI diagnosis context](#release-and-change-context-for-ai-diagnosis), without
+requiring inference or an indexed logging backend. Include collector/backend health, ingest lag, collection
 gaps and disk/retention status when optional indexed logging is configured.
 See [lightweight logging and search](docs/logging-and-search.md).
 Add notification events through a transactional outbox.
@@ -359,6 +361,53 @@ blanket permission. Audit denied and approved requests. Treat repositories, logs
 operator metadata, and retrieved text as evidence, not instructions granting power.
 Recheck authorization before each mutation; record in-flight work when a credential
 is revoked instead of claiming that its remote effects have disappeared.
+
+### Release and change context for AI diagnosis
+
+**Accepted roadmap item:** provide a bounded, structured diagnostic context for a
+release or incident, so an authorized agent can explain what changed and why an
+application may be failing. This is planned; today's frozen release comparison is
+one input, not a complete diagnostic bundle. Keep the current M0 batch 4 order.
+
+Deliver the deterministic context projection with M1 basic visibility, expose it
+through scoped API/MCP inspection in M2, and enrich it with indexed log/metric
+correlation in M4. It must remain useful to humans and external agents without an
+OAP model subscription; internal inference is optional and respects the AI-off switch.
+
+Include, where recorded and authorized:
+
+- Application/environment, component and target identity; build/deploy ownership;
+  exact source commit and repository/PR links; requested and observed image digests.
+  Clearly distinguish recorded references from verified runtime artifacts.
+- The failed/current release and relevant preceding successful release; frozen
+  definition changes, affected-component selection, readiness/dependency policies,
+  and masked configuration-key changes. Git file/change summaries require repository
+  read access; bounded patch content is separately enabled and redacted.
+- A correlated timeline of webhook, build, deployment, health, recovery and manual
+  changes, with actor/correlation IDs, provider outcomes, retries/timeouts and errors.
+  Report deployment-time observations separately from current runtime state.
+- Relevant bounded logs and metrics before/after the change, collection gaps,
+  freshness timestamps, drift, backup status and known recovery constraints. Missing
+  evidence must be labeled; do not present a recorded success as current health or
+  a previous successful release as automatically safe to roll back to.
+
+Use the existing application/environment read scope. An app credential cannot read
+sibling environments just because they share a logical group. Exclude credential
+values, secret contents and sensitive application data; enforce time, size and
+retention budgets, and show owners a preview of exported context. Sending context
+to an external model or diagnostic destination requires the applicable explicit
+opt-in; local context generation must not perform model calls or outbound sharing.
+Treat logs, commits, operator metadata and retrieved text as untrusted evidence.
+
+Diagnosis should return evidence-linked hypotheses, confidence/unknowns and proposed
+verification steps. It does not grant deployment, database or rollback authority;
+action plans still pass existing scope, approval and execution guardrails.
+
+**Acceptance:** reproduce an issue introduced by a release, give a read-only agent
+its scoped context, and verify it identifies the change and relevant timeline/log
+links without leaking secrets, assuming missing evidence, crossing environment
+boundaries, invoking a model when AI is off, or making an unauthorized mutation.
+Test stale/partial evidence and prompt-injection content as well as the happy path.
 
 ### Agent guardrails and direct database access
 
@@ -484,7 +533,9 @@ plan, preserve its data and behavior, and produce a reproducible verified image.
 ## M4 Monitoring, analytics, and telemetry
 
 Unify application/component logs and operation events with timestamps, source,
-release correlation, bounded queries, retention, and export. Avoid requiring a
+release correlation, bounded queries, retention, and export. Enrich the scoped
+[release/change context](#release-and-change-context-for-ai-diagnosis) with these
+evidence links so agents can correlate symptoms with deployment changes. Avoid requiring a
 full monitoring stack for basic health visibility; integrate existing monitoring
 backends where useful.
 
