@@ -15,6 +15,21 @@ export function AssembleApplication() {
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [review, setReview] = useState(false);
+  const [layoutId, setLayoutId] = useState("");
+  const applications = useQuery({
+    queryKey: ["applications"],
+    queryFn: () => api<Application[]>("/applications"),
+  });
+  const layout = useQuery({
+    queryKey: ["layout", layoutId],
+    queryFn: () =>
+      api<{
+        name: string;
+        definitionVersion: number;
+        components: { name: string; kind: string }[];
+      }>(`/applications/${layoutId}/layout`),
+    enabled: !!layoutId,
+  });
   const targets = useQuery({
     queryKey: ["targets"],
     queryFn: () => api<Target[]>("/targets"),
@@ -26,7 +41,9 @@ export function AssembleApplication() {
   const target = targets.data?.find((t) => t.id === id);
   const chosen =
     resources.data?.filter((r) => selected[r.id] !== undefined) ?? [];
+  const layoutReady = !layoutId || (!!layout.data && !layout.isFetching);
   const valid =
+    layoutReady &&
     /^[a-z][a-z0-9-]{0,47}$/.test(name) &&
     chosen.length > 0 &&
     chosen.length <= 16 &&
@@ -85,7 +102,32 @@ export function AssembleApplication() {
           2. Review application
         </span>
       </div>
-      <ErrorBox error={resources.error || save.error} />
+      <ErrorBox error={resources.error || save.error || layout.error} />
+      <label>
+        Reuse a component layout
+        <select
+          value={layoutId}
+          onChange={(e) => {
+            setLayoutId(e.target.value);
+            setSelected({});
+          }}
+        >
+          <option value="">Start with resource names</option>
+          {applications.data?.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.manifest.name} · {a.manifest.environment}
+            </option>
+          ))}
+        </select>
+      </label>
+      {layout.data && (
+        <p className="small muted">
+          Reusing component names from definition{" "}
+          {layout.data.definitionVersion}. Select this environment’s existing
+          resources and review every mapping. Credentials, images, routes and
+          resource IDs are not copied.
+        </p>
+      )}
       {!review ? (
         <section className="panel">
           <div className="section-heading">
@@ -113,7 +155,7 @@ export function AssembleApplication() {
           {resources.data?.map((r) => {
             const supported =
               r.artifactKind === "image" || r.artifactKind === "source";
-            const blocked = !!r.applicationId || !supported;
+            const blocked = !!r.applicationId || !supported || !layoutReady;
             return (
               <div className="assembly-resource" key={r.id}>
                 <input
@@ -129,6 +171,10 @@ export function AssembleApplication() {
                         .replace(/[^a-z0-9-]+/g, "-")
                         .replace(/^-+|-+$/g, "")
                         .slice(0, 48);
+                      const suggested =
+                        layout.data?.components[chosen.length]?.name;
+                      if (suggested && !Object.values(next).includes(suggested))
+                        next[r.id] = suggested;
                       if (!/^[a-z]/.test(next[r.id]))
                         next[r.id] = `service-${chosen.length + 1}`;
                     } else delete next[r.id];

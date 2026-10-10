@@ -133,6 +133,14 @@ connection UX, reusable definitions/diffs and fuller native authority/capability
 presentation remain in this batch; do not advance to batch 4 yet.
 
 
+**Batch 3 setup/review progress:** the Coolify guide generates a credential-reference
+recipe; configured targets have read-only scope checks. Human owners can connect
+another existing environment through a trusted operator without supplying an
+arbitrary URL or secret. Grouping reuses sanitized component layouts, and settings
+shows masked current/proposed configuration changes. Full credential/vault entry
+and full configuration promotion are separate work. See
+[target setup and definition review](docs/target-setup-and-definition-review.md).
+
 **Accepted operator-first correction:** primary onboarding is configure/connect
 operator → discover → select/review → group → manage supported capabilities. Native
 Coolify build/deploy and GitHub App workflows remain operator-owned by default.

@@ -278,3 +278,8 @@ This targets unused untagged test images; it does not prune application volumes.
 Keep the latest test runner tag and recorded screenshots/results for reproducibility.
 Failed build containers can retain cache layers and should be inspected before
 removal. Do not use volume pruning as a general disk-cleanup command.
+
+The [target setup and definition review](docs/target-setup-and-definition-review.md)
+flow generates first-connection recipes, verifies configured scopes read-only,
+connects additional existing environments through trusted operators, reuses naming
+layouts and previews masked configuration changes. Native workflows remain intact.

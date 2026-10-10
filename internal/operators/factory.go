@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/config"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator/coolify"
@@ -18,6 +19,9 @@ func New(t domain.Target) (operator.Adapter, error) {
 	}
 	switch t.Operator {
 	case "coolify":
+		if e := config.OperatorCredentialReference(t.TokenEnv); e != nil {
+			return nil, e
+		}
 		if len(t.Settings) > 0 && !bytes.Equal(bytes.TrimSpace(t.Settings), []byte("{}")) && !bytes.Equal(bytes.TrimSpace(t.Settings), []byte("null")) {
 			return nil, errors.New("Coolify settings are not supported; reference credentials through tokenEnv")
 		}

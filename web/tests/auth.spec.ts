@@ -100,6 +100,38 @@ test("owner setup, sessions, invitations, read-only membership, and scoped agent
     path: "../.local/ui-grouped-applications.png",
     fullPage: true,
   });
+  await page.getByRole("link", { name: "Deployment targets" }).click();
+  await page
+    .getByText("Connect another existing Coolify environment", { exact: true })
+    .click();
+  await page
+    .getByLabel("Existing operator connection")
+    .selectOption("coolify-local-mock");
+  await page
+    .getByLabel("New connection name")
+    .fill("Existing preview environment");
+  await page.getByLabel("New target ID").fill("coolify-existing-preview");
+  await page
+    .getByLabel("Existing operator environment", { exact: true })
+    .fill("preview");
+  await page
+    .getByRole("button", { name: "Verify and connect environment" })
+    .click();
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Environment connection added" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      name: "Existing preview environment",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "../.local/ui-existing-environment-connection.png",
+    fullPage: true,
+  });
   await page.getByRole("link", { name: "Workspace access" }).click();
   await expect(
     page.getByRole("heading", { name: "Workspace access" }),

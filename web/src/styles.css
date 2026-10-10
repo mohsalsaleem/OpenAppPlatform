@@ -1148,3 +1148,10 @@ input.inline-checkbox {
 .application-group .application-count { flex-wrap: wrap; justify-content: flex-end; }
 .application-group .environment { display: inline-flex; align-items: center; gap: 4px; }
 @media (max-width: 640px) { .app-card.application-group { grid-template-columns: 32px minmax(0, 1fr); } .application-group .application-count { grid-column: 2; justify-content: flex-start; } }
+
+.configuration-diff { margin: 16px 0 24px; }
+.configuration-diff .table-responsive { overflow-x: auto; margin-top: 12px; }
+.configuration-diff table { width: 100%; border-collapse: collapse; }
+.configuration-diff th, .configuration-diff td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: anywhere; }
+.configuration-diff th { color: #64748b; font-size: 12px; font-weight: 500; }
+.configuration-diff td { font-size: 13px; }

@@ -1,7 +1,9 @@
+import { ExistingEnvironment } from "./ExistingEnvironment";
+import { TargetSetup } from "./TargetSetup";
 import { useCanOperate } from "../../access";
 import { Link } from "react-router-dom";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Server } from "lucide-react";
 import { api, type Target, type Resource } from "../../api";
 import { Status } from "../../components/Status";
@@ -22,6 +24,8 @@ export function Targets() {
           </p>
         </div>
       </div>
+      <ExistingEnvironment targets={q.data ?? []} />
+      <TargetSetup existingIds={q.data?.map((t) => t.id) ?? []} />
       <ErrorBox error={q.error} />
       {q.isPending ? (
         <Loading />
@@ -51,6 +55,15 @@ export function Targets() {
 function TargetCard({ target: t }: { target: Target }) {
   const canOperate = useCanOperate();
   const [discover, setDiscover] = useState(false);
+  const check = useMutation({
+    mutationFn: () =>
+      api<{
+        checkedAt: string;
+        resourceCount: number;
+        nativeSourceObservation: boolean;
+      }>(`/targets/${t.id}/connection`),
+  });
+
   const q = useQuery({
     queryKey: ["resources", t.id],
     queryFn: () => api<Resource[]>(`/targets/${t.id}/resources`),
@@ -66,6 +79,13 @@ function TargetCard({ target: t }: { target: Target }) {
           </p>
         </div>
         <div className="log-buttons">
+          <button
+            className="secondary"
+            onClick={() => check.mutate()}
+            disabled={check.isPending}
+          >
+            {check.isPending ? "Checking…" : "Verify connection"}
+          </button>
           {canOperate && (
             <Link className="button primary" to={`/targets/${t.id}/assemble`}>
               Group services
@@ -82,7 +102,14 @@ function TargetCard({ target: t }: { target: Target }) {
           </button>
         </div>
       </div>
-      <ErrorBox error={q.error} />
+      <ErrorBox error={check.error || q.error} />
+      {check.data && (
+        <p role="status" className="saved-message">
+          Connection verified · {check.data.resourceCount} resources in the
+          configured scope. Existing builds and deployment triggers are
+          preserved.
+        </p>
+      )}
       {discover &&
         (q.isPending ? (
           <Loading />

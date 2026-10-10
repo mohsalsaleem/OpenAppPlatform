@@ -7,7 +7,7 @@ import http from 'node:http';
 const report={status:'running',startedAt:new Date().toISOString(),steps:[],expectedSkips:['TestLiveCoolifyLifecycle','TestLiveCoolifyRuntimeConfiguration','TestLiveCoolifyObserveOnlyAssembly','TestLiveCoolifyGitHubAppPinnedCommit','TestLiveSignedServerBuildCoolifyReplicas']};
 const env={...process.env,OAP_API_TOKEN:randomBytes(32).toString('base64url'),OAP_ADDR:'127.0.0.1:8787',OAP_AUTH_MODE:'preview'};
 delete env.COOLIFY_TOKEN;delete env.COOLIFY_URL;delete env.OAP_LIVE_COOLIFY;
-let platform;
+let platform;let operatorMock;let operatorWrites=0;
 async function persist(){await writeFile('/report/suite.json',JSON.stringify(report,null,2)+'\n');}
 async function run(label,command,args,cwd='/workspace',timeout=180000){
  console.log(`\n[local-test] ${label}`);
@@ -61,7 +61,9 @@ try{
  platform.kill('SIGTERM');await new Promise(r=>platform.on('close',r));platform=null;
  await writeFile('/report/platform.log',platformLog);
  env.OAP_AUTH_MODE='owner';env.OAP_SETUP_TOKEN=randomBytes(32).toString('base64url');env.OAP_COOKIE_SECURE='false';delete env.OAP_API_TOKEN;
- const ownerTargets=JSON.parse(await readFile('/workspace/.local/observed-targets.json','utf8'));ownerTargets.push({...ownerTargets[0],id:'docker-production',name:'Local production fixture',environment:'production'});await writeFile('/workspace/.local/observed-targets.json',JSON.stringify(ownerTargets));
+ env.COOLIFY_MOCK_TOKEN=randomBytes(32).toString('base64url');
+ operatorMock=http.createServer((req,res)=>{if(req.method!=='GET'){operatorWrites++;res.writeHead(405).end();return}if(req.headers.authorization!=='Bearer '+env.COOLIFY_MOCK_TOKEN){res.writeHead(401).end();return}if(!['/api/v1/projects/mock-project/staging','/api/v1/projects/mock-project/preview'].includes(req.url)){res.writeHead(404).end();return}res.setHeader('Content-Type','application/json');res.end(JSON.stringify({applications:[]}))});await new Promise(r=>operatorMock.listen(8792,'127.0.0.1',r));
+ const ownerTargets=JSON.parse(await readFile('/workspace/.local/observed-targets.json','utf8'));ownerTargets.push({...ownerTargets[0],id:'docker-production',name:'Local production fixture',environment:'production'});ownerTargets.push({id:'coolify-local-mock',name:'Local Coolify fixture',operator:'coolify',url:'http://127.0.0.1:8792',projectId:'mock-project',serverId:'mock-server',environment:'staging',tokenEnv:'COOLIFY_MOCK_TOKEN'});await writeFile('/workspace/.local/observed-targets.json',JSON.stringify(ownerTargets));
  platform=spawn('/opt/oap/platform',['-targets','/workspace/.local/observed-targets.json','-web','/workspace/web/dist'],{env,stdio:['ignore','pipe','pipe']});
  let ownerLog='';platform.stdout.on('data',b=>ownerLog+=b);platform.stderr.on('data',b=>ownerLog+=b);
  await waitReady();
@@ -69,6 +71,6 @@ try{
  platform.kill('SIGTERM');await new Promise(r=>platform.on('close',r));platform=null;
  await writeFile('/report/owner-platform.log',ownerLog);
  for(const name of await readdir('/workspace/.local'))if(name.endsWith('.png'))await copyFile('/workspace/.local/'+name,'/report/'+name);
- report.status='passed';
+ if(operatorWrites!==0)throw Error('Connection setup mutated the operator');report.status='passed';
 }catch(error){report.status='failed';report.error=error.message;console.error(error);process.exitCode=1}
-finally{try{for(const name of await readdir('/workspace/.local'))if(name.endsWith('.png'))await copyFile('/workspace/.local/'+name,'/report/'+name)}catch{};if(platform)platform.kill('SIGTERM');report.finishedAt=new Date().toISOString();await persist();console.log(`\n[local-test] ${report.status}`)}
+finally{if(operatorMock)operatorMock.close();try{for(const name of await readdir('/workspace/.local'))if(name.endsWith('.png'))await copyFile('/workspace/.local/'+name,'/report/'+name)}catch{};if(platform)platform.kill('SIGTERM');report.finishedAt=new Date().toISOString();await persist();console.log(`\n[local-test] ${report.status}`)}

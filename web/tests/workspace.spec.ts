@@ -48,6 +48,22 @@ test("authentication, application setup, release confirmation, and target discov
     page.getByRole("heading", { name: "Runtime configuration" }),
   ).toBeVisible();
   await page.getByLabel("Container image for web").fill("nginx:1.28-alpine");
+  await expect(
+    page.getByRole("region", { name: "Configuration changes" }),
+  ).toContainText("nginx:1.28-alpine");
+  await page
+    .getByLabel("Environment variables for web")
+    .fill('{"PRIVATE_MARKER":"hidden-from-diff"}');
+  await expect(
+    page.getByRole("region", { name: "Configuration changes" }),
+  ).toContainText("PRIVATE_MARKER");
+  await expect(
+    page.getByRole("region", { name: "Configuration changes" }),
+  ).not.toContainText("hidden-from-diff");
+  await page.screenshot({
+    path: "../.local/ui-configuration-diff.png",
+    fullPage: true,
+  });
   await page.getByRole("button", { name: "Save configuration" }).click();
   await expect(
     page.getByText("Configuration saved. Deploy when you are ready."),
@@ -59,6 +75,33 @@ test("authentication, application setup, release confirmation, and target discov
     fullPage: true,
   });
   await page.getByRole("link", { name: "Deployment targets" }).click();
+  await page
+    .getByText("Set up an existing Coolify connection", { exact: true })
+    .click();
+  await page
+    .getByLabel("Coolify URL", { exact: true })
+    .fill("https://coolify.example.test");
+  await page.getByLabel("Coolify project ID").fill("example-project");
+  await page.getByLabel("Coolify server ID").fill("example-server");
+  await expect(
+    page.getByRole("button", { name: "Copy target configuration" }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator("details")
+      .filter({ hasText: "Set up an existing Coolify connection" })
+      .locator("pre"),
+  ).toContainText('"tokenEnv": "COOLIFY_TOKEN"');
+  await page.screenshot({
+    path: "../.local/ui-target-setup.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Verify connection", exact: true })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Connection verified" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Inspect resources" }).click();
   await expect(
     page.getByText(/resources in this target environment/),
@@ -290,6 +333,15 @@ test("group existing Docker services without deploying or restarting", async ({
   await page.getByRole("button", { name: "Connect to workspace" }).click();
   await page.getByRole("link", { name: "Deployment targets" }).click();
   await page.getByRole("link", { name: "Group services" }).click();
+  const apps = await (
+    await page.request.get("/api/v1/applications", {
+      headers: { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` },
+    })
+  ).json();
+  const source = apps.find((a: { manifest: { name: string } }) =>
+    /^browser-[0-9]/.test(a.manifest.name),
+  );
+  await page.getByLabel("Reuse a component layout").selectOption(source.id);
   await page.getByLabel("Select existing-observation-fixture").check();
   await page.getByRole("button", { name: "Review 1 services" }).click();
   await page

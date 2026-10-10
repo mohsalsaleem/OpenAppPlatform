@@ -1,3 +1,4 @@
+import { ConfigurationDiff } from "./ConfigurationDiff";
 import { useCanOperate } from "../../access";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -105,6 +106,7 @@ export function ConfigurationEditor({
           </button>
         </div>
       </div>
+      <ConfigurationDiff before={base.manifest} after={draft} />
       {stale && (
         <div className="error" role="alert">
           A newer definition is available. Reload before saving to avoid

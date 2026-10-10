@@ -2306,6 +2306,102 @@
           }
         }
       }
+    },
+    "/api/v1/targets/{id}/connection": {
+      "get": {
+        "summary": "Read-only verification of a configured target scope",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verified scope, capabilities and resource count"
+          },
+          "502": {
+            "description": "Cannot verify credentials/scope"
+          }
+        }
+      }
+    },
+    "/api/v1/targets/scopes": {
+      "post": {
+        "summary": "Human owner connects an existing environment through a trusted configured Coolify target",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "name",
+                  "sourceTargetId",
+                  "environment"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "sourceTargetId": {
+                    "type": "string"
+                  },
+                  "environment": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created OAP metadata only"
+          },
+          "403": {
+            "description": "Human owner required"
+          },
+          "409": {
+            "description": "Duplicate ID/scope"
+          },
+          "502": {
+            "description": "Existing scope verification failed"
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/layout": {
+      "get": {
+        "summary": "Read a sanitized component naming layout",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Name/version and component name/kind only"
+          },
+          "404": {
+            "description": "Unavailable or outside credential scope"
+          }
+        }
+      }
     }
   },
   "components": {
