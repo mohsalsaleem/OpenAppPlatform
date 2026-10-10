@@ -81,6 +81,7 @@ def run(keep=False):
     LATEST.unlink(missing_ok=True)
     command([sys.executable, '-m', 'unittest', 'discover', '-s', 'tests/env', '-p', '*_test.py'])
     command([sys.executable, '-m', 'unittest', 'discover', '-s', 'scripts', '-p', 'test_build_on_server.py'])
+    command([sys.executable, '-m', 'unittest', 'discover', '-s', 'scripts', '-p', 'test_build_host.py'])
     run_id = time.strftime('%Y%m%d-%H%M%S') + '-' + secrets.token_hex(4)
     run_dir = STATE / 'runs' / run_id
     run_dir.mkdir(parents=True)

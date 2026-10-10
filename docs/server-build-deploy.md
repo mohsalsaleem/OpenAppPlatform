@@ -63,3 +63,43 @@ the database and pending setup state persisted. Coolify can redeploy this digest
 for runtime recovery. This first release has no earlier product image for rollback;
 a code rollback requires a known-good image plus migration compatibility review.
 GitHub CI stays disabled. Existing production applications were not redeployed.
+
+## Optional private host builder
+
+The image includes `/app/oap-build-client`, an optional command adapter using
+`OAP_BUILD_URL` and `OAP_BUILD_TOKEN` as explicit builder environment references.
+It refuses redirects, bounds responses and requires the exact commit/repository
+digest contract. Controller and operator credentials are never passed to it.
+
+`scripts/build-host.py --policy /private/policy.json` is the optional trusted host
+endpoint. The policy must be mode 0600 and contains a random token, private bind
+address/port and exact `bindings` (repository, repository ID, and component name,
+context and image destination). It accepts only those bindings and bounded JSON
+POSTs at `/build`. It fetches public repositories by the exact requested commit,
+archives the configured context and uses the same locked build-intent/receipt
+journal as the SSH helper. Busy/interrupted/failed requests hold for inspection.
+No automatic rebuild occurs after a durable intent.
+
+Run this optional service on a trusted Docker build host under its existing Docker
+operator account. Bind only a private network interface; do not expose its port
+through the public proxy. The staging host uses the private `coolify` bridge
+gateway (172.18.0.1:8790), with a dedicated token. This is a single-owner public
+repository builder, not a sandbox for untrusted repository authors. Repository
+builds have Docker build capabilities on that host. Private repository checkout,
+autoscaling and multi-host build queues are outside this adapter. The default
+platform still needs only the Go service and PostgreSQL.
+
+Example hook command configuration:
+
+```json
+{
+  "command": ["/app/oap-build-client"],
+  "builderEnv": ["OAP_BUILD_URL", "OAP_BUILD_TOKEN"],
+  "hooks": []
+}
+```
+
+Add an explicit owner-scoped hook mapping and app-scoped operate credential to
+`hooks`. Configure a separate repository hook for the OAP receiver; retain the
+Coolify GitHub App's existing webhook. A dedicated staging source branch avoids
+turning every main-branch documentation push into a fixture release.
