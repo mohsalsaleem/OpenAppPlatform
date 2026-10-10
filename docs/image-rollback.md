@@ -61,3 +61,31 @@ Configuration rollback, schema compatibility automation, native source rollback,
 stateful reconstruction and cancellation/abandonment remain future work. Older
 controllers do not enforce the new rollback preconditions; metadata readability alone
 is not execution compatibility.
+
+## Verification
+
+Exact-tree local run `20261010-223754-c2d498ad` passed unit, PostgreSQL system,
+scoped HTTP, native Docker restoration, adapter safety, and browser regressions.
+The Docker fixture upgraded between cached content IDs with identical configuration,
+then restored v1 at its stable binding and native healthy status. Browser tests reject
+a configuration-incompatible rollback and keep execution disabled.
+
+Controller/UI commit `eb505590dfc28690a8d0ca3bcf05d950cf48c856` reached healthy
+Coolify staging in deployment `wpl6y93qhrpuzc490rogg72f`. The dedicated stateless
+`signed-build-staging` fixture rolled back from source release
+`0495e641d50e1d566cb6b82774019166` to recorded snapshot
+`2cb436bfa9cc23529bee821f32e89c56`, producing new release
+`b1c3f5c23e4d9795f4f3f02111c3cd9f`. It returned to the original digest through
+release `8ae07e5348e5d2a1639bec5ed58ea142`. Both native replicas remained bound to
+the same resource IDs and ended healthy on digest
+`63ba6a360f4056623d71f85d0ffcfad64ffe213193822c43fc6ff37c37d2c804`.
+Repeated submissions reused each release. Desired definition and GitHub event/head
+ownership were not rewound. The live browser verified compatible review, required
+acknowledgement and cancellation without another application mutation.
+
+Fresh backup `staging-20261010T184729Z.dump` was restored into isolated database
+`openappplatform_staging_rollback_restore_check`; migration ledger 010, owner, group,
+source event and both rollback/return terminal records and provenance were verified.
+Existing backups/databases remain retained. No application data/schema restore or
+controller-binary rollback was performed. These tests establish the stateless image-only
+contract, not compatibility for stateful workloads or migrations.

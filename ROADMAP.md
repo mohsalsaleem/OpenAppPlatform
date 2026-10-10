@@ -152,12 +152,14 @@ replicas first, and inspects unselected bound dependencies without redeploying t
 Pre-dispatch dependency holds can resume without repeating an uncertain dispatch.
 Read-only frozen release/artifact comparison now includes masked runtime-key diffs
 and app-scope checks; comparison itself does not approve or execute rollback. A separate, reviewed image-only
-rollback path is in progress for compatible verified snapshots and existing OAP-owned
-instances. Configuration/data/schema rollback and cancellation/abandonment remain
+rollback path is implemented for compatible verified snapshots and existing OAP-owned
+instances; native Docker and two-replica Coolify rollback/return, duplicate request,
+review/acknowledgement and metadata restore checks passed. Configuration/data/schema rollback and cancellation/abandonment remain
 in this batch. See [controlled image rollback](docs/image-rollback.md). Batch 4 stays active.
 Readiness and dependency slices passed local/native Docker and staging UI verification;
 comparison passed local snapshot/scope/masking and staging UI/API verification. No native HTTP
-probe was provisioned and no retained workload was redeployed by these checks.
+probe was provisioned. The later image-only rollback test deliberately redeployed the
+dedicated stateless fixture and returned both replicas to their original digest.
 See [release readiness](docs/release-readiness.md) and
 [release comparison](docs/release-comparison.md).
 

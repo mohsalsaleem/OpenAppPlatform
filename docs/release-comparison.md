@@ -29,8 +29,10 @@ that it remains pullable. Release state is metadata, not a fresh runtime health 
 This is not a rollback compatibility decision or execution API. Restart and retirement
 records can be inspected, but their definitions do not establish a deployable known-good
 snapshot. Target authority, bindings, routes, storage/data, private image availability and
-schema compatibility still need explicit verification before future rollback. Comparing
-does not restore data or mutate desired state. Rollback and cancellation remain pending.
+schema compatibility still need explicit verification for rollback. Comparing does
+not restore data or mutate desired state. A separate
+[reviewed image-only rollback](image-rollback.md) is now available for compatible
+verified snapshots; broader configuration/data rollback and cancellation remain pending.
 
 Unit/system tests verify deterministic diffs, masking of all runtime map values,
 immutable-vs-mutable reference flags, same-ID rejection, scoped/cross-application
