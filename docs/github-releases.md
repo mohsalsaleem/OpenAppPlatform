@@ -109,3 +109,27 @@ GitHub App cloned the repository, built its committed Dockerfile, and reached
 healthy runtime. OAP registered an observe-only application and matched the exact
 provider operation. No management handoff, trigger changes, or registry credentials
 were required. The failed inline fixture is retained separately for diagnostics.
+
+### Opt-in signed server-build verification
+
+`TestLiveSignedServerBuildCoolifyReplicas` uses an isolated local PostgreSQL schema,
+a local owner-mode controller, the trusted SSH builder and the existing Coolify
+staging target. It retains two remote fixture resources and writes a non-secret
+receipt to `.local/signed-build-live.json`. The committed fixture context is
+`examples/server-build`; no real application database is needed by the fixture.
+
+Run from the repository with the configured local secrets and PostgreSQL:
+
+```sh
+OAP_LIVE_SERVER_BUILD=1 OAP_TEST_SOURCE_COMMIT="$(git rev-parse HEAD)" \
+  python3 scripts/run-local.py go test ./tests/system \
+  -run '^TestLiveSignedServerBuildCoolifyReplicas$' -count=1 -v
+```
+
+This explicitly authorizes staging fixture creation/build/deployment for the test.
+The source tree must be committed before execution because the builder archives
+only the exact Git object. The test checks HMAC rejection, duplicate delivery,
+commit provenance, saved build receipt reuse, two replicas sharing one registry
+digest, healthy runtime and completed redelivery. It sends a signed test payload;
+it does not register a GitHub repository hook or change existing App triggers.
+Do not run it against production or the hosted controller's live database.
