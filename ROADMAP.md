@@ -106,7 +106,9 @@ audit, queued-operation authorization, and offline password recovery. Local
 PostgreSQL, Docker, browser/MCP regressions and owner/mobile workflows passed on
 10 October 2026. See [owner access](docs/owner-access.md).
 
-**Current slice:** M0 batch 2, GitHub-triggered release ownership.
+**Completed slice:** M0 batch 2, GitHub-triggered release ownership.
+
+**Current slice:** M0 batch 3, application and environment organization.
 
 **Batch 2 progress:** signed/deduplicated GitHub intake, durable source requests,
 selected-component immutable-image release plumbing, explicit uncertain-build
@@ -115,9 +117,11 @@ Native GitHub App source build/exact-commit/healthy runtime observation passed
 on Coolify 4.4.6 using the existing personal GitHub App. Signed push intake through the real SSH builder/registry and two healthy Coolify
 replicas passed isolated staging verification. Duplicate delivery and saved-build
 receipt reuse passed. The payload was test-signed, not a new GitHub-origin delivery;
-live repository hook activation and hosted builder installation remain explicit
-operator configuration. Existing triggers stay unchanged. See
-[GitHub releases](docs/github-releases.md). Do not advance to batch 3 yet.
+The hosted staging builder and dedicated branch repository hook subsequently
+passed a real GitHub push, redelivery, two healthy replicas, builder/controller
+restart and database restore checks. Existing Coolify App triggers stay unchanged. See
+[GitHub releases](docs/github-releases.md). Batch 3 is next; native source
+management handoff remains unsupported.
 
 ### Next ordered batches
 

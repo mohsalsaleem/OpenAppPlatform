@@ -155,3 +155,33 @@ Enabling a live repository webhook is an explicit configuration step for an
 owner-selected application/branch. Existing GitHub App webhook ownership stays
 unchanged. The hosted staging controller has no installed image-builder command;
 this test does not grant it SSH keys or Docker socket access.
+
+### Hosted GitHub-origin delivery
+
+On 10 October 2026, the retained staging owner configured application
+`signed-build-staging` (`157eb0fb80179ca8cfa9b348fe3d35c9`) with an app-scoped
+operate credential and the private host builder. Repository hook `695267911`
+points at `https://oap-staging.mohsal.dev/api/v1/hooks/github/staging-source`.
+Only `oap-staging-source` maps to releases. Other repository branches are ignored.
+The Coolify GitHub App webhook was unchanged, and GitHub CI remains disabled.
+
+Pushing commit `20a323b1945eca85f42f24572586d22193ac659a` to that branch
+produced GitHub delivery `0af7b81e-c4b5-11f1-9504-88562cf37bbe` (HTTP 202),
+hosted source event `aa9bb302b848f9a36b56c695b857a476`, and release
+`0495e641d50e1d566cb6b82774019166`. One host build produced
+`127.0.0.1:5001/openappplatform/signed-staging@sha256:63ba6a360f4056623d71f85d0ffcfad64ffe213193822c43fc6ff37c37d2c804`.
+Both retained replicas reached healthy runtime on that digest. GitHub redelivery
+also received HTTP 202 and reused the existing event/release. Restarting the
+builder reused its completed receipt; controller restart preserved the completed
+source event and healthy replicas. A database backup restored all nine migrations,
+the retained owner, source event and successful release in an isolated database.
+
+The named release credential expires after 30 days. An owner must renew the
+configuration before expiry; expired/revoked credentials hold work rather than
+falling back to unrestricted access. Secrets reside in Coolify and private host
+policy, with names recorded in the deployment manifest. GitHub notifications
+do not grant general lifecycle access to other applications.
+
+This completes M0 batch 2's staged signed-release gate for the optional immutable
+image lane. Native source management handoff remains unsupported. Next is batch 3,
+application/environment organization, per the existing roadmap.

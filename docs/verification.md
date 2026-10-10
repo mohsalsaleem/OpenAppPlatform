@@ -218,3 +218,13 @@ and repeated builder receipt reuse passed. Source commit, event/release IDs,
 image digest, retained resources and scope limits are recorded in
 [GitHub releases](github-releases.md). This is a signed test payload through a
 local controller, not a claim of GitHub-origin delivery to the hosted controller.
+
+## Hosted signed GitHub release
+
+A real GitHub-origin push and redelivery to the retained staging workspace passed
+on 10 October 2026. The hosted controller invoked the private policy-limited
+builder and deployed two healthy Coolify replicas from one digest. Builder receipt
+reuse and controller restart passed. The restored database contained the retained
+owner and successful source event/release. See [GitHub releases](github-releases.md)
+and [server deployment](server-build-deploy.md) for exact identifiers, expiry and
+manual backup/recovery limits.

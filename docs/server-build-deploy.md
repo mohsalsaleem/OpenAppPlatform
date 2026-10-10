@@ -103,3 +103,28 @@ Add an explicit owner-scoped hook mapping and app-scoped operate credential to
 `hooks`. Configure a separate repository hook for the OAP receiver; retain the
 Coolify GitHub App's existing webhook. A dedicated staging source branch avoids
 turning every main-branch documentation push into a fixture release.
+
+### Hosted staging installation and recovery
+
+Staging now runs commit `20a323b1945eca85f42f24572586d22193ac659a` using
+`127.0.0.1:5001/openappplatform/staging@sha256:b3f050e2bb6e17208e74d4b084090f83f9b6f9d1de8d12fc21b19424b897e77b`.
+Coolify deployment `xu0gsybtt0zyt7x07vosfuh9` finished healthy. The retained
+owner can sign in, and `signed-build-staging` receives the dedicated branch hook.
+The private builder is a saleem user systemd service with lingering enabled,
+so it starts at boot and remains active after SSH logout. Service restarts reuse
+the durable build journal; missing credentials are rejected with HTTP 401.
+Host controller configuration files are mounted through Coolify file storage.
+
+The initialized database backup is
+`/home/saleem/.local/share/openappplatform/backups/staging-20261010T141658Z.dump`;
+restore into retained database `openappplatform_staging_source_restore_check`
+verified the owner, migration ledger and completed source release. Backups are
+manual; recurring/off-host coverage remains future work.
+
+The prior controller digest
+`127.0.0.1:5001/openappplatform/staging@sha256:208144df82ba9f41d879247b0bd419799928fe8b0b8973b60d17c9fe60682940`
+is retained as a known healthy compatible predecessor (same nine migrations).
+Before returning to it, deactivate the staging repository hook and remove the
+hosted builder hook configuration from the old controller: it has no build-client
+binary. Do not delete build journals or automatically retry uncertain intents.
+Controller rollback does not roll back application data or fixture images.

@@ -13,11 +13,11 @@ environments:
     status: healthy
     coolify_application_uuid: 2bs31xhjzmfi3w0aulusi7zy
     url: https://oap-staging.mohsal.dev
-    image: 127.0.0.1:5001/openappplatform/staging@sha256:208144df82ba9f41d879247b0bd419799928fe8b0b8973b60d17c9fe60682940
-    commit: 426a5200b301c87bd34093e099092add569fc974
-    provider_deployment_uuid: luz2foosxmamekw47dihqsqt
+    image: 127.0.0.1:5001/openappplatform/staging@sha256:b3f050e2bb6e17208e74d4b084090f83f9b6f9d1de8d12fc21b19424b897e77b
+    commit: 20a323b1945eca85f42f24572586d22193ac659a
+    provider_deployment_uuid: xu0gsybtt0zyt7x07vosfuh9
     auth_mode: owner
-    owner_setup: pending
+    owner_setup: complete
     configuration_storage_uuid: a2q7lc8ehu6twekwj1bcng8m
     verified: 2026-10-10
     database:
@@ -30,6 +30,9 @@ environments:
       - DATABASE_URL
       - OAP_SETUP_TOKEN
       - COOLIFY_TOKEN
+      - OAP_BUILD_TOKEN
+      - OAP_STAGING_HOOK_SECRET
+      - OAP_STAGING_HOOK_CREDENTIAL
 integration:
   context: mac-studio
   project_uuid: z4qk4dpkc9gqlcwymb3bimrg
@@ -64,3 +67,24 @@ native_github_verification:
   failed_inline_fixture_uuid: r9uzce0z9mnunfftgocit3sj
   verified_commit: add41068b125a136d0e544b5c1533e411a99209d
   provider_deployment_uuid: 69vq60zbyqtvtf6krvhnxryw
+
+hosted_source_verification:
+  application_id: 157eb0fb80179ca8cfa9b348fe3d35c9
+  application_name: signed-build-staging
+  hook_id: staging-source
+  github_repository_hook_id: 695267911
+  repository: mohsalsaleem/OpenAppPlatform
+  branch: oap-staging-source
+  event_id: aa9bb302b848f9a36b56c695b857a476
+  delivery_id: 0af7b81e-c4b5-11f1-9504-88562cf37bbe
+  release_id: 0495e641d50e1d566cb6b82774019166
+  build_id: 054aa10ad85a9d53b1f3c9dce31da556
+  image: 127.0.0.1:5001/openappplatform/signed-staging@sha256:63ba6a360f4056623d71f85d0ffcfad64ffe213193822c43fc6ff37c37d2c804
+  resource_uuids:
+    - pydcqkejo4cfinyfuggwbaje
+    - aupvnxi19jjbdrspudbuuzik
+  builder_service: openappplatform-build-host.service
+  builder_endpoint: http://172.18.0.1:8790/build
+  backup: /home/saleem/.local/share/openappplatform/backups/staging-20261010T141658Z.dump
+  restore_check_database: openappplatform_staging_source_restore_check
+  verified: 2026-10-10
