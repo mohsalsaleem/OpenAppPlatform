@@ -256,3 +256,24 @@ Local Docker verification briefly failed when the Mac disk filled and Docker's
 image store became read-only. Regenerable old OAP test archives/cache/image tags
 were reclaimed and Docker Desktop recovered; the subsequent full suite passed.
 Remote Coolify workloads were unaffected by that local recovery.
+
+## Trusted operator setup and definition review
+
+Local run `20261010-200808-488d4139` passed Go vet/race, PostgreSQL/Docker,
+preview/owner browser and MCP verification. System coverage checks read-only scope
+verification, trusted URL/credential inheritance, create-only/duplicate rejection,
+forged URL rejection, protected credential references, scoped-agent/viewer access
+and layout export without images, variables or endpoint values. Browser checks
+cover a generated credential-reference recipe, verified configured scope, reused
+layout, masked diff preview and owner registration of an existing environment
+against a local GET-only Coolify fixture. The fixture recorded zero operator writes.
+
+Coolify staging deployed commit `eabc693c21c50aeeb6a45d17c0a74298a2bf76ef`,
+image digest `sha256:2424f3e1c498fec4d5376564d20ab197aed9f4ebdc3e5b9229bc71f57ed0088e`,
+provider deployment `q0vzf0p6yejecqkrnvsxmupp`, and reached healthy runtime.
+Validated-HTTPS owner calls verified the real configured Coolify scope and a
+sanitary naming layout. Registering a nonexistent environment returned 502 and
+left the target set unchanged. The existing GitHub source event/release and both
+healthy replicas retained their IDs and image digest. No production connection or
+operator environment was created; successful registration is verified locally
+against the read-only fixture. This release adds no database migration.

@@ -152,3 +152,15 @@ is retained. Migration 010 preserves old reads and provides default-group insert
 for older controllers; SQL compatibility tests passed. A live rollback drill to
 that binary has not been performed. Do not drop migration 010 tables/columns to
 roll back: organization metadata and existing environment IDs must survive.
+
+### Trusted operator setup/review release
+
+Current staging runs commit `eabc693c21c50aeeb6a45d17c0a74298a2bf76ef` with
+`127.0.0.1:5001/openappplatform/staging@sha256:2424f3e1c498fec4d5376564d20ab197aed9f4ebdc3e5b9229bc71f57ed0088e`.
+Coolify deployment `q0vzf0p6yejecqkrnvsxmupp` finished healthy. Live owner API
+checks verified the configured operator scope, sanitized layout and rejected
+unverified scope registration without persisted target changes. Existing source
+release and replicas stayed healthy. Schema remains at ten migrations.
+The previous digest ending `74339c510c4d96e2dca5f3535635a3491201e5496d8b41b732dad940ded1e1ec`
+remains a known healthy predecessor on the same schema. Manual backup/restore
+evidence above remains applicable; no new scheduled backup is claimed.

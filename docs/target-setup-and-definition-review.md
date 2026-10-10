@@ -68,3 +68,8 @@ and owner environment registration through a local read-only Coolify fixture.
 Full secret entry/vault, full configuration templates/promotion, native delegated
 source commands and richer per-operation capability presentation remain follow-up
 work. Batch 3 remains active until its remaining contracts are delivered.
+
+The slice is deployed in Coolify staging. Live scope/layout verification and
+failed-scope persistence checks passed; successful owner registration and browser
+reuse/diff behavior were exercised against isolated local fixtures.
+See [verification](verification.md) for the exact build and evidence limits.
