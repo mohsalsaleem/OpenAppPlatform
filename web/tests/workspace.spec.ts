@@ -288,6 +288,20 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     selectedTo,
   );
   await page.unroute(historyPattern);
+  await page
+    .getByRole("button", {
+      name: `Review rollback to ${selectedFrom.slice(0, 8)}`,
+      exact: true,
+    })
+    .click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "snapshot configuration/topology differs",
+  );
+  await expect(
+    page.getByRole("button", { name: "Roll back images", exact: true }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+
   await comparison.screenshot({ path: "../.local/ui-release-comparison.png" });
   await page.getByRole("tab", { name: "Overview" }).click();
   await page
