@@ -53,6 +53,16 @@ test("authentication, application setup, release confirmation, and target discov
   await expect(
     page.getByRole("heading", { name: "Runtime configuration" }),
   ).toBeVisible();
+  await page
+    .getByLabel("Require operator-reported healthy status for web")
+    .check();
+  await page.getByLabel("Observation timeout for web (seconds)").fill("120");
+  await expect(
+    page.getByRole("region", { name: "Configuration changes" }),
+  ).toContainText("require healthy");
+  await expect(
+    page.getByRole("region", { name: "Configuration changes" }),
+  ).toContainText("120");
   await page.getByLabel("Container image for web").fill("nginx:1.28-alpine");
   await expect(
     page.getByRole("region", { name: "Configuration changes" }),

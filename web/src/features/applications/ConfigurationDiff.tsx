@@ -19,6 +19,27 @@ export function ConfigurationDiff({
           after: text(c[field]),
         });
     }
+    const oldReadiness = old.readiness ?? {},
+      nextReadiness = c.readiness ?? {};
+    for (const [field, a, b] of [
+      [
+        "require healthy",
+        !!oldReadiness.requireHealthy,
+        !!nextReadiness.requireHealthy,
+      ],
+      [
+        "observation timeout (seconds)",
+        oldReadiness.timeoutSeconds || 900,
+        nextReadiness.timeoutSeconds || 900,
+      ],
+    ] as const) {
+      if (a !== b)
+        rows.push({
+          field: `${c.name} · ${field}`,
+          before: String(a),
+          after: String(b),
+        });
+    }
     for (const field of ["env", "services", "serviceEndpoints"] as const) {
       const a = old[field] ?? {},
         b = c[field] ?? {};

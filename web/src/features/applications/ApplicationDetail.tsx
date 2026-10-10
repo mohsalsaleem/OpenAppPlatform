@@ -413,6 +413,17 @@ export function ApplicationDetail() {
                 </div>
                 <Status value={d.state} />
               </div>
+              {d.manifest.components
+                .filter((c) => c.readiness)
+                .map((c) => (
+                  <p className="small muted" key={`readiness-${c.name}`}>
+                    {c.name} readiness ·{" "}
+                    {c.readiness?.requireHealthy
+                      ? "Operator healthy status required"
+                      : "Operator running/health status"}{" "}
+                    · {c.readiness?.timeoutSeconds || 900}s observation timeout
+                  </p>
+                ))}
               {d.steps.map((s) => (
                 <div className="step" key={`${s.component}-${s.ordinal}`}>
                   <div>
@@ -556,6 +567,17 @@ export function ApplicationDetail() {
             Existing managed instances may restart. Standard deployment can
             cause downtime. No databases or volumes will be removed.
           </p>
+          {review.manifest.components
+            .filter((c) => c.readiness)
+            .map((c) => (
+              <p className="small muted" key={c.name}>
+                {c.name}:{" "}
+                {c.readiness?.requireHealthy
+                  ? "requires operator-reported healthy status"
+                  : "uses operator running/health status"}
+                ; observation timeout {c.readiness?.timeoutSeconds || 900}s.
+              </p>
+            ))}
           <ErrorBox error={deploy.error} />
           <div className="form-actions">
             <button

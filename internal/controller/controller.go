@@ -511,8 +511,8 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 			if step.ObservationStartedAt != nil {
 				started = *step.ObservationStartedAt
 			}
-			if time.Since(started) > 15*time.Minute {
-				return fail(step, "attention", errors.New("deployment observation exceeded 15 minutes; provider may still be running"))
+			if time.Since(started) > observationTimeout(comp) {
+				return fail(step, "attention", fmt.Errorf("deployment observation exceeded %s; provider may still be running or waiting for readiness", observationTimeout(comp)))
 			}
 			var status operator.DeploymentStatus
 			if step.Action == "retire" {
@@ -527,7 +527,7 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 			if status.State == "failed" {
 				step.Phase = "failed"
 				step.Error = "provider deployment failed"
-			} else if status.State == "succeeded" && (step.Action == "retire" || Healthy(status.ResourceStatus)) {
+			} else if status.State == "succeeded" && (step.Action == "retire" || releaseReady(comp, status.ResourceStatus)) {
 				step.Phase = "succeeded"
 			}
 			if step.Action == "retire" && step.Phase == "succeeded" {

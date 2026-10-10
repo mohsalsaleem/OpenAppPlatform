@@ -113,3 +113,27 @@ func TestObserveOnlySourceManifest(t *testing.T) {
 		t.Fatal("observe-only runtime configuration accepted")
 	}
 }
+
+func TestReadinessPolicyValidation(t *testing.T) {
+	for _, seconds := range []int{-1, 1, 29, 1801} {
+		m := valid()
+		m.Components[0].Readiness = &ReadinessPolicy{TimeoutSeconds: seconds}
+		if m.Validate() == nil {
+			t.Fatal("invalid readiness timeout accepted", seconds)
+		}
+	}
+	for _, seconds := range []int{0, 30, 900, 1800} {
+		m := valid()
+		m.Components[0].Readiness = &ReadinessPolicy{TimeoutSeconds: seconds, RequireHealthy: true}
+		if err := m.Validate(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m := valid()
+	m.Components[0].ResourceID = "external"
+	m.Components[0].Management = "observe"
+	m.Components[0].Readiness = &ReadinessPolicy{}
+	if m.Validate() == nil {
+		t.Fatal("observed policy override accepted")
+	}
+}

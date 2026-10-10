@@ -1,4 +1,5 @@
 export interface Component {
+  readiness?: { requireHealthy?: boolean; timeoutSeconds?: number };
   management?: "observe";
   serviceEndpoints?: Record<string, string>;
   env?: Record<string, string>;

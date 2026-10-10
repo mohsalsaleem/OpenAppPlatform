@@ -8,6 +8,7 @@ import {
   type Application,
   type Manifest,
   type Capabilities,
+  type Component,
 } from "../../api";
 import { RuntimeVariables } from "./RuntimeVariables";
 import { ErrorBox } from "../../components/Feedback";
@@ -62,7 +63,7 @@ export function ConfigurationEditor({
   function change(
     index: number,
     field: string,
-    value: string | number | Record<string, string>,
+    value: string | number | Record<string, string> | Component["readiness"],
   ) {
     setSaved(false);
     setDraft({
@@ -98,7 +99,14 @@ export function ConfigurationEditor({
               !dirty ||
               stale ||
               save.isPending ||
-              Object.values(invalid).some(Boolean)
+              Object.values(invalid).some(Boolean) ||
+              draft.components.some(
+                (c) =>
+                  c.readiness?.timeoutSeconds !== undefined &&
+                  (!Number.isInteger(c.readiness.timeoutSeconds) ||
+                    c.readiness.timeoutSeconds < 30 ||
+                    c.readiness.timeoutSeconds > 1800),
+              )
             }
           >
             <Save size={15} />
@@ -193,6 +201,47 @@ export function ConfigurationEditor({
               </small>
             </div>
           </div>
+          {c.management !== "observe" && (
+            <fieldset className="readiness-fields">
+              <legend>Release readiness for {c.name}</legend>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={!!c.readiness?.requireHealthy}
+                  onChange={(e) =>
+                    change(i, "readiness", {
+                      ...c.readiness,
+                      requireHealthy: e.target.checked,
+                    })
+                  }
+                />
+                Require operator-reported healthy status for {c.name}
+              </label>
+              <label htmlFor={`readiness-timeout-${i}`}>
+                Observation timeout for {c.name} (seconds)
+              </label>
+              <input
+                id={`readiness-timeout-${i}`}
+                type="number"
+                min="30"
+                max="1800"
+                value={c.readiness?.timeoutSeconds ?? 900}
+                onChange={(e) =>
+                  change(i, "readiness", {
+                    ...c.readiness,
+                    timeoutSeconds: +e.target.value,
+                  })
+                }
+              />
+              <p className="small muted">
+                Starts after provider dispatch, including deployment and
+                readiness waiting. This uses the operator’s existing health
+                check; it does not create a probe. A service with no reported
+                health will time out when healthy status is required. Timeout
+                requires recovery review and does not stop the provider.
+              </p>
+            </fieldset>
+          )}
           <RuntimeVariables
             component={c}
             onChange={(field, value) => change(i, field, value)}

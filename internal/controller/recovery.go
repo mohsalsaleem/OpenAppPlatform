@@ -113,8 +113,15 @@ func (c *Controller) Recover(ctx context.Context, id string, request Recovery) (
 				step.Phase = "failed"
 				step.Error = "provider deployment failed"
 			case "succeeded":
-				if !Healthy(status.ResourceStatus) {
-					return d, errors.New("provider completed but the instance is not healthy")
+				var component domain.Component
+				for _, candidate := range d.Manifest.Components {
+					if candidate.Name == step.Component {
+						component = candidate
+						break
+					}
+				}
+				if !releaseReady(component, status.ResourceStatus) {
+					return d, errors.New("provider completed but the instance does not satisfy the frozen readiness policy")
 				}
 				step.Phase = "succeeded"
 				step.Error = ""

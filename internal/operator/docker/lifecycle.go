@@ -18,6 +18,8 @@ import (
 func revision(s operator.Spec, imageID string) string {
 	// Replica count belongs to application topology, not an instance's runtime.
 	s.Component.Instances = 1
+	// Controller readiness changes do not replace the container runtime.
+	s.Component.Readiness = nil
 	b, _ := json.Marshal(struct {
 		Spec  operator.Spec
 		Image string

@@ -19,7 +19,15 @@ var digestSuffix = regexp.MustCompile(`@sha256:[a-f0-9]{64}$`)
 
 var slug = regexp.MustCompile(`^[a-z][a-z0-9-]{0,47}$`)
 
+// ReadinessPolicy gates release completion using operator-reported runtime health.
+// It does not configure a native probe or contact arbitrary network endpoints.
+type ReadinessPolicy struct {
+	RequireHealthy bool `json:"requireHealthy,omitempty"`
+	TimeoutSeconds int  `json:"timeoutSeconds,omitempty"`
+}
+
 type Component struct {
+	Readiness        *ReadinessPolicy  `json:"readiness,omitempty"`
 	Management       string            `json:"management,omitempty"`
 	ServiceEndpoints map[string]string `json:"serviceEndpoints,omitempty"`
 	Env              map[string]string `json:"env,omitempty"`
@@ -62,6 +70,14 @@ func (m *Manifest) Validate() error {
 		}
 		if c.Management == "observe" && (c.ResourceID == "" || c.HostPort != 0 || len(c.Env)+len(c.Services)+len(c.ServiceEndpoints) > 0) {
 			return errors.New("observe-only components require a resourceId and cannot configure runtime settings")
+		}
+		if c.Readiness != nil {
+			if c.Management == "observe" {
+				return errors.New("observed component readiness remains owned by the operator")
+			}
+			if c.Readiness.TimeoutSeconds != 0 && (c.Readiness.TimeoutSeconds < 30 || c.Readiness.TimeoutSeconds > 1800) {
+				return errors.New("readiness timeoutSeconds must be zero for the default or between 30 and 1800")
+			}
 		}
 		if c.Kind == "" {
 			c.Kind = "web"
