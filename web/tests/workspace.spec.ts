@@ -251,6 +251,17 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     })
     .toBe(process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!);
   await expect(page.locator(".release-banner")).toContainText("succeeded");
+  await page.getByRole("tab", { name: "Activity" }).click();
+  await page
+    .getByRole("button", { name: "Compare selected releases", exact: true })
+    .click();
+  const comparison = page.getByRole("region", { name: "Release comparison" });
+  await expect(comparison).toContainText("internal port");
+  await expect(comparison).toContainText("8025");
+  await expect(comparison).toContainText("Changed (value hidden)");
+  await expect(comparison).not.toContainText("browser-v2");
+  await comparison.screenshot({ path: "../.local/ui-release-comparison.png" });
+  await page.getByRole("tab", { name: "Overview" }).click();
   await page
     .getByRole("button", { name: "Restart web / 1", exact: true })
     .click();

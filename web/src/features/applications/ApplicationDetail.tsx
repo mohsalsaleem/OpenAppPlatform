@@ -1,3 +1,4 @@
+import { ReleaseComparison } from "./ReleaseComparison";
 import { WorkflowOwnership } from "./WorkflowOwnership";
 import { EnvironmentNavigation } from "./EnvironmentNavigation";
 import { SourceEvents } from "./SourceEvents";
@@ -387,6 +388,12 @@ export function ApplicationDetail() {
       )}
       {tab === "deployments" && (
         <SourceEvents applicationId={a.id} version={a.version} />
+      )}
+      {tab === "deployments" && (
+        <ReleaseComparison
+          applicationId={a.id}
+          releases={releases.data ?? []}
+        />
       )}
       {tab === "deployments" && (
         <section className="panel">

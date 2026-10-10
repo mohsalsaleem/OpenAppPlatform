@@ -113,3 +113,14 @@ before starting its frontend. Local tests cover invalid graphs, replica readines
 process restart, immutable graphs, failed dependencies, unselected dependency drift
 before dispatch, safe pre-dispatch recovery, signed GitHub affected-component
 selection and native Docker connectivity/restart/scaling.
+
+Dependency slice staging verification: commit
+`9eadc868f4a156c07609ca3982ea569885563047`, deployment
+`8xvsfnuufuwbbb08al76f800`, healthy runtime. Exact-tree local run
+`20261010-214932-7966bb45` passed, including the connected native Docker fixture,
+signed selected-component GitHub dependency check, recovery and browser configuration
+diff. The live owner UI verified the dependency panel on the retained single-component
+application without saving; multi-component selection/order was tested locally.
+Retained source release and replica digests remain unchanged and healthy. No
+migration or new hosted workload was required. Older controllers also ignore startup
+dependency fields; do not treat readability as ordering compatibility on rollback.
