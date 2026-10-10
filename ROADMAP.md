@@ -551,6 +551,47 @@ optional metrics integration. Backend and collector deployment are planned, not
 implemented. See [logging and search design](docs/logging-and-search.md). The
 current M0 batch order stays unchanged.
 
+### Bounded post-release monitoring mode
+
+**Accepted product goal:** make useful release-focused logging and assisted debugging
+accessible to small teams that cannot justify an enterprise observability subscription.
+Keep the default self-hosted footprint and operating cost small; reuse existing
+operator/monitoring sources, with optional indexed logs and BYOK inference. This is
+planned M4 work, built on M1 visibility and M2 scoped diagnosis; the M0 order stays
+unchanged. This does not claim enterprise APM coverage or measured cost savings.
+
+An owner can enable a monitoring window for one release, or explicitly configure an
+application policy to watch subsequent releases. Default off; duration, sampling,
+retention and notification/model budgets are configurable (for example, a 15–60
+minute window). The window is separate from rollout readiness and does not delay
+or change the operator's deployment workflow. Support operator-owned releases as
+well as OAP-managed ones where the adapter can correlate the actual deployed commit.
+
+Watch release-correlated runtime/build/operation logs, health, restarts, resource
+pressure, and request/error/latency signals when available. Compare with an authorized
+pre-release baseline; link anomalies to exact commits, artifacts and configuration
+changes using the [diagnostic context](#release-and-change-context-for-ai-diagnosis).
+Start with deterministic checks and use optional AI to summarize evidence, cluster
+new errors and suggest verification steps. Missing traffic/instrumentation, stale
+observations or collection gaps produce an inconclusive result, not an all-clear.
+
+Expose watch progress, evidence links, findings and a final healthy/issue/inconclusive
+report in UI/API, with deduplicated owner-configured notifications. A completed watch
+only describes its coverage/window; it is not proof that the release has no defects.
+Persist release identity, start/expiry, sampling cursor and findings so controller
+restart resumes only the remaining window without duplicate alerts or inference.
+Owners can stop or extend a watch. Apply scope, redaction, rate/concurrency limits,
+local retention and AI cost caps; external model sharing needs its own opt-in. AI-off
+keeps deterministic monitoring and manual/API diagnosis available with no OAP model
+calls. Monitoring grants no restart, rollback or database mutation authority.
+
+**Acceptance:** stage a regression that passes initial readiness but develops errors
+or latency afterward. Detect it within the configured window, connect findings to
+the release/change evidence, and notify once. Test expiry/stop, restart recovery,
+healthy and inconclusive cases, absent metrics, bounded resource/model usage,
+AI-off operation, secret redaction, and cross-environment access denial. No new
+monitoring cluster or automatic remediation is required for this gate.
+
 Keep three distinct data classes:
 
 | Data | Purpose | Default direction |

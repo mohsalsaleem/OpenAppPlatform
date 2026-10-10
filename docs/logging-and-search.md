@@ -198,3 +198,32 @@ remain bounded; synthetic secrets are excluded; missing logs differ from zero er
 Record dataset, ingest rate, peak memory/CPU, storage growth and p50/p95 query latency
 for short/long windows. Do not accept proper indexing or lightweight operation on a
 UI demonstration alone. Pin tested backend/collector versions and digests at delivery.
+
+## Post-release monitoring windows
+
+Planned M4 mode: an owner-selected release watch, or an explicitly enabled per-app
+policy that watches future releases for a bounded period. Small teams should be able
+to diagnose release regressions with the existing operator and a small self-hosted
+logging setup, without an enterprise subscription or mandatory AI provider.
+
+Keep rollout readiness separate from the watch. Capture release/commit/artifact
+identity and current ownership, then sample authorized logs, health and available
+metrics against a bounded pre-release baseline. No collector installation, global
+logging-driver change, application restart or traffic instrumentation happens
+silently when a watch is enabled. Show unsupported signals and coverage gaps.
+
+Persist start/expiry, cursor/checkpoint, finding IDs and notification/inference
+idempotency so a crash cannot reset the duration, create duplicate alerts, or
+unboundedly repeat model calls. Stop and expiry end increased sampling/inference;
+retained evidence follows the configured local retention policy. Extending a window
+is an explicit owner action. Enforce resource, query and model cost budgets.
+
+Use deterministic checks with optional AI evidence summaries and proposed debugging
+steps. Reports are healthy, issue detected, or inconclusive for the observed window.
+No traffic, missing instrumentation, stale data or lost collection cannot establish
+a healthy result. Findings reference the scoped release/change diagnostic context.
+External model sharing and outbound notifications require their configured consent;
+AI-off preserves deterministic checks and manual/API access. Watches are read-only
+and never authorize rollback, restart or database changes.
+
+See [the roadmap acceptance gate](../ROADMAP.md#bounded-post-release-monitoring-mode).
