@@ -30,8 +30,8 @@ func main() {
 	}
 }
 func run() error {
-	targetFile := flag.String("targets", "", "JSON file containing configured deployment targets")
-	sourceFile := flag.String("github-hooks", "", "trusted GitHub bindings and image-builder command JSON")
+	targetFile := flag.String("targets", os.Getenv("OAP_TARGETS_FILE"), "JSON file containing configured deployment targets")
+	sourceFile := flag.String("github-hooks", os.Getenv("OAP_GITHUB_HOOKS_FILE"), "trusted GitHub bindings and image-builder command JSON")
 	web := flag.String("web", "web/dist", "compiled dashboard directory")
 	flag.Parse()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
