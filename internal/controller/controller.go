@@ -112,7 +112,7 @@ func (c *Controller) EnqueueImages(ctx context.Context, appID, key string, image
 	return c.EnqueueVersion(ctx, appID, key, images, 0)
 }
 func (c *Controller) EnqueueVersion(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64) (domain.Deployment, error) {
-	return c.enqueueOperation(ctx, appID, key, images, expectedVersion, nil, nil, nil)
+	return c.enqueueOperation(ctx, appID, key, images, expectedVersion, nil, nil, nil, nil)
 }
 
 type RestartRequest struct {
@@ -124,9 +124,9 @@ func (c *Controller) EnqueueRestart(ctx context.Context, appID, key string, requ
 	if request.Component == "" || request.Ordinal < 1 || version < 1 {
 		return domain.Deployment{}, errors.New("component, ordinal and expectedVersion are required")
 	}
-	return c.enqueueOperation(ctx, appID, key, nil, version, &request, nil, nil)
+	return c.enqueueOperation(ctx, appID, key, nil, version, &request, nil, nil, nil)
 }
-func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64, restart *RestartRequest, scaleDown *ScaleDownRequest, provenance *domain.ReleaseSource) (domain.Deployment, error) {
+func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64, restart *RestartRequest, scaleDown *ScaleDownRequest, provenance *domain.ReleaseSource, rollback *RollbackRequest) (domain.Deployment, error) {
 	if len(key) < 8 || len(key) > 128 {
 		return domain.Deployment{}, errors.New("Idempotency-Key must contain 8 to 128 characters")
 	}
@@ -155,7 +155,8 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		Restart   *RestartRequest       `json:"restart,omitempty"`
 		ScaleDown *ScaleDownRequest     `json:"scaleDown,omitempty"`
 		Source    *domain.ReleaseSource `json:"source,omitempty"`
-	}{images, expectedVersion, restart, scaleDown, provenance})
+		Rollback  *RollbackRequest      `json:"rollback,omitempty"`
+	}{images, expectedVersion, restart, scaleDown, provenance, rollback})
 	requestSum := sha256.Sum256(requestBody)
 	requestHash := hex.EncodeToString(requestSum[:])
 	var existingID, oldHash string
@@ -180,6 +181,21 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 			return domain.Deployment{}, domain.ErrConflict
 		}
 	}
+	var rollbackPlan RollbackPlan
+	var rollbackSource domain.Deployment
+	if rollback != nil {
+		rollbackPlan, rollbackSource, e = c.rollbackPlan(ctx, tx, a, rollback.ReleaseID)
+		if e != nil {
+			return domain.Deployment{}, e
+		}
+		if rollbackPlan.PlanHash != rollback.PlanHash {
+			return domain.Deployment{}, domain.ErrConflict
+		}
+		images = map[string]string{}
+		for _, instance := range rollbackPlan.Instances {
+			images[instance.Component] = instance.RestoreImage
+		}
+	}
 	for _, comp := range a.Manifest.Components {
 		if comp.Management == "observe" && (provenance == nil || images[comp.Name] != "") && ((restart == nil && scaleDown == nil) || (restart != nil && restart.Component == comp.Name) || (scaleDown != nil && scaleDown.Component == comp.Name)) {
 			return domain.Deployment{}, errors.New("observe-only components require an explicit management handoff before lifecycle operations")
@@ -194,7 +210,7 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 				if comp.ResourceID != "" && comp.Image != image {
 					return domain.Deployment{}, errors.New("adopted resource image changes are not supported")
 				}
-				if !strings.Contains(image, "@sha256:") {
+				if !strings.Contains(image, "@sha256:") && !(rollback != nil && dockerContentID.MatchString(image)) {
 					return domain.Deployment{}, errors.New("release image overrides must use an immutable sha256 digest")
 				}
 				comp.Image = image
@@ -228,7 +244,7 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	}
 	d := domain.Deployment{Operation: "deploy", ID: domain.NewID(), ApplicationID: appID, Manifest: a.Manifest, DefinitionVersion: a.Version, State: "queued", Steps: domain.InitialSteps(a.Manifest)}
 	d.Source = provenance
-	if provenance != nil {
+	if provenance != nil || rollback != nil {
 		selected := []domain.Step{}
 		for _, step := range d.Steps {
 			if images[step.Component] != "" {
@@ -239,6 +255,19 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 			return d, errors.New("source release requires at least one selected image")
 		}
 		d.Steps = selected
+		if rollback != nil {
+			d.Source = rollbackSource.Source
+			for i := range d.Steps {
+				for _, instance := range rollbackPlan.Instances {
+					if instance.Component == d.Steps[i].Component && instance.Ordinal == d.Steps[i].Ordinal {
+						d.Steps[i].RollbackFrom = rollback.ReleaseID
+						d.Steps[i].RollbackTargetHash = rollbackPlan.TargetHash
+						d.Steps[i].RollbackResourceID = instance.ResourceID
+						d.Steps[i].RollbackExpectedImage = instance.CurrentImage
+					}
+				}
+			}
+		}
 	}
 	target, e := c.Store.TargetTx(ctx, tx, a.Manifest.TargetID)
 	if e != nil {
@@ -320,8 +349,8 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	if e != nil {
 		return d, e
 	}
-	if provenance != nil {
-		raw, _ := json.Marshal(provenance)
+	if d.Source != nil {
+		raw, _ := json.Marshal(d.Source)
 		if _, e = tx.Exec(ctx, "UPDATE oap_deployments SET source=$2 WHERE id=$1", d.ID, raw); e != nil {
 			return d, e
 		}
@@ -425,6 +454,11 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 		if e = c.authorizeRelease(ctx, d); e != nil {
 			return fail(step, "attention", e)
 		}
+		if step.RollbackFrom != "" {
+			if e = c.verifyRollbackInstance(ctx, a, d, *step, comp); e != nil {
+				return fail(step, "attention", e)
+			}
+		}
 		if step.Action != "retire" && (step.Phase == "pending" || step.Phase == "prepared") {
 			ready, err := c.dependenciesReady(ctx, a, d, comp)
 			if err != nil {
@@ -468,6 +502,9 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 				r, e := a.Ensure(ctx, operator.Spec{Name: domain.ResourceName(d.ApplicationID, comp.Name, step.Ordinal), Ownership: "OpenAppPlatform:" + d.ApplicationID + ":" + comp.Name, Component: runtime, Variables: c.Store.VariableJournal(d.Manifest.TargetID, d.ApplicationID, comp.Name, step.Ordinal)})
 				if e != nil {
 					return e
+				}
+				if step.RollbackFrom != "" && r.ID != step.RollbackResourceID {
+					return fail(step, "attention", errors.New("rollback preparation returned a different resource"))
 				}
 				step.ResourceID = r.ID
 			}
@@ -577,5 +614,5 @@ func Healthy(status string) bool {
 }
 
 func (c *Controller) EnqueueSource(ctx context.Context, app, key string, images map[string]string, version int64, provenance *domain.ReleaseSource) (domain.Deployment, error) {
-	return c.enqueueOperation(ctx, app, key, images, version, nil, nil, provenance)
+	return c.enqueueOperation(ctx, app, key, images, version, nil, nil, provenance, nil)
 }

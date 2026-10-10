@@ -80,6 +80,18 @@ func (c *Controller) Recover(ctx context.Context, id string, request Recovery) (
 		if step.Phase != "attention" {
 			return d, domain.ErrConflict
 		}
+		if step.RollbackFrom != "" {
+			var component domain.Component
+			for _, candidate := range d.Manifest.Components {
+				if candidate.Name == step.Component {
+					component = candidate
+					break
+				}
+			}
+			if err = c.verifyRollbackInstance(ctx, adapter, d, *step, component); err != nil {
+				return d, err
+			}
+		}
 		if request.RetryPreparation {
 			if (step.RecoveryPhase != "pending" && step.RecoveryPhase != "prepared") || step.RemoteDeploymentID != "" || request.RemoteDeploymentID != "" {
 				return d, errors.New("only a recorded pre-dispatch phase can be retried")

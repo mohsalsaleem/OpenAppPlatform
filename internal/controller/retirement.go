@@ -18,7 +18,7 @@ func (c *Controller) EnqueueScaleDown(ctx context.Context, appID, key string, re
 	if request.Component == "" || request.Instances < 1 || request.Instances > 4 || version < 1 {
 		return domain.Deployment{}, errors.New("component, instances between 1 and 4, and expectedVersion are required")
 	}
-	return c.enqueueOperation(ctx, appID, key, nil, version, nil, &request, nil)
+	return c.enqueueOperation(ctx, appID, key, nil, version, nil, &request, nil, nil)
 }
 func retirementOwner(d domain.Deployment, step domain.Step) string {
 	return "OpenAppPlatform:" + d.ApplicationID + ":" + step.Component

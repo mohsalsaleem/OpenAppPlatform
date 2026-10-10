@@ -42,6 +42,7 @@ export interface Target {
   url: string;
 }
 export interface Step {
+  rollbackFrom?: string;
   component: string;
   ordinal: number;
   phase: string;
@@ -116,6 +117,7 @@ export interface Instance {
 }
 
 export interface Capabilities {
+  imageRollback: boolean;
   rolling: boolean;
   blueGreen: boolean;
   managementHandoff: boolean;

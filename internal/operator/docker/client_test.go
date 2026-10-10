@@ -211,3 +211,33 @@ func TestReadinessPolicyDoesNotChangeDockerRuntimeRevision(t *testing.T) {
 		t.Fatal("runtime change did not change revision")
 	}
 }
+
+func TestRollbackSafetyRejectsMountedDataAndForeignPortMappings(t *testing.T) {
+	mounted := false
+	hostPort := "8791"
+	client := fakeClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			t.Error("rollback safety issued mutation")
+			w.WriteHeader(405)
+			return
+		}
+		mounts := []any{}
+		if mounted {
+			mounts = append(mounts, map[string]any{"Destination": "/data"})
+		}
+		json.NewEncoder(w).Encode(map[string]any{"Id": "fixture-id", "Mounts": mounts, "Config": map[string]any{"Labels": map[string]string{prefix + "target": "fixture", prefix + "environment": "staging", prefix + "reference": "web", prefix + "owner": "OpenAppPlatform:app:web"}, "Env": []string{"MODE=test"}}, "HostConfig": map[string]any{"PortBindings": map[string]any{"80/tcp": []any{map[string]any{"HostPort": hostPort, "HostIp": "127.0.0.1"}}}}})
+	})
+	component := domain.Component{Port: 80, HostPort: 8791, Env: map[string]string{"MODE": "test"}}
+	if err := client.CheckRollbackConfiguration(context.Background(), "web", component); err != nil {
+		t.Fatal(err)
+	}
+	mounted = true
+	if err := client.CheckRollbackConfiguration(context.Background(), "web", component); err == nil {
+		t.Fatal("mounted data accepted")
+	}
+	mounted = false
+	hostPort = "8792"
+	if err := client.CheckRollbackConfiguration(context.Background(), "web", component); err == nil {
+		t.Fatal("host port drift accepted")
+	}
+}

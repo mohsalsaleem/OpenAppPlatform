@@ -1,3 +1,4 @@
+import { RollbackReview } from "./RollbackReview";
 import { ReleaseComparison } from "./ReleaseComparison";
 import { WorkflowOwnership } from "./WorkflowOwnership";
 import { EnvironmentNavigation } from "./EnvironmentNavigation";
@@ -413,6 +414,9 @@ export function ApplicationDetail() {
                   <strong>Release {d.id.slice(0, 8)}</strong>
                   <p className="small muted">
                     {when(d.createdAt)} · definition v{d.definitionVersion}
+                    {d.steps.some((step) => step.rollbackFrom)
+                      ? ` · rollback from ${d.steps.find((step) => step.rollbackFrom)!.rollbackFrom!.slice(0, 8)}`
+                      : ""}
                     {d.source
                       ? ` · ${d.source.repository}@${d.source.commit.slice(0, 8)}`
                       : ""}
@@ -456,6 +460,14 @@ export function ApplicationDetail() {
                   <Status value={s.phase} />
                 </div>
               ))}
+              {d.state === "succeeded" &&
+                (d.operation || "deploy") === "deploy" && (
+                  <RollbackReview
+                    application={a}
+                    release={d}
+                    onQueued={() => setTab("deployments")}
+                  />
+                )}
               {d.state === "attention" && <RecoveryPanel deployment={d} />}
             </article>
           ))}

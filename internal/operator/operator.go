@@ -8,6 +8,7 @@ import (
 )
 
 type Capabilities struct {
+	ImageRollback     bool `json:"imageRollback"`
 	ManagementHandoff bool `json:"managementHandoff"`
 	Retirement        bool `json:"retirement"`
 	Restart           bool `json:"restart"`
@@ -99,4 +100,10 @@ type NativeSourceDeployment struct {
 }
 type NativeSourceObserver interface {
 	FindSourceDeployment(context.Context, string, string, string, string, time.Time) (NativeSourceDeployment, error)
+}
+
+// RollbackSafetyChecker reads current runtime fields that preparation could change.
+// It must not mutate provider configuration or return sensitive field values.
+type RollbackSafetyChecker interface {
+	CheckRollbackConfiguration(context.Context, string, domain.Component) error
 }

@@ -122,6 +122,10 @@ function TargetCard({ target: t }: { target: Target }) {
             {(
               [
                 ["Standard image releases", check.data.capabilities.standard],
+                [
+                  "Image rollback safety checks",
+                  check.data.capabilities.imageRollback,
+                ],
                 ["Instance restart", check.data.capabilities.restart],
                 ["Retire owned instances", check.data.capabilities.retirement],
                 [

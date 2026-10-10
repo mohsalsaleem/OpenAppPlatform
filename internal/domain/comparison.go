@@ -43,6 +43,12 @@ func CompareReleases(from, to Deployment) ReleaseComparison {
 	}
 	summary := func(d Deployment) ReleaseSummary {
 		out := ReleaseSummary{ID: d.ID, DefinitionVersion: d.DefinitionVersion, State: d.State, Operation: d.Operation, Artifacts: []ReleaseArtifact{}}
+		for _, step := range d.Steps {
+			if step.RollbackFrom != "" {
+				out.Operation = "rollback"
+				break
+			}
+		}
 		if out.Operation == "" {
 			out.Operation = "deploy"
 		}

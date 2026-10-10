@@ -17,6 +17,9 @@ var version = "dev"
 var port = "8080"
 
 func main() {
+	if configured := os.Getenv("FIXTURE_PORT"); configured != "" {
+		port = configured
+	}
 	log.Printf("fixture %s listening on %s", version, port)
 	boot := fmt.Sprint(time.Now().UnixNano())
 	mux := http.NewServeMux()

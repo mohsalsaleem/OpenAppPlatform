@@ -1249,3 +1249,14 @@ input.inline-checkbox {
 .dependency-fields input[type="checkbox"] {
   width: auto;
 }
+
+.rollback-ack {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+}
+.rollback-ack input[type="checkbox"] {
+  width: auto;
+  margin-top: 3px;
+}

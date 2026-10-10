@@ -151,8 +151,10 @@ This does not configure native HTTP probes. Explicit dependency ordering now gat
 replicas first, and inspects unselected bound dependencies without redeploying them.
 Pre-dispatch dependency holds can resume without repeating an uncertain dispatch.
 Read-only frozen release/artifact comparison now includes masked runtime-key diffs
-and app-scope checks; it does not approve or execute rollback. Rollback and
-cancellation/abandonment remain in this batch. Batch 4 stays active.
+and app-scope checks; comparison itself does not approve or execute rollback. A separate, reviewed image-only
+rollback path is in progress for compatible verified snapshots and existing OAP-owned
+instances. Configuration/data/schema rollback and cancellation/abandonment remain
+in this batch. See [controlled image rollback](docs/image-rollback.md). Batch 4 stays active.
 Readiness and dependency slices passed local/native Docker and staging UI verification;
 comparison passed local snapshot/scope/masking and staging UI/API verification. No native HTTP
 probe was provisioned and no retained workload was redeployed by these checks.

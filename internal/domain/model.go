@@ -165,16 +165,20 @@ type Application struct {
 	Version   int64     `json:"version"`
 }
 type Step struct {
-	Action               string     `json:"action,omitempty"`
-	RecoveryPhase        string     `json:"recoveryPhase,omitempty"`
-	ObservationStartedAt *time.Time `json:"observationStartedAt,omitempty"`
-	Component            string     `json:"component"`
-	Ordinal              int        `json:"ordinal"`
-	Phase                string     `json:"phase"`
-	ResourceID           string     `json:"resourceId,omitempty"`
-	RemoteDeploymentID   string     `json:"remoteDeploymentId,omitempty"`
-	Observed             string     `json:"observed,omitempty"`
-	Error                string     `json:"error,omitempty"`
+	RollbackTargetHash    string     `json:"rollbackTargetHash,omitempty"`
+	RollbackFrom          string     `json:"rollbackFrom,omitempty"`
+	RollbackResourceID    string     `json:"rollbackResourceId,omitempty"`
+	RollbackExpectedImage string     `json:"rollbackExpectedImage,omitempty"`
+	Action                string     `json:"action,omitempty"`
+	RecoveryPhase         string     `json:"recoveryPhase,omitempty"`
+	ObservationStartedAt  *time.Time `json:"observationStartedAt,omitempty"`
+	Component             string     `json:"component"`
+	Ordinal               int        `json:"ordinal"`
+	Phase                 string     `json:"phase"`
+	ResourceID            string     `json:"resourceId,omitempty"`
+	RemoteDeploymentID    string     `json:"remoteDeploymentId,omitempty"`
+	Observed              string     `json:"observed,omitempty"`
+	Error                 string     `json:"error,omitempty"`
 }
 type ReleaseSource struct {
 	EventID    string `json:"eventId,omitempty"`

@@ -76,7 +76,7 @@ func New(t domain.Target) (*Client, error) {
 	return &Client{target: t, settings: settings, base: "http://docker", http: &http.Client{Transport: transport, Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) Capabilities() operator.Capabilities {
-	return operator.Capabilities{Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ApplicationDNS: true, ServiceEndpoints: true}
+	return operator.Capabilities{ImageRollback: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ApplicationDNS: true, ServiceEndpoints: true}
 }
 func (c *Client) request(ctx context.Context, method, path string, input, output any) error {
 	var body io.Reader
@@ -121,10 +121,18 @@ func isStatus(err error, status int) bool {
 }
 
 type container struct {
-	ID     string `json:"Id"`
-	Name   string `json:"Name"`
-	Image  string `json:"Image"`
+	ID         string            `json:"Id"`
+	Name       string            `json:"Name"`
+	Image      string            `json:"Image"`
+	Mounts     []json.RawMessage `json:"Mounts"`
+	HostConfig struct {
+		PortBindings map[string][]struct {
+			HostPort string `json:"HostPort"`
+			HostIP   string `json:"HostIp"`
+		} `json:"PortBindings"`
+	} `json:"HostConfig"`
 	Config struct {
+		Env    []string          `json:"Env"`
 		Image  string            `json:"Image"`
 		Labels map[string]string `json:"Labels"`
 	} `json:"Config"`
