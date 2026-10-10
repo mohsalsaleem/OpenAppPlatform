@@ -43,3 +43,13 @@ integration:
   lifecycle: retained_for_inspection
 promotion:
   require_human_approval: true
+
+native_github_verification:
+  github_app_source_id: 2
+  github_app_name: saleem-personal
+  repository: mohsalsaleem/OpenAppPlatform
+  repository_id: 1411193511
+  source_application_uuid: r9uzce0z9mnunfftgocit3sj
+  auto_deploy_enabled: false
+  dockerfile_location: /examples/github-source/Dockerfile
+  status: pending-source-context-verification

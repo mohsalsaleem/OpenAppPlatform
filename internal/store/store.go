@@ -154,19 +154,24 @@ func (s *Store) Applications(ctx context.Context) ([]domain.Application, error) 
 }
 func ScanDeployment(row pgx.Row) (domain.Deployment, error) {
 	var d domain.Deployment
-	var spec, steps []byte
-	e := row.Scan(&d.ID, &d.ApplicationID, &d.State, &spec, &steps, &d.CreatedAt, &d.UpdatedAt, &d.DefinitionVersion, &d.Operation)
+	var spec, steps, source []byte
+	e := row.Scan(&d.ID, &d.ApplicationID, &d.State, &spec, &steps, &d.CreatedAt, &d.UpdatedAt, &d.DefinitionVersion, &d.Operation, &source)
 	if e != nil {
 		return d, mapError(e)
 	}
 	if e = json.Unmarshal(spec, &d.Manifest); e != nil {
 		return d, e
 	}
+	if len(source) > 0 && string(source) != "null" {
+		if e = json.Unmarshal(source, &d.Source); e != nil {
+			return d, e
+		}
+	}
 	e = json.Unmarshal(steps, &d.Steps)
 	return d, e
 }
 
-const deploymentColumns = "id,application_id,state,spec,steps,created_at,updated_at,definition_version,operation"
+const deploymentColumns = "id,application_id,state,spec,steps,created_at,updated_at,definition_version,operation,source"
 
 // DeploymentTx reuses the enqueue transaction connection while its advisory lock is held.
 func (s *Store) DeploymentTx(ctx context.Context, tx pgx.Tx, id string) (domain.Deployment, error) {

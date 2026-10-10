@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
+	"time"
 )
 
 type Capabilities struct {
@@ -86,4 +87,16 @@ type VariableJournal interface {
 	Begin(context.Context, string, string, string, string) error
 	Commit(context.Context, string, string, string, string) error
 	Forget(context.Context, string, string, string) error
+}
+
+// NativeSourceObserver follows an existing operator-owned GitHub deployment.
+// It never starts a build, deploys, or changes trigger ownership.
+type NativeSourceDeployment struct {
+	ID             string `json:"id"`
+	Commit         string `json:"commit"`
+	State          string `json:"state"`
+	ResourceStatus string `json:"resourceStatus"`
+}
+type NativeSourceObserver interface {
+	FindSourceDeployment(context.Context, string, string, string, string, time.Time) (NativeSourceDeployment, error)
 }

@@ -238,3 +238,12 @@ audit. Existing resources remain in the installation's single workspace.
 See [owner access](docs/owner-access.md) for local HTTP configuration, session and
 role behavior, agent scopes, legacy preview compatibility and password recovery.
 `OAP_API_TOKEN` no longer grants platform access in owner mode.
+
+## GitHub source activity
+
+Use existing Coolify GitHub Apps for native source deployment. OAP can observe
+signed push notifications and correlate exact commits with resource-scoped provider
+history while keeping management observe-only. An optional trusted image-builder
+command supports durable build requests and selected-component digest releases.
+See [GitHub releases](docs/github-releases.md) and [examples](examples/github-sources).
+The live native/build artifact handoff gate remains open; CI stays disabled.

@@ -1,3 +1,4 @@
+import { SourceEvents } from "./SourceEvents";
 import { useCanOperate } from "../../access";
 import { useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -373,6 +374,9 @@ export function ApplicationDetail() {
         </>
       )}
       {tab === "deployments" && (
+        <SourceEvents applicationId={a.id} version={a.version} />
+      )}
+      {tab === "deployments" && (
         <section className="panel">
           <div className="section-heading">
             <h2>Release history</h2>
@@ -390,6 +394,9 @@ export function ApplicationDetail() {
                   <strong>Release {d.id.slice(0, 8)}</strong>
                   <p className="small muted">
                     {when(d.createdAt)} · definition v{d.definitionVersion}
+                    {d.source
+                      ? ` · ${d.source.repository}@${d.source.commit.slice(0, 8)}`
+                      : ""}
                   </p>
                 </div>
                 <Status value={d.state} />

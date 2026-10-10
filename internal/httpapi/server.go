@@ -43,6 +43,7 @@ func (s *Server) Handler() http.Handler {
 		mux.HandleFunc("POST /api/v1/auth/login", s.publicAccess)
 		mux.HandleFunc("POST /api/v1/auth/invitations/accept", s.publicAccess)
 	}
+	mux.HandleFunc("POST /api/v1/hooks/github/{id}", s.githubWebhook)
 	mux.Handle("/api/", s.auth(s.routes()))
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if s.WebDir == "" {
@@ -119,6 +120,7 @@ func (s *Server) routes() http.Handler {
 		s.accessRoutes(mux)
 	}
 	c := s.Controller
+	s.sourceRoutes(mux)
 	mux.HandleFunc("GET /api/v1/meta", func(w http.ResponseWriter, r *http.Request) {
 		write(w, 200, map[string]any{"name": "OpenAppPlatform", "version": "0.2.0-dev", "workspaceId": "default", "strategies": []string{"standard"}, "adapters": []string{"coolify", "docker"}})
 	})

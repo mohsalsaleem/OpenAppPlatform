@@ -44,6 +44,12 @@ export interface Step {
   error?: string;
 }
 export interface Deployment {
+  source?: {
+    repository: string;
+    commit: string;
+    ref: string;
+    deliveryId: string;
+  };
   operation?: "deploy" | "restart" | "scale-down";
   id: string;
   applicationId: string;

@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/source"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
@@ -27,6 +28,8 @@ type DeployArgs struct {
 func (DeployArgs) Kind() string { return "oap_deploy" }
 
 type Controller struct {
+	SourceHooks     map[string]source.Hook
+	SourceBuilder   source.Builder
 	RequireIdentity bool
 	Store           *store.Store
 	Factory         operator.Factory
@@ -50,6 +53,7 @@ func New(ctx context.Context, s *store.Store, f operator.Factory) (*Controller, 
 	}
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &Worker{Controller: c})
+	river.AddWorker(workers, &SourceWorker{Controller: c})
 	c.Jobs, e = river.NewClient(driver, &river.Config{Queues: map[string]river.QueueConfig{"default": {MaxWorkers: 4}}, Workers: workers, JobTimeout: time.Minute})
 	return c, e
 }
@@ -108,7 +112,7 @@ func (c *Controller) EnqueueImages(ctx context.Context, appID, key string, image
 	return c.EnqueueVersion(ctx, appID, key, images, 0)
 }
 func (c *Controller) EnqueueVersion(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64) (domain.Deployment, error) {
-	return c.enqueueOperation(ctx, appID, key, images, expectedVersion, nil, nil)
+	return c.enqueueOperation(ctx, appID, key, images, expectedVersion, nil, nil, nil)
 }
 
 type RestartRequest struct {
@@ -120,9 +124,9 @@ func (c *Controller) EnqueueRestart(ctx context.Context, appID, key string, requ
 	if request.Component == "" || request.Ordinal < 1 || version < 1 {
 		return domain.Deployment{}, errors.New("component, ordinal and expectedVersion are required")
 	}
-	return c.enqueueOperation(ctx, appID, key, nil, version, &request, nil)
+	return c.enqueueOperation(ctx, appID, key, nil, version, &request, nil, nil)
 }
-func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64, restart *RestartRequest, scaleDown *ScaleDownRequest) (domain.Deployment, error) {
+func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64, restart *RestartRequest, scaleDown *ScaleDownRequest, provenance *domain.ReleaseSource) (domain.Deployment, error) {
 	if len(key) < 8 || len(key) > 128 {
 		return domain.Deployment{}, errors.New("Idempotency-Key must contain 8 to 128 characters")
 	}
@@ -146,11 +150,12 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		images = nil
 	}
 	requestBody, _ := json.Marshal(struct {
-		Images    map[string]string `json:"images"`
-		Version   int64             `json:"expectedVersion"`
-		Restart   *RestartRequest   `json:"restart,omitempty"`
-		ScaleDown *ScaleDownRequest `json:"scaleDown,omitempty"`
-	}{images, expectedVersion, restart, scaleDown})
+		Images    map[string]string     `json:"images"`
+		Version   int64                 `json:"expectedVersion"`
+		Restart   *RestartRequest       `json:"restart,omitempty"`
+		ScaleDown *ScaleDownRequest     `json:"scaleDown,omitempty"`
+		Source    *domain.ReleaseSource `json:"source,omitempty"`
+	}{images, expectedVersion, restart, scaleDown, provenance})
 	requestSum := sha256.Sum256(requestBody)
 	requestHash := hex.EncodeToString(requestSum[:])
 	var existingID, oldHash string
@@ -168,8 +173,15 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	if expectedVersion > 0 && a.Version != expectedVersion {
 		return domain.Deployment{}, domain.ErrConflict
 	}
+	if provenance != nil {
+		var current string
+		e = tx.QueryRow(ctx, "SELECT h.event_id FROM oap_source_heads h JOIN oap_source_events e ON e.hook_id=h.hook_id AND e.application_id=h.application_id WHERE e.id=$1 FOR UPDATE OF h", provenance.EventID).Scan(&current)
+		if e != nil || current != provenance.EventID {
+			return domain.Deployment{}, domain.ErrConflict
+		}
+	}
 	for _, comp := range a.Manifest.Components {
-		if comp.Management == "observe" && ((restart == nil && scaleDown == nil) || (restart != nil && restart.Component == comp.Name) || (scaleDown != nil && scaleDown.Component == comp.Name)) {
+		if comp.Management == "observe" && (provenance == nil || images[comp.Name] != "") && ((restart == nil && scaleDown == nil) || (restart != nil && restart.Component == comp.Name) || (scaleDown != nil && scaleDown.Component == comp.Name)) {
 			return domain.Deployment{}, errors.New("observe-only components require an explicit management handoff before lifecycle operations")
 		}
 	}
@@ -215,6 +227,19 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		return domain.Deployment{}, domain.ErrConflict
 	}
 	d := domain.Deployment{Operation: "deploy", ID: domain.NewID(), ApplicationID: appID, Manifest: a.Manifest, DefinitionVersion: a.Version, State: "queued", Steps: domain.InitialSteps(a.Manifest)}
+	d.Source = provenance
+	if provenance != nil {
+		selected := []domain.Step{}
+		for _, step := range d.Steps {
+			if images[step.Component] != "" {
+				selected = append(selected, step)
+			}
+		}
+		if len(selected) == 0 {
+			return d, errors.New("source release requires at least one selected image")
+		}
+		d.Steps = selected
+	}
 	target, e := c.Store.TargetTx(ctx, tx, a.Manifest.TargetID)
 	if e != nil {
 		return d, e
@@ -294,6 +319,12 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	e = tx.QueryRow(ctx, "INSERT INTO oap_deployments(id,application_id,state,spec,steps,idempotency_key,request_hash,definition_version,request_hash_version,operation) VALUES($1,$2,$3,$4,$5,$6,$7,$8,2,$9) RETURNING created_at,updated_at", d.ID, appID, d.State, spec, steps, key, requestHash, a.Version, d.Operation).Scan(&d.CreatedAt, &d.UpdatedAt)
 	if e != nil {
 		return d, e
+	}
+	if provenance != nil {
+		raw, _ := json.Marshal(provenance)
+		if _, e = tx.Exec(ctx, "UPDATE oap_deployments SET source=$2 WHERE id=$1", d.ID, raw); e != nil {
+			return d, e
+		}
 	}
 	if e = c.recordCredential(ctx, tx, d.ID, appID); e != nil {
 		return d, e
@@ -530,4 +561,8 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 }
 func Healthy(status string) bool {
 	return status == "running" || status == "running:healthy" || strings.HasPrefix(status, "running:healthy:")
+}
+
+func (c *Controller) EnqueueSource(ctx context.Context, app, key string, images map[string]string, version int64, provenance *domain.ReleaseSource) (domain.Deployment, error) {
+	return c.enqueueOperation(ctx, app, key, images, version, nil, nil, provenance)
 }

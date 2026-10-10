@@ -2044,6 +2044,151 @@
           }
         }
       }
+    },
+    "/api/v1/hooks/github/{id}": {
+      "post": {
+        "summary": "Receive a signed GitHub push or ping",
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Hub-Signature-256",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-GitHub-Event",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-GitHub-Delivery",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Signed ping or ignored unmapped event"
+          },
+          "202": {
+            "description": "Durable source event registered; duplicate returns its original ID"
+          },
+          "401": {
+            "description": "Invalid signature"
+          },
+          "409": {
+            "description": "Changed payload under an existing delivery ID"
+          },
+          "503": {
+            "description": "Source credential unavailable or not scoped to this app"
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/source-events": {
+      "get": {
+        "summary": "List latest 50 source events for one application",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Source events including commit, state, build/provider results, and recovery timestamp"
+          }
+        }
+      }
+    },
+    "/api/v1/source-events/{id}/recover": {
+      "post": {
+        "summary": "Owner-session recovery after reviewing uncertain builds or superseded commits",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expectedUpdatedAt",
+                  "expectedVersion"
+                ],
+                "properties": {
+                  "expectedUpdatedAt": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "retryBuild": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "approveSourceCommit": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recovered event; existing release acknowledgement is restored without rebuilding"
+          },
+          "403": {
+            "description": "Owner session required"
+          },
+          "409": {
+            "description": "Stale event or definition version"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2449,6 +2594,10 @@
               "restart",
               "scale-down"
             ]
+          },
+          "source": {
+            "type": "object",
+            "description": "Pinned GitHub repository/commit/ref/delivery provenance supplied by the trusted source pipeline."
           }
         },
         "required": [

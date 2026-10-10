@@ -108,8 +108,12 @@ PostgreSQL, Docker, browser/MCP regressions and owner/mobile workflows passed on
 
 **Current slice:** M0 batch 2, GitHub-triggered release ownership.
 
-**Next:** return to M0 batch 2, GitHub-triggered release ownership, before
-application/environment organization.
+**Batch 2 progress:** signed/deduplicated GitHub intake, durable source requests,
+selected-component immutable-image release plumbing, explicit uncertain-build
+recovery, and read-only existing Coolify GitHub App tracking are implemented.
+Native GitHub App source deployment and real builder/registry staging evidence
+remain acceptance requirements. Existing triggers stay unchanged. See
+[GitHub releases](docs/github-releases.md). Do not advance to batch 3 yet.
 
 ### Next ordered batches
 

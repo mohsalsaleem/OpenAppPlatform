@@ -19,6 +19,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/httpapi"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operators"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/source"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 )
 
@@ -30,6 +31,7 @@ func main() {
 }
 func run() error {
 	targetFile := flag.String("targets", "", "JSON file containing configured deployment targets")
+	sourceFile := flag.String("github-hooks", "", "trusted GitHub bindings and image-builder command JSON")
 	web := flag.String("web", "web/dist", "compiled dashboard directory")
 	flag.Parse()
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -88,6 +90,26 @@ func run() error {
 	c, e := controller.New(ctx, s, operators.New)
 	if e != nil {
 		return e
+	}
+	if *sourceFile != "" {
+		if preview {
+			return errors.New("GitHub release bindings require owner mode")
+		}
+		raw, e := os.ReadFile(*sourceFile)
+		if e != nil {
+			return e
+		}
+		config, e := source.Parse(raw)
+		if e != nil {
+			return e
+		}
+		if len(config.Command) > 0 {
+			c.SourceBuilder = source.CommandBuilder{Command: config.Command, Env: config.BuilderEnv}
+		}
+		c.SourceHooks = map[string]source.Hook{}
+		for _, hook := range config.Hooks {
+			c.SourceHooks[hook.ID] = hook
+		}
 	}
 	c.RequireIdentity = !preview
 	if e = c.Jobs.Start(ctx); e != nil {

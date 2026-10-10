@@ -1,0 +1,15 @@
+{
+  "hooks": [
+    {
+      "id": "existing-coolify-app",
+      "mode": "coolify-github-app",
+      "applicationId": "replace-with-observed-oap-application-id",
+      "repository": "mohsalsaleem/OpenAppPlatform",
+      "repositoryId": 1411193511,
+      "branch": "main",
+      "secretEnv": "OAP_GITHUB_WEBHOOK_SECRET",
+      "credentialEnv": "OAP_GITHUB_READ_TOKEN",
+      "components": [{ "name": "web" }]
+    }
+  ]
+}

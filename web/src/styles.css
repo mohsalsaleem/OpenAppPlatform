@@ -1135,3 +1135,10 @@ pre {
     padding: 8px;
   }
 }
+
+input.inline-checkbox {
+  width: 16px;
+  min-height: 16px;
+  margin: 14px 8px 14px 0;
+  accent-color: #2563eb;
+}

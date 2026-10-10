@@ -1,0 +1,15 @@
+{
+  "command": ["/opt/oap-builders/build-image"],
+  "builderEnv": ["OAP_BUILD_GITHUB_TOKEN", "OAP_BUILD_REGISTRY_TOKEN"],
+  "hooks": [{
+    "id": "web-release",
+    "mode": "image-builder",
+    "applicationId": "replace-with-managed-oap-application-id",
+    "repository": "mohsalsaleem/OpenAppPlatform",
+    "repositoryId": 1411193511,
+    "branch": "main",
+    "secretEnv": "OAP_GITHUB_WEBHOOK_SECRET",
+    "credentialEnv": "OAP_GITHUB_OPERATE_TOKEN",
+    "components": [{"name":"web","context":".","imageRepository":"ghcr.io/mohsalsaleem/openappplatform"}]
+  }]
+}

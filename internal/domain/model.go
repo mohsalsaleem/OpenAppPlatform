@@ -150,16 +150,25 @@ type Step struct {
 	Observed             string     `json:"observed,omitempty"`
 	Error                string     `json:"error,omitempty"`
 }
+type ReleaseSource struct {
+	EventID    string `json:"eventId,omitempty"`
+	Repository string `json:"repository"`
+	Commit     string `json:"commit"`
+	Ref        string `json:"ref"`
+	DeliveryID string `json:"deliveryId"`
+}
+
 type Deployment struct {
-	Operation         string    `json:"operation,omitempty"`
-	ID                string    `json:"id"`
-	ApplicationID     string    `json:"applicationId"`
-	DefinitionVersion int64     `json:"definitionVersion"`
-	State             string    `json:"state"`
-	Manifest          Manifest  `json:"manifest"`
-	Steps             []Step    `json:"steps"`
-	CreatedAt         time.Time `json:"createdAt"`
-	UpdatedAt         time.Time `json:"updatedAt"`
+	Source            *ReleaseSource `json:"source,omitempty"`
+	Operation         string         `json:"operation,omitempty"`
+	ID                string         `json:"id"`
+	ApplicationID     string         `json:"applicationId"`
+	DefinitionVersion int64          `json:"definitionVersion"`
+	State             string         `json:"state"`
+	Manifest          Manifest       `json:"manifest"`
+	Steps             []Step         `json:"steps"`
+	CreatedAt         time.Time      `json:"createdAt"`
+	UpdatedAt         time.Time      `json:"updatedAt"`
 }
 
 func NewID() string {
