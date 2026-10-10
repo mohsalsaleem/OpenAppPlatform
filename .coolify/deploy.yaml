@@ -13,9 +13,9 @@ environments:
     status: healthy
     coolify_application_uuid: 2bs31xhjzmfi3w0aulusi7zy
     url: https://oap-staging.mohsal.dev
-    image: 127.0.0.1:5001/openappplatform/staging@sha256:b3f050e2bb6e17208e74d4b084090f83f9b6f9d1de8d12fc21b19424b897e77b
-    commit: 20a323b1945eca85f42f24572586d22193ac659a
-    provider_deployment_uuid: xu0gsybtt0zyt7x07vosfuh9
+    image: 127.0.0.1:5001/openappplatform/staging@sha256:74339c510c4d96e2dca5f3535635a3491201e5496d8b41b732dad940ded1e1ec
+    commit: 43e2f507230f4e94c19c0aca01d999c03f3fe7ad
+    provider_deployment_uuid: 7zq0dxt0hvkpuktfmovswmee
     auth_mode: owner
     owner_setup: complete
     configuration_storage_uuid: a2q7lc8ehu6twekwj1bcng8m
@@ -87,4 +87,13 @@ hosted_source_verification:
   builder_endpoint: http://172.18.0.1:8790/build
   backup: /home/saleem/.local/share/openappplatform/backups/staging-20261010T141658Z.dump
   restore_check_database: openappplatform_staging_source_restore_check
+  verified: 2026-10-10
+
+environment_organization_verification:
+  migration: 010_application_groups
+  legacy_environment_id: 157eb0fb80179ca8cfa9b348fe3d35c9
+  logical_application_id: 157eb0fb80179ca8cfa9b348fe3d35c9
+  pre_migration_backup: /home/saleem/.local/share/openappplatform/backups/staging-20261010T151355Z.dump
+  post_migration_backup: /home/saleem/.local/share/openappplatform/backups/staging-20261010T151613Z.dump
+  restored_database: openappplatform_staging_environment_restore_check
   verified: 2026-10-10

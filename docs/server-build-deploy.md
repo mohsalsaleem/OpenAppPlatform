@@ -128,3 +128,27 @@ Before returning to it, deactivate the staging repository hook and remove the
 hosted builder hook configuration from the old controller: it has no build-client
 binary. Do not delete build journals or automatically retry uncertain intents.
 Controller rollback does not roll back application data or fixture images.
+
+### Application/environment organization release
+
+Current staging is commit `43e2f507230f4e94c19c0aca01d999c03f3fe7ad`, image
+`127.0.0.1:5001/openappplatform/staging@sha256:74339c510c4d96e2dca5f3535635a3491201e5496d8b41b732dad940ded1e1ec`,
+Coolify deployment `7zq0dxt0hvkpuktfmovswmee`. The existing owner and GitHub
+fixture kept their IDs, credentials and healthy workloads through migration 010.
+The logical application API exposes the original environment record under the
+new additive organization layer. No production target or workload was provisioned.
+
+Before migration, backup `staging-20261010T151355Z.dump` was restored in
+`openappplatform_staging_before_groups_restore_check`. After migration, backup
+`staging-20261010T151613Z.dump` restored in
+`openappplatform_staging_environment_restore_check` verified ten migrations, owner,
+source event/release and group mapping. Both dumps remain private in
+`/home/saleem/.local/share/openappplatform/backups/`. Scheduled/off-host backup
+coverage remains separate work.
+
+The previous controller digest
+`127.0.0.1:5001/openappplatform/staging@sha256:b3f050e2bb6e17208e74d4b084090f83f9b6f9d1de8d12fc21b19424b897e77b`
+is retained. Migration 010 preserves old reads and provides default-group insertion
+for older controllers; SQL compatibility tests passed. A live rollback drill to
+that binary has not been performed. Do not drop migration 010 tables/columns to
+roll back: organization metadata and existing environment IDs must survive.

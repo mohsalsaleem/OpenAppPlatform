@@ -228,3 +228,31 @@ reuse and controller restart passed. The restored database contained the retaine
 owner and successful source event/release. See [GitHub releases](github-releases.md)
 and [server deployment](server-build-deploy.md) for exact identifiers, expiry and
 manual backup/recovery limits.
+
+## Existing application environment organization
+
+Local run `20261010-190841-d7471d66` passed the Go vet/race, PostgreSQL, Docker,
+preview/owner browser and MCP suite. New coverage checks migration from the old
+nine-schema layout, unchanged environment/binding/release IDs, old-style controller
+inserts after migration, versioned link/unlink, concurrent links, duplicate/stale
+rejection and denied scoped-agent/viewer organization changes. Owner browser
+coverage links isolated local staging/production definitions, switches their URLs
+and renders one logical application with both environments. Screenshots are kept
+in the ignored run directory.
+
+Coolify staging deployed commit `43e2f507230f4e94c19c0aca01d999c03f3fe7ad`
+using image digest `sha256:74339c510c4d96e2dca5f3535635a3491201e5496d8b41b732dad940ded1e1ec`,
+provider deployment `7zq0dxt0hvkpuktfmovswmee`. Migration 010 applied; HTTPS
+owner sign-in, logical group projection and the prior completed GitHub source
+release passed. Environment ID `157eb0fb80179ca8cfa9b348fe3d35c9`, release
+`0495e641d50e1d566cb6b82774019166` and both runtime resource IDs were unchanged.
+The live workspace currently has its original staging environment; multi-environment
+link/switch coverage uses the isolated local browser fixture, not a new production
+deployment. Pre/post migration backups were restored into retained isolated check
+databases. The post-migration restore verified all ten migrations, retained owner,
+source event/release and logical application mapping.
+
+Local Docker verification briefly failed when the Mac disk filled and Docker's
+image store became read-only. Regenerable old OAP test archives/cache/image tags
+were reclaimed and Docker Desktop recovered; the subsequent full suite passed.
+Remote Coolify workloads were unaffected by that local recovery.

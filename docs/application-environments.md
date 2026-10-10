@@ -56,3 +56,7 @@ Batch 3 remains active. Safe guided target connection, reusable definitions/read
 diffs and more detailed native capability/authority presentation remain follow-up
 items. Target setup still uses server-side configuration files and secret references.
 No production environment is provisioned by the new UI or by this migration.
+
+The slice is deployed in Coolify staging and its existing resource/release IDs
+were verified unchanged after migration. [Verification](verification.md) records
+the exact image, migration, local browser evidence and restored backups.

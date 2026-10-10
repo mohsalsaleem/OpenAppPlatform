@@ -82,13 +82,19 @@ Use trusted OAP metadata for these fields:
 
 | Field | Purpose |
 | --- | --- |
-| `oap_workspace_id`, `oap_application_id` | Authorization and logical application |
+| `oap_workspace_id`, `oap_application_id` | Authorization and immutable environment-record ID |
+| `oap_group_id` | Logical application context; not an authorization grant |
 | `environment`, `component`, `target_id` | Placement and component filters |
 | `source_kind` | Runtime, controller, build, or provider deployment |
 | `resource_id`, `container_id`, `instance_ordinal` | Exact runtime identity |
 | `release_id`, `operation_id`, `source_commit` | Release and lifecycle correlation when known |
 | `level`, `request_id`, `trace_id` | Severity and request investigation when present |
 | `event_id`, `collector_id` | Replay diagnosis and source identity |
+
+Logical-application search resolves current member environment IDs on the server
+and intersects authorization. App-scoped agents remain limited to their original
+environment record. Historical group annotations do not grant sibling access or
+hide old logs after metadata reorganization.
 
 Reserve the `oap_` namespace. Workload JSON must not override ownership, environment,
 resource mapping or collector authority. Treat workload-supplied IDs as untrusted
