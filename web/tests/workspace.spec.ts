@@ -43,7 +43,7 @@ test("authentication, application setup, release confirmation, and target discov
   await expect(page.getByRole("dialog")).not.toBeVisible();
   await page.getByRole("button", { name: "Deploy application" }).click();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
-  await page.getByRole("tab", { name: "Configuration" }).click();
+  await page.getByRole("tab", { name: "Settings" }).click();
   await expect(
     page.getByRole("heading", { name: "Runtime configuration" }),
   ).toBeVisible();
@@ -152,7 +152,7 @@ test("deploy, inspect live instances, read logs, and update a Docker application
   await expect(page.locator(".log-output")).toContainText("fixture", {
     timeout: 5000,
   });
-  await page.getByRole("tab", { name: "Configuration" }).click();
+  await page.getByRole("tab", { name: "Settings" }).click();
   await page
     .getByLabel("Container image for web")
     .fill(process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!);
@@ -214,7 +214,7 @@ test("deploy, inspect live instances, read logs, and update a Docker application
   await expect(page.locator(".release-banner")).toContainText("succeeded");
   await expect(live).toContainText("running:healthy");
 
-  await page.getByRole("tab", { name: "Configuration" }).click();
+  await page.getByRole("tab", { name: "Settings" }).click();
   await page.getByLabel("Instances for web").fill("2");
   await page.getByRole("button", { name: "Save configuration" }).click();
   await expect(

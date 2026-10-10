@@ -868,3 +868,18 @@ pre { padding: 14px; line-height: 1.5; }
   .main { margin-left: 0; width: 100%; }
   .title-line { gap: 8px; }
 }
+
+.list-count { margin-left: 6px; padding: 2px 6px; background: #e8edf5; color: #475569; border-radius: 4px; font-size: 12px; font-weight: 500; }
+.application-list-heading { margin-top: 28px; margin-bottom: 12px; }
+.app-card { grid-template-columns: 36px minmax(0, 1fr) 90px minmax(100px, 160px) 120px 20px; }
+.application-target { color: #64748b; font-size: 12px; overflow-wrap: anywhere; }
+@media (max-width: 900px) and (min-width: 641px) {
+  .app-card { grid-template-columns: 32px minmax(0, 1fr) 80px 20px; gap: 10px; }
+  .application-target, .application-count { grid-column: 2; }
+  .application-arrow { grid-column: 4; grid-row: 1; }
+}
+@media (max-width: 640px) {
+  .app-card { grid-template-columns: 32px minmax(0, 1fr) 20px; }
+  .application-target { grid-column: 2; grid-row: 3; }
+  .application-count { grid-row: 4; }
+}

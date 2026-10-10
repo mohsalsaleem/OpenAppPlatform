@@ -83,7 +83,7 @@ export function NewApplication() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">APPLICATION SETUP</p>
-          <h1>Make room for your next idea</h1>
+          <h1>Create application</h1>
           <p className="muted">
             Define the components. Deploy when you’re ready.
           </p>
@@ -92,7 +92,7 @@ export function NewApplication() {
       <form onSubmit={submit}>
         <section className="panel">
           <div className="section-heading">
-            <h2>Application identity</h2>
+            <h2>Application details</h2>
             <span className="small muted">
               Creating a definition does not deploy workloads.
             </span>

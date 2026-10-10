@@ -31,26 +31,9 @@ export function Applications() {
           <Plus size={17} /> New application
         </Link>
       </div>
-      <div className="summary">
-        <div>
-          <span>Applications</span>
-          <strong>{q.data?.length ?? "—"}</strong>
-        </div>
-        <div>
-          <span>Connected targets</span>
-          <strong>{targets.data?.length ?? "—"}</strong>
-        </div>
-        <div>
-          <span>Deployment policy</span>
-          <strong className="summary-text">Your choice</strong>
-          <small>Standard available · advanced strategies planned</small>
-        </div>
-      </div>
-      <div className="section-heading">
-        <h2>Application directory</h2>
-        <span className="small muted">
-          Organized by product, deployed on your infrastructure
-        </span>
+      <div className="section-heading application-list-heading">
+        <h2>Applications <span className="list-count">{q.data?.length ?? "—"}</span></h2>
+        <span className="small muted">{targets.data?.length ?? "—"} deployment targets</span>
       </div>
       <ErrorBox error={q.error} />
       {q.isPending ? (
@@ -74,6 +57,7 @@ export function Applications() {
                 <p>{a.manifest.components.map((c) => c.name).join(" · ")}</p>
               </div>
               <span className="environment">{a.manifest.environment}</span>
+              <span className="application-target">{targets.data?.find((t) => t.id === a.manifest.targetId)?.name ?? a.manifest.targetId}</span>
               <span className="application-count">
                 <ComponentIcon size={14} /> {a.manifest.components.length} components
               </span>

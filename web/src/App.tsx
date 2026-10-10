@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { NavLink, Link, Routes, Route } from "react-router-dom";
+import { NavLink, Link, Routes, Route, useLocation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -21,6 +21,8 @@ export function App() {
   const [accessToken, setAccessToken] = useState("");
   const [error, setError] = useState("");
   const client = useQueryClient();
+  const location = useLocation();
+  const pageName = location.pathname === "/targets" ? "Deployment targets" : location.pathname === "/applications/new" ? "New application" : location.pathname.startsWith("/applications/") ? "Application" : "Applications";
   async function connect(e: FormEvent) {
     e.preventDefault();
     sessionStorage.setItem("oap-token", accessToken);
@@ -41,7 +43,7 @@ export function App() {
             <Layers3 size={28} />
           </div>
           <p className="eyebrow">YOUR APPLICATION WORKSPACE</p>
-          <h1>OpenAppPlatform</h1>
+          <h1>Open App Platform</h1>
           <p className="muted">
             One place for your applications.
             <br />
@@ -78,7 +80,7 @@ export function App() {
             <Layers3 size={21} />
           </span>
           <span>
-            OpenApp<span className="brand-sub">Platform</span>
+            Open App<span className="brand-sub">Platform</span>
           </span>
         </Link>
         <div className="workspace">
@@ -115,7 +117,7 @@ export function App() {
       <main className="main">
         <header className="topbar">
           <span>
-            Workspace <span className="slash">/</span> Applications
+            Workspace <span className="slash">/</span> {pageName}
           </span>
           <a
             href="https://github.com/mohsalsaleem/OpenAppPlatform"

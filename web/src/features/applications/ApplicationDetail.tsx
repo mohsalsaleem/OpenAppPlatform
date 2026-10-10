@@ -164,7 +164,7 @@ export function ApplicationDetail() {
             key={t}
             onClick={() => setTab(t)}
           >
-            {t[0].toUpperCase() + t.slice(1)}
+            {({ overview: "Overview", deployments: "Activity", configuration: "Settings", logs: "Logs" } as Record<string, string>)[t]}
           </button>
         ))}
       </div>
@@ -194,7 +194,6 @@ export function ApplicationDetail() {
           <section className="panel">
             <div className="section-heading">
               <h2>Components</h2>
-              <span className="small muted">Standard deployment</span>
             </div>
             {a.manifest.components.map((c) => (
               <div className="component-row" key={c.name}>
