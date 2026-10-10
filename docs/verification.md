@@ -47,7 +47,8 @@ The live test now waits for readiness with normal TLS validation and a bounded
 
 Fixtures are retained for inspection. Resource IDs and target placement are
 recorded in .coolify/deploy.yaml; credentials are excluded from Git. The platform
-itself runs locally and has not been deployed to Coolify.
+itself was subsequently deployed to Coolify staging; see the server-built product
+staging evidence below.
 
 ## Local review
 
@@ -197,3 +198,13 @@ OAP observed the exact commit/operation without changing management mode. The
 fixture keeps auto-deploy disabled. This explicit API staging test proves native
 GitHub App clone/build behavior, not a new live webhook ownership handoff.
 The initial inline-Dockerfile fixture remains retained; it lacked repository context.
+
+## Server-built product staging
+
+The actual platform (not only a fixture) is deployed in Coolify staging at
+https://oap-staging.mohsal.dev from commit `426a520`. The exact digest, provider
+operation, mount workaround, manual backup/restore and restart evidence are in
+[server-build-deploy.md](server-build-deploy.md). Owner-mode protected routes and
+invalid bootstrap rejection were checked over validated HTTPS. Real owner signup
+and authenticated live product journeys await the owner's account; local owner
+browser integration coverage remains the evidence for those flows.

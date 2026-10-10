@@ -6,12 +6,20 @@ application:
     dockerfile: Dockerfile
   healthcheck:
     path: /healthz
-# The platform itself runs locally; no platform deployment is provisioned yet.
+# Product staging is deployed from a server-built immutable image.
 environments:
   staging:
     branch: main
-    status: unprovisioned
-    coolify_application_uuid: ""
+    status: healthy
+    coolify_application_uuid: 2bs31xhjzmfi3w0aulusi7zy
+    url: https://oap-staging.mohsal.dev
+    image: 127.0.0.1:5001/openappplatform/staging@sha256:208144df82ba9f41d879247b0bd419799928fe8b0b8973b60d17c9fe60682940
+    commit: 426a5200b301c87bd34093e099092add569fc974
+    provider_deployment_uuid: luz2foosxmamekw47dihqsqt
+    auth_mode: owner
+    owner_setup: pending
+    configuration_storage_uuid: a2q7lc8ehu6twekwj1bcng8m
+    verified: 2026-10-10
     database:
       engine: postgresql
       database_name: openappplatform_staging

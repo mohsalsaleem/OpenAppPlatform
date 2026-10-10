@@ -119,9 +119,11 @@ pass -targets /path/to/targets.json. The controller can run through Coolify or o
 Docker directly. Running the controller on bare Docker is distinct from the
 future adapter that manages application workloads on bare Docker.
 
-.coolify/deploy.yaml records the retained staging test fixture. The platform
-itself has not been deployed to Coolify. Backups, restore verification, and
-production authentication remain release requirements.
+.coolify/deploy.yaml records product staging and retained integration fixtures.
+The platform is available at https://oap-staging.mohsal.dev in owner mode, with
+server-built image provenance and a verified manual database backup/restore.
+See [server deployment and recovery](docs/server-build-deploy.md) for setup and
+operational limits. Production release requirements remain separate.
 
 ## License
 
