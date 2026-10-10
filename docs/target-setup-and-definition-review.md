@@ -98,3 +98,29 @@ unchanged and healthy. Observed-component ownership was tested in the local fixt
 Schema remains at migration 010; the previous staging image and tested database
 backup remain available. This completes the presentation slice of M0 batch 3, not
 native lifecycle handoff or configuration promotion.
+
+## Reproducible operator-first acceptance
+
+The opt-in acceptance run requires explicit, distinct staging image/source resource
+IDs. It uses the exact-tree local test image and a disposable PostgreSQL database,
+without mounting a Docker socket or connecting to the platform's durable database:
+
+```sh
+make test-local
+python3 scripts/run-local.py python3 scripts/test-operator-acceptance.py \
+  --image-resource <existing-staging-image-id> \
+  --source-resource <existing-staging-source-id>
+```
+
+The adapter passes through a GET-only forwarding boundary. Non-GET requests fail
+locally and are never forwarded to Coolify. It selects the named resources from the
+configured project/environment, groups them only in the disposable OAP database,
+checks health/log access, verifies environment identity, and rejects OAP deploy,
+restart and native source handoff. Configuration fingerprints compare native source,
+trigger settings, domains, ports, image, full environment records and storage records.
+Provider bodies, secrets and logs are never printed. Independent native deployments
+can change fingerprints during this check; a failure is investigated, never overwritten.
+No production scope, provider creation, trigger changes or metadata imports into the
+hosted platform are performed. Multi-environment linking remains covered by local
+system/browser tests; this staging test verifies a mixed native application in its
+existing environment.

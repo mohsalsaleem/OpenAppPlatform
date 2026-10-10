@@ -134,6 +134,9 @@ overviews now explain build/deploy/restart/configuration ownership per component
 verified target checks expose adapter support, including unavailable rollout modes.
 Full configuration promotion and native authority transitions remain scoped separately;
 do not advance to batch 4 yet.
+The next acceptance gate is explicit mixed image/source Coolify grouping through a
+GET-only provider boundary, with native configuration fingerprints and blocked
+mutations, using a disposable OAP database.
 
 
 **Batch 3 setup/review progress:** the Coolify guide generates a credential-reference
