@@ -226,6 +226,22 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     .getByLabel("Container image for web")
     .fill(process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!);
   await page.getByLabel("Internal port for web").fill("8025");
+  await page.getByLabel("Health check mode for web").selectOption("http");
+  await page.getByLabel("Health check path for web").fill("/health/custom");
+  await page.getByLabel("Interval for web (seconds)").fill("1");
+  await page.getByLabel("Attempt timeout for web (seconds)").fill("1");
+  await page.getByLabel("Retries for web", { exact: true }).fill("1");
+  await page.getByLabel("Start period for web (seconds)").fill("0");
+  await expect(
+    page.getByRole("region", { name: "Configuration changes" }),
+  ).toContainText("HTTP GET /health/custom");
+  await page
+    .getByLabel("Health check path for web")
+    .fill("https://outside.invalid/health");
+  await expect(
+    page.getByRole("button", { name: "Save configuration" }),
+  ).toBeDisabled();
+  await page.getByLabel("Health check path for web").fill("/health/custom");
   await page
     .getByLabel("Environment variables for web")
     .fill('{"OAP_TEST_MESSAGE":"browser-v2"}');
@@ -251,6 +267,9 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     })
     .toBe(process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!);
   await expect(page.locator(".release-banner")).toContainText("succeeded");
+  await expect(
+    page.getByText("HTTP GET /health/custom", { exact: false }).first(),
+  ).toBeVisible();
   await page.getByRole("tab", { name: "Activity" }).click();
   await page
     .getByRole("button", { name: "Compare selected releases", exact: true })

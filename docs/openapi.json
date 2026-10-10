@@ -2709,6 +2709,9 @@
               "observe"
             ],
             "description": "New existing-resource registrations always start observe-only. Omitted on existing managed definitions. Enable lifecycle management using the explicit handoff endpoint."
+          },
+          "healthCheck": {
+            "$ref": "#/components/schemas/HealthCheck"
           }
         },
         "required": [
@@ -3295,6 +3298,52 @@
                 }
               }
             }
+          }
+        }
+      },
+      "HealthCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "http",
+              "image"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 256,
+            "pattern": "^/[A-Za-z0-9/_~.\\-]*$",
+            "description": "Local path, required for http; no URL, query or fragment"
+          },
+          "intervalSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 300,
+            "default": 10
+          },
+          "timeoutSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 30,
+            "default": 3
+          },
+          "retries": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20,
+            "default": 3
+          },
+          "startPeriodSeconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 600,
+            "default": 0
           }
         }
       }

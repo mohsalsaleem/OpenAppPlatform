@@ -147,7 +147,7 @@ contract is sanitized naming/layout reuse, not secret or runtime cloning.
 **Batch 4 progress:** optional per-component operator-health gates and bounded
 observation deadlines are frozen with release definitions and honored by recovery.
 Legacy definitions retain running/health acceptance and a 15-minute window.
-This does not configure native HTTP probes. Explicit dependency ordering now gates preparation/dispatch, verifies all selected
+Native HTTP health check configuration is implemented for OAP-owned image workloads on Docker/Coolify; reproducible verification is in progress. Explicit dependency ordering now gates preparation/dispatch, verifies all selected
 replicas first, and inspects unselected bound dependencies without redeploying them.
 Pre-dispatch dependency holds can resume without repeating an uncertain dispatch.
 Read-only frozen release/artifact comparison now includes masked runtime-key diffs

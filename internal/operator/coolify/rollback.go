@@ -47,5 +47,5 @@ func (c *Client) CheckRollbackConfiguration(ctx context.Context, ref string, com
 			}
 		}
 	}
-	return nil
+	return c.CheckHealthCheck(ctx, ref, component, false)
 }

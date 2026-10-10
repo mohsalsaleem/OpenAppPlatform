@@ -109,3 +109,22 @@ suite before pushing.
 GitHub's workflow is disabled in repository settings and has no push/PR triggers.
 It retains workflow_dispatch for a future deliberate re-enable; ordinary pushes
 must not start remote CI.
+
+## Native HTTP probe coverage
+
+`make test-local` runs the native Docker HTTP probe system test in the isolated engine, alongside race-enabled controller and adapter checks. A fixture image carries a healthy image check, while `/health/custom` succeeds and `/health/fail` returns 503. The test configures an override, proves that the failing endpoint fails the release despite the image's healthy check, and returns explicitly to the image check while preserving the stable binding. Browser E2E edits probe settings, rejects an external URL, deploys a real native Docker runtime, and verifies healthy completion. Controller fixtures cover native configuration drift, frozen snapshots, process restart and owner recovery without duplicate dispatch. Coolify adapter tests read back the configured native fields and reject drift/out-of-scope resources; live Coolify verification is recorded separately and is not part of the offline baseline.
+
+Core Go test packages have a 180-second deadline and a 240-second runner guard. Reports, screenshots and logs are retained under `.local/test-env/runs/<runId>/`; test databases and Docker state are isolated and removed on completion.
+
+To exercise a real operator after deploying OAP to staging, run the opt-in script with a private owner credential JSON file and a pinned image that already includes a healthy image check:
+
+```sh
+python3 scripts/verify-staging-health-checks.py \
+  --credentials-file .local/staging-workspace-credentials.json \
+  --target-id coolify-staging \
+  --image 'registry.example/fixture@sha256:<64-hex-digest>' \
+  --port 8025 --path / \
+  --receipt .local/staging-health-check-receipt.json
+```
+
+It creates/reuses `native-health-check-staging`, configures an HTTP check, deploys through the operator, returns explicitly to the image check, and verifies healthy completion plus the same resource binding. It retains one stateless fixture for subsequent runs. It refuses non-staging targets and incompatible existing topology. A failed/uncertain release requires inspection; the script does not delete it or automatically reissue its dispatch. Owner credentials and receipts remain private/ignored; the offline suite needs neither internet nor these credentials after its pinned images are cached.

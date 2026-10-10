@@ -1,3 +1,4 @@
+import { HealthCheckFields, invalidHealthCheck } from "./HealthCheckFields";
 import { ConfigurationDiff } from "./ConfigurationDiff";
 import { useCanOperate } from "../../access";
 import { useState } from "react";
@@ -67,6 +68,7 @@ export function ConfigurationEditor({
       | string
       | number
       | Record<string, string>
+      | Component["healthCheck"]
       | Component["readiness"]
       | string[],
   ) {
@@ -105,6 +107,7 @@ export function ConfigurationEditor({
               stale ||
               save.isPending ||
               Object.values(invalid).some(Boolean) ||
+              draft.components.some((c) => invalidHealthCheck(c.healthCheck)) ||
               draft.components.some(
                 (c) =>
                   c.readiness?.timeoutSeconds !== undefined &&
@@ -281,13 +284,26 @@ export function ConfigurationEditor({
               />
               <p className="small muted">
                 Starts after provider dispatch, including deployment and
-                readiness waiting. This uses the operator’s existing health
+                readiness waiting. This gate uses the operator-reported health
                 check; it does not create a probe. A service with no reported
                 health will time out when healthy status is required. Timeout
                 requires recovery review and does not stop the provider.
               </p>
             </fieldset>
           )}
+          {c.management !== "observe" &&
+            !c.resourceId &&
+            capabilities.data?.httpHealthChecks && (
+              <HealthCheckFields
+                name={c.name}
+                healthCheck={c.healthCheck}
+                allowExisting={
+                  !base.manifest.components.find((b) => b.name === c.name)
+                    ?.healthCheck
+                }
+                onChange={(value) => change(i, "healthCheck", value)}
+              />
+            )}
           <RuntimeVariables
             component={c}
             onChange={(field, value) => change(i, field, value)}

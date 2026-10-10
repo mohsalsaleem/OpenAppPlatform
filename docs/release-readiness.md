@@ -1,7 +1,7 @@
 # Release readiness
 
 M0 batch 4 starts with a configurable completion gate over existing operator health.
-This is controller policy, not a new HTTP probe or health-check provisioning API.
+The original readiness gate uses operator-reported health. Native HTTP health checks are now available as a separate optional runtime setting for OAP-owned image workloads; see [native health checks](native-health-checks.md).
 Both Docker and Coolify continue to execute their native lifecycle and health checks.
 
 ```json
@@ -20,8 +20,8 @@ Omit readiness to preserve existing behavior: a completed provider deployment pl
 `running` or `running:healthy` can finish the step, within 900 seconds. Unhealthy,
 unknown and starting statuses never pass. `requireHealthy` accepts only explicit
 `running:healthy` status (including its existing provider suffix format). A running
-service with no native health result cannot pass this stricter gate. Configure its
-native health check in the operator before selecting this requirement.
+service with no native health result cannot pass this stricter gate. Select an OAP native HTTP health check on owned image workloads, or configure the
+existing check through the operator, before requiring explicit healthy status.
 
 `timeoutSeconds` is zero/omitted for 900 seconds, or an integer from 30 to 1800.
 The observation clock starts when a dispatch acknowledgement is persisted; it
@@ -53,8 +53,7 @@ No migration is required: the additive optional field lives in existing JSON
 manifests. Unit tests cover defaults/bounds/statuses and Docker runtime identity;
 system tests cover frozen policy through definition changes, controller restart,
 timeout and exact-operation recovery without redispatch. Browser tests exercise
-settings and the readable diff. HTTP probe configuration, dependency ordering,
-release comparison, rollback and cancellation remain later slices of batch 4.
+settings and the readable diff. Dependency ordering, release comparison, image-only rollback and release controls are delivered. Native HTTP health check implementation is undergoing local end-to-end verification; broader configuration/data rollback remains in batch 4.
 
 ## Staging verification and compatibility
 

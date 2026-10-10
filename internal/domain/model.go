@@ -27,6 +27,7 @@ type ReadinessPolicy struct {
 }
 
 type Component struct {
+	HealthCheck      *HealthCheck      `json:"healthCheck,omitempty"`
 	DependsOn        []string          `json:"dependsOn,omitempty"`
 	Readiness        *ReadinessPolicy  `json:"readiness,omitempty"`
 	Management       string            `json:"management,omitempty"`
@@ -71,6 +72,14 @@ func (m *Manifest) Validate() error {
 		}
 		if c.Management == "observe" && (c.ResourceID == "" || c.HostPort != 0 || len(c.Env)+len(c.Services)+len(c.ServiceEndpoints)+len(c.DependsOn) > 0) {
 			return errors.New("observe-only components require a resourceId and cannot configure runtime settings")
+		}
+		if c.HealthCheck != nil {
+			if c.Management == "observe" || c.ResourceID != "" {
+				return errors.New("native health check overrides require OAP-owned resources")
+			}
+			if e := c.HealthCheck.Validate(); e != nil {
+				return e
+			}
 		}
 		if c.Readiness != nil {
 			if c.Management == "observe" {

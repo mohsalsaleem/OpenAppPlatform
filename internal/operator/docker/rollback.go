@@ -42,7 +42,7 @@ func (c *Client) CheckRollbackConfiguration(ctx context.Context, ref string, com
 			return errors.New("rollback environment configuration differs")
 		}
 	}
-	return nil
+	return c.CheckHealthCheck(ctx, ref, component, false)
 }
 
 // CachedImageID exposes a read-only content address for already-cached images.

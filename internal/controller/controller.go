@@ -447,6 +447,11 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 				return fail(step, "attention", e)
 			}
 		}
+		if step.Action != "retire" && step.Phase != "pending" {
+			if e = verifyHealthCheck(ctx, a, step.ResourceID, comp, step.Phase == "prepared"); e != nil {
+				return fail(step, "attention", e)
+			}
+		}
 		if step.Action != "retire" && (step.Phase == "pending" || step.Phase == "prepared") {
 			ready, err := c.dependenciesReady(ctx, a, d, comp)
 			if err != nil {

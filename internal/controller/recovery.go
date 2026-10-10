@@ -116,6 +116,16 @@ func (c *Controller) Recover(ctx context.Context, id string, request Recovery) (
 			if remote == "" || len(remote) > 256 {
 				return d, errors.New("supply the exact provider deployment ID after inspecting the operator; recovery never issues another deployment")
 			}
+			var frozen domain.Component
+			for _, candidate := range d.Manifest.Components {
+				if candidate.Name == step.Component {
+					frozen = candidate
+					break
+				}
+			}
+			if err = verifyHealthCheck(ctx, adapter, step.ResourceID, frozen, false); err != nil {
+				return d, err
+			}
 			status, err := adapter.Observe(ctx, remote, step.ResourceID)
 			if err != nil {
 				return d, err

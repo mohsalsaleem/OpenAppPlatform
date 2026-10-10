@@ -8,6 +8,7 @@ import (
 )
 
 type Capabilities struct {
+	HTTPHealthChecks  bool `json:"httpHealthChecks"`
 	ImageRollback     bool `json:"imageRollback"`
 	ManagementHandoff bool `json:"managementHandoff"`
 	Retirement        bool `json:"retirement"`
@@ -60,6 +61,9 @@ type Restarter interface {
 
 func ValidateRuntime(m domain.Manifest, caps Capabilities) error {
 	for _, c := range m.Components {
+		if c.HealthCheck != nil && !caps.HTTPHealthChecks {
+			return fmt.Errorf("target does not support native HTTP health checks for %s", c.Name)
+		}
 		if len(c.Env) > 0 && !caps.Environment {
 			return fmt.Errorf("target does not support managed environment variables for %s", c.Name)
 		}
@@ -106,4 +110,9 @@ type NativeSourceObserver interface {
 // It must not mutate provider configuration or return sensitive field values.
 type RollbackSafetyChecker interface {
 	CheckRollbackConfiguration(context.Context, string, domain.Component) error
+}
+
+// HealthCheckVerifier reads native configuration before dispatch and during observation.
+type HealthCheckVerifier interface {
+	CheckHealthCheck(context.Context, string, domain.Component, bool) error
 }

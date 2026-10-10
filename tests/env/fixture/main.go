@@ -44,6 +44,10 @@ func main() {
 		w.WriteHeader(response.StatusCode)
 		io.Copy(w, io.LimitReader(response.Body, 4096))
 	})
+	mux.HandleFunc("GET /health/custom", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ready")) })
+	mux.HandleFunc("GET /health/fail", func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "probe fixture unavailable", http.StatusServiceUnavailable)
+	})
 	mux.HandleFunc("GET /health/ready", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]bool{"ready": true})

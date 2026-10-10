@@ -70,6 +70,9 @@ func (c *Controller) dependenciesReady(ctx context.Context, adapter operator.Ada
 			} else if resource.Description != "OpenAppPlatform:"+release.ApplicationID+":"+name {
 				return false, fmt.Errorf("dependency %s / %d ownership changed", name, ordinal)
 			}
+			if err = verifyHealthCheck(ctx, adapter, resourceID, dependency, false); err != nil {
+				return false, fmt.Errorf("dependency %s / %d native health configuration differs", name, ordinal)
+			}
 			if !releaseReady(dependency, resource.Status) {
 				return false, fmt.Errorf("dependency %s / %d is not ready under the frozen policy", name, ordinal)
 			}

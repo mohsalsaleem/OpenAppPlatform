@@ -1,3 +1,4 @@
+import { healthCheckSummary } from "./HealthCheckFields";
 import { ReleaseControls } from "./ReleaseControls";
 import { RollbackReview } from "./RollbackReview";
 import { ReleaseComparison } from "./ReleaseComparison";
@@ -258,6 +259,11 @@ export function ApplicationDetail() {
                     {c.kind} · {c.instances} instance
                     {c.instances > 1 ? "s" : ""} · port {c.port}
                   </p>
+                  {c.healthCheck && (
+                    <p className="small muted">
+                      {healthCheckSummary(c.healthCheck)}
+                    </p>
+                  )}
                   <code className="image-ref">
                     {instances.data?.find(
                       (v) => v.component === c.name && v.resource?.image,
@@ -430,11 +436,19 @@ export function ApplicationDetail() {
                 <Status value={d.state} />
               </div>
               {d.manifest.components
-                .filter((c) => c.readiness)
+                .filter((c) => c.healthCheck)
+                .map((c) => (
+                  <p className="small muted" key={`health-${c.name}`}>
+                    {c.name} · {healthCheckSummary(c.healthCheck)}
+                  </p>
+                ))}
+              {d.manifest.components
+                .filter((c) => c.readiness || c.healthCheck?.mode === "http")
                 .map((c) => (
                   <p className="small muted" key={`readiness-${c.name}`}>
                     {c.name} readiness ·{" "}
-                    {c.readiness?.requireHealthy
+                    {c.healthCheck?.mode === "http" ||
+                    c.readiness?.requireHealthy
                       ? "Operator healthy status required"
                       : "Operator running/health status"}{" "}
                     · {c.readiness?.timeoutSeconds || 900}s observation timeout
@@ -600,11 +614,18 @@ export function ApplicationDetail() {
             cause downtime. No databases or volumes will be removed.
           </p>
           {review.manifest.components
-            .filter((c) => c.readiness)
+            .filter((c) => c.healthCheck)
+            .map((c) => (
+              <p className="small muted" key={`native-${c.name}`}>
+                {c.name} · {healthCheckSummary(c.healthCheck)}
+              </p>
+            ))}
+          {review.manifest.components
+            .filter((c) => c.readiness || c.healthCheck?.mode === "http")
             .map((c) => (
               <p className="small muted" key={c.name}>
                 {c.name}:{" "}
-                {c.readiness?.requireHealthy
+                {c.healthCheck?.mode === "http" || c.readiness?.requireHealthy
                   ? "requires operator-reported healthy status"
                   : "uses operator running/health status"}
                 ; observation timeout {c.readiness?.timeoutSeconds || 900}s.

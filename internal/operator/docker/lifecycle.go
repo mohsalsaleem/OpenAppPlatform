@@ -102,6 +102,9 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	}
 	sort.Strings(env)
 	input := map[string]any{"Env": env, "Image": imageID, "Labels": labels, "ExposedPorts": map[string]any{port: map[string]any{}}, "HostConfig": host, "NetworkingConfig": map[string]any{"EndpointsConfig": map[string]any{network: map[string]any{"Aliases": []string{s.Component.Name}}}}}
+	if probe := httpHealthCheck(s.Component); probe != nil {
+		input["Healthcheck"] = probe
+	}
 	var result struct {
 		ID string `json:"Id"`
 	}

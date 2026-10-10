@@ -241,3 +241,16 @@ func TestRollbackSafetyRejectsMountedDataAndForeignPortMappings(t *testing.T) {
 		t.Fatal("host port drift accepted")
 	}
 }
+
+func TestNativeHealthCheckChangesRuntimeRevisionAndUsesExecArguments(t *testing.T) {
+	spec := operator.Spec{Name: "web", Ownership: "owner", Component: domain.Component{Name: "web", Image: "image:v1", Port: 8080}}
+	old := revision(spec, "image")
+	spec.Component.HealthCheck = &domain.HealthCheck{Mode: "http", Path: "/health/custom", IntervalSeconds: 5, TimeoutSeconds: 2, Retries: 2}
+	if old == revision(spec, "image") {
+		t.Fatal("native probe change did not replace runtime")
+	}
+	probe := httpHealthCheck(spec.Component)
+	if probe.Test[0] != "CMD" || probe.Test[len(probe.Test)-1] != "http://127.0.0.1:8080/health/custom" {
+		t.Fatal("probe did not use fixed loopback/exec arguments", probe)
+	}
+}

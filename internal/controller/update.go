@@ -66,6 +66,9 @@ func (c *Controller) UpdateApplication(ctx context.Context, id string, m domain.
 		if !ok || old.Kind != comp.Kind || old.ResourceID != comp.ResourceID || old.Management != comp.Management {
 			return domain.Application{}, errors.New("component identity and resource adoption cannot change through configuration editing")
 		}
+		if old.HealthCheck != nil && comp.HealthCheck == nil {
+			return domain.Application{}, errors.New("select image health check explicitly to remove a managed HTTP override")
+		}
 		if comp.Instances < old.Instances {
 			return domain.Application{}, errors.New("scale-down requires explicit instance retirement")
 		}

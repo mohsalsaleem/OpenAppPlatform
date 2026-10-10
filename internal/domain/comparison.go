@@ -133,6 +133,7 @@ func CompareReleases(from, to Deployment) ReleaseComparison {
 		add(name, "instances", fmt.Sprint(a.Instances), fmt.Sprint(b.Instances))
 		add(name, "strategy", a.Strategy, b.Strategy)
 		add(name, "startup dependencies", dependencies(a), dependencies(b))
+		add(name, "native health check", HealthCheckSummary(a.HealthCheck), HealthCheckSummary(b.HealthCheck))
 		add(name, "require healthy", fmt.Sprint(health(a)), fmt.Sprint(health(b)))
 		add(name, "observation timeout (seconds)", fmt.Sprint(timeout(a)), fmt.Sprint(timeout(b)))
 		for _, maps := range []struct {

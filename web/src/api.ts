@@ -1,4 +1,13 @@
+export interface HealthCheck {
+  mode: "http" | "image";
+  path?: string;
+  intervalSeconds?: number;
+  timeoutSeconds?: number;
+  retries?: number;
+  startPeriodSeconds?: number;
+}
 export interface Component {
+  healthCheck?: HealthCheck;
   dependsOn?: string[];
   readiness?: { requireHealthy?: boolean; timeoutSeconds?: number };
   management?: "observe";
@@ -123,6 +132,7 @@ export interface Instance {
 }
 
 export interface Capabilities {
+  httpHealthChecks: boolean;
   imageRollback: boolean;
   rolling: boolean;
   blueGreen: boolean;

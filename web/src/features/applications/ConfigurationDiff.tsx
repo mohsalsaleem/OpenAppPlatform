@@ -1,3 +1,4 @@
+import { healthCheckSummary } from "./HealthCheckFields";
 import type { Manifest } from "../../api";
 export function ConfigurationDiff({
   before,
@@ -28,6 +29,14 @@ export function ConfigurationDiff({
         field: `${c.name} · startup dependencies`,
         before: previousDependencies,
         after: proposedDependencies,
+      });
+    if (
+      healthCheckSummary(old.healthCheck) !== healthCheckSummary(c.healthCheck)
+    )
+      rows.push({
+        field: `${c.name} · native health check`,
+        before: healthCheckSummary(old.healthCheck),
+        after: healthCheckSummary(c.healthCheck),
       });
     const oldReadiness = old.readiness ?? {},
       nextReadiness = c.readiness ?? {};

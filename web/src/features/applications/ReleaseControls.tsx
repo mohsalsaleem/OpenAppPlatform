@@ -96,7 +96,7 @@ export function ReleaseControls({ deployment: d }: { deployment: Deployment }) {
       {mode && (
         <DeploymentDialog
           onClose={() => {
-            if (!mutation.isPending) setMode("");
+            setMode("");
           }}
         >
           <h2 id="deploy-title">

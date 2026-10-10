@@ -38,7 +38,7 @@ func New(t domain.Target, token string) (*Client, error) {
 	return &Client{base: strings.TrimRight(t.URL, "/"), token: token, target: t, http: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) Capabilities() operator.Capabilities {
-	return operator.Capabilities{ImageRollback: true, ManagementHandoff: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Environment: true, ServiceEndpoints: true}
+	return operator.Capabilities{HTTPHealthChecks: true, ImageRollback: true, ManagementHandoff: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Environment: true, ServiceEndpoints: true}
 }
 func (c *Client) request(ctx context.Context, method, path string, input, output any) error {
 	var body io.Reader
@@ -190,6 +190,7 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 		if s.Component.HostPort != 0 {
 			data["ports_mappings"] = fmt.Sprintf("%d:%d", s.Component.HostPort, s.Component.Port)
 		}
+		applyHealthCheck(data, s.Component)
 		if e = c.request(ctx, "PATCH", "/applications/"+url.PathEscape(found.ID), data, nil); e != nil {
 			return operator.Resource{}, e
 		}
@@ -202,6 +203,7 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	if s.Component.HostPort != 0 {
 		data["ports_mappings"] = fmt.Sprintf("%d:%d", s.Component.HostPort, s.Component.Port)
 	}
+	applyHealthCheck(data, s.Component)
 	var result struct {
 		UUID string `json:"uuid"`
 	}
