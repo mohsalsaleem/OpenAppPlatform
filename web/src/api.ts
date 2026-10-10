@@ -18,7 +18,14 @@ export interface Manifest {
   targetId: string;
   components: Component[];
 }
+export interface ApplicationGroup {
+  id: string;
+  name: string;
+  version: number;
+  environments: Application[];
+}
 export interface Application {
+  groupId: string;
   id: string;
   manifest: Manifest;
   createdAt: string;

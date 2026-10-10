@@ -61,6 +61,7 @@ export function NewApplication() {
       }),
     onSuccess: (a) => {
       client.invalidateQueries({ queryKey: ["applications"] });
+      client.invalidateQueries({ queryKey: ["application-groups"] });
       navigate(`/applications/${a.id}`);
     },
   });

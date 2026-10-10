@@ -1,3 +1,4 @@
+import { EnvironmentNavigation } from "./EnvironmentNavigation";
 import { SourceEvents } from "./SourceEvents";
 import { useCanOperate } from "../../access";
 import { useState, useEffect } from "react";
@@ -178,6 +179,7 @@ export function ApplicationDetail() {
                 : "Deploy application"}
         </button>
       </div>
+      <EnvironmentNavigation applicationId={id!} />
       <div className="tabs" role="tablist">
         {["overview", "deployments", "configuration", "logs"].map((t) => (
           <button
@@ -249,6 +251,7 @@ export function ApplicationDetail() {
                       (v) => v.component === c.name && v.resource?.image,
                     )?.resource?.image || c.image}
                   </code>
+                  <p className="small muted">{c.management === "observe" ? "Build and deployment stay with the existing workflow." : "OAP coordinates image releases through the deployment target."}</p>
                 </div>
                 <span className="small muted">
                   {c.management === "observe"

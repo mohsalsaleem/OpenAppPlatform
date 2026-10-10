@@ -116,7 +116,7 @@ func TestOwnerSessionsRolesScopeAuditAndRevokedJobs(t *testing.T) {
 	if code != 200 {
 		t.Fatal("scoped read denied")
 	}
-	for _, path := range []string{"/api/v1/targets", "/api/v1/applications/foreign", "/api/v1/access/members"} {
+	for _, path := range []string{"/api/v1/targets", "/api/v1/application-groups", "/api/v1/applications/foreign", "/api/v1/access/members"} {
 		code, _, _ = call("GET", path, nil, nil, "Bearer "+read, "")
 		if code == 200 {
 			t.Fatal("scope bypass", path)
@@ -127,6 +127,15 @@ func TestOwnerSessionsRolesScopeAuditAndRevokedJobs(t *testing.T) {
 		t.Fatal("read token dispatched")
 	}
 	operate := issue("operate")
+	code, _, _ = call("POST", "/api/v1/application-groups/"+app.GroupID+"/environments", map[string]any{"applicationId": app.ID, "expectedGroupVersion": 1, "expectedSourceVersion": 1}, nil, "Bearer "+operate, "")
+	if code != 404 {
+		t.Fatal("app-scoped agent changed organization", code)
+	}
+	code, _, _ = call("POST", "/api/v1/application-groups/"+app.GroupID+"/environments", map[string]any{"applicationId": app.ID, "expectedGroupVersion": 1, "expectedSourceVersion": 1}, viewer, "", "")
+	if code != 403 {
+		t.Fatal("viewer changed organization", code)
+	}
+
 	code, raw, _ = call("POST", "/api/v1/applications/"+app.ID+"/deployments", nil, nil, "Bearer "+operate, "")
 	if code != 202 {
 		t.Fatalf("enqueue %d %s", code, raw)

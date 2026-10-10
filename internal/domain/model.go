@@ -131,7 +131,15 @@ func (t Target) Validate() error {
 	return nil
 }
 
+type ApplicationGroup struct {
+	ID           string        `json:"id"`
+	Name         string        `json:"name"`
+	Version      int64         `json:"version"`
+	Environments []Application `json:"environments"`
+}
+
 type Application struct {
+	GroupID   string    `json:"groupId"`
 	ID        string    `json:"id"`
 	Manifest  Manifest  `json:"manifest"`
 	CreatedAt time.Time `json:"createdAt"`

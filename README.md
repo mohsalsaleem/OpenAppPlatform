@@ -255,3 +255,11 @@ See [GitHub releases](docs/github-releases.md) and [examples](examples/github-so
 The optional hosted image-builder lane passed a real GitHub push and redelivery.
 Native source handoff/artifact reuse remains unsupported; CI stays disabled.
 See the [operator-first audit and roadmap corrections](docs/operator-first-audit.md).
+
+## Application environments
+
+Logical applications group existing staging/production environment records while
+preserving resource IDs, native workflows, release histories and credential scopes.
+Owners explicitly link or separate environments through the dashboard. Existing
+flat application URLs/APIs stay compatible. Target configuration remains server-side.
+See [application environments](docs/application-environments.md).

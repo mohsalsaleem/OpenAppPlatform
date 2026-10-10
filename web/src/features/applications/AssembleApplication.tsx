@@ -56,6 +56,7 @@ export function AssembleApplication() {
       }),
     onSuccess: (a) => {
       client.invalidateQueries({ queryKey: ["applications"] });
+      client.invalidateQueries({ queryKey: ["application-groups"] });
       client.invalidateQueries({ queryKey: ["resources", id] });
       navigate(`/applications/${a.id}`);
     },

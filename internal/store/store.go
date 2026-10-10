@@ -80,6 +80,7 @@ func (s *Store) Targets(ctx context.Context) ([]domain.Target, error) {
 }
 func (s *Store) CreateApplication(ctx context.Context, m domain.Manifest) (domain.Application, error) {
 	a := domain.Application{ID: domain.NewID(), Manifest: m}
+	a.GroupID = a.ID
 	b, e := json.Marshal(m)
 	if e != nil {
 		return a, e
@@ -89,7 +90,10 @@ func (s *Store) CreateApplication(ctx context.Context, m domain.Manifest) (domai
 		return a, e
 	}
 	defer tx.Rollback(ctx)
-	e = tx.QueryRow(ctx, "INSERT INTO oap_applications(id,name,environment,spec) VALUES($1,$2,$3,$4) RETURNING created_at,updated_at,version", a.ID, m.Name, m.Environment, b).Scan(&a.CreatedAt, &a.UpdatedAt, &a.Version)
+	if _, e = tx.Exec(ctx, "INSERT INTO oap_application_groups(id,name) VALUES($1,$2)", a.ID, m.Name); e != nil {
+		return a, mapError(e)
+	}
+	e = tx.QueryRow(ctx, "INSERT INTO oap_applications(id,name,environment,spec,group_id) VALUES($1,$2,$3,$4,$1) RETURNING created_at,updated_at,version", a.ID, m.Name, m.Environment, b).Scan(&a.CreatedAt, &a.UpdatedAt, &a.Version)
 	if e != nil {
 		return a, mapError(e)
 	}
@@ -126,7 +130,7 @@ func (s *Store) Bind(ctx context.Context, targetID, resourceID, appID, component
 func scanApp(row pgx.Row) (domain.Application, error) {
 	var a domain.Application
 	var b []byte
-	e := row.Scan(&a.ID, &b, &a.CreatedAt, &a.UpdatedAt, &a.Version)
+	e := row.Scan(&a.ID, &b, &a.CreatedAt, &a.UpdatedAt, &a.Version, &a.GroupID)
 	if e != nil {
 		return a, mapError(e)
 	}
@@ -134,10 +138,10 @@ func scanApp(row pgx.Row) (domain.Application, error) {
 	return a, e
 }
 func (s *Store) Application(ctx context.Context, id string) (domain.Application, error) {
-	return scanApp(s.Pool.QueryRow(ctx, "SELECT id,spec,created_at,updated_at,version FROM oap_applications WHERE id=$1", id))
+	return scanApp(s.Pool.QueryRow(ctx, "SELECT id,spec,created_at,updated_at,version,group_id FROM oap_applications WHERE id=$1", id))
 }
 func (s *Store) Applications(ctx context.Context) ([]domain.Application, error) {
-	rows, e := s.Pool.Query(ctx, "SELECT id,spec,created_at,updated_at,version FROM oap_applications ORDER BY created_at DESC")
+	rows, e := s.Pool.Query(ctx, "SELECT id,spec,created_at,updated_at,version,group_id FROM oap_applications ORDER BY created_at DESC")
 	if e != nil {
 		return nil, e
 	}
@@ -206,14 +210,14 @@ func (s *Store) SaveDeployment(ctx context.Context, d domain.Deployment) error {
 }
 
 func (s *Store) ApplicationTx(ctx context.Context, tx pgx.Tx, id string) (domain.Application, error) {
-	return scanApp(tx.QueryRow(ctx, "SELECT id,spec,created_at,updated_at,version FROM oap_applications WHERE id=$1", id))
+	return scanApp(tx.QueryRow(ctx, "SELECT id,spec,created_at,updated_at,version,group_id FROM oap_applications WHERE id=$1", id))
 }
 func (s *Store) UpdateApplicationTx(ctx context.Context, tx pgx.Tx, id string, m domain.Manifest, expectedVersion int64) (domain.Application, error) {
 	b, e := json.Marshal(m)
 	if e != nil {
 		return domain.Application{}, e
 	}
-	return scanApp(tx.QueryRow(ctx, `UPDATE oap_applications SET spec=$2,version=version+1,updated_at=now() WHERE id=$1 AND version=$3 RETURNING id,spec,created_at,updated_at,version`, id, b, expectedVersion))
+	return scanApp(tx.QueryRow(ctx, `UPDATE oap_applications SET spec=$2,version=version+1,updated_at=now() WHERE id=$1 AND version=$3 RETURNING id,spec,created_at,updated_at,version,group_id`, id, b, expectedVersion))
 }
 
 // Bindings are the current instance references, independent of release history.

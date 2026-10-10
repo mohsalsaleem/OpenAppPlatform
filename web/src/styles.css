@@ -1142,3 +1142,9 @@ input.inline-checkbox {
   margin: 14px 8px 14px 0;
   accent-color: #2563eb;
 }
+
+/* Logical application rows keep environment links together at narrow widths. */
+.app-card.application-group { grid-template-columns: 36px minmax(0, 1fr) minmax(120px, 1fr); }
+.application-group .application-count { flex-wrap: wrap; justify-content: flex-end; }
+.application-group .environment { display: inline-flex; align-items: center; gap: 4px; }
+@media (max-width: 640px) { .app-card.application-group { grid-template-columns: 32px minmax(0, 1fr); } .application-group .application-count { grid-column: 2; justify-content: flex-start; } }

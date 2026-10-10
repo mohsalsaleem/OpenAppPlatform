@@ -122,6 +122,17 @@ PostgreSQL, Docker, browser/MCP regressions and owner/mobile workflows passed on
 
 **Current slice:** M0 batch 3, application and environment organization.
 
+**Batch 3 progress:** existing-service grouping leads the application entry flow.
+An additive logical application layer groups existing environment records without
+changing their IDs, resources, histories or credential scopes. Owner-only versioned
+link/unlink, environment navigation and grouped application cards are implemented.
+The migration retains separate same-named legacy applications and supports older
+controller inserts. Scoped agents cannot enumerate siblings or change membership.
+See [application environments](docs/application-environments.md). Safe target
+connection UX, reusable definitions/diffs and fuller native authority/capability
+presentation remain in this batch; do not advance to batch 4 yet.
+
+
 **Accepted operator-first correction:** primary onboarding is configure/connect
 operator → discover → select/review → group → manage supported capabilities. Native
 Coolify build/deploy and GitHub App workflows remain operator-owned by default.

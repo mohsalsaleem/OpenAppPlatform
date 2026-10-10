@@ -2189,6 +2189,123 @@
           }
         }
       }
+    },
+    "/api/v1/application-groups": {
+      "get": {
+        "summary": "List logical applications and their existing environments",
+        "responses": {
+          "200": {
+            "description": "Groups with environment IDs and versions; unavailable to app-scoped credentials"
+          }
+        }
+      }
+    },
+    "/api/v1/application-groups/{id}/environments": {
+      "post": {
+        "summary": "Owner links a standalone environment without changing workloads or credential scopes",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "applicationId",
+                  "expectedGroupVersion",
+                  "expectedSourceVersion"
+                ],
+                "properties": {
+                  "applicationId": {
+                    "type": "string"
+                  },
+                  "expectedGroupVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "expectedSourceVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Metadata linked"
+          },
+          "403": {
+            "description": "Human owner required"
+          },
+          "409": {
+            "description": "Stale versions or duplicate environment"
+          }
+        }
+      }
+    },
+    "/api/v1/application-groups/{id}/environments/{environment}/unlink": {
+      "post": {
+        "summary": "Owner makes an environment standalone without changing workloads",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "environment",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "expectedVersion"
+                ],
+                "properties": {
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Environment made standalone"
+          },
+          "403": {
+            "description": "Human owner required"
+          },
+          "409": {
+            "description": "Stale version or only remaining environment"
+          }
+        }
+      }
     }
   },
   "components": {

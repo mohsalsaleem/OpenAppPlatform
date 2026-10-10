@@ -21,6 +21,85 @@ test("owner setup, sessions, invitations, read-only membership, and scoped agent
   await expect(
     page.getByRole("heading", { name: "Your applications" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Group existing services" }),
+  ).toBeVisible();
+  const stageResponse = await page.request.post("/api/v1/applications", {
+    headers: { "X-OAP-CSRF": "1" },
+    data: {
+      name: "environment-browser-stage",
+      environment: "staging",
+      targetId: "test-docker",
+      components: [
+        {
+          name: "web",
+          image: "nginx:alpine",
+          port: 80,
+          instances: 1,
+          strategy: "standard",
+        },
+      ],
+    },
+  });
+  expect(stageResponse.status()).toBe(201);
+  const stageApp = await stageResponse.json();
+  const prodResponse = await page.request.post("/api/v1/applications", {
+    headers: { "X-OAP-CSRF": "1" },
+    data: {
+      name: "environment-browser-production",
+      environment: "production",
+      targetId: "docker-production",
+      components: [
+        {
+          name: "web",
+          image: "nginx:alpine",
+          port: 80,
+          instances: 1,
+          strategy: "standard",
+        },
+      ],
+    },
+  });
+  expect(prodResponse.status()).toBe(201);
+  const prodApp = await prodResponse.json();
+  await page.goto(`/applications/${stageApp.id}`);
+  await page.getByLabel("Existing environment").selectOption(prodApp.id);
+  await page
+    .getByRole("button", { name: "Link environment", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("navigation", { name: "Application environments" })
+      .getByRole("link", { name: "production" }),
+  ).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "Application environments" })
+    .getByRole("link", { name: "production" })
+    .click();
+  await expect(page).toHaveURL(new RegExp(prodApp.id));
+  await expect(
+    page.getByRole("heading", {
+      name: "Environments",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "../.local/ui-environments.png",
+    fullPage: true,
+  });
+  await page
+    .locator("aside")
+    .getByRole("link", { name: "Applications", exact: true })
+    .click();
+  await expect(
+    page
+      .locator(".application-group")
+      .filter({ hasText: "environment-browser-stage" }),
+  ).toContainText("2 environments");
+  await page.screenshot({
+    path: "../.local/ui-grouped-applications.png",
+    fullPage: true,
+  });
   await page.getByRole("link", { name: "Workspace access" }).click();
   await expect(
     page.getByRole("heading", { name: "Workspace access" }),

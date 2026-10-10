@@ -61,6 +61,7 @@ try{
  platform.kill('SIGTERM');await new Promise(r=>platform.on('close',r));platform=null;
  await writeFile('/report/platform.log',platformLog);
  env.OAP_AUTH_MODE='owner';env.OAP_SETUP_TOKEN=randomBytes(32).toString('base64url');env.OAP_COOKIE_SECURE='false';delete env.OAP_API_TOKEN;
+ const ownerTargets=JSON.parse(await readFile('/workspace/.local/observed-targets.json','utf8'));ownerTargets.push({...ownerTargets[0],id:'docker-production',name:'Local production fixture',environment:'production'});await writeFile('/workspace/.local/observed-targets.json',JSON.stringify(ownerTargets));
  platform=spawn('/opt/oap/platform',['-targets','/workspace/.local/observed-targets.json','-web','/workspace/web/dist'],{env,stdio:['ignore','pipe','pipe']});
  let ownerLog='';platform.stdout.on('data',b=>ownerLog+=b);platform.stderr.on('data',b=>ownerLog+=b);
  await waitReady();

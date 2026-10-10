@@ -22,12 +22,12 @@ an existing application. Bare Docker remains first-class for owners without an o
 | Area | Implemented behavior | Remaining gap |
 | --- | --- | --- |
 | Operator connection | Server-side target JSON and environment secret references; Coolify and direct Docker factories | Guided connection/validation and safe configuration UX; no target credential-entry UI |
-| Discovery/grouping | Scoped Coolify image/source discovery, Select → Review → Create observed application, atomic resource reservations | Main empty state still leads with creating a new application; grouping is under Deployment targets |
+| Discovery/grouping | Scoped Coolify image/source discovery, Select → Review → Create observed application, atomic resource reservations | Application entry now leads with existing-service grouping; target setup remains manual |
 | Existing workloads | Exact resource-bound health and bounded logs; no release dispatch when grouping | Databases, workers/jobs, dependency topology and all other operator resource kinds are not imported |
 | Native Coolify source workflow | `coolify-github-app` hook mode observes exact-commit GitHub App deployments with an app-scoped read credential; source components stay observed | Manual mapping/configuration; no native source lifecycle handoff or native image-artifact extraction/reuse |
 | Lifecycle management | Standard image releases and supported restart/configuration; explicit image-only Coolify handoff with version/drift checks | No operation-by-operation authority model; source-backed grouped components cannot deploy/restart through OAP |
 | Optional build lane | Trusted command/private HTTP host builder; signed GitHub intake, exact-commit digest releases, receipt reuse and scoped audit; real staging verification | This is a selected fallback, not the operator-first default or proof that native Coolify builds are OAP-controlled |
-| Application environments | Each current manifest has one `environment` and one `targetId` | Batch 3: logical application with multiple environment mappings, preserving IDs/history |
+| Application environments | Each current manifest has one `environment` and one `targetId` | Additive logical groups and owner link/unlink now implemented; safe connection UX and reusable definition/diffs remain |
 | Log search/monitoring | Live health, bounded per-instance operator logs and source activity | VictoriaLogs native scoped indexing/search is planned; no collector/index backend is installed |
 | Other operators | Interface and architecture candidates | Dokploy, Dokku and Portainer adapters are not implemented |
 

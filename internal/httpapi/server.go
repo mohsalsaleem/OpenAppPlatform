@@ -121,6 +121,7 @@ func (s *Server) routes() http.Handler {
 	}
 	c := s.Controller
 	s.sourceRoutes(mux)
+	s.groupRoutes(mux)
 	mux.HandleFunc("GET /api/v1/meta", func(w http.ResponseWriter, r *http.Request) {
 		write(w, 200, map[string]any{"name": "OpenAppPlatform", "version": "0.2.0-dev", "workspaceId": "default", "strategies": []string{"standard"}, "adapters": []string{"coolify", "docker"}})
 	})
