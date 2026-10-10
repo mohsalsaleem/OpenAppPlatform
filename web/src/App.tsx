@@ -1,3 +1,6 @@
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useState, useEffect, type FormEvent } from "react";
 import { NavLink, Link, Routes, Route, useLocation } from "react-router-dom";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
@@ -13,7 +16,7 @@ import {
 import { OperationAccess, OwnerAccess } from "./access";
 import { AccountGate } from "./components/AccountGate";
 import { Access } from "./features/access/Access";
-import { api, token } from "./api";
+import { unwrap, api, token } from "./api";
 import { ErrorBox } from "./components/Feedback";
 import { Applications } from "./features/applications/Applications";
 import { NewApplication } from "./features/applications/NewApplication";
@@ -29,22 +32,19 @@ export function App() {
   const location = useLocation();
   const authStatus = useQuery({
     queryKey: ["auth-status"],
-    queryFn: async () => {
-      const r = await fetch("/api/v1/auth/status");
-      if (!r.ok) throw new Error("Cannot connect to the platform");
-      return r.json() as Promise<{ mode: string; setupRequired: boolean }>;
-    },
+    queryFn: () => api.GET("/api/v1/auth/status").then(unwrap),
   });
   const identity = useQuery({
     queryKey: ["identity"],
-    queryFn: () =>
-      api<{ name: string; role: string; kind: string }>("/auth/me"),
+    queryFn: () => api.GET("/api/v1/auth/me").then(unwrap),
     enabled: authStatus.data?.mode === "owner",
     retry: false,
   });
   useEffect(() => {
     if (authStatus.data?.mode === "preview" && token())
-      api("/meta")
+      api
+        .GET("/api/v1/meta")
+        .then(unwrap)
         .then(() => setConnected(true))
         .catch(() => sessionStorage.removeItem("oap-token"));
   }, [authStatus.data?.mode]);
@@ -74,7 +74,7 @@ export function App() {
     e.preventDefault();
     sessionStorage.setItem("oap-token", accessToken);
     try {
-      await api("/meta");
+      await api.GET("/api/v1/meta").then(unwrap);
       setConnected(true);
       setError("");
     } catch (e) {
@@ -111,8 +111,8 @@ export function App() {
             Your infrastructure, your choice.
           </p>
           <form onSubmit={connect}>
-            <label htmlFor="access-token">Platform Access Token</label>
-            <input
+            <Label htmlFor="access-token">Platform Access Token</Label>
+            <Input
               id="access-token"
               type="password"
               value={accessToken}
@@ -121,9 +121,9 @@ export function App() {
               autoComplete="off"
               placeholder="Paste your local access token"
             />
-            <button className="primary" type="submit">
+            <Button variant="default" type="submit">
               Connect to Workspace <ArrowUpRight size={16} />
-            </button>
+            </Button>
           </form>
           <ErrorBox error={error} />
           <p className="small muted">
@@ -175,29 +175,34 @@ export function App() {
             </div>
             <p className="nav-label">WORKSPACE</p>
             <nav>
-              <NavLink to="/" end>
-                <Box size={18} /> Applications
-              </NavLink>
+              <Button asChild variant="ghost">
+                <NavLink to="/" end>
+                  <Box size={18} /> Applications
+                </NavLink>
+              </Button>
             </nav>
             <p className="nav-label">INFRASTRUCTURE</p>
             <nav aria-label="Infrastructure">
-              <NavLink to="/targets">
-                <Server size={18} /> Deployment Targets
-              </NavLink>
+              <Button asChild variant="ghost">
+                <NavLink to="/targets">
+                  <Server size={18} /> Deployment Targets
+                </NavLink>
+              </Button>
             </nav>
             <div className="sidebar-bottom">
               <span className="small">
                 <span className="dot" /> Core preview · v0.2
               </span>
-              <button
-                className="text-button"
+              <Button
+                variant="ghost"
+
                 title={
                   authStatus.data?.mode === "owner" ? "Sign Out" : "Disconnect"
                 }
                 onClick={async () => {
                   if (authStatus.data?.mode === "owner") {
                     try {
-                      await api("/auth/logout", { method: "POST" });
+                      await api.POST("/api/v1/auth/logout").then(unwrap);
                     } catch {
                       return;
                     }
@@ -210,7 +215,7 @@ export function App() {
               >
                 <LogOut size={15} />{" "}
                 {authStatus.data?.mode === "owner" ? "Sign Out" : "Disconnect"}
-              </button>
+              </Button>
             </div>
           </aside>
           <main className="main">

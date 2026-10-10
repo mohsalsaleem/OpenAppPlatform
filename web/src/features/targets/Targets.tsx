@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { ExistingEnvironment } from "./ExistingEnvironment";
 import { TargetSetup } from "./TargetSetup";
 import { useCanOperate } from "../../access";
@@ -5,13 +6,13 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Server } from "lucide-react";
-import { api, type Target, type Resource, type Capabilities } from "../../api";
+import { unwrap, api, type Target } from "../../api";
 import { Status } from "../../components/Status";
 import { ErrorBox, Loading } from "../../components/Feedback";
 export function Targets() {
   const q = useQuery({
     queryKey: ["targets"],
-    queryFn: () => api<Target[]>("/targets"),
+    queryFn: () => api.GET("/api/v1/targets").then(unwrap),
   });
   return (
     <>
@@ -47,17 +48,21 @@ function TargetCard({ target: t }: { target: Target }) {
   const [discover, setDiscover] = useState(false);
   const check = useMutation({
     mutationFn: () =>
-      api<{
-        checkedAt: string;
-        resourceCount: number;
-        nativeSourceObservation: boolean;
-        capabilities: Capabilities;
-      }>(`/targets/${t.id}/connection`),
+      api
+        .GET("/api/v1/targets/{id}/connection", {
+          params: { path: { id: t.id! } },
+        })
+        .then(unwrap),
   });
 
   const q = useQuery({
     queryKey: ["resources", t.id],
-    queryFn: () => api<Resource[]>(`/targets/${t.id}/resources`),
+    queryFn: () =>
+      api
+        .GET("/api/v1/targets/{id}/resources", {
+          params: { path: { id: t.id! } },
+        })
+        .then(unwrap),
     enabled: discover,
   });
   return (
@@ -70,27 +75,29 @@ function TargetCard({ target: t }: { target: Target }) {
           </p>
         </div>
         <div className="log-buttons">
-          <button
-            className="secondary"
+          <Button
+            variant="outline"
+
             onClick={() => check.mutate()}
             disabled={check.isPending}
           >
             {check.isPending ? "Checking…" : "Verify Connection"}
-          </button>
+          </Button>
           {canOperate && (
             <Link className="button primary" to={`/targets/${t.id}/assemble`}>
               Group Services
             </Link>
           )}
-          <button
-            className="secondary"
+          <Button
+            variant="outline"
+
             onClick={() => {
               setDiscover(true);
               if (discover) q.refetch();
             }}
           >
             Inspect Resources
-          </button>
+          </Button>
         </div>
       </div>
       <ErrorBox error={check.error || q.error} />

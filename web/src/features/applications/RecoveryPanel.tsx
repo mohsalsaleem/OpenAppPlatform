@@ -1,6 +1,9 @@
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type Deployment } from "../../api";
+import { unwrap, api, type Deployment } from "../../api";
 import { ErrorBox } from "../../components/Feedback";
 export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
   const client = useQueryClient();
@@ -19,17 +22,19 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
       retryPreparation?: boolean;
       retryFinalization?: boolean;
     }) =>
-      api<Deployment>(`/deployments/${deployment.id}/recover`, {
-        method: "POST",
-        body: JSON.stringify({
-          component,
-          ordinal,
-          remoteDeploymentId,
-          retryPreparation,
-          retryFinalization,
-          expectedUpdatedAt: deployment.updatedAt,
-        }),
-      }),
+      api
+        .POST("/api/v1/deployments/{id}/recover", {
+          params: { path: { id: deployment.id! } },
+          body: {
+            component,
+            ordinal,
+            remoteDeploymentId,
+            retryPreparation,
+            retryFinalization,
+            expectedUpdatedAt: deployment.updatedAt,
+          },
+        })
+        .then(unwrap),
     onSuccess: () => {
       client.invalidateQueries({
         queryKey: ["deployments", deployment.applicationId],
@@ -53,13 +58,14 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
       <ErrorBox error={recovery.error} />
       {deployment.operation === "scale-down" &&
         deployment.steps.every((s) => s.phase === "succeeded") && (
-          <button
-            className="secondary"
+          <Button
+            variant="outline"
+
             disabled={recovery.isPending}
             onClick={() => recovery.mutate({ retryFinalization: true })}
           >
             Retry Saving Replica Count
-          </button>
+          </Button>
         )}
       {deployment.steps
         .filter((s) => s.phase === "attention")
@@ -75,8 +81,9 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
                 <p>
                   {s.component} / {s.ordinal}: paused before dispatch.
                 </p>
-                <button
-                  className="secondary"
+                <Button
+                  variant="outline"
+
                   disabled={recovery.isPending}
                   onClick={() =>
                     recovery.mutate({
@@ -89,23 +96,24 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
                   {s.recoveryPhase === "prepared"
                     ? "Recheck dependencies before dispatch"
                     : "Retry preparation"}
-                </button>
+                </Button>
               </div>
             );
           return (
             <div className="recovery-step" key={key}>
-              <label htmlFor={`recovery-${deployment.id}-${key}`}>
+              <Label htmlFor={`recovery-${deployment.id}-${key}`}>
                 Provider Deployment ID for {s.component} / {s.ordinal}
-              </label>
-              <input
+              </Label>
+              <Input
                 id={`recovery-${deployment.id}-${key}`}
                 value={remote}
                 readOnly={!!s.remoteDeploymentId}
                 maxLength={256}
                 onChange={(e) => setIds({ ...ids, [key]: e.target.value })}
               />
-              <button
-                className="secondary"
+              <Button
+                variant="outline"
+
                 disabled={recovery.isPending || !remote}
                 onClick={() =>
                   recovery.mutate({
@@ -118,7 +126,7 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
                 {recovery.isPending
                   ? "Checking…"
                   : "Recheck provider deployment"}
-              </button>
+              </Button>
             </div>
           );
         })}

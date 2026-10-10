@@ -1,118 +1,128 @@
 # System design
 
-OpenAppPlatform is an application control plane. This milestone implements a
-single-workspace API, dashboard, PostgreSQL persistence, durable standard
-release execution, Coolify and Docker adapters, versioned configuration, and read-only MCP tools. It is intended for local evaluation
-and isolated staging, not unattended production adoption.
+Open App Platform is a single-workspace application control plane over existing
+operators and bare Docker. The supported runtime adapters are Coolify and Docker.
+It is verified locally and in isolated staging; owner-grade production hardening
+remains in M1. The [roadmap](../../ROADMAP.md) defines the delivery order.
 
-## Boundaries and dependency direction
+## Boundaries
 
-```text
-cmd/platform          composition root and process lifecycle
-internal/domain       operator-independent types and validation
-internal/operator     adapter port, capabilities, safe resource projections
-internal/operator/coolify
-                      REST implementation; no controller or database dependency
-internal/store        PostgreSQL persistence and ownership constraints
-internal/controller   release snapshots, jobs, state transitions, adapter calls
-internal/httpapi      authentication, transport validation, response projection
-web/src               application-oriented dashboard
-examples              runnable definitions and CI integration examples
-tests/system          PostgreSQL, HTTP, durable jobs, and opt-in real operator tests
-```
+| Package | Responsibility |
+| --- | --- |
+| `cmd/platform` | Composition, HTTP lifecycle and River workers |
+| `internal/domain` | Operator-independent types and validation |
+| `internal/operator` | Adapter ports, explicit capabilities and safe projections |
+| `internal/operator/coolify`, `internal/operator/docker` | Provider transports and supported lifecycle operations |
+| `internal/store` | Domain projection, PostgreSQL persistence and migrations |
+| `internal/store/queries`, `internal/store/db` | Named SQL and sqlc-generated queries/types |
+| `internal/controller` | Frozen releases, admission, jobs, authority and recovery |
+| `internal/httpapi` | Authentication, authorization, transport and SSE |
+| `web/src` | React dashboard using the generated OpenAPI client and shadcn primitives |
+| `tests/system`, `tests/env` | PostgreSQL/provider contracts and isolated reproducible acceptance |
 
-Domain has no database, HTTP, or provider imports. The operator interface imports
-only domain. Controller orchestrates persistence and adapters; UI code never
-calls Coolify directly. The direct Docker adapter implements the same port.
+Domain has no provider, HTTP or database dependencies. Operators do not depend on
+controller or store. The browser calls OAP rather than calling providers directly.
+One Go process serves the compiled React dashboard, API and River workers.
+PostgreSQL supplies state and the durable queue; Redis is not required.
 
-## Process and persistence
+## Operator ownership and source workflows
 
-One Go process serves the built React UI, authenticated API, and River workers.
-PostgreSQL stores application definitions, configured targets, frozen releases,
-instance bindings, and River jobs. Operator credentials remain in environment
-variables referenced by trusted target configuration. They are not stored in API
-projections or application manifests.
+Connecting and grouping existing resources changes OAP metadata only. Native
+builds, GitHub App/webhooks, routes, variables and storage remain operator-owned.
+Native Coolify source components are observe-only: OAP observes exact-commit
+activity, health and bounded logs, without starting another deployment.
 
-One active release per application is enforced by a partial unique index.
-Enqueue takes an application-scoped transaction lock, checks idempotency, and
-inserts the deployment and River job in one transaction. Workers claim jobs
-through River. A session advisory lock fences duplicate execution of the same
-release. Worker and API can be separated later without changing the domain.
+An optional, explicitly configured managed-image lane verifies signed GitHub
+notifications, freezes commits and digest artifacts, deduplicates deliveries, and
+queues affected components. A separate builder/registry is not required to group
+existing applications. Native source mutation and artifact reuse remain future
+adapter contracts. Image-backed management handoff requires explicit scope,
+definition/version checks and runtime inspection.
 
-Explicit SQL uses pgx in this milestone. sqlc generation remains a planned
-refinement once persistence queries stabilize. There is no separate Redis or
-workflow service.
+## Applications and releases
 
-## Release semantics
+A logical application group contains environment records. Existing environment,
+resource and release IDs and credential scopes survive organization. Each
+environment has a manifest and a target; grouping does not create enterprise
+multi-tenancy or move a workload between servers.
 
-Standard releases use a frozen manifest. The API can provide component image
-overrides by immutable digest for CI releases without editing the application's
-base definition. New idempotency hashes bind the declared release request and preserve retries
-after definition edits. Legacy manifest hashes remain readable. A repeated key
-with a different request is rejected.
+Releases freeze a complete definition, its version, selected component/instance
+steps, readiness policy and optional source provenance. Image overrides are
+immutable. An override changes the release artifact, not the saved definition.
+A deployment without an override uses saved images rather than automatically
+reusing the last release's overrides. The UI distinguishes saved and running images.
 
-A new release without overrides uses the application's base definition; it is
-not an implicit rollback or redeployment of the latest artifact override. UI
-configuration and release views must distinguish those versions.
+A short application transaction lock serializes admission and definition reads.
+Admission records the release, its component claims, credential and River job in
+one transaction. A retry with the same idempotency key and request returns the
+original release even after the saved definition changes.
 
-Components run sequentially, with one independently managed Coolify resource
-per instance. This groups instances but does not add service routing, balancing,
-or zero-downtime behavior. Workers and scheduled jobs are rejected until their
-lifecycle rules are implemented.
+Active releases claim writes for selected components and reads for transitive
+`dependsOn` and declared service connections. Independent components can execute
+concurrently; overlapping writers and writes to a dependency being read are
+rejected. Full-application releases claim all components. Restart and retirement
+claim their selected component. Attention and unresolved abandonment retain their
+claims until explicit recovery/reconciliation. Pre-upgrade active releases receive
+conservative whole-manifest write claims. Unclaimed work created by an older
+controller conservatively blocks new admissions. Only one controller version
+should dispatch during an upgrade; mixed-version concurrent writers are unsupported.
 
-A release succeeds only after Coolify reports deployment completion and the
-workload reports running or running:healthy. Running without a configured
-health check means process availability, not application readiness. The live
-system test additionally verifies HTTP externally; the core does not yet have
-user-configurable HTTP readiness probes.
+Session advisory locks fence each release worker/recovery operation and disappear
+when their PostgreSQL connection dies. Claims survive controller crashes. Definition
+restoration, management handoff and rollback planning retain conservative
+application-wide checks where they depend on a complete compatible snapshot.
 
-Provider failures retain per-instance outcomes and permit later components to
-be observed. Ambiguous dispatch produces attention and halts automatic
-sequencing. A failed deployment is not assumed to have preserved the old
-container. Standard lifecycle availability remains operator-dependent.
+## Execution and recovery
 
-## GitHub integration
+Steps prepare resources, persist dispatch intent, dispatch once, then observe the
+exact provider operation. A lost dispatch response enters attention instead of
+blindly repeating an uncertain operation. Native HTTP/image health configuration,
+bounded readiness deadlines and dependency ordering are frozen with the release.
+A provider's acceptance is distinct from verified completion.
 
-The current executable path is GitHub Actions building and publishing an image,
-then calling the authenticated release API with its digest and an idempotency
-key. See examples/github-actions.yml. Repository-push webhook verification,
-repository-to-component mapping, and operator source builds are future work.
+Cancel before dispatch, owner abandonment, provider reconciliation, reviewed
+image rollback and saved-configuration restoration are implemented. Saved
+configuration restoration preserves current saved images and changes metadata
+only; deployment needs a separate review. Data/schema restoration is a separate
+manual compatibility boundary, not an automatic rollback guarantee.
 
-For controller-owned releases, independent operator deployment triggers must be
-disabled. This milestone adopts Docker-image applications only; it does not
-change source integrations or production auto-deployment settings.
+Standard replacement may interrupt service and inherits the operator lifecycle.
+Stable routing, graceful draining, rolling and optional blue-green remain queued
+work. Docker app DNS and explicit Coolify service endpoints are available; Coolify
+private-network mutation and retirement are not claimed. Workers, scheduled jobs
+and stateful provisioning remain unsupported until their dedicated contracts pass.
 
-## Operator support
+## API, dashboard and streams
 
-Coolify is implemented and tested against the owner's staging installation.
-Discovery is scoped to a configured project and environment. Names alone do not
-confer ownership: generated resources must have the expected ownership marker.
-Adopted resources retain provider configuration and cannot have their artifact
-changed through release overrides yet.
+`docs/openapi.json` supplies the dashboard's generated types and typed
+`openapi-fetch` operations. Generation is reproducible and checked locally.
+The UI uses React/TypeScript/Vite, React Router, TanStack Query, Tailwind and
+repository-owned shadcn/Radix primitives. Page composition remains local React
+code; control behavior and styling come from the shared components.
 
-Bare Docker is implemented over a local Unix socket. It manages labeled
-containers and application networks using cached images or an explicit public
-pull policy. Dokploy, Dokku, and Portainer are also planned.
-Unsupported strategies or operators return explicit errors.
+Application/release updates and selected per-instance logs use SSE with cookie or
+bearer authentication. Streams contain replaceable snapshots, bound memory/write
+time, flush through proxies, and recheck live credentials before each sample.
+Disconnects reconnect to current persisted state; a lost stream cannot lose a
+release. Deployment polling is a fallback while disconnected. Provider instance
+health and native source activity still use bounded polling, because those
+adapters do not expose a portable event stream. Log snapshots contain the last
+100 lines; this is not indexed historical search. VictoriaLogs remains planned.
 
-## Security and operational limits
+## Security and operational boundaries
 
-API authentication defaults to owner sessions, invite-only workspace roles and
-application-scoped agent credentials. Workspace ownership is enforced for the
-single installation; additional tenants are explicitly unsupported. Legacy shared
-preview tokens require a loopback-only mode that refuses an initialized owner
-installation. See [owner access](../owner-access.md) for CSRF, revocation, audit,
-queued-operation checks and host recovery.
+One default workspace has an owner, invited operator/viewer members, opaque
+session cookies, and app-scoped, expiring/revocable agent credentials. Mutations
+use CSRF/origin checks, current authorization, and durable audit intents. Workers
+recheck admitted credentials before provider writes. Read streams also respect
+revocation and scope. Additional tenants are explicitly unsupported.
 
-Provider connections require HTTPS except localhost. Redirects are not followed.
-Responses and logs are bounded. Provider errors exclude upstream response bodies
-because they may contain credentials. Logs redact known connection and platform
-tokens but do not guarantee redaction of every application secret.
+Provider credentials are trusted server-side environment references, excluded
+from manifests/API projections. HTTP transports require HTTPS except approved
+local endpoints, refuse redirects and bound responses/errors/logs. Known tokens
+are redacted; arbitrary application secrets are not guaranteed to be recognized.
 
-The controller does not delete external resources or volumes. Target files are
-trusted server configuration, not arbitrary user-controlled endpoints. Target
-URLs and resource names returned by the API are still operational metadata.
-
-Existing workloads continue when the controller is unavailable. A single host
-remains a failure boundary. PostgreSQL data needs backups before production use.
-Local development uses a named database volume and loopback-only ports.
+Existing workloads continue when OAP is down. A single host remains a failure
+boundary. Metadata backups and compatible restore verification are required for
+staging upgrades. No OAP action implicitly deletes external resources or volumes.
+The project is MIT licensed; third-party component notices are retained separately.

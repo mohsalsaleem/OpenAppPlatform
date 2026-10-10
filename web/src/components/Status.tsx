@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 export function statusLabel(value: string) {
   const labels: Record<string, string> = {
     succeeded: "Completed",
@@ -38,12 +39,13 @@ export function Status({ value }: { value: string }) {
     value.includes("unhealthy") ||
     value.startsWith("exited");
   return (
-    <span
+    <Badge
+      variant="outline"
       title={value}
       className={`status ${good ? "good" : bad ? "bad" : "neutral"}`}
     >
       <span aria-hidden="true" className="dot" />
       {statusLabel(value)}
-    </span>
+    </Badge>
   );
 }

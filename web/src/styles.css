@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   --success-text: #047857;
   --slate-900: #0f172a;
@@ -53,59 +55,15 @@ a {
   color: inherit;
   text-decoration: none;
 }
-button,
-input,
-select {
-  font: inherit;
-}
-button,
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-radius: 8px;
-  padding: 8px 12px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 13px;
-}
-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-select:focus-visible {
-  outline: 3px solid var(--focus-ring);
-  outline-offset: 3px;
-}
-.primary {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
-}
-.primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-.secondary {
-  background: white;
-  border-color: var(--border-secondary);
-  color: var(--slate-700);
-}
-.text-button {
-  background: none;
-  padding: 8px 0;
-  font-weight: 400;
-  color: var(--slate-400);
-}
-.icon-button {
-  background: transparent;
-  color: var(--text-muted);
-  padding: 8px;
-}
+
+
+
+
+
+
+
+
+
 .shell {
   display: flex;
   min-height: 100vh;
@@ -438,20 +396,6 @@ label {
   font-size: 11px;
   margin: 0 0 8px;
 }
-input,
-select {
-  width: 100%;
-  border: 1px solid var(--slate-300);
-  border-radius: 7px;
-  background: var(--surface);
-  padding: 8px 10px;
-  color: var(--slate-800);
-  font-size: 12px;
-  min-height: 36px;
-}
-input:read-only {
-  background: var(--slate-100);
-}
 small {
   font-size: 10px;
   display: block;
@@ -494,24 +438,6 @@ small {
   display: flex;
   align-items: center;
   gap: 16px;
-}
-.tabs {
-  display: flex;
-  gap: 25px;
-  border-bottom: 1px solid var(--slate-200);
-  margin-bottom: 18px;
-}
-.tabs button {
-  border-radius: 0;
-  background: transparent;
-  border-bottom: 2px solid transparent;
-  padding: 12px 0;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.tabs button.selected {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
 }
 .release-banner {
   display: flex;
@@ -650,28 +576,10 @@ pre {
 .connect-card > .small {
   margin-top: 25px;
 }
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: var(--slate-900) 80;
-  display: grid;
-  place-items: center;
-  padding: 25px;
-  z-index: 10;
-}
-.modal {
-  max-width: 480px;
-  background: white;
-  border-radius: 14px;
-  padding: 30px;
-  box-shadow: 0 25px 90px var(--slate-900) 40;
-}
-.modal h2 {
-  font-size: 21px;
-}
-.modal p {
-  margin-top: 16px;
-}
+
+
+
+
 @media (max-width: 900px) {
   .sidebar {
     width: 190px;
@@ -774,12 +682,6 @@ pre {
   .component-row .grow {
     flex-basis: 60%;
   }
-  .tabs {
-    gap: 14px;
-  }
-  .tabs button {
-    font-size: 11px;
-  }
   .connect-card {
     padding: 28px;
   }
@@ -794,13 +696,8 @@ pre {
   }
 }
 
-dialog.modal {
-  border: 0;
-  width: min(480px, calc(100% - 36px));
-}
-dialog.modal::backdrop {
-  background: var(--slate-900) 80;
-}
+
+
 
 .configuration-fields {
   margin-top: 20px;
@@ -974,30 +871,9 @@ h1 {
   font-size: 11px;
   border-radius: 5px;
 }
-.tabs {
-  gap: 24px;
-}
-.tabs button {
-  padding: 10px 0;
-  font-size: 13px;
-}
 label {
   font-size: 12px;
   margin-bottom: 6px;
-}
-textarea {
-  font:
-    12px/1.5 ui-monospace,
-    monospace;
-  color: var(--slate-800);
-  background: white;
-  border: 1px solid var(--slate-300);
-  border-radius: 6px;
-  padding: 8px 10px;
-}
-textarea:focus-visible {
-  outline: 3px solid var(--focus-ring);
-  outline-offset: 2px;
 }
 .configuration-fields {
   margin-top: 14px;
@@ -1120,13 +996,6 @@ pre {
   padding: 12px 0;
   border-top: 1px solid var(--border);
 }
-.assembly-resource input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  min-height: 16px;
-  flex-shrink: 0;
-  accent-color: var(--accent);
-}
 .assembly-resource p {
   overflow-wrap: anywhere;
 }
@@ -1140,10 +1009,6 @@ pre {
 .assembly-link {
   font-size: 12px;
   color: var(--accent);
-}
-.tabs > span {
-  padding: 10px 0;
-  font-size: 13px;
 }
 
 .connect-card form label:not(:first-child) {
@@ -1175,13 +1040,6 @@ pre {
     height: 36px;
     padding: 8px;
   }
-}
-
-input.inline-checkbox {
-  width: 16px;
-  min-height: 16px;
-  margin: 14px 8px 14px 0;
-  accent-color: var(--accent);
 }
 
 /* Logical application rows keep environment links together at narrow widths. */
@@ -1271,10 +1129,6 @@ input.inline-checkbox {
   border-radius: 8px;
   padding: 12px;
 }
-.readiness-fields input[type="checkbox"] {
-  width: auto;
-  margin-right: 8px;
-}
 .readiness-fields input[type="number"] {
   max-width: 180px;
 }
@@ -1287,19 +1141,12 @@ input.inline-checkbox {
   align-items: center;
   gap: 8px;
 }
-.dependency-fields input[type="checkbox"] {
-  width: auto;
-}
 
 .rollback-ack {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   font-size: 13px;
-}
-.rollback-ack input[type="checkbox"] {
-  width: auto;
-  margin-top: 3px;
 }
 
 /* Shared audit fixes: stable hierarchy, wrapping, and accessible controls. */
@@ -1336,16 +1183,6 @@ label > select {
   display: block;
   width: 100%;
   margin-top: 6px;
-}
-label:has(> input[type="checkbox"]) {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-input[type="checkbox"] {
-  flex: 0 0 auto;
-  width: 16px;
-  margin-top: 3px;
 }
 .workspace-settings {
   display: inline-flex;
@@ -1437,13 +1274,7 @@ summary {
   padding: 12px 0;
   z-index: 1;
 }
-.tabs button {
-  min-height: 44px;
-}
-.icon-button {
-  min-width: 44px;
-  min-height: 44px;
-}
+
 @media (max-width: 640px) {
   .sidebar {
     gap: 8px;
@@ -1553,3 +1384,38 @@ summary {
   min-width: 0;
   overflow-wrap: anywhere;
 }
+
+
+@theme inline {
+  --color-background: var(--surface);
+  --color-foreground: var(--text-primary);
+  --color-primary: var(--accent);
+  --color-primary-foreground: #fff;
+  --color-secondary: var(--slate-100);
+  --color-secondary-foreground: var(--slate-700);
+  --color-muted: var(--slate-100);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--accent-surface);
+  --color-accent-foreground: var(--text-primary);
+  --color-destructive: var(--danger-text);
+  --color-border: var(--border-soft);
+  --color-input: var(--control-border);
+  --color-ring: var(--accent);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text-primary);
+}
+@layer base {
+  * { @apply border-border; }
+  h1, h2, h3 { @apply font-semibold tracking-tight; }
+}
+/* Layout only; controls are owned by the shadcn primitives. */
+[data-slot="dialog-content"] { max-height: calc(100dvh - 2rem); overflow-y: auto; }
+[data-slot="dialog-content"] > p { color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+[data-slot="dialog-content"] .form-actions { padding-top: 16px; border-top: 1px solid var(--border-soft); margin-top: 4px; }
+label:has(> [data-slot="checkbox"]) { display: flex; align-items: flex-start; gap: 8px; }
+label > [data-slot="checkbox"] { margin-top: 3px; flex-shrink: 0; }
+[data-slot="native-select-wrapper"] { width: 100%; }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-weight: 500; }
+a.button.primary { background: var(--accent); color: white; }
+a.button.secondary { background: var(--surface); border: 1px solid var(--border-soft); }
+[data-slot="tabs-trigger"] { min-height: 36px; }

@@ -1,3 +1,5 @@
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useState, useEffect } from "react";
 import type { Component } from "../../api";
 
@@ -52,10 +54,10 @@ export function RuntimeVariables({
   return (
     <div className="form-grid runtime-variables">
       <div>
-        <label htmlFor={`env-${component.name}`}>
+        <Label htmlFor={`env-${component.name}`}>
           Environment Variables for {component.name}
-        </label>
-        <textarea
+        </Label>
+        <Textarea
           id={`env-${component.name}`}
           rows={4}
           value={values.env}
@@ -74,10 +76,10 @@ export function RuntimeVariables({
         )}
       </div>
       <div>
-        <label htmlFor={`services-${component.name}`}>
+        <Label htmlFor={`services-${component.name}`}>
           Service Connections for {component.name}
-        </label>
-        <textarea
+        </Label>
+        <Textarea
           id={`services-${component.name}`}
           rows={4}
           value={values.services}
@@ -97,10 +99,10 @@ export function RuntimeVariables({
       </div>
       {endpointsSupported && (
         <div className="endpoint-field">
-          <label htmlFor={`endpoints-${component.name}`}>
+          <Label htmlFor={`endpoints-${component.name}`}>
             Service Endpoints for {component.name}
-          </label>
-          <textarea
+          </Label>
+          <Textarea
             id={`endpoints-${component.name}`}
             rows={3}
             value={values.serviceEndpoints}

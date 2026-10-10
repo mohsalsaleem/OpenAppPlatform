@@ -1,7 +1,10 @@
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useState, type FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Layers3 } from "lucide-react";
-import { api } from "../api";
+import { unwrap, api } from "../api";
 import { ErrorBox } from "./Feedback";
 export function AccountGate({
   setup,
@@ -24,19 +27,24 @@ export function AccountGate({
     setError("");
     try {
       sessionStorage.removeItem("oap-token");
-      const user = await api(
-        `/auth/${setup ? "setup" : inviteMode ? "invitations/accept" : "login"}`,
-        {
-          method: "POST",
-          headers: setup ? { Authorization: `Setup ${secret}` } : {},
-          body: JSON.stringify({
-            email,
-            name,
-            password,
-            ...(inviteMode ? { invite: secret } : {}),
-          }),
-        },
-      );
+      const user = await api
+        .POST(
+          setup
+            ? "/api/v1/auth/setup"
+            : inviteMode
+              ? "/api/v1/auth/invitations/accept"
+              : "/api/v1/auth/login",
+          {
+            body: {
+              email,
+              name,
+              password,
+              ...(inviteMode ? { invite: secret } : {}),
+            },
+            headers: setup ? { Authorization: `Setup ${secret}` } : {},
+          },
+        )
+        .then(unwrap);
       setPassword("");
       setSecret("");
       client.setQueryData(["identity"], user);
@@ -72,8 +80,8 @@ export function AccountGate({
         <form onSubmit={submit}>
           {(setup || inviteMode) && (
             <>
-              <label htmlFor="account-name">Your Name</label>
-              <input
+              <Label htmlFor="account-name">Your Name</Label>
+              <Input
                 id="account-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -83,8 +91,8 @@ export function AccountGate({
               />
             </>
           )}
-          <label htmlFor="account-email">Email</label>
-          <input
+          <Label htmlFor="account-email">Email</Label>
+          <Input
             id="account-email"
             type="email"
             value={email}
@@ -92,8 +100,8 @@ export function AccountGate({
             autoComplete="username"
             required
           />
-          <label htmlFor="account-password">Password</label>
-          <input
+          <Label htmlFor="account-password">Password</Label>
+          <Input
             id="account-password"
             type="password"
             minLength={setup || inviteMode ? 12 : undefined}
@@ -107,10 +115,10 @@ export function AccountGate({
           />
           {(setup || inviteMode) && (
             <>
-              <label htmlFor="account-secret">
+              <Label htmlFor="account-secret">
                 {setup ? "Setup Secret" : "Invitation Code"}
-              </label>
-              <input
+              </Label>
+              <Input
                 id="account-secret"
                 type="password"
                 value={secret}
@@ -125,7 +133,7 @@ export function AccountGate({
               </small>
             </>
           )}
-          <button className="primary" disabled={busy}>
+          <Button variant="default" disabled={busy}>
             {busy
               ? "Please wait…"
               : setup
@@ -133,11 +141,12 @@ export function AccountGate({
                 : inviteMode
                   ? "Accept Invitation"
                   : "Sign In"}
-          </button>
+          </Button>
         </form>
         <ErrorBox error={error} />
         {!setup && (
-          <button
+          <Button
+            variant="outline"
             className="text-button account-switch"
             onClick={() => {
               setInviteMode(!inviteMode);
@@ -147,7 +156,7 @@ export function AccountGate({
             }}
           >
             {inviteMode ? "Back to sign in" : "Have an invitation?"}
-          </button>
+          </Button>
         )}
       </div>
     </div>

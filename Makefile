@@ -22,3 +22,9 @@ test-local:
 	python3 scripts/test-env.py run
 install-test-hook:
 	python3 scripts/test-env.py install-hook
+
+.PHONY: generate check-generated
+generate:
+	python3 scripts/generate.py
+check-generated:
+	python3 scripts/generate.py --check

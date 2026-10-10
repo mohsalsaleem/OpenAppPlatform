@@ -2,14 +2,7 @@ import { useCanOperate } from "../../access";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, Box, Plus } from "lucide-react";
-import {
-  api,
-  type ApplicationGroup,
-  type Target,
-  type Application,
-  type Instance,
-  type Deployment,
-} from "../../api";
+import { unwrap, api, type Target, type Application } from "../../api";
 import { replicaSummary, releaseOperation } from "./runtimeSummary";
 import { Status } from "../../components/Status";
 import { ErrorBox, Loading } from "../../components/Feedback";
@@ -17,11 +10,11 @@ export function Applications() {
   const canOperate = useCanOperate();
   const q = useQuery({
     queryKey: ["application-groups"],
-    queryFn: () => api<ApplicationGroup[]>("/application-groups"),
+    queryFn: () => api.GET("/api/v1/application-groups").then(unwrap),
   });
   const targets = useQuery({
     queryKey: ["targets"],
-    queryFn: () => api<Target[]>("/targets"),
+    queryFn: () => api.GET("/api/v1/targets").then(unwrap),
   });
   return (
     <>
@@ -114,12 +107,22 @@ function EnvironmentSummary({
 }) {
   const instances = useQuery({
     queryKey: ["instances", a.id],
-    queryFn: () => api<Instance[]>(`/applications/${a.id}/instances`),
+    queryFn: () =>
+      api
+        .GET("/api/v1/applications/{id}/instances", {
+          params: { path: { id: a.id! } },
+        })
+        .then(unwrap),
     refetchInterval: 10000,
   });
   const releases = useQuery({
     queryKey: ["deployments", a.id],
-    queryFn: () => api<Deployment[]>(`/applications/${a.id}/deployments`),
+    queryFn: () =>
+      api
+        .GET("/api/v1/applications/{id}/deployments", {
+          params: { path: { id: a.id! } },
+        })
+        .then(unwrap),
     refetchInterval: 10000,
   });
   const latest = releases.data?.[0];

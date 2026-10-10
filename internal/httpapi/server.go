@@ -120,6 +120,7 @@ func (s *Server) routes() http.Handler {
 		s.accessRoutes(mux)
 	}
 	c := s.Controller
+	s.streamRoutes(mux)
 	s.sourceRoutes(mux)
 	s.groupRoutes(mux)
 	s.setupRoutes(mux)
@@ -245,6 +246,7 @@ func (s *Server) routes() http.Handler {
 	})
 	mux.HandleFunc("POST /api/v1/applications/{id}/deployments", func(w http.ResponseWriter, r *http.Request) {
 		var request struct {
+			Components      []string          `json:"components"`
 			Images          map[string]string `json:"images"`
 			ExpectedVersion int64             `json:"expectedVersion"`
 		}
@@ -254,7 +256,7 @@ func (s *Server) routes() http.Handler {
 				return
 			}
 		}
-		d, e := c.EnqueueVersion(r.Context(), r.PathValue("id"), r.Header.Get("Idempotency-Key"), request.Images, request.ExpectedVersion)
+		d, e := c.EnqueueSelected(r.Context(), r.PathValue("id"), r.Header.Get("Idempotency-Key"), request.Images, request.ExpectedVersion, request.Components)
 		if e != nil {
 			if errors.Is(e, domain.ErrConflict) || errors.Is(e, domain.ErrNotFound) {
 				fail(w, e)

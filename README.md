@@ -133,7 +133,8 @@ operational limits. Production release requirements remain separate.
 
 ## License
 
-The repository is public. An open-source license has not yet been selected.
+Open App Platform is open source under the [MIT License](LICENSE).
+Third-party notices are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Configuration and release preconditions
 

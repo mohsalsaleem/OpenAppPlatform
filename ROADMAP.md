@@ -230,7 +230,7 @@ M4 work; this correction does not advance or reorder roadmap features.
 | 4 | Release verification and recovery controls | Configurable readiness probes, dependency/start ordering, deploy only selected affected components, release/artifact comparison, explicit rollback to a compatible known-good runtime snapshot, and owner-visible cancellation/abandon/reconciliation paths. Exercise process crashes and stale workers without duplicate dispatches or database edits. Rollback does not rewind application data. |
 | 5 | Stable endpoints, domains, and replica routing | Reuse operator proxies where supported; add a small routing adapter only where necessary. Keep endpoints stable through replacement and scaling, verify domain/TLS setup, remove stopped backends, and define health-aware routing and draining. Surviving workloads/routes continue if the controller is down. Docker DNS alone is not the completion gate. |
 | 6 | First useful workload and configuration breadth | Worker lifecycle, linked existing databases/queues/storage, minimal runtime secret references, private registry access, and configurable resource limits. Add a single execution path at a time with real examples. Scheduled jobs require a durable schedule identity and proof that restart does not create duplicate active schedulers. Stateful provisioning waits for backup/restore and storage guarantees. |
-| 7 | Reproducible installation and staging dogfooding | Package/bootstrap one Go service, UI, and PostgreSQL; run OAP through a supported operator in staging. Demonstrate update, compatible rollback, controller recovery from outside OAP, and metadata backup/restore. Resolve the open-source license before the first public release. |
+| 7 | Reproducible installation and staging dogfooding | Package/bootstrap one Go service, UI, and PostgreSQL; run OAP through a supported operator in staging. Demonstrate update, compatible rollback, controller recovery from outside OAP, and metadata backup/restore. MIT licensing is established; retain third-party notices. |
 
 Minimum secret references and registry credentials must precede any batch that
 needs private artifacts or sensitive runtime inputs. They are not permission to
@@ -800,5 +800,19 @@ exposure still requires M1 gates.
 
 Open decisions include the owner login method, first external secret provider,
 first analytics export, default inference policy, tunnel choice for each client,
-acceptable recovery objectives, and the project's open-source license. Evaluate
+and acceptable recovery objectives. Evaluate
 runtime research independently so it does not block the core owner experience.
+
+## Architecture alignment correction
+
+The implementation must use the agreed Tailwind/shadcn UI foundation, pgx/sqlc,
+OpenAPI-generated dashboard contracts, and SSE application/release/log updates.
+These are core corrections rather than optional new roadmap integrations.
+Component write claims and dependency read guards replace the previous application-wide
+active-release constraint; short application admission/configuration locks remain.
+The operator-first boundary continues to preserve existing native workflows.
+
+This correction does not advance M0 beyond batch 4. Stable routing, native source
+mutation, workload breadth, indexed logging, AI diagnosis and additional adapters
+remain scheduled by their existing acceptance gates. See the
+[alignment audit](docs/architecture/alignment-audit.md) for implementation and limits.

@@ -61,6 +61,13 @@ const release = {
 async function fixtures(page: Page, preview = false) {
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname.replace("/api/v1", "");
+    if (path.endsWith("/events") || path.endsWith("/stream")) {
+      await route.fulfill({
+        status: 503,
+        json: { message: "Live streams unavailable in this read-only fixture" },
+      });
+      return;
+    }
     const routes: Record<string, unknown> = {
       "/auth/status": {
         mode: preview ? "preview" : "owner",
@@ -208,6 +215,9 @@ test("operational hierarchy, deployment image differences, source result, keyboa
   await expect(dialog).toContainText(proposed);
   await expect(dialog).toContainText("1 component on Staging Coolify");
   await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Review Deployment", exact: true }),
+  ).toBeFocused();
   const overview = page.getByRole("tab", { name: "Overview" });
   await overview.focus();
   await page.keyboard.press("ArrowRight");
@@ -293,7 +303,7 @@ test("workspace settings, readable mobile navigation and long audit details stay
     page.getByRole("heading", { name: "Workspace Settings" }),
   ).toBeVisible();
   await expect(page.locator(".topbar")).toContainText("Workspace Access");
-  await page.getByRole("button", { name: "Audit Log", exact: true }).click();
+  await page.getByRole("tab", { name: "Audit Log", exact: true }).click();
   const auditPanel = page.locator(".panel").filter({
     has: page.getByRole("heading", { name: "Audit Log", exact: true }),
   });
@@ -436,4 +446,92 @@ test("delayed log responses preserve navigation and the latest selected instance
   await expect(page.locator(".log-output")).toHaveText(
     "latest instance response",
   );
+});
+
+test("live release snapshots preserve busy components and submit only an available component", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const grouped = {
+    ...app,
+    manifest: {
+      ...app.manifest,
+      components: [
+        ...app.manifest.components,
+        { ...app.manifest.components[0], name: "api", instances: 1 },
+      ],
+    },
+  };
+  const busy = {
+    ...release,
+    id: "live-stream-release",
+    state: "attention",
+    manifest: grouped.manifest,
+    steps: [
+      {
+        component: "web",
+        ordinal: 1,
+        phase: "attention",
+        recoveryPhase: "dispatching",
+        error: "stream-only failure",
+      },
+    ],
+  };
+  await page.route(`**/api/v1/applications/${app.id}/events`, async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await route.fulfill({
+      contentType: "text/event-stream",
+      body: `event: snapshot\nid: live-fixture\ndata: ${JSON.stringify({ application: grouped, deployments: [busy] })}\n\n`,
+    });
+  });
+  const posted: unknown[] = [];
+  await page.route(
+    `**/api/v1/applications/${app.id}/deployments`,
+    async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      const body = route.request().postDataJSON();
+      posted.push(body);
+      await route.fulfill({
+        status: 202,
+        json: {
+          ...release,
+          id: "selected-api-release",
+          manifest: grouped.manifest,
+          state: "queued",
+          steps: [{ component: "api", ordinal: 1, phase: "pending" }],
+        },
+      });
+    },
+  );
+  await page.goto(`/applications/${app.id}`);
+  await page.getByRole("tab", { name: "Activity", exact: true }).click();
+  await expect(
+    page.getByText("stream-only failure", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Review Deployment", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("checkbox", { name: "web · In Use", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    dialog.getByRole("checkbox", { name: "web · In Use", exact: true }),
+  ).not.toBeChecked();
+  await expect(
+    dialog.getByRole("checkbox", { name: "api", exact: true }),
+  ).toBeChecked();
+  await expect(
+    dialog.getByRole("region", { name: "Deployment image changes" }),
+  ).toContainText("api");
+  await page.screenshot({
+    path: "../.local/ui-shadcn-component-review.png",
+    fullPage: true,
+  });
+  await dialog.getByRole("button", { name: "Deploy Now", exact: true }).click();
+  await expect.poll(() => posted.length).toBe(1);
+  expect(posted[0]).toEqual({
+    expectedVersion: app.version,
+    components: ["api"],
+  });
 });

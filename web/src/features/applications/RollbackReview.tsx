@@ -1,22 +1,13 @@
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type Application, type Deployment } from "../../api";
+import { unwrap, api, type Application, type Deployment } from "../../api";
 import { useCanOperate } from "../../access";
 import { ErrorBox } from "../../components/Feedback";
 import { DeploymentDialog } from "../../components/DeploymentDialog";
 
-type Plan = {
-  releaseId: string;
-  definitionVersion: number;
-  planHash: string;
-  artifactAvailability: string;
-  instances: {
-    component: string;
-    ordinal: number;
-    currentImage: string;
-    restoreImage: string;
-  }[];
-};
 export function RollbackReview({
   application,
   release,
@@ -33,22 +24,32 @@ export function RollbackReview({
   const [key, setKey] = useState("");
   const plan = useMutation({
     mutationFn: () =>
-      api<Plan>(
-        `/applications/${application.id}/rollback-plan?releaseId=${release.id}&expectedVersion=${application.version}`,
-      ),
+      api
+        .GET("/api/v1/applications/{id}/rollback-plan", {
+          params: {
+            path: { id: application.id! },
+            query: {
+              releaseId: release.id,
+              expectedVersion: application.version,
+            },
+          },
+        })
+        .then(unwrap),
   });
   const apply = useMutation({
     mutationFn: () =>
-      api<Deployment>(`/applications/${application.id}/rollbacks`, {
-        method: "POST",
-        headers: { "Idempotency-Key": key },
-        body: JSON.stringify({
-          releaseId: plan.data!.releaseId,
-          planHash: plan.data!.planHash,
-          expectedVersion: plan.data!.definitionVersion,
-          acknowledgeDataCompatibility: ack,
-        }),
-      }),
+      api
+        .POST("/api/v1/applications/{id}/rollbacks", {
+          params: { path: { id: application.id! } },
+          body: {
+            releaseId: plan.data!.releaseId,
+            planHash: plan.data!.planHash,
+            expectedVersion: plan.data!.definitionVersion,
+            acknowledgeDataCompatibility: ack,
+          },
+          headers: { "Idempotency-Key": key },
+        })
+        .then(unwrap),
     onSuccess: () => {
       setOpen(false);
       client.invalidateQueries({ queryKey: ["deployments", application.id] });
@@ -58,8 +59,9 @@ export function RollbackReview({
   });
   return (
     <>
-      <button
-        className="secondary"
+      <Button
+        variant="outline"
+
         disabled={!canOperate || apply.isPending}
         onClick={() => {
           setOpen(true);
@@ -71,7 +73,7 @@ export function RollbackReview({
         }}
       >
         Review Rollback to {release.id.slice(0, 8)}
-      </button>
+      </Button>
       {open && (
         <DeploymentDialog onClose={() => !apply.isPending && setOpen(false)}>
           <h2 id="deploy-title">Review Image Rollback</h2>
@@ -107,27 +109,28 @@ export function RollbackReview({
                 </div>
               ))}
               <p className="small muted">{plan.data.artifactAvailability}</p>
-              <label className="rollback-ack">
-                <input
-                  type="checkbox"
+              <Label className="rollback-ack">
+                <Checkbox
                   checked={ack}
-                  onChange={(e) => setAck(e.target.checked)}
+                  onCheckedChange={(e) => setAck(e === true)}
                 />
                 I reviewed that this older image is compatible with the
                 application’s current data and schema.
-              </label>
+              </Label>
             </>
           )}
           <div className="form-actions">
-            <button
-              className="secondary"
+            <Button
+              variant="outline"
+
               disabled={apply.isPending}
               onClick={() => setOpen(false)}
             >
               Cancel
-            </button>
-            <button
-              className="primary"
+            </Button>
+            <Button
+              variant="default"
+
               disabled={
                 !canOperate ||
                 !plan.data ||
@@ -139,7 +142,7 @@ export function RollbackReview({
               onClick={() => apply.mutate()}
             >
               {apply.isPending ? "Queuing…" : "Roll Back Images"}
-            </button>
+            </Button>
           </div>
         </DeploymentDialog>
       )}

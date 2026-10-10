@@ -40,7 +40,8 @@ project, its network, and its socket/data volumes.
 
 ## What runs
 
-The image build checks Go static analysis and TypeScript/Vite compilation. The
+The image build rejects sqlc/OpenAPI generation drift using pinned generators,
+then checks Go static analysis and TypeScript/Vite compilation. The
 runner executes all packages containing Go tests with the race detector, including
 PostgreSQL system tests and the real Docker lifecycle/replacement test. It then
 starts a fresh platform and runs browser setup/configuration/target-discovery
@@ -128,3 +129,18 @@ python3 scripts/verify-staging-health-checks.py \
 ```
 
 It creates/reuses `native-health-check-staging`, configures an HTTP check, deploys through the operator, returns explicitly to the image check, and verifies healthy completion plus the same resource binding. It retains one stateless fixture for subsequent runs. It refuses non-staging targets and incompatible existing topology. A failed/uncertain release requires inspection; the script does not delete it or automatically reissue its dispatch. Owner credentials and receipts remain private/ignored; the offline suite needs neither internet nor these credentials after its pinned images are cached.
+
+## Generated code
+
+`make generate` recreates sqlc query helpers and the OpenAPI dashboard contract.
+`make check-generated` rejects edited schemas/queries with stale generated outputs.
+Host generation uses sqlc v1.30.0 and the npm-lockfile-pinned OpenAPI generator;
+install the repository-local sqlc executable with:
+
+```sh
+python3 scripts/run-local.py go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
+```
+
+The isolated test image installs the same pinned generator and runs both checks.
+Generated files are committed, so deployment builds do not install generators.
+GitHub CI stays manual-only.

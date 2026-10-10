@@ -1,6 +1,10 @@
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type Target } from "../../api";
+import { unwrap, api, type Target } from "../../api";
 import { ErrorBox } from "../../components/Feedback";
 export function ExistingEnvironment({ targets }: { targets: Target[] }) {
   const client = useQueryClient();
@@ -10,15 +14,16 @@ export function ExistingEnvironment({ targets }: { targets: Target[] }) {
   const [environment, setEnvironment] = useState("");
   const me = useQuery({
     queryKey: ["identity"],
-    queryFn: () => api<{ role: string; kind: string }>("/auth/me"),
+    queryFn: () => api.GET("/api/v1/auth/me").then(unwrap),
     retry: false,
   });
   const connect = useMutation({
     mutationFn: () =>
-      api<Target>("/targets/scopes", {
-        method: "POST",
-        body: JSON.stringify({ id, name, environment, sourceTargetId }),
-      }),
+      api
+        .POST("/api/v1/targets/scopes", {
+          body: { id, name, environment, sourceTargetId },
+        })
+        .then(unwrap),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["targets"] });
       setSource("");
@@ -56,9 +61,9 @@ export function ExistingEnvironment({ targets }: { targets: Target[] }) {
           deployment triggers stay unchanged.
         </p>
         <div className="form-grid">
-          <label>
+          <Label>
             Existing Operator Connection
-            <select
+            <NativeSelect
               value={sourceTargetId}
               onChange={(e) => setSource(e.target.value)}
             >
@@ -70,30 +75,31 @@ export function ExistingEnvironment({ targets }: { targets: Target[] }) {
                     {t.name}
                   </option>
                 ))}
-            </select>
-          </label>
-          <label>
+            </NativeSelect>
+          </Label>
+          <Label>
             New Connection Name
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </Label>
+          <Label>
             New Target ID
-            <input value={id} onChange={(e) => setId(e.target.value)} />
-          </label>
-          <label>
+            <Input value={id} onChange={(e) => setId(e.target.value)} />
+          </Label>
+          <Label>
             Existing Operator Environment
-            <input
+            <Input
               value={environment}
               onChange={(e) => setEnvironment(e.target.value)}
             />
-          </label>
+          </Label>
         </div>
-        <button
+        <Button
+          variant="outline"
           className="button primary"
           disabled={!valid || connect.isPending}
         >
           {connect.isPending ? "Verifying…" : "Verify and Connect Environment"}
-        </button>
+        </Button>
         <ErrorBox error={connect.error} />
         {connect.isSuccess && (
           <p role="status">

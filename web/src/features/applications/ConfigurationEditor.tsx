@@ -1,3 +1,7 @@
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { HealthCheckFields, invalidHealthCheck } from "./HealthCheckFields";
 import { ConfigurationDiff } from "./ConfigurationDiff";
 import { useCanOperate } from "../../access";
@@ -5,10 +9,10 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Save, RotateCcw } from "lucide-react";
 import {
+  unwrap,
   api,
   type Application,
   type Manifest,
-  type Capabilities,
   type Component,
 } from "../../api";
 import { RuntimeVariables } from "./RuntimeVariables";
@@ -31,7 +35,11 @@ export function ConfigurationEditor({
   const capabilities = useQuery({
     queryKey: ["capabilities", app.manifest.targetId],
     queryFn: () =>
-      api<Capabilities>(`/targets/${app.manifest.targetId}/capabilities`),
+      api
+        .GET("/api/v1/targets/{id}/capabilities", {
+          params: { path: { id: app.manifest.targetId! } },
+        })
+        .then(unwrap),
   });
   const dirty = JSON.stringify(draft) !== JSON.stringify(base.manifest);
   const stale = app.version !== base.version;
@@ -53,13 +61,15 @@ export function ConfigurationEditor({
   }, [dirty, invalid]);
   const save = useMutation({
     mutationFn: () =>
-      api<Application>(`/applications/${app.id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          manifest: draft,
-          expectedVersion: base.version,
-        }),
-      }),
+      api
+        .PUT("/api/v1/applications/{id}", {
+          params: { path: { id: app.id! } },
+          body: {
+            manifest: draft,
+            expectedVersion: base.version,
+          },
+        })
+        .then(unwrap),
     onSuccess: (updated) => {
       setBase(updated);
       setDraft(structuredClone(updated.manifest));
@@ -107,15 +117,17 @@ export function ConfigurationEditor({
           </p>
         </div>
         <div className="log-buttons">
-          <button
-            className="secondary"
+          <Button
+            variant="outline"
+
             onClick={reload}
             disabled={save.isPending}
           >
             <RotateCcw size={15} /> Reload Configuration
-          </button>
-          <button
-            className="primary"
+          </Button>
+          <Button
+            variant="default"
+
             onClick={() => save.mutate()}
             disabled={
               !canOperate ||
@@ -135,7 +147,7 @@ export function ConfigurationEditor({
           >
             <Save size={15} />
             {save.isPending ? "Saving…" : "Save Configuration"}
-          </button>
+          </Button>
         </div>
       </div>
       {dirty && (
@@ -170,10 +182,10 @@ export function ConfigurationEditor({
           </p>
           <div className="form-grid configuration-fields">
             <div>
-              <label htmlFor={`config-image-${i}`}>
+              <Label htmlFor={`config-image-${i}`}>
                 Container Image for {c.name}
-              </label>
-              <input
+              </Label>
+              <Input
                 id={`config-image-${i}`}
                 value={c.image}
                 readOnly={!!c.resourceId}
@@ -182,10 +194,10 @@ export function ConfigurationEditor({
             </div>
             <div className="form-grid compact">
               <div>
-                <label htmlFor={`config-port-${i}`}>
+                <Label htmlFor={`config-port-${i}`}>
                   Internal Port for {c.name}
-                </label>
-                <input
+                </Label>
+                <Input
                   id={`config-port-${i}`}
                   type="number"
                   min="1"
@@ -196,10 +208,10 @@ export function ConfigurationEditor({
                 />
               </div>
               <div>
-                <label htmlFor={`config-instances-${i}`}>
+                <Label htmlFor={`config-instances-${i}`}>
                   Instances for {c.name}
-                </label>
-                <input
+                </Label>
+                <Input
                   id={`config-instances-${i}`}
                   type="number"
                   min={base.manifest.components[i].instances}
@@ -215,8 +227,8 @@ export function ConfigurationEditor({
               </div>
             </div>
             <div>
-              <label htmlFor={`config-host-${i}`}>Host Port for {c.name}</label>
-              <input
+              <Label htmlFor={`config-host-${i}`}>Host Port for {c.name}</Label>
+              <Input
                 id={`config-host-${i}`}
                 type="number"
                 min="0"
@@ -245,15 +257,14 @@ export function ConfigurationEditor({
               {draft.components
                 .filter((other) => other.name !== c.name)
                 .map((other) => (
-                  <label key={other.name}>
-                    <input
-                      type="checkbox"
+                  <Label key={other.name}>
+                    <Checkbox
                       checked={c.dependsOn?.includes(other.name) || false}
-                      onChange={(e) =>
+                      onCheckedChange={(e) =>
                         change(
                           i,
                           "dependsOn",
-                          e.target.checked
+                          e === true
                             ? [...(c.dependsOn || []), other.name]
                             : (c.dependsOn || []).filter(
                                 (name) => name !== other.name,
@@ -262,7 +273,7 @@ export function ConfigurationEditor({
                       }
                     />
                     Wait for {other.name} before starting {c.name}
-                  </label>
+                  </Label>
                 ))}
               {draft.components.length === 1 && (
                 <p className="small muted">
@@ -280,27 +291,26 @@ export function ConfigurationEditor({
                   Healthy status is required by the selected HTTP check.
                 </p>
               )}
-              <label>
-                <input
-                  type="checkbox"
+              <Label>
+                <Checkbox
                   checked={
                     c.healthCheck?.mode === "http" ||
                     !!c.readiness?.requireHealthy
                   }
                   disabled={c.healthCheck?.mode === "http"}
-                  onChange={(e) =>
+                  onCheckedChange={(e) =>
                     change(i, "readiness", {
                       ...c.readiness,
-                      requireHealthy: e.target.checked,
+                      requireHealthy: e === true,
                     })
                   }
                 />
                 Require Healthy Status for {c.name}
-              </label>
-              <label htmlFor={`readiness-timeout-${i}`}>
+              </Label>
+              <Label htmlFor={`readiness-timeout-${i}`}>
                 Observation Timeout for {c.name} (seconds)
-              </label>
-              <input
+              </Label>
+              <Input
                 id={`readiness-timeout-${i}`}
                 type="number"
                 min="30"

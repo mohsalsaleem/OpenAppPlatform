@@ -9,9 +9,9 @@ is the current execution order and separates implemented behavior from future
 contracts. Finish Coolify runtime configuration/connections, then prioritize guided
 assembly, GitHub release ownership, environment organization, readiness/recovery,
 and stable routing. Minimal owner auth and scoped agents are implemented; full M1 hardening and
-AI assistance follow the usable core. Technology choices
-below remain proposals where they differ from the implementation; additional
-frameworks or services are not required to satisfy the product model.
+AI assistance follow the usable core. The technology stack below is the implementation contract. Any future change
+requires an explicit recorded decision rather than silently making it optional.
+Later capabilities remain scheduled by the roadmap, not implied by this draft.
 
 
 ## Product direction
@@ -174,7 +174,7 @@ Persist release artifacts or their retrievable references, configuration version
 
 ## Technology stack
 
-| Layer | Proposed choice |
+| Layer | Choice |
 | --- | --- |
 | API and controller | Go with standard net/http |
 | Adapters | Go interfaces and packages |
@@ -220,7 +220,8 @@ The model provider stays behind an interface. Core deployment operations continu
 3. Standard deployment with exact version tracking and durable progress.
 4. GitHub event handling with deduplication and component deployment serialization.
 5. Unified status, bounded logs, configuration, and partial-failure reporting.
-6. Structured API, MCP tools, and read-only AI diagnosis.
+6. Structured API and read-only MCP tools; AI diagnosis follows the M1/M2
+   diagnostic-context and permission gates.
 7. First-class direct Docker Engine deployment alongside Coolify, with shared adapter contract tests.
 
 Follow with health-gated replacement deployments, routing integration, scaling, and optional blue-green.

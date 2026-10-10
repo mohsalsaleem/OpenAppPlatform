@@ -1,3 +1,11 @@
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
 import { healthCheckSummary } from "./HealthCheckFields";
 import type { Manifest } from "../../api";
 export function ConfigurationDiff({
@@ -94,24 +102,24 @@ export function ConfigurationDiff({
         this summary.
       </p>
       <div className="table-responsive">
-        <table>
-          <thead>
-            <tr>
-              <th>Field</th>
-              <th>Current</th>
-              <th>Proposed</th>
-            </tr>
-          </thead>
-          <tbody>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Field</TableHead>
+              <TableHead>Current</TableHead>
+              <TableHead>Proposed</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map((r) => (
-              <tr key={r.field}>
-                <td>{r.field}</td>
-                <td>{r.before}</td>
-                <td>{r.after}</td>
-              </tr>
+              <TableRow key={r.field}>
+                <TableCell>{r.field}</TableCell>
+                <TableCell>{r.before}</TableCell>
+                <TableCell>{r.after}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </section>
   );

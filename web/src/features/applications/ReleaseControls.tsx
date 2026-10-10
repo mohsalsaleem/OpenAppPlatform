@@ -1,7 +1,11 @@
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DeploymentDialog } from "../../components/DeploymentDialog";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type Deployment } from "../../api";
+import { unwrap, api, type Deployment } from "../../api";
 import { useCanOperate, useIsOwner } from "../../access";
 import { ErrorBox } from "../../components/Feedback";
 
@@ -9,7 +13,7 @@ export function ReleaseControls({ deployment: d }: { deployment: Deployment }) {
   const canOperate = useCanOperate();
   const owner = useIsOwner();
   const client = useQueryClient();
-  const [mode, setMode] = useState("");
+  const [mode, setMode] = useState<"" | "cancel" | "abandon" | "reconcile">("");
   const [reason, setReason] = useState("");
   const [reviewedAt, setReviewedAt] = useState("");
   const [ack, setAck] = useState(false);
@@ -23,40 +27,46 @@ export function ReleaseControls({ deployment: d }: { deployment: Deployment }) {
     (s) => !preDispatch(s) && !s.remoteDeploymentId,
   );
   const mutation = useMutation({
-    mutationFn: () =>
-      api<Deployment>(
-        `/deployments/${d.id}/${mode === "reconcile" ? "reconcile-abandoned" : "control"}`,
-        {
-          method: "POST",
-          body: JSON.stringify(
-            mode === "reconcile"
-              ? {
-                  expectedUpdatedAt: reviewedAt,
-                  acknowledgeCurrentRuntime: ack,
-                  operations: unresolved.map((s) => ({
-                    component: s.component,
-                    ordinal: s.ordinal,
-                    remoteDeploymentId:
-                      ids[`${s.component}:${s.ordinal}`] || "",
-                  })),
-                }
-              : {
-                  mode,
-                  reason,
-                  expectedUpdatedAt: reviewedAt,
-                  acknowledgePreparedChanges: ack,
-                  acknowledgeProviderMayContinue: ack,
-                },
-          ),
-        },
-      ),
+    mutationFn: () => {
+      if (!ack || !mode)
+        throw new Error("Review and acknowledge the effects first");
+      return api
+        .POST(
+          mode === "reconcile"
+            ? "/api/v1/deployments/{id}/reconcile-abandoned"
+            : "/api/v1/deployments/{id}/control",
+          {
+            params: { path: { id: d.id! } },
+            body:
+              mode === "reconcile"
+                ? {
+                    expectedUpdatedAt: reviewedAt,
+                    acknowledgeCurrentRuntime: true,
+                    operations: unresolved.map((s) => ({
+                      component: s.component,
+                      ordinal: s.ordinal,
+                      remoteDeploymentId:
+                        ids[`${s.component}:${s.ordinal}`] || "",
+                    })),
+                  }
+                : {
+                    mode,
+                    reason,
+                    expectedUpdatedAt: reviewedAt,
+                    acknowledgePreparedChanges: true,
+                    acknowledgeProviderMayContinue: ack,
+                  },
+          },
+        )
+        .then(unwrap);
+    },
     onSuccess: () => {
       setMode("");
       setAck(false);
       client.invalidateQueries({ queryKey: ["deployments", d.applicationId] });
     },
   });
-  const review = (value: string) => {
+  const review = (value: "cancel" | "abandon" | "reconcile") => {
     setMode(value);
     setReviewedAt(d.updatedAt);
     setAck(false);
@@ -77,28 +87,28 @@ export function ReleaseControls({ deployment: d }: { deployment: Deployment }) {
           {d.control.mode === "abandon"
             ? d.control.resolvedAt
               ? "Owner reconciled provider operations; tracking stays closed."
-              : "Application fenced until owner reconciliation. Provider work may continue."
+              : "Selected components remain protected until owner reconciliation. Provider work may continue."
             : "Cancelled before dispatch. Prepared changes may remain."}
         </p>
       )}
       {canOperate && ["queued", "running", "attention"].includes(d.state) && (
         <div className="log-buttons">
           {d.steps.length > 0 && d.steps.every(preDispatch) && (
-            <button className="secondary" onClick={() => review("cancel")}>
+            <Button variant="outline" onClick={() => review("cancel")}>
               Review Cancellation
-            </button>
+            </Button>
           )}
           {owner && d.operation !== "scale-down" && (
-            <button className="secondary" onClick={() => review("abandon")}>
+            <Button variant="outline" onClick={() => review("abandon")}>
               Review Abandonment
-            </button>
+            </Button>
           )}
         </div>
       )}
       {owner && d.state === "abandoned" && !d.control?.resolvedAt && (
-        <button className="secondary" onClick={() => review("reconcile")}>
+        <Button variant="outline" onClick={() => review("reconcile")}>
           Review Reconciliation
-        </button>
+        </Button>
       )}
       {mode && (
         <DeploymentDialog
@@ -115,24 +125,24 @@ export function ReleaseControls({ deployment: d }: { deployment: Deployment }) {
           </h2>
           <p className="small muted">
             {mode === "reconcile"
-              ? "Inspect the operator first. Every possible provider operation must be terminal. This releases the application fence and keeps unfinished steps closed."
+              ? "Inspect the operator first. Every possible provider operation must be terminal. This releases the component and dependency guards and keeps unfinished steps closed."
               : "Prepared resources and configuration may remain. This does not undo changes or stop provider work."}
           </p>
           {mode !== "reconcile" && (
-            <label>
+            <Label>
               Reason
-              <input
+              <Input
                 maxLength={512}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
               />
-            </label>
+            </Label>
           )}
           {mode === "reconcile" &&
             unresolved.map((s) => (
-              <label key={`${s.component}:${s.ordinal}`}>
+              <Label key={`${s.component}:${s.ordinal}`}>
                 {s.component} #{s.ordinal} exact provider operation ID
-                <input
+                <Input
                   value={ids[`${s.component}:${s.ordinal}`] || ""}
                   onChange={(e) =>
                     setIds({
@@ -141,31 +151,32 @@ export function ReleaseControls({ deployment: d }: { deployment: Deployment }) {
                     })
                   }
                 />
-              </label>
+              </Label>
             ))}
-          <label className="rollback-ack">
-            <input
-              type="checkbox"
+          <Label className="rollback-ack">
+            <Checkbox
               checked={ack}
-              onChange={(e) => setAck(e.target.checked)}
+              onCheckedChange={(e) => setAck(e === true)}
             />
             {mode === "reconcile"
               ? "I inspected and accept the current runtime."
               : mode === "abandon"
-                ? "I accept retained changes, continuing provider work and the application fence."
+                ? "I accept retained changes, continuing provider work and the component and dependency guards."
                 : "I accept that prepared changes may remain."}
-          </label>
+          </Label>
           <ErrorBox error={mutation.error} />
           <div className="form-actions">
-            <button
-              className="secondary"
+            <Button
+              variant="outline"
+
               disabled={mutation.isPending}
               onClick={() => setMode("")}
             >
               Close
-            </button>{" "}
-            <button
-              className="primary"
+            </Button>{" "}
+            <Button
+              variant="default"
+
               disabled={
                 mutation.isPending ||
                 !ack ||
@@ -183,7 +194,7 @@ export function ReleaseControls({ deployment: d }: { deployment: Deployment }) {
                 : mode === "cancel"
                   ? "cancellation"
                   : "abandonment"}
-            </button>
+            </Button>
           </div>
         </DeploymentDialog>
       )}

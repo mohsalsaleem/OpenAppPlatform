@@ -1,7 +1,10 @@
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, type ApplicationGroup } from "../../api";
+import { unwrap, api } from "../../api";
 import { ErrorBox } from "../../components/Feedback";
 
 export function EnvironmentNavigation({
@@ -15,11 +18,11 @@ export function EnvironmentNavigation({
   const [selected, setSelected] = useState("");
   const groups = useQuery({
     queryKey: ["application-groups"],
-    queryFn: () => api<ApplicationGroup[]>("/application-groups"),
+    queryFn: () => api.GET("/api/v1/application-groups").then(unwrap),
   });
   const me = useQuery({
     queryKey: ["identity"],
-    queryFn: () => api<{ role: string; kind: string }>("/auth/me"),
+    queryFn: () => api.GET("/api/v1/auth/me").then(unwrap),
     retry: false,
   });
   const group = groups.data?.find((g) =>
@@ -41,14 +44,16 @@ export function EnvironmentNavigation({
       const source = candidates.find((g) => g.environments[0].id === selected);
       if (!group || !source)
         throw new Error("Refresh and select an available environment");
-      return api(`/application-groups/${group.id}/environments`, {
-        method: "POST",
-        body: JSON.stringify({
-          applicationId: selected,
-          expectedGroupVersion: group.version,
-          expectedSourceVersion: source.version,
-        }),
-      });
+      return api
+        .POST("/api/v1/application-groups/{id}/environments", {
+          params: { path: { id: group.id! } },
+          body: {
+            applicationId: selected,
+            expectedGroupVersion: group.version,
+            expectedSourceVersion: source.version,
+          },
+        })
+        .then(unwrap);
     },
     onSuccess: () => {
       setSelected("");
@@ -58,13 +63,15 @@ export function EnvironmentNavigation({
   });
   const unlink = useMutation({
     mutationFn: () =>
-      api(
-        `/application-groups/${group!.id}/environments/${applicationId}/unlink`,
-        {
-          method: "POST",
-          body: JSON.stringify({ expectedVersion: group!.version }),
-        },
-      ),
+      api
+        .POST(
+          "/api/v1/application-groups/{id}/environments/{environment}/unlink",
+          {
+            params: { path: { id: group!.id, environment: applicationId } },
+            body: { expectedVersion: group!.version },
+          },
+        )
+        .then(unwrap),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["application-groups"] });
       client.invalidateQueries({ queryKey: ["applications"] });
@@ -103,13 +110,14 @@ export function EnvironmentNavigation({
         <span className="small muted">{group.name}</span>
       </div>
       {canLink && group.environments.length > 1 && (
-        <button
+        <Button
+          variant="outline"
           className="button"
           onClick={() => unlink.mutate()}
           disabled={unlink.isPending}
         >
           Make This Environment Standalone
-        </button>
+        </Button>
       )}
       <ErrorBox error={unlink.error} />
       {canLink && candidates.length > 0 && (
@@ -119,9 +127,9 @@ export function EnvironmentNavigation({
             link.mutate();
           }}
         >
-          <label>
+          <Label>
             Existing Environment
-            <select
+            <NativeSelect
               aria-label="Existing Environment"
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
@@ -134,15 +142,19 @@ export function EnvironmentNavigation({
                   {g.name} · {g.environments[0].manifest.environment}
                 </option>
               ))}
-            </select>
-          </label>
+            </NativeSelect>
+          </Label>
           <p className="small muted">
             Linking changes organization only. Deployments, resource IDs and
             permissions stay with each environment.
           </p>
-          <button className="button" disabled={!selected || link.isPending}>
+          <Button
+            variant="outline"
+            className="button"
+            disabled={!selected || link.isPending}
+          >
             Link Environment
-          </button>
+          </Button>
           <ErrorBox error={link.error} />
         </form>
       )}

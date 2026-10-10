@@ -5,13 +5,15 @@ LABEL io.openappplatform.test-cache="true"
 WORKDIR /workspace
 COPY go.mod go.sum ./
 RUN go mod download
+RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
 # Compile only Go-package inputs. Root docs and UI edits must not regenerate
 # the large Go race/compiler cache layer on every verification run.
+COPY sqlc.yaml ./
 COPY cmd/ cmd/
 COPY internal/ internal/
 COPY tests/ tests/
 COPY examples/ examples/
-RUN go vet ./... && mkdir -p /opt/oap/tests && \
+RUN /go/bin/sqlc diff && go vet ./... && mkdir -p /opt/oap/tests && \
     go list -f '{{if or .TestGoFiles .XTestGoFiles}}{{.ImportPath}}{{end}}' ./... | sed '/^$/d' > /opt/oap/packages.txt && \
     index=0; while read -r package; do \
       go test -c -race -o "/opt/oap/tests/$index.test" "$package" || exit 1; \
@@ -29,5 +31,6 @@ COPY web/package.json web/package-lock.json ./web/
 RUN PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm --prefix web ci
 COPY . .
 COPY --from=core /opt/oap /opt/oap
-RUN node -e 'const p=require("./web/node_modules/@playwright/test/package.json");if(p.version!=="1.64.0")throw Error("Playwright browser/package versions must match")' && npm --prefix web run build
+COPY --from=core /go/bin/sqlc /usr/local/bin/sqlc
+RUN node -e 'const p=require("./web/node_modules/@playwright/test/package.json");if(p.version!=="1.64.0")throw Error("Playwright browser/package versions must match")' && python3 scripts/generate.py --check && python3 scripts/check-contract.py && npm --prefix web run build
 ENTRYPOINT ["node", "/workspace/tests/env/run.mjs"]

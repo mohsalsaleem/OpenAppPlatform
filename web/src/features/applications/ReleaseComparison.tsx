@@ -1,27 +1,19 @@
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
 import { releaseOperation } from "./runtimeSummary";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { api, type Deployment } from "../../api";
+import { unwrap, api, type Deployment } from "../../api";
 import { ErrorBox } from "../../components/Feedback";
-
-type Summary = {
-  id: string;
-  definitionVersion: number;
-  state: string;
-  operation: string;
-  commit?: string;
-  artifacts: { component: string; image: string; immutable: boolean }[];
-};
-type Comparison = {
-  from: Summary;
-  to: Summary;
-  changes: {
-    component: string;
-    field: string;
-    before: string;
-    after: string;
-  }[];
-};
 
 export function ReleaseComparison({
   applicationId,
@@ -34,9 +26,17 @@ export function ReleaseComparison({
   const [to, setTo] = useState("");
   const comparison = useMutation({
     mutationFn: ({ from, to }: { from: string; to: string }) =>
-      api<Comparison>(
-        `/applications/${applicationId}/release-comparison?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
-      ),
+      api
+        .GET("/api/v1/applications/{id}/release-comparison", {
+          params: {
+            path: { id: applicationId! },
+            query: {
+              from: from,
+              to: to,
+            },
+          },
+        })
+        .then(unwrap),
   });
   const fromId = from || releases[1]?.id || "",
     toId = to || releases[0]?.id || "";
@@ -59,8 +59,8 @@ export function ReleaseComparison({
         <>
           <div className="form-grid compact">
             <div>
-              <label htmlFor="compare-from">From Release</label>
-              <select
+              <Label htmlFor="compare-from">From Release</Label>
+              <NativeSelect
                 id="compare-from"
                 value={fromId}
                 onChange={(e) => {
@@ -74,11 +74,11 @@ export function ReleaseComparison({
                     {r.definitionVersion}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
             <div>
-              <label htmlFor="compare-to">To Release</label>
-              <select
+              <Label htmlFor="compare-to">To Release</Label>
+              <NativeSelect
                 id="compare-to"
                 value={toId}
                 onChange={(e) => {
@@ -92,11 +92,12 @@ export function ReleaseComparison({
                     {r.definitionVersion}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
           </div>
-          <button
-            className="secondary"
+          <Button
+            variant="outline"
+
             disabled={
               !fromId || !toId || fromId === toId || comparison.isPending
             }
@@ -107,7 +108,7 @@ export function ReleaseComparison({
             }}
           >
             {comparison.isPending ? "Comparing…" : "Compare Selected Releases"}
-          </button>
+          </Button>
         </>
       )}
       <ErrorBox error={comparison.error} />
@@ -146,26 +147,26 @@ export function ReleaseComparison({
           </div>
           {comparison.data.changes.length ? (
             <div className="table-responsive">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Field</th>
-                    <th>From</th>
-                    <th>To</th>
-                  </tr>
-                </thead>
-                <tbody>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Field</TableHead>
+                    <TableHead>From</TableHead>
+                    <TableHead>To</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {comparison.data.changes.map((c) => (
-                    <tr key={`${c.component}-${c.field}`}>
-                      <td>
+                    <TableRow key={`${c.component}-${c.field}`}>
+                      <TableCell>
                         {c.component} · {c.field}
-                      </td>
-                      <td>{c.before}</td>
-                      <td>{c.after}</td>
-                    </tr>
+                      </TableCell>
+                      <TableCell>{c.before}</TableCell>
+                      <TableCell>{c.after}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           ) : (
             <p role="status">

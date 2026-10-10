@@ -1,33 +1,14 @@
+import type { ReadResponse } from "../../api";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type Deployment } from "../../api";
+import { unwrap, api, type Deployment } from "../../api";
 import { Status } from "../../components/Status";
 import { ErrorBox } from "../../components/Feedback";
 import { useState } from "react";
 import { DeploymentDialog } from "../../components/DeploymentDialog";
-type Event = {
-  id: string;
-  commit: string;
-  state: string;
-  error?: string;
-  deploymentId?: string;
-  updatedAt: string;
-  definitionVersion: number;
-  binding: { repository: string; branch: string };
-  builds: Record<
-    string,
-    {
-      id: string;
-      state: string;
-      image?: string;
-      provider?: {
-        id: string;
-        commit: string;
-        state: string;
-        resourceStatus: string;
-      };
-    }
-  >;
-};
+type Event = ReadResponse<"/api/v1/applications/{id}/source-events">[number];
 export function SourceEvents({
   applicationId,
   version,
@@ -43,25 +24,32 @@ export function SourceEvents({
   const [approveCommit, setApproveCommit] = useState(false);
   const me = useQuery({
     queryKey: ["identity"],
-    queryFn: () => api<{ role: string; kind: string }>("/auth/me"),
+    queryFn: () => api.GET("/api/v1/auth/me").then(unwrap),
     retry: false,
   });
   const events = useQuery({
     queryKey: ["source-events", applicationId],
-    queryFn: () => api<Event[]>(`/applications/${applicationId}/source-events`),
+    queryFn: () =>
+      api
+        .GET("/api/v1/applications/{id}/source-events", {
+          params: { path: { id: applicationId! } },
+        })
+        .then(unwrap),
     refetchInterval: 5000,
   });
   const recover = useMutation({
     mutationFn: () =>
-      api(`/source-events/${review!.id}/recover`, {
-        method: "POST",
-        body: JSON.stringify({
-          expectedUpdatedAt: review!.updatedAt,
-          expectedVersion: version,
-          retryBuild: confirmed,
-          approveSourceCommit: approveCommit,
-        }),
-      }),
+      api
+        .POST("/api/v1/source-events/{id}/recover", {
+          params: { path: { id: review!.id! } },
+          body: {
+            expectedUpdatedAt: review!.updatedAt,
+            expectedVersion: version,
+            retryBuild: confirmed,
+            approveSourceCommit: approveCommit,
+          },
+        })
+        .then(unwrap),
     onSuccess: () => {
       setReview(null);
       client.invalidateQueries({ queryKey: ["source-events", applicationId] });
@@ -115,8 +103,9 @@ export function SourceEvents({
           {e.state === "attention" &&
             me.data?.role === "owner" &&
             me.data.kind === "session" && (
-              <button
-                className="secondary"
+              <Button
+                variant="outline"
+
                 onClick={() => {
                   setConfirmed(false);
                   setApproveCommit(false);
@@ -124,7 +113,7 @@ export function SourceEvents({
                 }}
               >
                 Review Source Recovery
-              </button>
+              </Button>
             )}
         </article>
       ))}
@@ -136,32 +125,33 @@ export function SourceEvents({
             are retained. Inspect any uncertain build IDs before authorizing
             another build.
           </p>
-          <label>
-            <input
+          <Label>
+            <Checkbox
               className="inline-checkbox"
-              type="checkbox"
+
               checked={confirmed}
-              onChange={(e) => setConfirmed(e.target.checked)}
+              onCheckedChange={(e) => setConfirmed(e === true)}
             />{" "}
             I inspected the uncertain build and authorize a retry.
-          </label>
-          <label>
-            <input
+          </Label>
+          <Label>
+            <Checkbox
               className="inline-checkbox"
-              type="checkbox"
+
               checked={approveCommit}
-              onChange={(e) => setApproveCommit(e.target.checked)}
+              onCheckedChange={(e) => setApproveCommit(e === true)}
             />{" "}
             I reviewed the repository branch head and authorize this commit if
             it was superseded.
-          </label>
+          </Label>
           <ErrorBox error={recover.error} />
           <div className="form-actions">
-            <button className="secondary" onClick={() => setReview(null)}>
+            <Button variant="outline" onClick={() => setReview(null)}>
               Cancel
-            </button>
-            <button
-              className="primary"
+            </Button>
+            <Button
+              variant="default"
+
               disabled={
                 recover.isPending ||
                 (!confirmed &&
@@ -172,7 +162,7 @@ export function SourceEvents({
               onClick={() => recover.mutate()}
             >
               Recover Delivery
-            </button>
+            </Button>
           </div>
         </DeploymentDialog>
       )}

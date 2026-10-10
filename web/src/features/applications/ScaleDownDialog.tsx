@@ -1,6 +1,9 @@
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type Deployment } from "../../api";
+import { unwrap, api } from "../../api";
 import { DeploymentDialog } from "../../components/DeploymentDialog";
 import { ErrorBox } from "../../components/Feedback";
 
@@ -23,15 +26,19 @@ export function ScaleDownDialog({
   const [wanted, setWanted] = useState(instances - 1);
   const scale = useMutation({
     mutationFn: () =>
-      api<Deployment>(`/applications/${applicationId}/scale-down`, {
-        method: "POST",
-        headers: { "Idempotency-Key": crypto.randomUUID() },
-        body: JSON.stringify({
-          component,
-          instances: wanted,
-          expectedVersion: version,
-        }),
-      }),
+      api
+        .POST("/api/v1/applications/{id}/scale-down", {
+          params: {
+            path: { id: applicationId! },
+            header: { "Idempotency-Key": crypto.randomUUID() },
+          },
+          body: {
+            component,
+            instances: wanted,
+            expectedVersion: version,
+          },
+        })
+        .then(unwrap),
     onSuccess: () => {
       client.invalidateQueries({ queryKey: ["deployments", applicationId] });
       client.invalidateQueries({ queryKey: ["instances", applicationId] });
@@ -45,8 +52,8 @@ export function ScaleDownDialog({
   return (
     <DeploymentDialog onClose={onClose}>
       <h2 id="deploy-title">Scale Down {component}?</h2>
-      <label htmlFor="retirement-count">Remaining Instances</label>
-      <select
+      <Label htmlFor="retirement-count">Remaining Instances</Label>
+      <NativeSelect
         id="retirement-count"
         value={wanted}
         disabled={scale.isPending}
@@ -57,7 +64,7 @@ export function ScaleDownDialog({
             {count}
           </option>
         ))}
-      </select>
+      </NativeSelect>
       <p>
         Retire{" "}
         {ordinals.map((ordinal) => `${component} / ${ordinal}`).join(", ")}.
@@ -70,20 +77,22 @@ export function ScaleDownDialog({
       </p>
       <ErrorBox error={scale.error} />
       <div className="form-actions">
-        <button
-          className="secondary"
+        <Button
+          variant="outline"
+
           disabled={scale.isPending}
           onClick={onClose}
         >
           Cancel
-        </button>
-        <button
-          className="primary"
+        </Button>
+        <Button
+          variant="default"
+
           disabled={scale.isPending}
           onClick={() => scale.mutate()}
         >
           {scale.isPending ? "Queuing…" : "Retire Instances"}
-        </button>
+        </Button>
       </div>
     </DeploymentDialog>
   );

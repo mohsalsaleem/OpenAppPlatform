@@ -1,9 +1,15 @@
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCanOperate } from "../../access";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Plus } from "lucide-react";
-import { api, type Application, type Resource, type Target } from "../../api";
+import { unwrap, api } from "../../api";
 import { ErrorBox, Loading } from "../../components/Feedback";
 import { Status } from "../../components/Status";
 
@@ -20,25 +26,30 @@ export function AssembleApplication() {
   const [layoutId, setLayoutId] = useState("");
   const applications = useQuery({
     queryKey: ["applications"],
-    queryFn: () => api<Application[]>("/applications"),
+    queryFn: () => api.GET("/api/v1/applications").then(unwrap),
   });
   const layout = useQuery({
     queryKey: ["layout", layoutId],
     queryFn: () =>
-      api<{
-        name: string;
-        definitionVersion: number;
-        components: { name: string; kind: string }[];
-      }>(`/applications/${layoutId}/layout`),
+      api
+        .GET("/api/v1/applications/{id}/layout", {
+          params: { path: { id: layoutId! } },
+        })
+        .then(unwrap),
     enabled: !!layoutId,
   });
   const targets = useQuery({
     queryKey: ["targets"],
-    queryFn: () => api<Target[]>("/targets"),
+    queryFn: () => api.GET("/api/v1/targets").then(unwrap),
   });
   const resources = useQuery({
     queryKey: ["resources", id],
-    queryFn: () => api<Resource[]>(`/targets/${id}/resources`),
+    queryFn: () =>
+      api
+        .GET("/api/v1/targets/{id}/resources", {
+          params: { path: { id: id! } },
+        })
+        .then(unwrap),
   });
   const target = targets.data?.find((t) => t.id === id);
   const chosen =
@@ -55,24 +66,25 @@ export function AssembleApplication() {
     new Set(chosen.map((r) => selected[r.id])).size === chosen.length;
   const save = useMutation({
     mutationFn: () =>
-      api<Application>("/applications", {
-        method: "POST",
-        body: JSON.stringify({
-          name,
-          targetId: id,
-          environment: target!.environment,
-          components: chosen.map((r) => ({
-            name: selected[r.id],
-            kind: "web",
-            image: r.image ?? "",
-            port: r.port ?? 0,
-            instances: 1,
-            strategy: "standard",
-            resourceId: r.id,
-            management: "observe",
-          })),
-        }),
-      }),
+      api
+        .POST("/api/v1/applications", {
+          body: {
+            name,
+            targetId: id!,
+            environment: target!.environment,
+            components: chosen.map((r) => ({
+              name: selected[r.id],
+              kind: "web" as const,
+              image: r.image ?? "",
+              port: r.port ?? 0,
+              instances: 1,
+              strategy: "standard" as const,
+              resourceId: r.id,
+              management: "observe" as const,
+            })),
+          },
+        })
+        .then(unwrap),
     onSuccess: (a) => {
       client.invalidateQueries({ queryKey: ["applications"] });
       client.invalidateQueries({ queryKey: ["application-groups"] });
@@ -96,18 +108,39 @@ export function AssembleApplication() {
           </p>
         </div>
       </div>
-      <div className="tabs" aria-label="Assembly steps">
-        <span className={!review ? "assembly-current" : "muted"}>
-          1. Select services
-        </span>
-        <span className={review ? "assembly-current" : "muted"}>
-          2. Review application
-        </span>
-      </div>
+      <ol
+        aria-label="Assembly Steps"
+        className="flex flex-wrap items-center gap-6 mb-5"
+      >
+        <li
+          aria-current={!review ? "step" : undefined}
+          className="flex items-center gap-2 text-sm"
+        >
+          <Badge
+            variant={!review ? "default" : "secondary"}
+            className="size-5 justify-center rounded-full p-0"
+          >
+            1
+          </Badge>{" "}
+          Select Services
+        </li>
+        <li
+          aria-current={review ? "step" : undefined}
+          className="flex items-center gap-2 text-sm"
+        >
+          <Badge
+            variant={review ? "default" : "secondary"}
+            className="size-5 justify-center rounded-full p-0"
+          >
+            2
+          </Badge>{" "}
+          Review Application
+        </li>
+      </ol>
       <ErrorBox error={resources.error || save.error || layout.error} />
-      <label>
+      <Label>
         Reuse a Component Layout
-        <select
+        <NativeSelect
           value={layoutId}
           onChange={(e) => {
             setLayoutId(e.target.value);
@@ -120,8 +153,8 @@ export function AssembleApplication() {
               {a.manifest.name} · {a.manifest.environment}
             </option>
           ))}
-        </select>
-      </label>
+        </NativeSelect>
+      </Label>
       {layout.data && (
         <p className="small muted">
           Reusing component names from definition{" "}
@@ -140,8 +173,9 @@ export function AssembleApplication() {
                 without changing workloads.
               </p>
             </div>
-            <button
-              className="secondary"
+            <Button
+              variant="outline"
+
               onClick={() => {
                 setSelected({});
                 resources.refetch();
@@ -149,43 +183,44 @@ export function AssembleApplication() {
               disabled={resources.isFetching}
             >
               Refresh Resources
-            </button>
+            </Button>
           </div>
           <div className="form-grid">
-            <label>
+            <Label>
               Search Services
-              <input
+              <Input
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Name or resource ID"
               />
-            </label>
-            <label>
+            </Label>
+            <Label>
               Availability
-              <select
+              <NativeSelect
                 value={availability}
                 onChange={(e) => setAvailability(e.target.value)}
               >
                 <option value="all">All Services</option>
                 <option value="available">Available to Group</option>
                 <option value="grouped">Already Grouped</option>
-              </select>
-            </label>
+              </NativeSelect>
+            </Label>
           </div>
           <p className="small muted" role="status">
             {chosen.length} selected
           </p>
           <div className="form-actions selection-actions">
-            <button
-              className="primary"
+            <Button
+              variant="default"
+
               disabled={
                 !chosen.length || chosen.length > 16 || resources.isError
               }
               onClick={() => setReview(true)}
             >
               Review Selection ({chosen.length})
-            </button>
+            </Button>
           </div>{" "}
           {resources.data?.length === 0 && (
             <p className="muted">No resources found in this target scope.</p>
@@ -208,14 +243,13 @@ export function AssembleApplication() {
               const blocked = !!r.applicationId || !supported || !layoutReady;
               return (
                 <div className="assembly-resource" key={r.id}>
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     aria-label={`Select ${r.name}`}
                     checked={selected[r.id] !== undefined}
                     disabled={blocked}
-                    onChange={(e) => {
+                    onCheckedChange={(e) => {
                       const next = { ...selected };
-                      if (e.target.checked) {
+                      if (e === true) {
                         next[r.id] = r.name
                           .toLowerCase()
                           .replace(/[^a-z0-9-]+/g, "-")
@@ -261,8 +295,8 @@ export function AssembleApplication() {
             operator configuration changes.
           </p>
           <div className="configuration-fields">
-            <label htmlFor="assembly-name">Application Name</label>
-            <input
+            <Label htmlFor="assembly-name">Application Name</Label>
+            <Input
               id="assembly-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -271,10 +305,10 @@ export function AssembleApplication() {
           </div>
           {chosen.map((r) => (
             <div className="component-form configuration-fields" key={r.id}>
-              <label htmlFor={`mapping-${r.id}`}>
+              <Label htmlFor={`mapping-${r.id}`}>
                 Component Name for {r.name}
-              </label>
-              <input
+              </Label>
+              <Input
                 id={`mapping-${r.id}`}
                 value={selected[r.id]}
                 onChange={(e) =>
@@ -295,21 +329,23 @@ export function AssembleApplication() {
             imported.
           </p>
           <div className="form-actions">
-            <button
-              className="secondary"
+            <Button
+              variant="outline"
+
               disabled={save.isPending}
               onClick={() => setReview(false)}
             >
               Back to Selection
-            </button>
-            <button
-              className="primary"
+            </Button>
+            <Button
+              variant="default"
+
               disabled={!canOperate || !valid || save.isPending}
               onClick={() => save.mutate()}
             >
               <Plus size={16} />
               {save.isPending ? "Grouping…" : "Create Observed Application"}
-            </button>
+            </Button>
           </div>
         </section>
       )}

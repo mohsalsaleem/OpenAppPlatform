@@ -97,6 +97,28 @@ test("owner setup, sessions, invitations, read-only membership, and scoped agent
       .locator(".application-group")
       .filter({ hasText: "environment-browser-stage" }),
   ).toContainText("2 environments");
+  await page.goto(`/applications/${prodApp.id}`);
+  await page.getByRole("tab", { name: "Settings" }).click();
+  const unlinked = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response
+        .url()
+        .endsWith(
+          `/application-groups/${stageApp.groupId}/environments/${prodApp.id}/unlink`,
+        ),
+  );
+  await page
+    .getByRole("button", { name: "Make This Environment Standalone" })
+    .click();
+  expect((await unlinked).status()).toBe(200);
+  await expect(
+    page
+      .getByRole("navigation", { name: "Application Environments" })
+      .getByRole("link", { name: "staging" }),
+  ).toHaveCount(0);
+  await page.goto("/");
+
   await page.screenshot({
     path: "../.local/ui-grouped-applications.png",
     fullPage: true,
@@ -218,7 +240,7 @@ test("owner setup, sessions, invitations, read-only membership, and scoped agent
   await expect(
     page.getByText("Read-only member", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Agent Tokens", exact: true }).click();
+  await page.getByRole("tab", { name: "Agent Tokens", exact: true }).click();
   await expect(
     page.getByText("Read-only agent", { exact: true }),
   ).toBeVisible();

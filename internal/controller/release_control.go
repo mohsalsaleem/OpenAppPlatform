@@ -68,7 +68,7 @@ func (c *Controller) StopRelease(ctx context.Context, id string, request StopRel
 		return domain.Deployment{}, controlBlocked("acknowledge that prepared resources/configuration may remain")
 	}
 	if request.Mode == "abandon" && !request.AcknowledgeProviderMayContinue {
-		return domain.Deployment{}, controlBlocked("acknowledge that the provider may continue and the application will remain fenced")
+		return domain.Deployment{}, controlBlocked("acknowledge that the provider may continue and the release components and dependencies will remain protected")
 	}
 	original, err := c.Store.Deployment(ctx, id)
 	if err != nil {
@@ -244,7 +244,7 @@ func (c *Controller) ReconcileAbandoned(ctx context.Context, id string, request 
 			return release, controlBlocked("exact provider operation cannot be observed")
 		}
 		if status.State != "succeeded" && status.State != "failed" {
-			return release, controlBlocked("provider operation is not terminal; the application fence stays active")
+			return release, controlBlocked("provider operation is not terminal; the component and dependency guards stay active")
 		}
 		resolved = append(resolved, domain.ProviderReconciliation{Component: step.Component, Ordinal: step.Ordinal, RemoteDeploymentID: remote, State: status.State})
 	}

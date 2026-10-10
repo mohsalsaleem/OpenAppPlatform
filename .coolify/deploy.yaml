@@ -10,16 +10,20 @@ application:
 environments:
   staging:
     branch: main
-    status: healthy
+    status: provisioned
     coolify_application_uuid: 2bs31xhjzmfi3w0aulusi7zy
     url: https://oap-staging.mohsal.dev
-    image: 127.0.0.1:5001/openappplatform/staging@sha256:c95ed1b0bf0be93e1153524096f0b75d432125eb172753f19bb6e845387a9a20
-    commit: 09801982e325178f8c0e62c8ece87dd1f6a4007c
-    provider_deployment_uuid: 0yatraphzfxotpkerayadr9m
+    image_repository: 127.0.0.1:5001/openappplatform/staging
+    # Historical verified receipt, not a claim about the currently deployed image.
+    # The build/deployment helper records each current receipt in .local/oap-staging.json.
+    last_verified_deployment:
+      image: 127.0.0.1:5001/openappplatform/staging@sha256:9cbcd419d64af6f07bed5861f27d15e8934a2bfbe6634e82f3d725e57d7601bd
+      commit: 490677c9542cebf0faa61de98808ab1e01ac13ce
+      provider_deployment_uuid: tpj8hmtxkcjz3keixiqrtuzk
+      verified: 2026-10-11
     auth_mode: owner
     owner_setup: complete
     configuration_storage_uuid: a2q7lc8ehu6twekwj1bcng8m
-    verified: 2026-10-10
     database:
       engine: postgresql
       database_name: openappplatform_staging

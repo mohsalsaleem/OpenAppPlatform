@@ -1,26 +1,22 @@
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Button } from "@/components/ui/button";
 import { useCanOperate } from "../../access";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Component as ComponentIcon, Plus, X } from "lucide-react";
-import {
-  api,
-  type Application,
-  type Target,
-  type Manifest,
-  type Resource,
-  type Component,
-  type Capabilities,
-} from "../../api";
+import { unwrap, api, type Manifest, type Component } from "../../api";
 import { RuntimeVariables } from "./RuntimeVariables";
-import { ErrorBox, Loading } from "../../components/Feedback";
+import { ErrorBox } from "../../components/Feedback";
 export function NewApplication() {
   const canOperate = useCanOperate();
   const navigate = useNavigate();
   const client = useQueryClient();
   const targets = useQuery({
     queryKey: ["targets"],
-    queryFn: () => api<Target[]>("/targets"),
+    queryFn: () => api.GET("/api/v1/targets").then(unwrap),
   });
   const [name, setName] = useState("");
   const [target, setTarget] = useState("");
@@ -45,20 +41,27 @@ export function NewApplication() {
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const capabilities = useQuery({
     queryKey: ["capabilities", selected?.id],
-    queryFn: () => api<Capabilities>(`/targets/${selected!.id}/capabilities`),
+    queryFn: () =>
+      api
+        .GET("/api/v1/targets/{id}/capabilities", {
+          params: { path: { id: selected!.id! } },
+        })
+        .then(unwrap),
     enabled: !!selected,
   });
   const resources = useQuery({
     queryKey: ["resources", selected?.id],
-    queryFn: () => api<Resource[]>(`/targets/${selected!.id}/resources`),
+    queryFn: () =>
+      api
+        .GET("/api/v1/targets/{id}/resources", {
+          params: { path: { id: selected!.id! } },
+        })
+        .then(unwrap),
     enabled: !!selected,
   });
   const mutation = useMutation({
     mutationFn: (manifest: Manifest) =>
-      api<Application>("/applications", {
-        method: "POST",
-        body: JSON.stringify(manifest),
-      }),
+      api.POST("/api/v1/applications", { body: manifest }).then(unwrap),
     onSuccess: (a) => {
       client.invalidateQueries({ queryKey: ["applications"] });
       client.invalidateQueries({ queryKey: ["application-groups"] });
@@ -103,8 +106,8 @@ export function NewApplication() {
           </div>
           <div className="form-grid">
             <div>
-              <label htmlFor="app-name">Application Name</label>
-              <input
+              <Label htmlFor="app-name">Application Name</Label>
+              <Input
                 id="app-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -117,8 +120,8 @@ export function NewApplication() {
               </small>
             </div>
             <div>
-              <label htmlFor="target">Deployment Target</label>
-              <select
+              <Label htmlFor="target">Deployment Target</Label>
+              <NativeSelect
                 id="target"
                 value={target || targets.data?.[0]?.id || ""}
                 onChange={(e) => setTarget(e.target.value)}
@@ -128,7 +131,7 @@ export function NewApplication() {
                     {t.name} · {t.environment}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </div>
           </div>
           <ErrorBox error={targets.error} />
@@ -136,9 +139,10 @@ export function NewApplication() {
         <section className="panel">
           <div className="section-heading">
             <h2>Web Components</h2>
-            <button
+            <Button
+              variant="outline"
               type="button"
-              className="secondary"
+
               onClick={() =>
                 setComponents([
                   ...components,
@@ -158,7 +162,7 @@ export function NewApplication() {
               disabled={components.length >= 16}
             >
               <Plus size={16} /> Add Component
-            </button>
+            </Button>
           </div>
           {components.map((c, i) => (
             <div className="component-form" key={c.editorId}>
@@ -167,22 +171,24 @@ export function NewApplication() {
                   <ComponentIcon size={16} /> Component {i + 1}
                 </span>
                 {components.length > 1 && (
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     type="button"
-                    className="icon-button"
+
                     aria-label={`Remove Component ${i + 1}`}
                     onClick={() =>
                       setComponents(components.filter((_, n) => n !== i))
                     }
                   >
                     <X size={16} />
-                  </button>
+                  </Button>
                 )}
               </div>
               <div className="form-grid">
                 <div>
-                  <label htmlFor={`name-${i}`}>Component Name</label>
-                  <input
+                  <Label htmlFor={`name-${i}`}>Component Name</Label>
+                  <Input
                     id={`name-${i}`}
                     value={c.name}
                     onChange={(e) =>
@@ -196,8 +202,8 @@ export function NewApplication() {
                   />
                 </div>
                 <div>
-                  <label htmlFor={`adopt-${i}`}>Resource Ownership</label>
-                  <select
+                  <Label htmlFor={`adopt-${i}`}>Resource Ownership</Label>
+                  <NativeSelect
                     id={`adopt-${i}`}
                     value={c.resourceId}
                     onChange={(e) => {
@@ -238,11 +244,11 @@ export function NewApplication() {
                           Observe {r.name}
                         </option>
                       ))}
-                  </select>
+                  </NativeSelect>
                 </div>
                 <div>
-                  <label htmlFor={`image-${i}`}>Container Image</label>
-                  <input
+                  <Label htmlFor={`image-${i}`}>Container Image</Label>
+                  <Input
                     id={`image-${i}`}
                     value={c.image}
                     readOnly={!!c.resourceId}
@@ -261,8 +267,8 @@ export function NewApplication() {
                 </div>
                 <div className="form-grid compact">
                   <div>
-                    <label htmlFor={`port-${i}`}>Internal Port</label>
-                    <input
+                    <Label htmlFor={`port-${i}`}>Internal Port</Label>
+                    <Input
                       id={`port-${i}`}
                       type="number"
                       min="1"
@@ -278,8 +284,8 @@ export function NewApplication() {
                     />
                   </div>
                   <div>
-                    <label htmlFor={`instances-${i}`}>Instances</label>
-                    <input
+                    <Label htmlFor={`instances-${i}`}>Instances</Label>
+                    <Input
                       id={`instances-${i}`}
                       type="number"
                       min="1"
@@ -296,8 +302,8 @@ export function NewApplication() {
                   </div>
                 </div>
                 <div>
-                  <label htmlFor={`host-port-${i}`}>Host Port</label>
-                  <input
+                  <Label htmlFor={`host-port-${i}`}>Host Port</Label>
+                  <Input
                     id={`host-port-${i}`}
                     type="number"
                     min="0"
@@ -359,8 +365,9 @@ export function NewApplication() {
           <Link className="button secondary" to="/">
             Cancel
           </Link>
-          <button
-            className="primary"
+          <Button
+            variant="default"
+
             disabled={
               !canOperate ||
               !selected ||
@@ -369,7 +376,7 @@ export function NewApplication() {
             }
           >
             {mutation.isPending ? "Creating…" : "Create Application"}
-          </button>
+          </Button>
         </div>
       </form>
     </>

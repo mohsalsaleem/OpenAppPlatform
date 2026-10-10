@@ -112,7 +112,7 @@ func (c *Controller) EnqueueImages(ctx context.Context, appID, key string, image
 	return c.EnqueueVersion(ctx, appID, key, images, 0)
 }
 func (c *Controller) EnqueueVersion(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64) (domain.Deployment, error) {
-	return c.enqueueOperation(ctx, appID, key, images, expectedVersion, nil, nil, nil, nil)
+	return c.enqueueOperation(ctx, appID, key, images, expectedVersion, nil, nil, nil, nil, nil)
 }
 
 type RestartRequest struct {
@@ -124,9 +124,9 @@ func (c *Controller) EnqueueRestart(ctx context.Context, appID, key string, requ
 	if request.Component == "" || request.Ordinal < 1 || version < 1 {
 		return domain.Deployment{}, errors.New("component, ordinal and expectedVersion are required")
 	}
-	return c.enqueueOperation(ctx, appID, key, nil, version, &request, nil, nil, nil)
+	return c.enqueueOperation(ctx, appID, key, nil, version, &request, nil, nil, nil, nil)
 }
-func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64, restart *RestartRequest, scaleDown *ScaleDownRequest, provenance *domain.ReleaseSource, rollback *RollbackRequest) (domain.Deployment, error) {
+func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64, restart *RestartRequest, scaleDown *ScaleDownRequest, provenance *domain.ReleaseSource, rollback *RollbackRequest, selection []string) (domain.Deployment, error) {
 	if len(key) < 8 || len(key) > 128 {
 		return domain.Deployment{}, errors.New("Idempotency-Key must contain 8 to 128 characters")
 	}
@@ -143,6 +143,17 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	if e != nil {
 		return domain.Deployment{}, e
 	}
+	for _, name := range selection {
+		found := false
+		for _, component := range a.Manifest.Components {
+			if component.Name == name {
+				found = true
+			}
+		}
+		if !found {
+			return domain.Deployment{}, errors.New("unknown selected component")
+		}
+	}
 	if expectedVersion < 0 {
 		return domain.Deployment{}, errors.New("expectedVersion cannot be negative")
 	}
@@ -150,13 +161,14 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		images = nil
 	}
 	requestBody, _ := json.Marshal(struct {
-		Images    map[string]string     `json:"images"`
-		Version   int64                 `json:"expectedVersion"`
-		Restart   *RestartRequest       `json:"restart,omitempty"`
-		ScaleDown *ScaleDownRequest     `json:"scaleDown,omitempty"`
-		Source    *domain.ReleaseSource `json:"source,omitempty"`
-		Rollback  *RollbackRequest      `json:"rollback,omitempty"`
-	}{images, expectedVersion, restart, scaleDown, provenance, rollback})
+		Images     map[string]string     `json:"images"`
+		Version    int64                 `json:"expectedVersion"`
+		Restart    *RestartRequest       `json:"restart,omitempty"`
+		ScaleDown  *ScaleDownRequest     `json:"scaleDown,omitempty"`
+		Source     *domain.ReleaseSource `json:"source,omitempty"`
+		Rollback   *RollbackRequest      `json:"rollback,omitempty"`
+		Components []string              `json:"components,omitempty"`
+	}{images, expectedVersion, restart, scaleDown, provenance, rollback, selection})
 	requestSum := sha256.Sum256(requestBody)
 	requestHash := hex.EncodeToString(requestSum[:])
 	var existingID, oldHash string
@@ -197,7 +209,7 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		}
 	}
 	for _, comp := range a.Manifest.Components {
-		if comp.Management == "observe" && (provenance == nil || images[comp.Name] != "") && ((restart == nil && scaleDown == nil) || (restart != nil && restart.Component == comp.Name) || (scaleDown != nil && scaleDown.Component == comp.Name)) {
+		if comp.Management == "observe" && (len(selection) == 0 || selectedComponent(selection, comp.Name)) && (provenance == nil || images[comp.Name] != "") && ((restart == nil && scaleDown == nil) || (restart != nil && restart.Component == comp.Name) || (scaleDown != nil && scaleDown.Component == comp.Name)) {
 			return domain.Deployment{}, errors.New("observe-only components require an explicit management handoff before lifecycle operations")
 		}
 	}
@@ -235,19 +247,13 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		}
 		return c.Store.DeploymentTx(ctx, tx, existingID)
 	}
-	var active bool
-	if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM oap_deployments WHERE application_id=$1 AND state IN ('queued','running','attention'))", appID).Scan(&active); e != nil {
-		return domain.Deployment{}, e
-	}
-	if active {
-		return domain.Deployment{}, domain.ErrConflict
-	}
+
 	d := domain.Deployment{Operation: "deploy", ID: domain.NewID(), ApplicationID: appID, Manifest: a.Manifest, DefinitionVersion: a.Version, State: "queued", Steps: domain.InitialSteps(a.Manifest)}
 	d.Source = provenance
-	if provenance != nil || rollback != nil {
+	if provenance != nil || rollback != nil || len(selection) > 0 {
 		selected := []domain.Step{}
 		for _, step := range d.Steps {
-			if images[step.Component] != "" {
+			if images[step.Component] != "" || selectedComponent(selection, step.Component) {
 				selected = append(selected, step)
 			}
 		}
@@ -340,6 +346,13 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		}
 		d.Steps = []domain.Step{{Component: restart.Component, Ordinal: restart.Ordinal, ResourceID: ref, Phase: "pending", Action: "restart"}}
 	}
+	claims, e := releaseClaims(d)
+	if e != nil {
+		return d, e
+	}
+	if e = checkReleaseClaims(ctx, tx, appID, claims); e != nil {
+		return d, e
+	}
 	spec, e = json.Marshal(d.Manifest)
 	if e != nil {
 		return d, e
@@ -347,6 +360,9 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	steps, _ := json.Marshal(d.Steps)
 	e = tx.QueryRow(ctx, "INSERT INTO oap_deployments(id,application_id,state,spec,steps,idempotency_key,request_hash,definition_version,request_hash_version,operation) VALUES($1,$2,$3,$4,$5,$6,$7,$8,2,$9) RETURNING created_at,updated_at", d.ID, appID, d.State, spec, steps, key, requestHash, a.Version, d.Operation).Scan(&d.CreatedAt, &d.UpdatedAt)
 	if e != nil {
+		return d, e
+	}
+	if e = saveReleaseClaims(ctx, tx, d.ID, claims); e != nil {
 		return d, e
 	}
 	if d.Source != nil {
@@ -607,5 +623,5 @@ func Healthy(status string) bool {
 }
 
 func (c *Controller) EnqueueSource(ctx context.Context, app, key string, images map[string]string, version int64, provenance *domain.ReleaseSource) (domain.Deployment, error) {
-	return c.enqueueOperation(ctx, app, key, images, version, nil, nil, provenance, nil)
+	return c.enqueueOperation(ctx, app, key, images, version, nil, nil, provenance, nil, nil)
 }

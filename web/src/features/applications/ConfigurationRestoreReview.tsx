@@ -1,20 +1,21 @@
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type Application, type Deployment } from "../../api";
+import { unwrap, api, type Application, type Deployment } from "../../api";
 import { useCanOperate } from "../../access";
 import { DeploymentDialog } from "../../components/DeploymentDialog";
 import { ErrorBox } from "../../components/Feedback";
-type Plan = {
-  releaseId: string;
-  definitionVersion: number;
-  planHash: string;
-  changes: {
-    component: string;
-    field: string;
-    before: string;
-    after: string;
-  }[];
-};
+
 export function ConfigurationRestoreReview({
   application,
   release,
@@ -28,24 +29,31 @@ export function ConfigurationRestoreReview({
     [ack, setAck] = useState(false);
   const plan = useMutation({
     mutationFn: () =>
-      api<Plan>(
-        `/applications/${application.id}/configuration-restore-plan?releaseId=${release.id}&expectedVersion=${application.version}`,
-      ),
+      api
+        .GET("/api/v1/applications/{id}/configuration-restore-plan", {
+          params: {
+            path: { id: application.id! },
+            query: {
+              releaseId: release.id,
+              expectedVersion: application.version,
+            },
+          },
+        })
+        .then(unwrap),
   });
   const save = useMutation({
     mutationFn: () =>
-      api<Application>(
-        `/applications/${application.id}/configuration-restores`,
-        {
-          method: "POST",
-          body: JSON.stringify({
+      api
+        .POST("/api/v1/applications/{id}/configuration-restores", {
+          params: { path: { id: application.id! } },
+          body: {
             releaseId: plan.data!.releaseId,
             expectedVersion: plan.data!.definitionVersion,
             planHash: plan.data!.planHash,
             acknowledgeEffects: ack,
-          }),
-        },
-      ),
+          },
+        })
+        .then(unwrap),
     onSuccess: (app) => {
       setOpen(false);
       client.setQueryData(["application", application.id], app);
@@ -55,8 +63,9 @@ export function ConfigurationRestoreReview({
   });
   return (
     <>
-      <button
-        className="secondary"
+      <Button
+        variant="outline"
+
         disabled={!canOperate}
         onClick={() => {
           setOpen(true);
@@ -67,7 +76,7 @@ export function ConfigurationRestoreReview({
         }}
       >
         Review Configuration from {release.id.slice(0, 8)}
-      </button>
+      </Button>
       {open && (
         <DeploymentDialog
           onClose={() => {
@@ -92,51 +101,52 @@ export function ConfigurationRestoreReview({
           {plan.data && (
             <>
               <div className="table-responsive">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Setting</th>
-                      <th>Saved Now</th>
-                      <th>Restore</th>
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Setting</TableHead>
+                      <TableHead>Saved Now</TableHead>
+                      <TableHead>Restore</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {plan.data.changes.map((c) => (
-                      <tr key={`${c.component}-${c.field}`}>
-                        <td>
+                      <TableRow key={`${c.component}-${c.field}`}>
+                        <TableCell>
                           {c.component} · {c.field}
-                        </td>
-                        <td>{c.before}</td>
-                        <td>{c.after}</td>
-                      </tr>
+                        </TableCell>
+                        <TableCell>{c.before}</TableCell>
+                        <TableCell>{c.after}</TableCell>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </Table>
               </div>
               <p className="small muted">
                 Variable and endpoint values are hidden in this review.
               </p>
-              <label className="rollback-ack">
-                <input
-                  type="checkbox"
+              <Label className="rollback-ack">
+                <Checkbox
                   checked={ack}
-                  onChange={(e) => setAck(e.target.checked)}
+                  onCheckedChange={(e) => setAck(e === true)}
                 />
                 I reviewed the settings and their effects. This saves
                 configuration for a later deployment.
-              </label>
+              </Label>
             </>
           )}
           <div className="form-actions">
-            <button
-              className="secondary"
+            <Button
+              variant="outline"
+
               disabled={save.isPending}
               onClick={() => setOpen(false)}
             >
               Cancel
-            </button>
-            <button
-              className="primary"
+            </Button>
+            <Button
+              variant="default"
+
               disabled={
                 !canOperate ||
                 !plan.data ||
@@ -147,7 +157,7 @@ export function ConfigurationRestoreReview({
               onClick={() => save.mutate()}
             >
               {save.isPending ? "Saving…" : "Restore Saved Configuration"}
-            </button>
+            </Button>
           </div>
         </DeploymentDialog>
       )}

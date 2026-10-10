@@ -6,8 +6,9 @@
 | --- | --- |
 | oap_targets | Stable target ID; token environment reference separate from public JSON |
 | oap_applications | Unique name and environment; validated base manifest |
-| oap_deployments | Frozen manifest and steps; unique application and idempotency key; one active release per application |
+| oap_deployments | Frozen manifest and steps; unique application and idempotency key; component claims fence overlapping active work |
 | oap_bindings | One owner per target and resource; one resource per application component and ordinal |
+| oap_release_claims | Durable component write/read claims; active/attention releases retain conflicts |
 | River tables | Transactional job insertion, retries, and crash recovery |
 
 JSONB stores bounded manifests and instance steps while ownership and release
@@ -41,20 +42,22 @@ Deployment dispatch is not treated as idempotent. Persisting dispatching before
 the request gives a conservative recovery boundary: a restarted worker never
 blindly resubmits an uncertain request. This can produce attention even when no
 request reached Coolify, which is preferable to an uncontrolled duplicate
-release. An unresolved attention release blocks subsequent releases. This
-milestone has no automated resolution endpoint; the provider must be inspected
-and state reconciled deliberately before resuming. Provider-specific dispatch
-reconciliation can improve that later.
+release. An unresolved attention release retains its component and dependency claims.
+Recovery, pre-dispatch cancellation, owner abandonment and provider reconciliation
+are explicit endpoints. A closed tracking view does not remove uncertain provider
+work; unresolved abandonment keeps its claims until successful reconciliation.
 
 Observation is a short job execution followed by River snooze. Each observed
 state is persisted. External failures retry boundedly; exhaustion records
-attention. Observation has a fifteen-minute release deadline. An interrupted
+attention. Observation uses the frozen per-component readiness deadline; legacy releases
+retain a fifteen-minute window. An interrupted
 application release never silently becomes successful.
 
 ## API
 
 The root health endpoint checks PostgreSQL reachability. All /api routes require
-Bearer authentication. Application JSON rejects unknown fields and multiple JSON
+an owner session or an authorized app-scoped bearer credential (apart from
+public setup/status and signed webhook intake). Application JSON rejects unknown fields and multiple JSON
 documents, and request size is limited to 64 KiB. Validation normalizes defaults
 before persistence. Not found, conflict, validation, authentication, and provider
 errors are represented as stable code and message fields.
@@ -62,7 +65,8 @@ errors are represented as stable code and message fields.
 The OpenAPI document is docs/openapi.json. Resource discovery returns only safe
 projections instead of provider objects, which can contain webhook secrets and
 credentials. Logs return at most one instance's recent 100 lines through the
-adapter; consolidated and live log streaming are future work.
+adapter; the selected instance also exposes bounded log snapshots over SSE. Historical
+indexing and consolidated search remain planned.
 
 ## Coolify transport
 
@@ -84,15 +88,24 @@ application detail, application directory, and target discovery are separate
 feature views. Reusable status, loading, and error components normalize feedback.
 React Query owns server state; local form and modal state stays in React.
 
-Polling refreshes release progress every two seconds. The UI shows real API data
+Authenticated SSE refreshes application/release state; disconnected clients
+fall back to two-second polling. Instance health still polls the provider. The UI shows real API data
 and does not invent health metrics. Standard deployment requires an explicit
 confirmation describing its effect. Definition creation performs no deployment.
 Provider resource inspection is read-only. Layout reflows for narrow screens.
 
-This first UI uses custom CSS alongside reusable React components. Tailwind and
-shadcn/ui remain optional refinements; they are not installed. Large feature
-views should be extracted as their workflows grow, rather than introducing a
-shared global state layer early.
+The UI foundation is Tailwind and shadcn/ui, with shared Button, Input,
+NativeSelect, Textarea, Checkbox, Label, Table, Badge, Tabs and Dialog components.
+Radix manages modal focus/keyboard behavior and tab navigation. Application panels
+remain mounted to preserve configuration drafts. Custom CSS handles page composition,
+not a competing control library. OpenAPI-generated types and typed operations are
+used by the dashboard; shared response models are not maintained a second time.
+
+Named store SQL lives in `internal/store/queries`; sqlc generates checked SQL,
+parameter/result types and pgx helpers in `internal/store/db`. Store projections
+convert generated records to domain types. Transactional controller/auth queries
+still use explicit pgx SQL where their authorization and locking need a local
+transaction; sqlc does not replace the transaction model.
 
 ## Tests
 

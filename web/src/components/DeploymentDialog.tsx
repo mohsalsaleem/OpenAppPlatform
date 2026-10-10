@@ -1,6 +1,7 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { Children, isValidElement, useRef, type ReactNode } from "react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
-/** Native dialog supplies focus containment, Escape handling, and inert background. */
+/** All operation reviews share the shadcn/Radix focus, overlay and Escape behavior. */
 export function DeploymentDialog({
   onClose,
   children,
@@ -8,22 +9,40 @@ export function DeploymentDialog({
   onClose: () => void;
   children: ReactNode;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current!;
-    dialog.showModal();
-    return () => {
-      if (dialog.open) dialog.close();
-    };
-  }, []);
+  const previousFocus = useRef(document.activeElement as HTMLElement | null);
+  const content = Children.toArray(children).map((child) =>
+    isValidElement<{ children?: ReactNode; id?: string }>(child) &&
+    child.type === "h2" ? (
+      <DialogTitle key="title">{child.props.children}</DialogTitle>
+    ) : (
+      child
+    ),
+  );
   return (
-    <dialog
-      ref={ref}
-      className="modal"
-      aria-labelledby="deploy-title"
-      onCancel={onClose}
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
     >
-      {children}
-    </dialog>
+      <DialogContent
+        className="sm:max-w-2xl"
+        showCloseButton={false}
+        aria-describedby={undefined}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          const original = previousFocus.current;
+          if (original?.isConnected && original.getClientRects().length)
+            original.focus();
+          else
+            document
+              .querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+              ?.focus();
+        }}
+        onInteractOutside={(event) => event.preventDefault()}
+      >
+        {content}
+      </DialogContent>
+    </Dialog>
   );
 }

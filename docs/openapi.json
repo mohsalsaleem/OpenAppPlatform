@@ -44,8 +44,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -64,8 +64,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -84,7 +84,8 @@
               }
             }
           }
-        }
+        },
+        "parameters": []
       }
     },
     "/api/v1/targets": {
@@ -115,8 +116,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -135,8 +136,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -155,7 +156,8 @@
               }
             }
           }
-        }
+        },
+        "parameters": []
       }
     },
     "/api/v1/targets/{id}/resources": {
@@ -186,8 +188,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -206,8 +208,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -277,8 +279,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -297,8 +299,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -317,7 +319,8 @@
               }
             }
           }
-        }
+        },
+        "parameters": []
       },
       "post": {
         "summary": "Create application definition",
@@ -343,8 +346,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -363,8 +366,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -389,11 +392,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Manifest"
+                "$ref": "#/components/schemas/ManifestInput"
               }
             }
           }
-        }
+        },
+        "parameters": []
       }
     },
     "/api/v1/applications/{id}": {
@@ -421,8 +425,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -441,8 +445,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -499,7 +503,7 @@
                 "additionalProperties": false,
                 "properties": {
                   "manifest": {
-                    "$ref": "#/components/schemas/Manifest"
+                    "$ref": "#/components/schemas/ManifestInput"
                   },
                   "expectedVersion": {
                     "type": "integer",
@@ -511,28 +515,18 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation rejected",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -551,8 +545,8 @@
               }
             }
           },
-          "500": {
-            "description": "Internal error",
+          "409": {
+            "description": "Conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -561,12 +555,22 @@
               }
             }
           },
-          "200": {
-            "description": "Successful operation",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Application"
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
@@ -602,8 +606,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -622,8 +626,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -678,8 +682,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -698,8 +702,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -721,14 +725,6 @@
         },
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
@@ -736,6 +732,14 @@
               "type": "string",
               "minLength": 8,
               "maxLength": 128
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -757,6 +761,13 @@
                     "type": "integer",
                     "minimum": 0,
                     "description": "If positive, reject a new release when this definition version has changed."
+                  },
+                  "components": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "uniqueItems": true
                   }
                 },
                 "required": [],
@@ -792,8 +803,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -812,8 +823,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -879,8 +890,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -899,8 +910,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -950,12 +961,9 @@
           {
             "name": "ordinal",
             "in": "query",
-            "description": "Select an instance; defaults to 1",
+            "required": true,
             "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 4,
-              "default": 1
+              "type": "number"
             }
           }
         ]
@@ -989,8 +997,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1009,8 +1017,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -1067,8 +1075,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1087,8 +1095,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -1156,8 +1164,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1176,8 +1184,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -1234,8 +1242,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1254,8 +1262,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -1277,14 +1285,6 @@
         },
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
@@ -1292,6 +1292,14 @@
               "type": "string",
               "minLength": 8,
               "maxLength": 128
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -1333,8 +1341,8 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -1353,8 +1361,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -1376,14 +1384,6 @@
         },
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
@@ -1391,6 +1391,14 @@
               "type": "string",
               "minLength": 8,
               "maxLength": 128
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -1447,7 +1455,7 @@
         },
         "responses": {
           "200": {
-            "description": "Handoff recorded; definition version increased",
+            "description": "Successful operation",
             "content": {
               "application/json": {
                 "schema": {
@@ -1470,7 +1478,31 @@
         "summary": "Owner setup status",
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Public installation authentication mode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mode": {
+                      "type": "string",
+                      "enum": [
+                        "owner",
+                        "preview"
+                      ]
+                    },
+                    "setupRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "setupRequired"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing or expired credential"
@@ -1563,7 +1595,15 @@
         "summary": "Sign in and issue an HttpOnly session cookie",
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing or expired credential"
@@ -1693,7 +1733,31 @@
         "summary": "Get current credential identity and workspace",
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "role",
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing or expired credential"
@@ -1707,7 +1771,8 @@
           "422": {
             "description": "Invalid input"
           }
-        }
+        },
+        "parameters": []
       }
     },
     "/api/v1/auth/logout": {
@@ -1715,7 +1780,15 @@
         "summary": "Revoke current session",
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing or expired credential"
@@ -1751,7 +1824,42 @@
         "summary": "List workspace members (owner sessions only)",
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "email": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "role": {
+                        "type": "string"
+                      },
+                      "active": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "email",
+                      "name",
+                      "role",
+                      "active"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing or expired credential"
@@ -1765,7 +1873,8 @@
           "422": {
             "description": "Invalid input"
           }
-        }
+        },
+        "parameters": []
       }
     },
     "/api/v1/access/members/{id}": {
@@ -1773,7 +1882,15 @@
         "summary": "Change role or disable a non-owner member",
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing or expired credential"
@@ -1790,14 +1907,6 @@
         },
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "X-OAP-CSRF",
             "in": "header",
             "required": false,
@@ -1808,6 +1917,14 @@
               ]
             },
             "description": "Required for browser-cookie and public account writes."
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {
@@ -1843,6 +1960,25 @@
       "post": {
         "summary": "Create an invitation, returned once",
         "responses": {
+          "201": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "invite": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "invite"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "401": {
             "description": "Missing or expired credential"
           },
@@ -1854,9 +1990,6 @@
           },
           "422": {
             "description": "Invalid input"
-          },
-          "201": {
-            "description": "Success"
           }
         },
         "parameters": [
@@ -1906,6 +2039,25 @@
       "post": {
         "summary": "Issue a named app-scoped agent token, returned once",
         "responses": {
+          "201": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "token": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "token"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "401": {
             "description": "Missing or expired credential"
           },
@@ -1917,9 +2069,6 @@
           },
           "422": {
             "description": "Invalid input"
-          },
-          "201": {
-            "description": "Success"
           }
         },
         "parameters": [
@@ -1974,9 +2123,49 @@
         "summary": "List agent metadata without token values (owner sessions only)",
         "responses": {
           "200": {
-            "description": "Latest 100 agent credentials"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "scope": {
+                        "type": "string"
+                      },
+                      "applicationId": {
+                        "type": "string"
+                      },
+                      "expiresAt": {
+                        "type": "string"
+                      },
+                      "revoked": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name",
+                      "scope",
+                      "applicationId",
+                      "expiresAt",
+                      "revoked"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters": []
       }
     },
     "/api/v1/access/credentials/{id}": {
@@ -1984,7 +2173,15 @@
         "summary": "Revoke an agent credential",
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing or expired credential"
@@ -2001,14 +2198,6 @@
         },
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
             "name": "X-OAP-CSRF",
             "in": "header",
             "required": false,
@@ -2019,6 +2208,14 @@
               ]
             },
             "description": "Required for browser-cookie and public account writes."
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -2028,7 +2225,50 @@
         "summary": "Latest 100 audit intents/results, excluding request bodies",
         "responses": {
           "200": {
-            "description": "Success"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "credentialName": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "subject": {
+                        "type": "string"
+                      },
+                      "action": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "number"
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "credentialName",
+                      "kind",
+                      "id",
+                      "subject",
+                      "action",
+                      "status",
+                      "createdAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing or expired credential"
@@ -2042,7 +2282,8 @@
           "422": {
             "description": "Invalid input"
           }
-        }
+        },
+        "parameters": []
       }
     },
     "/api/v1/hooks/github/{id}": {
@@ -2126,7 +2367,112 @@
         ],
         "responses": {
           "200": {
-            "description": "Source events including commit, state, build/provider results, and recovery timestamp"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "commit": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
+                      },
+                      "error": {
+                        "type": "string"
+                      },
+                      "deploymentId": {
+                        "type": "string"
+                      },
+                      "updatedAt": {
+                        "type": "string"
+                      },
+                      "definitionVersion": {
+                        "type": "number"
+                      },
+                      "binding": {
+                        "type": "object",
+                        "properties": {
+                          "repository": {
+                            "type": "string"
+                          },
+                          "branch": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "repository",
+                          "branch"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "builds": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "state": {
+                              "type": "string"
+                            },
+                            "image": {
+                              "type": "string"
+                            },
+                            "provider": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "commit": {
+                                  "type": "string"
+                                },
+                                "state": {
+                                  "type": "string"
+                                },
+                                "resourceStatus": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "commit",
+                                "state",
+                                "resourceStatus"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "state"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "commit",
+                      "state",
+                      "updatedAt",
+                      "definitionVersion",
+                      "binding",
+                      "builds"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -2179,7 +2525,15 @@
         },
         "responses": {
           "200": {
-            "description": "Recovered event; existing release acknowledgement is restored without rebuilding"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
           },
           "403": {
             "description": "Owner session required"
@@ -2195,9 +2549,20 @@
         "summary": "List logical applications and their existing environments",
         "responses": {
           "200": {
-            "description": "Groups with environment IDs and versions; unavailable to app-scoped credentials"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApplicationGroup"
+                  }
+                }
+              }
+            }
           }
-        }
+        },
+        "parameters": []
       }
     },
     "/api/v1/application-groups/{id}/environments": {
@@ -2243,7 +2608,15 @@
         },
         "responses": {
           "200": {
-            "description": "Metadata linked"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
           },
           "403": {
             "description": "Human owner required"
@@ -2322,7 +2695,35 @@
         ],
         "responses": {
           "200": {
-            "description": "Verified scope, capabilities and resource count"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "checkedAt": {
+                      "type": "string"
+                    },
+                    "resourceCount": {
+                      "type": "number"
+                    },
+                    "nativeSourceObservation": {
+                      "type": "boolean"
+                    },
+                    "capabilities": {
+                      "$ref": "#/components/schemas/Capabilities"
+                    }
+                  },
+                  "required": [
+                    "checkedAt",
+                    "resourceCount",
+                    "nativeSourceObservation",
+                    "capabilities"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "502": {
             "description": "Cannot verify credentials/scope"
@@ -2366,7 +2767,14 @@
         },
         "responses": {
           "201": {
-            "description": "Created OAP metadata only"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Target"
+                }
+              }
+            }
           },
           "403": {
             "description": "Human owner required"
@@ -2377,7 +2785,8 @@
           "502": {
             "description": "Existing scope verification failed"
           }
-        }
+        },
+        "parameters": []
       }
     },
     "/api/v1/applications/{id}/layout": {
@@ -2395,7 +2804,47 @@
         ],
         "responses": {
           "200": {
-            "description": "Name/version and component name/kind only"
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "definitionVersion": {
+                      "type": "number"
+                    },
+                    "components": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "kind"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "definitionVersion",
+                    "components"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
           },
           "404": {
             "description": "Unavailable or outside credential scope"
@@ -2428,8 +2877,11 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "403": {
+            "description": "Insufficient scope or human owner session required"
+          },
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2448,8 +2900,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -2467,9 +2919,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "Insufficient scope or human owner session required"
           }
         },
         "parameters": [
@@ -2520,8 +2969,11 @@
               }
             }
           },
-          "422": {
-            "description": "Validation rejected",
+          "403": {
+            "description": "Insufficient scope or human owner session required"
+          },
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2540,8 +2992,8 @@
               }
             }
           },
-          "404": {
-            "description": "Not found",
+          "422": {
+            "description": "Validation rejected",
             "content": {
               "application/json": {
                 "schema": {
@@ -2559,9 +3011,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "Insufficient scope or human owner session required"
           }
         },
         "parameters": [
@@ -2581,6 +3030,521 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ReconcileReleaseRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/events": {
+      "get": {
+        "operationId": "applicationEvents",
+        "summary": "Stream current application and release snapshots",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE snapshot/heartbeat frames; reconnect receives current state",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/logs/{component}/stream": {
+      "get": {
+        "operationId": "instanceLogEvents",
+        "summary": "Stream bounded per-instance log snapshots",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "component",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ordinal",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4,
+              "default": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "SSE snapshot/heartbeat frames; reconnect receives current state",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/configuration-restore-plan": {
+      "get": {
+        "operationId": "get__api_v1_applications_id_configuration_restore_plan",
+        "summary": "/api/v1/applications/{id}/configuration-restore-plan",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "releaseId": {
+                      "type": "string"
+                    },
+                    "definitionVersion": {
+                      "type": "number"
+                    },
+                    "planHash": {
+                      "type": "string"
+                    },
+                    "changes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "component": {
+                            "type": "string"
+                          },
+                          "field": {
+                            "type": "string"
+                          },
+                          "before": {
+                            "type": "string"
+                          },
+                          "after": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "component",
+                          "field",
+                          "before",
+                          "after"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "releaseId",
+                    "definitionVersion",
+                    "planHash",
+                    "changes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "releaseId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "expectedVersion",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/applications/{id}/configuration-restores": {
+      "post": {
+        "operationId": "post__api_v1_applications_id_configuration_restores",
+        "summary": "/api/v1/applications/{id}/configuration-restores",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/release-comparison": {
+      "get": {
+        "operationId": "get__api_v1_applications_id_release_comparison",
+        "summary": "/api/v1/applications/{id}/release-comparison",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "from": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "definitionVersion": {
+                          "type": "number"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "operation": {
+                          "type": "string"
+                        },
+                        "commit": {
+                          "type": "string"
+                        },
+                        "artifacts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "component": {
+                                "type": "string"
+                              },
+                              "image": {
+                                "type": "string"
+                              },
+                              "immutable": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "component",
+                              "image",
+                              "immutable"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "definitionVersion",
+                        "state",
+                        "operation",
+                        "artifacts"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "to": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "definitionVersion": {
+                          "type": "number"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "operation": {
+                          "type": "string"
+                        },
+                        "commit": {
+                          "type": "string"
+                        },
+                        "artifacts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "component": {
+                                "type": "string"
+                              },
+                              "image": {
+                                "type": "string"
+                              },
+                              "immutable": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "component",
+                              "image",
+                              "immutable"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "definitionVersion",
+                        "state",
+                        "operation",
+                        "artifacts"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "changes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "component": {
+                            "type": "string"
+                          },
+                          "field": {
+                            "type": "string"
+                          },
+                          "before": {
+                            "type": "string"
+                          },
+                          "after": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "component",
+                          "field",
+                          "before",
+                          "after"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "from",
+                    "to",
+                    "changes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/applications/{id}/rollback-plan": {
+      "get": {
+        "operationId": "get__api_v1_applications_id_rollback_plan",
+        "summary": "/api/v1/applications/{id}/rollback-plan",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "releaseId": {
+                      "type": "string"
+                    },
+                    "definitionVersion": {
+                      "type": "number"
+                    },
+                    "planHash": {
+                      "type": "string"
+                    },
+                    "artifactAvailability": {
+                      "type": "string"
+                    },
+                    "instances": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "component": {
+                            "type": "string"
+                          },
+                          "ordinal": {
+                            "type": "number"
+                          },
+                          "currentImage": {
+                            "type": "string"
+                          },
+                          "restoreImage": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "component",
+                          "ordinal",
+                          "currentImage",
+                          "restoreImage"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "releaseId",
+                    "definitionVersion",
+                    "planHash",
+                    "artifactAvailability",
+                    "instances"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "releaseId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "expectedVersion",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/applications/{id}/rollbacks": {
+      "post": {
+        "operationId": "post__api_v1_applications_id_rollbacks",
+        "summary": "/api/v1/applications/{id}/rollbacks",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
               }
             }
           }
@@ -2627,6 +3591,57 @@
       "Component": {
         "type": "object",
         "properties": {
+          "healthCheck": {
+            "$ref": "#/components/schemas/HealthCheck"
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "readiness": {
+            "type": "object",
+            "properties": {
+              "requireHealthy": {
+                "type": "boolean"
+              },
+              "timeoutSeconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3600
+              }
+            },
+            "additionalProperties": false
+          },
+          "management": {
+            "type": "string",
+            "enum": [
+              "observe"
+            ],
+            "description": "New existing-resource registrations always start observe-only. Omitted on existing managed definitions. Enable lifecycle management using the explicit handoff endpoint."
+          },
+          "serviceEndpoints": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Referenced component name to explicit operator-managed HTTP(S) endpoint. Required for Coolify connections; no credentials, query, or fragment."
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Plain non-secret runtime variables. Coolify mutates only recorded OAP-owned production variables; unrelated and preview variables remain operator-managed."
+          },
+          "services": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Environment variable to component name. Uses application DNS on Docker or a supplied explicit endpoint; adopted targets require an explicit endpoint."
+          },
           "name": {
             "type": "string"
           },
@@ -2634,22 +3649,26 @@
             "type": "string",
             "enum": [
               "web"
-            ]
+            ],
+            "default": "web"
           },
           "image": {
             "type": "string"
           },
           "port": {
             "type": "integer",
+            "description": "Zero allowed only for observe-only resources whose operator does not report a port.",
             "minimum": 0,
-            "maximum": 65535,
-            "description": "Zero allowed only for observe-only resources whose operator does not report a port."
+            "maximum": 65535
+          },
+          "hostPort": {
+            "type": "number",
+            "description": "Zero adds no host port mapping. Existing operator routes may still expose the resource."
           },
           "instances": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 4,
-            "default": 1
+            "maximum": 4
           },
           "strategy": {
             "type": "string",
@@ -2660,64 +3679,15 @@
           },
           "resourceId": {
             "type": "string"
-          },
-          "hostPort": {
-            "oneOf": [
-              {
-                "type": "integer",
-                "enum": [
-                  0
-                ]
-              },
-              {
-                "type": "integer",
-                "minimum": 1024,
-                "maximum": 65535
-              }
-            ],
-            "description": "Zero keeps a component private. A fixed host port requires one instance."
-          },
-          "env": {
-            "type": "object",
-            "description": "Plain non-secret runtime variables. Coolify mutates only recorded OAP-owned production variables; unrelated and preview variables remain operator-managed.",
-            "additionalProperties": {
-              "type": "string",
-              "maxLength": 4096
-            },
-            "maxProperties": 64
-          },
-          "services": {
-            "type": "object",
-            "description": "Environment variable to component name. Uses application DNS on Docker or a supplied explicit endpoint; adopted targets require an explicit endpoint.",
-            "additionalProperties": {
-              "type": "string"
-            },
-            "maxProperties": 64
-          },
-          "serviceEndpoints": {
-            "type": "object",
-            "description": "Referenced component name to explicit operator-managed HTTP(S) endpoint. Required for Coolify connections; no credentials, query, or fragment.",
-            "additionalProperties": {
-              "type": "string",
-              "format": "uri",
-              "maxLength": 2048
-            }
-          },
-          "management": {
-            "type": "string",
-            "enum": [
-              "observe"
-            ],
-            "description": "New existing-resource registrations always start observe-only. Omitted on existing managed definitions. Enable lifecycle management using the explicit handoff endpoint."
-          },
-          "healthCheck": {
-            "$ref": "#/components/schemas/HealthCheck"
           }
         },
         "required": [
           "name",
+          "kind",
           "image",
-          "port"
+          "port",
+          "instances",
+          "strategy"
         ],
         "additionalProperties": false
       },
@@ -2735,11 +3705,11 @@
           },
           "components": {
             "type": "array",
-            "minItems": 1,
-            "maxItems": 16,
             "items": {
               "$ref": "#/components/schemas/Component"
-            }
+            },
+            "maxItems": 16,
+            "minItems": 1
           }
         },
         "required": [
@@ -2753,6 +3723,9 @@
       "Application": {
         "type": "object",
         "properties": {
+          "groupId": {
+            "type": "string"
+          },
           "id": {
             "type": "string"
           },
@@ -2763,21 +3736,22 @@
             "type": "string",
             "format": "date-time"
           },
-          "version": {
-            "type": "integer",
-            "minimum": 1
-          },
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "version": {
+            "type": "number",
+            "minimum": 1
           }
         },
         "required": [
+          "groupId",
           "id",
           "manifest",
           "createdAt",
-          "version",
-          "updatedAt"
+          "updatedAt",
+          "version"
         ],
         "additionalProperties": false
       },
@@ -2791,96 +3765,58 @@
             "type": "string"
           },
           "operator": {
-            "type": "string",
-            "enum": [
-              "coolify",
-              "docker"
-            ]
-          },
-          "url": {
-            "type": "string"
-          },
-          "projectId": {
-            "type": "string"
-          },
-          "serverId": {
             "type": "string"
           },
           "environment": {
             "type": "string"
           },
-          "settings": {
-            "type": "object",
-            "properties": {
-              "pullPolicy": {
-                "type": "string",
-                "enum": [
-                  "never",
-                  "if-missing"
-                ]
-              },
-              "hostBindIP": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false
+          "url": {
+            "type": "string"
           }
         },
         "required": [
           "id",
           "name",
           "operator",
-          "url",
-          "projectId",
-          "serverId",
-          "environment"
+          "environment",
+          "url"
         ],
         "additionalProperties": false
       },
       "Resource": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
           "description": {
             "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "url": {
-            "type": "string"
-          },
-          "image": {
-            "type": "string"
-          },
-          "environment": {
-            "type": "string"
-          },
-          "projectId": {
-            "type": "string"
-          },
-          "artifactKind": {
-            "type": "string",
-            "enum": [
-              "image",
-              "source"
-            ]
-          },
-          "port": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 65535
           },
           "applicationId": {
             "type": "string",
             "description": "Existing OAP reservation, when present on discovery."
           },
           "component": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "artifactKind": {
+            "type": "string"
+          },
+          "port": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 65535
+          },
+          "image": {
+            "type": "string"
+          },
+          "url": {
             "type": "string"
           }
         },
@@ -2894,23 +3830,28 @@
       "Step": {
         "type": "object",
         "properties": {
+          "rollbackFrom": {
+            "type": "string"
+          },
           "component": {
             "type": "string"
           },
           "ordinal": {
-            "type": "integer"
+            "type": "number"
           },
           "phase": {
+            "type": "string"
+          },
+          "action": {
             "type": "string",
             "enum": [
-              "pending",
-              "prepared",
-              "dispatching",
-              "observing",
-              "succeeded",
-              "failed",
-              "attention"
-            ]
+              "restart",
+              "retire"
+            ],
+            "description": "Absent for ordinary deployment steps."
+          },
+          "recoveryPhase": {
+            "type": "string"
           },
           "resourceId": {
             "type": "string"
@@ -2923,21 +3864,6 @@
           },
           "error": {
             "type": "string"
-          },
-          "recoveryPhase": {
-            "type": "string"
-          },
-          "observationStartedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "action": {
-            "type": "string",
-            "enum": [
-              "restart",
-              "retire"
-            ],
-            "description": "Absent for ordinary deployment steps."
           }
         },
         "required": [
@@ -2950,11 +3876,75 @@
       "Deployment": {
         "type": "object",
         "properties": {
+          "control": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "cancel",
+                  "abandon"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "at": {
+                "type": "string"
+              },
+              "resolvedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "mode",
+              "reason",
+              "at"
+            ],
+            "additionalProperties": false
+          },
+          "source": {
+            "type": "object",
+            "properties": {
+              "repository": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "deliveryId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "repository",
+              "commit",
+              "ref",
+              "deliveryId"
+            ],
+            "additionalProperties": false,
+            "description": "Pinned GitHub repository/commit/ref/delivery provenance supplied by the trusted source pipeline."
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "deploy",
+              "restart",
+              "scale-down"
+            ]
+          },
           "id": {
             "type": "string"
           },
           "applicationId": {
             "type": "string"
+          },
+          "definitionVersion": {
+            "type": "number",
+            "minimum": 1
           },
           "state": {
             "type": "string",
@@ -2963,7 +3953,9 @@
               "running",
               "succeeded",
               "failed",
-              "attention"
+              "attention",
+              "cancelled",
+              "abandoned"
             ]
           },
           "manifest": {
@@ -2982,52 +3974,32 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "definitionVersion": {
-            "type": "integer",
-            "minimum": 1
-          },
-          "operation": {
-            "type": "string",
-            "enum": [
-              "deploy",
-              "restart",
-              "scale-down"
-            ]
-          },
-          "source": {
-            "type": "object",
-            "description": "Pinned GitHub repository/commit/ref/delivery provenance supplied by the trusted source pipeline."
           }
         },
         "required": [
           "id",
           "applicationId",
+          "definitionVersion",
           "state",
           "manifest",
           "steps",
           "createdAt",
-          "updatedAt",
-          "definitionVersion"
+          "updatedAt"
         ],
         "additionalProperties": false
       },
       "Instance": {
         "type": "object",
-        "required": [
-          "component",
-          "ordinal",
-          "status",
-          "checkedAt",
-          "retired"
-        ],
-        "additionalProperties": false,
         "properties": {
+          "retired": {
+            "type": "boolean",
+            "description": "Retained instance reserved for this application after confirmed stop."
+          },
           "component": {
             "type": "string"
           },
           "ordinal": {
-            "type": "integer",
+            "type": "number",
             "minimum": 1
           },
           "resourceId": {
@@ -3045,12 +4017,16 @@
           "checkedAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "retired": {
-            "type": "boolean",
-            "description": "Retained instance reserved for this application after confirmed stop."
           }
-        }
+        },
+        "required": [
+          "retired",
+          "component",
+          "ordinal",
+          "status",
+          "checkedAt"
+        ],
+        "additionalProperties": false
       },
       "Recovery": {
         "type": "object",
@@ -3134,7 +4110,10 @@
       "Capabilities": {
         "type": "object",
         "properties": {
-          "standard": {
+          "httpHealthChecks": {
+            "type": "boolean"
+          },
+          "imageRollback": {
             "type": "boolean"
           },
           "rolling": {
@@ -3143,10 +4122,16 @@
           "blueGreen": {
             "type": "boolean"
           },
-          "discovery": {
+          "managementHandoff": {
             "type": "boolean"
           },
-          "immutableImages": {
+          "standard": {
+            "type": "boolean"
+          },
+          "serviceEndpoints": {
+            "type": "boolean"
+          },
+          "retirement": {
             "type": "boolean"
           },
           "restart": {
@@ -3158,16 +4143,28 @@
           "applicationDns": {
             "type": "boolean"
           },
-          "retirement": {
+          "discovery": {
             "type": "boolean"
           },
-          "serviceEndpoints": {
-            "type": "boolean"
-          },
-          "managementHandoff": {
+          "immutableImages": {
             "type": "boolean"
           }
         },
+        "required": [
+          "httpHealthChecks",
+          "imageRollback",
+          "rolling",
+          "blueGreen",
+          "managementHandoff",
+          "standard",
+          "serviceEndpoints",
+          "retirement",
+          "restart",
+          "environment",
+          "applicationDns",
+          "discovery",
+          "immutableImages"
+        ],
         "additionalProperties": false
       },
       "Restart": {
@@ -3303,10 +4300,6 @@
       },
       "HealthCheck": {
         "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "mode"
-        ],
         "properties": {
           "mode": {
             "type": "string",
@@ -3317,35 +4310,191 @@
           },
           "path": {
             "type": "string",
-            "maxLength": 256,
-            "pattern": "^/[A-Za-z0-9/_~.\\-]*$",
-            "description": "Local path, required for http; no URL, query or fragment"
+            "description": "Local path, required for http; no URL, query or fragment",
+            "maxLength": 256
           },
           "intervalSeconds": {
-            "type": "integer",
+            "type": "number",
             "minimum": 1,
-            "maximum": 300,
-            "default": 10
+            "maximum": 300
           },
           "timeoutSeconds": {
-            "type": "integer",
+            "type": "number",
             "minimum": 1,
-            "maximum": 30,
-            "default": 3
+            "maximum": 30
           },
           "retries": {
-            "type": "integer",
+            "type": "number",
             "minimum": 1,
-            "maximum": 20,
-            "default": 3
+            "maximum": 20
           },
           "startPeriodSeconds": {
-            "type": "integer",
+            "type": "number",
             "minimum": 0,
-            "maximum": 600,
-            "default": 0
+            "maximum": 600
           }
-        }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false
+      },
+      "ApplicationGroup": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "number"
+          },
+          "environments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Application"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "environments"
+        ],
+        "additionalProperties": false
+      },
+      "ComponentInput": {
+        "type": "object",
+        "properties": {
+          "healthCheck": {
+            "$ref": "#/components/schemas/HealthCheck"
+          },
+          "dependsOn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "readiness": {
+            "type": "object",
+            "properties": {
+              "requireHealthy": {
+                "type": "boolean"
+              },
+              "timeoutSeconds": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3600
+              }
+            },
+            "additionalProperties": false
+          },
+          "management": {
+            "type": "string",
+            "enum": [
+              "observe"
+            ],
+            "description": "New existing-resource registrations always start observe-only. Omitted on existing managed definitions. Enable lifecycle management using the explicit handoff endpoint."
+          },
+          "serviceEndpoints": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Referenced component name to explicit operator-managed HTTP(S) endpoint. Required for Coolify connections; no credentials, query, or fragment."
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Plain non-secret runtime variables. Coolify mutates only recorded OAP-owned production variables; unrelated and preview variables remain operator-managed."
+          },
+          "services": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Environment variable to component name. Uses application DNS on Docker or a supplied explicit endpoint; adopted targets require an explicit endpoint."
+          },
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "web"
+            ],
+            "default": "web"
+          },
+          "image": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer",
+            "description": "Zero allowed only for observe-only resources whose operator does not report a port.",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "hostPort": {
+            "type": "number",
+            "description": "Zero adds no host port mapping. Existing operator routes may still expose the resource."
+          },
+          "instances": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "default": 1
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "standard"
+            ],
+            "default": "standard"
+          },
+          "resourceId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "image",
+          "port"
+        ],
+        "additionalProperties": false
+      },
+      "ManifestInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComponentInput"
+            },
+            "maxItems": 16,
+            "minItems": 1
+          }
+        },
+        "required": [
+          "name",
+          "environment",
+          "targetId",
+          "components"
+        ],
+        "additionalProperties": false
       }
     }
   }

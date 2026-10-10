@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/store/db"
 )
 
 //go:embed migrations/*.sql
@@ -39,44 +40,37 @@ func mapError(e error) error {
 	return e
 }
 func (s *Store) SaveTarget(ctx context.Context, t domain.Target) error {
-	b, e := json.Marshal(t)
-	if e != nil {
-		return e
+	b, err := json.Marshal(t)
+	if err != nil {
+		return err
 	}
-	_, e = s.Pool.Exec(ctx, "INSERT INTO oap_targets(id,spec,token_env) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET spec=$2,token_env=$3", t.ID, b, t.TokenEnv)
-	return e
+	_, err = db.New(s.Pool).UpsertTarget(ctx, db.UpsertTargetParams{ID: t.ID, Spec: b, TokenEnv: t.TokenEnv})
+	return err
 }
 func (s *Store) Target(ctx context.Context, id string) (domain.Target, error) {
-	var t domain.Target
-	var b []byte
-	var env string
-	e := s.Pool.QueryRow(ctx, "SELECT spec,token_env FROM oap_targets WHERE id=$1", id).Scan(&b, &env)
-	if e != nil {
-		return t, mapError(e)
+	row, err := db.New(s.Pool).GetTarget(ctx, id)
+	if err != nil {
+		return domain.Target{}, mapError(err)
 	}
-	e = json.Unmarshal(b, &t)
-	t.TokenEnv = env
-	return t, e
+	var target domain.Target
+	err = json.Unmarshal(row.Spec, &target)
+	target.TokenEnv = row.TokenEnv
+	return target, err
 }
 func (s *Store) Targets(ctx context.Context) ([]domain.Target, error) {
-	rows, e := s.Pool.Query(ctx, "SELECT spec FROM oap_targets ORDER BY id")
-	if e != nil {
-		return nil, e
+	rows, err := db.New(s.Pool).ListTargets(ctx)
+	if err != nil {
+		return nil, err
 	}
-	defer rows.Close()
 	out := []domain.Target{}
-	for rows.Next() {
-		var b []byte
-		if e = rows.Scan(&b); e != nil {
-			return nil, e
+	for _, raw := range rows {
+		var target domain.Target
+		if err = json.Unmarshal(raw, &target); err != nil {
+			return nil, err
 		}
-		var t domain.Target
-		if e = json.Unmarshal(b, &t); e != nil {
-			return nil, e
-		}
-		out = append(out, t)
+		out = append(out, target)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 func (s *Store) CreateApplication(ctx context.Context, m domain.Manifest) (domain.Application, error) {
 	a := domain.Application{ID: domain.NewID(), Manifest: m}
@@ -90,16 +84,16 @@ func (s *Store) CreateApplication(ctx context.Context, m domain.Manifest) (domai
 		return a, e
 	}
 	defer tx.Rollback(ctx)
-	if _, e = tx.Exec(ctx, "INSERT INTO oap_application_groups(id,name) VALUES($1,$2)", a.ID, m.Name); e != nil {
+	if _, e = tx.Exec(ctx, db.InsertApplicationGroup, a.ID, m.Name); e != nil {
 		return a, mapError(e)
 	}
-	e = tx.QueryRow(ctx, "INSERT INTO oap_applications(id,name,environment,spec,group_id) VALUES($1,$2,$3,$4,$1) RETURNING created_at,updated_at,version", a.ID, m.Name, m.Environment, b).Scan(&a.CreatedAt, &a.UpdatedAt, &a.Version)
+	e = tx.QueryRow(ctx, db.InsertApplication, a.ID, m.Name, m.Environment, b).Scan(&a.CreatedAt, &a.UpdatedAt, &a.Version)
 	if e != nil {
 		return a, mapError(e)
 	}
 	for _, c := range m.Components {
 		if c.ResourceID != "" {
-			if _, e = tx.Exec(ctx, "INSERT INTO oap_bindings(target_id,resource_id,application_id,component,ordinal) VALUES($1,$2,$3,$4,1)", m.TargetID, c.ResourceID, a.ID, c.Name); e != nil {
+			if _, e = tx.Exec(ctx, db.InsertObservedBinding, m.TargetID, c.ResourceID, a.ID, c.Name); e != nil {
 				return a, mapError(e)
 			}
 		}
@@ -107,20 +101,19 @@ func (s *Store) CreateApplication(ctx context.Context, m domain.Manifest) (domai
 	return a, tx.Commit(ctx)
 }
 func (s *Store) Bind(ctx context.Context, targetID, resourceID, appID, component string, ordinal int) error {
-	_, e := s.Pool.Exec(ctx, `INSERT INTO oap_bindings(target_id,resource_id,application_id,component,ordinal)
- VALUES($1,$2,$3,$4,$5) ON CONFLICT(target_id,resource_id) DO NOTHING`, targetID, resourceID, appID, component, ordinal)
+	_, e := s.Pool.Exec(ctx, db.ReserveBinding, targetID, resourceID, appID, component, ordinal)
 	if e != nil {
 		return mapError(e)
 	}
 	var owner, comp string
 	var number int
-	if e = s.Pool.QueryRow(ctx, "SELECT application_id,component,ordinal FROM oap_bindings WHERE target_id=$1 AND resource_id=$2", targetID, resourceID).Scan(&owner, &comp, &number); e != nil {
+	if e = s.Pool.QueryRow(ctx, db.GetBindingOwner, targetID, resourceID).Scan(&owner, &comp, &number); e != nil {
 		return e
 	}
 	if owner != appID || comp != component || number != ordinal {
 		return domain.ErrConflict
 	}
-	_, e = s.Pool.Exec(ctx, "UPDATE oap_bindings SET retired_at=NULL WHERE target_id=$1 AND resource_id=$2 AND application_id=$3 AND component=$4 AND ordinal=$5", targetID, resourceID, appID, component, ordinal)
+	_, e = s.Pool.Exec(ctx, db.ReactivateBinding, targetID, resourceID, appID, component, ordinal)
 	if e != nil {
 		return e
 	}
@@ -138,23 +131,22 @@ func scanApp(row pgx.Row) (domain.Application, error) {
 	return a, e
 }
 func (s *Store) Application(ctx context.Context, id string) (domain.Application, error) {
-	return scanApp(s.Pool.QueryRow(ctx, "SELECT id,spec,created_at,updated_at,version,group_id FROM oap_applications WHERE id=$1", id))
+	return applicationRow(db.New(s.Pool).GetApplication(ctx, id))
 }
 func (s *Store) Applications(ctx context.Context) ([]domain.Application, error) {
-	rows, e := s.Pool.Query(ctx, "SELECT id,spec,created_at,updated_at,version,group_id FROM oap_applications ORDER BY created_at DESC")
-	if e != nil {
-		return nil, e
+	rows, err := db.New(s.Pool).ListApplications(ctx)
+	if err != nil {
+		return nil, err
 	}
-	defer rows.Close()
 	out := []domain.Application{}
-	for rows.Next() {
-		a, e := scanApp(rows)
-		if e != nil {
-			return nil, e
+	for _, row := range rows {
+		app, err := applicationRow(db.GetApplicationRow(row), nil)
+		if err != nil {
+			return nil, err
 		}
-		out = append(out, a)
+		out = append(out, app)
 	}
-	return out, rows.Err()
+	return out, nil
 }
 func ScanDeployment(row pgx.Row) (domain.Deployment, error) {
 	var d domain.Deployment
@@ -187,13 +179,13 @@ const deploymentColumns = "id,application_id,state,spec,steps,created_at,updated
 
 // DeploymentTx reuses the enqueue transaction connection while its advisory lock is held.
 func (s *Store) DeploymentTx(ctx context.Context, tx pgx.Tx, id string) (domain.Deployment, error) {
-	return ScanDeployment(tx.QueryRow(ctx, "SELECT "+deploymentColumns+" FROM oap_deployments WHERE id=$1", id))
+	return ScanDeployment(tx.QueryRow(ctx, db.GetDeployment, id))
 }
 func (s *Store) Deployment(ctx context.Context, id string) (domain.Deployment, error) {
-	return ScanDeployment(s.Pool.QueryRow(ctx, "SELECT "+deploymentColumns+" FROM oap_deployments WHERE id=$1", id))
+	return ScanDeployment(s.Pool.QueryRow(ctx, db.GetDeployment, id))
 }
 func (s *Store) Deployments(ctx context.Context, appID string) ([]domain.Deployment, error) {
-	rows, e := s.Pool.Query(ctx, "SELECT "+deploymentColumns+" FROM oap_deployments WHERE application_id=$1 ORDER BY created_at DESC LIMIT 50", appID)
+	rows, e := s.Pool.Query(ctx, db.ListDeployments, appID)
 	if e != nil {
 		return nil, e
 	}
@@ -209,23 +201,24 @@ func (s *Store) Deployments(ctx context.Context, appID string) ([]domain.Deploym
 	return out, rows.Err()
 }
 func (s *Store) SaveDeployment(ctx context.Context, d domain.Deployment) error {
-	b, e := json.Marshal(d.Steps)
-	if e != nil {
-		return e
+	raw, err := json.Marshal(d.Steps)
+	if err != nil {
+		return err
 	}
-	_, e = s.Pool.Exec(ctx, "UPDATE oap_deployments SET state=$2,steps=$3,updated_at=now() WHERE id=$1", d.ID, deploymentStorageState(d), b)
-	return e
+	_, err = db.New(s.Pool).UpdateDeployment(ctx, db.UpdateDeploymentParams{ID: d.ID, State: deploymentStorageState(d), Steps: raw})
+	return err
 }
 
 func (s *Store) ApplicationTx(ctx context.Context, tx pgx.Tx, id string) (domain.Application, error) {
-	return scanApp(tx.QueryRow(ctx, "SELECT id,spec,created_at,updated_at,version,group_id FROM oap_applications WHERE id=$1", id))
+	return applicationRow(db.New(tx).GetApplication(ctx, id))
 }
 func (s *Store) UpdateApplicationTx(ctx context.Context, tx pgx.Tx, id string, m domain.Manifest, expectedVersion int64) (domain.Application, error) {
-	b, e := json.Marshal(m)
-	if e != nil {
-		return domain.Application{}, e
+	raw, err := json.Marshal(m)
+	if err != nil {
+		return domain.Application{}, err
 	}
-	return scanApp(tx.QueryRow(ctx, `UPDATE oap_applications SET spec=$2,version=version+1,updated_at=now() WHERE id=$1 AND version=$3 RETURNING id,spec,created_at,updated_at,version,group_id`, id, b, expectedVersion))
+	row, err := db.New(tx).UpdateApplication(ctx, db.UpdateApplicationParams{ID: id, Spec: raw, Version: expectedVersion})
+	return applicationRow(db.GetApplicationRow(row), err)
 }
 
 // Bindings are the current instance references, independent of release history.
@@ -237,49 +230,45 @@ type Binding struct {
 }
 
 func (s *Store) Bindings(ctx context.Context, id string) ([]Binding, error) {
-	rows, e := s.Pool.Query(ctx, "SELECT component,ordinal,resource_id,retired_at IS NOT NULL FROM oap_bindings WHERE application_id=$1 ORDER BY component,ordinal", id)
-	if e != nil {
-		return nil, e
+	rows, err := db.New(s.Pool).ListBindings(ctx, id)
+	if err != nil {
+		return nil, err
 	}
-	defer rows.Close()
 	out := []Binding{}
-	for rows.Next() {
-		var b Binding
-		if e = rows.Scan(&b.Component, &b.Ordinal, &b.ResourceID, &b.Retired); e != nil {
-			return nil, e
-		}
-		out = append(out, b)
+	for _, row := range rows {
+		out = append(out, Binding{Component: row.Component, Ordinal: int(row.Ordinal), ResourceID: row.ResourceID, Retired: row.Retired})
 	}
-	return out, rows.Err()
+	return out, nil
 }
 func (s *Store) SaveDeploymentTx(ctx context.Context, tx pgx.Tx, d *domain.Deployment) error {
-	b, e := json.Marshal(d.Steps)
-	if e != nil {
-		return e
+	raw, err := json.Marshal(d.Steps)
+	if err != nil {
+		return err
 	}
-	return tx.QueryRow(ctx, "UPDATE oap_deployments SET state=$2,steps=$3,updated_at=now() WHERE id=$1 RETURNING updated_at", d.ID, deploymentStorageState(*d), b).Scan(&d.UpdatedAt)
+	at, err := db.New(tx).UpdateDeploymentReturningTimestamp(ctx, db.UpdateDeploymentReturningTimestampParams{ID: d.ID, State: deploymentStorageState(*d), Steps: raw})
+	if err == nil {
+		d.UpdatedAt = at.Time
+	}
+	return err
 }
 
 func (s *Store) TargetTx(ctx context.Context, tx pgx.Tx, id string) (domain.Target, error) {
-	var t domain.Target
-	var spec []byte
-	var env string
-	e := tx.QueryRow(ctx, "SELECT spec,token_env FROM oap_targets WHERE id=$1", id).Scan(&spec, &env)
-	if e != nil {
-		return t, mapError(e)
+	row, err := db.New(tx).GetTarget(ctx, id)
+	if err != nil {
+		return domain.Target{}, mapError(err)
 	}
-	e = json.Unmarshal(spec, &t)
-	t.TokenEnv = env
-	return t, e
+	var target domain.Target
+	err = json.Unmarshal(row.Spec, &target)
+	target.TokenEnv = row.TokenEnv
+	return target, err
 }
 func (s *Store) BindingTx(ctx context.Context, tx pgx.Tx, id, component string, ordinal int) (string, error) {
-	var ref string
-	e := tx.QueryRow(ctx, "SELECT resource_id FROM oap_bindings WHERE application_id=$1 AND component=$2 AND ordinal=$3 AND retired_at IS NULL", id, component, ordinal).Scan(&ref)
-	return ref, mapError(e)
+	ref, err := db.New(tx).GetActiveBinding(ctx, db.GetActiveBindingParams{ApplicationID: id, Component: component, Ordinal: int32(ordinal)})
+	return ref, mapError(err)
 }
 
 func (s *Store) RetireBindingTx(ctx context.Context, tx pgx.Tx, target, ref, app, component string, ordinal int) error {
-	command, e := tx.Exec(ctx, "UPDATE oap_bindings SET retired_at=COALESCE(retired_at,now()) WHERE target_id=$1 AND resource_id=$2 AND application_id=$3 AND component=$4 AND ordinal=$5", target, ref, app, component, ordinal)
+	command, e := tx.Exec(ctx, db.RetireBinding, target, ref, app, component, ordinal)
 	if e != nil {
 		return e
 	}
@@ -303,4 +292,13 @@ func deploymentStorageState(d domain.Deployment) string {
 		}
 	}
 	return d.State
+}
+
+func applicationRow(row db.GetApplicationRow, err error) (domain.Application, error) {
+	if err != nil {
+		return domain.Application{}, mapError(err)
+	}
+	app := domain.Application{ID: row.ID, GroupID: row.GroupID, Version: row.Version, CreatedAt: row.CreatedAt.Time, UpdatedAt: row.UpdatedAt.Time}
+	err = json.Unmarshal(row.Spec, &app.Manifest)
+	return app, err
 }

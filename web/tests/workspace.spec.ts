@@ -201,6 +201,7 @@ test("deploy, inspect live instances, read logs, and update a Docker application
       page.getByRole("button", { name: "Review Deployment" }),
     ).toBeEnabled();
   }
+  await page.route("**/api/v1/applications/*/events", (route) => route.abort());
   await page.goto("/");
   await page
     .getByLabel("Platform Access Token")
@@ -316,6 +317,12 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     .getByLabel("To Release", { exact: true })
     .inputValue();
   const historyPattern = `**/api/v1/applications/${page.url().split("/").at(-1)}/deployments`;
+  // These history fixtures deliberately replace persisted release state; disable
+  // its SSE source so it cannot overwrite the fixture's chosen projection.
+  await page.route(
+    `**/api/v1/applications/${page.url().split("/").at(-1)}/events`,
+    (route) => route.abort(),
+  );
   await page.route(historyPattern, async (route) => {
     const response = await route.fetch();
     const history = await response.json();
@@ -609,6 +616,9 @@ test("release control review explains retained changes and abandonment fences", 
     control: undefined as
       undefined | { mode: string; reason: string; at: string },
   };
+  await page.route(`**/api/v1/applications/${app.id}/events`, (route) =>
+    route.abort(),
+  );
   await page.route(`**/api/v1/applications/${app.id}/deployments`, (route) =>
     route.fulfill({ json: [release] }),
   );
@@ -667,13 +677,29 @@ test("release control review explains retained changes and abandonment fences", 
   };
   await page.reload();
   await expect(
-    page.getByRole("button", { name: "Reconciliation Required" }),
+    page.getByRole("button", { name: "Review Deployment", exact: true }),
+  ).toBeEnabled();
+  await page
+    .getByRole("button", { name: "Review Deployment", exact: true })
+    .click();
+  const partialReview = page.getByRole("dialog");
+  await expect(
+    partialReview.getByRole("checkbox", { name: "web · In Use", exact: true }),
   ).toBeDisabled();
+  await expect(
+    partialReview.getByRole("checkbox", { name: "api", exact: true }),
+  ).toBeChecked();
+  await partialReview
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
   await page.getByRole("tab", { name: "Activity" }).click();
   await expect(
-    page.getByText("Application fenced until owner reconciliation.", {
-      exact: false,
-    }),
+    page.getByText(
+      "Selected components remain protected until owner reconciliation.",
+      {
+        exact: false,
+      },
+    ),
   ).toBeVisible();
   await page.getByRole("button", { name: "Review Reconciliation" }).click();
   await expect(page.getByRole("dialog")).toContainText(

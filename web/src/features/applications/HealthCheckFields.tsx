@@ -1,3 +1,6 @@
+import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Input } from "@/components/ui/input";
 import type { HealthCheck } from "../../api";
 const timings = [
   {
@@ -64,9 +67,9 @@ export function HealthCheckFields({
   return (
     <fieldset className="readiness-fields">
       <legend>Health Check for {name}</legend>
-      <label>
+      <Label>
         Health Check Mode for {name}
-        <select
+        <NativeSelect
           value={h?.mode || "existing"}
           onChange={(e) =>
             onChange(
@@ -90,16 +93,16 @@ export function HealthCheckFields({
           )}
           <option value="http">Container HTTP Check</option>
           <option value="image">Use Image Health Check</option>
-        </select>
-      </label>
+        </NativeSelect>
+      </Label>
       {h?.mode === "http" && (
         <>
           <p className="small muted">
             Deployments wait for healthy status when this HTTP check is
             selected.
           </p>
-          <label htmlFor={`${prefix}-path`}>Health Check Path for {name}</label>
-          <input
+          <Label htmlFor={`${prefix}-path`}>Health Check Path for {name}</Label>
+          <Input
             id={`${prefix}-path`}
             value={h.path || ""}
             maxLength={256}
@@ -124,11 +127,11 @@ export function HealthCheckFields({
                   !Number.isInteger(value) || value < f.min || value > f.max;
                 return (
                   <div key={f.key}>
-                    <label htmlFor={`${prefix}-${f.key}`}>
+                    <Label htmlFor={`${prefix}-${f.key}`}>
                       {f.label} for {name}
                       {f.key !== "retries" ? " (seconds)" : ""}
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                       id={`${prefix}-${f.key}`}
                       type="number"
                       min={f.min}

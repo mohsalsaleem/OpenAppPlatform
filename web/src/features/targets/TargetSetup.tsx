@@ -1,3 +1,6 @@
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
 export function TargetSetup({ existingIds = [] }: { existingIds?: string[] }) {
   const [draft, setDraft] = useState({
@@ -53,7 +56,7 @@ export function TargetSetup({ existingIds = [] }: { existingIds?: string[] }) {
       </p>
       <div className="form-grid">
         {Object.entries(draft).map(([key, value]) => (
-          <label key={key}>
+          <Label key={key}>
             {
               (
                 {
@@ -67,14 +70,14 @@ export function TargetSetup({ existingIds = [] }: { existingIds?: string[] }) {
                 } as Record<string, string>
               )[key]
             }
-            <input
+            <Input
               value={value}
               onChange={(e) => {
                 setCopied(false);
                 setDraft({ ...draft, [key]: e.target.value });
               }}
             />
-          </label>
+          </Label>
         ))}
       </div>
       <ol>
@@ -104,14 +107,15 @@ export function TargetSetup({ existingIds = [] }: { existingIds?: string[] }) {
       {valid ? (
         <>
           <pre>{recipe}</pre>
-          <button
+          <Button
+            variant="outline"
             className="button"
             onClick={() =>
               navigator.clipboard.writeText(recipe).then(() => setCopied(true))
             }
           >
             {copied ? "Configuration copied" : "Copy Target Configuration"}
-          </button>
+          </Button>
         </>
       ) : (
         <p role="status">
