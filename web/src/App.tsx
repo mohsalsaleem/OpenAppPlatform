@@ -2,7 +2,8 @@ import { useState, useEffect, type FormEvent } from "react";
 import { NavLink, Link, Routes, Route, useLocation } from "react-router-dom";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import {
-  ArrowLeft,
+  LogOut,
+  Settings,
   ArrowUpRight,
   Box,
   CircleHelp,
@@ -59,12 +60,16 @@ export function App() {
   }, [client]);
   const pageName =
     location.pathname === "/targets"
-      ? "Deployment targets"
-      : location.pathname === "/applications/new"
-        ? "New application"
-        : location.pathname.startsWith("/applications/")
-          ? "Application"
-          : "Applications";
+      ? "Deployment Targets"
+      : location.pathname.startsWith("/targets/")
+        ? "Group Existing Services"
+        : location.pathname === "/access"
+          ? "Workspace Settings / Workspace Access"
+          : location.pathname === "/applications/new"
+            ? "New Application"
+            : location.pathname.startsWith("/applications/")
+              ? "Application"
+              : "Applications";
   async function connect(e: FormEvent) {
     e.preventDefault();
     sessionStorage.setItem("oap-token", accessToken);
@@ -106,7 +111,7 @@ export function App() {
             Your infrastructure, your choice.
           </p>
           <form onSubmit={connect}>
-            <label htmlFor="access-token">Platform access token</label>
+            <label htmlFor="access-token">Platform Access Token</label>
             <input
               id="access-token"
               type="password"
@@ -117,7 +122,7 @@ export function App() {
               placeholder="Paste your local access token"
             />
             <button className="primary" type="submit">
-              Connect to workspace <ArrowUpRight size={16} />
+              Connect to Workspace <ArrowUpRight size={16} />
             </button>
           </form>
           <ErrorBox error={error} />
@@ -150,26 +155,34 @@ export function App() {
             <div className="workspace">
               <span className="workspace-avatar">W</span>
               <div>
-                My workspace
+                My Workspace
                 <small>
                   {identity.data
                     ? `${identity.data.name} · ${identity.data.role}`
                     : "Self-hosted"}
                 </small>
               </div>
+              {identity.data?.role === "owner" && (
+                <NavLink
+                  to="/access"
+                  className="workspace-settings"
+                  title="Workspace Settings"
+                  aria-label="Workspace Settings"
+                >
+                  <Settings size={18} />
+                </NavLink>
+              )}
             </div>
             <p className="nav-label">WORKSPACE</p>
             <nav>
               <NavLink to="/" end>
                 <Box size={18} /> Applications
               </NavLink>
-              {identity.data?.role === "owner" && (
-                <NavLink to="/access">
-                  <Server size={18} /> Workspace access
-                </NavLink>
-              )}
+            </nav>
+            <p className="nav-label">INFRASTRUCTURE</p>
+            <nav aria-label="Infrastructure">
               <NavLink to="/targets">
-                <Server size={18} /> Deployment targets
+                <Server size={18} /> Deployment Targets
               </NavLink>
             </nav>
             <div className="sidebar-bottom">
@@ -178,6 +191,9 @@ export function App() {
               </span>
               <button
                 className="text-button"
+                title={
+                  authStatus.data?.mode === "owner" ? "Sign Out" : "Disconnect"
+                }
                 onClick={async () => {
                   if (authStatus.data?.mode === "owner") {
                     try {
@@ -192,8 +208,8 @@ export function App() {
                   setConnected(false);
                 }}
               >
-                <ArrowLeft size={15} />{" "}
-                {authStatus.data?.mode === "owner" ? "Sign out" : "Disconnect"}
+                <LogOut size={15} />{" "}
+                {authStatus.data?.mode === "owner" ? "Sign Out" : "Disconnect"}
               </button>
             </div>
           </aside>
@@ -207,7 +223,7 @@ export function App() {
                 target="_blank"
                 rel="noreferrer"
               >
-                <CircleHelp size={16} /> Project docs
+                <CircleHelp size={16} /> Project Docs
               </a>
             </header>
             <div className="content">
@@ -226,7 +242,7 @@ export function App() {
                 <Route path="/applications/new" element={<NewApplication />} />
                 <Route
                   path="/applications/:id"
-                  element={<ApplicationDetail />}
+                  element={<ApplicationDetail key={location.pathname} />}
                 />
                 <Route
                   path="/targets/:id/assemble"
@@ -236,9 +252,16 @@ export function App() {
                 <Route
                   path="*"
                   element={
-                    <p>
-                      Page not found. <Link to="/">Go to applications</Link>
-                    </p>
+                    <section className="empty">
+                      <CircleHelp size={32} />
+                      <h1>Page Not Found</h1>
+                      <p>
+                        This page is unavailable. Return to your applications.
+                      </p>
+                      <Link className="button primary" to="/">
+                        Go to Applications
+                      </Link>
+                    </section>
                   }
                 />
               </Routes>

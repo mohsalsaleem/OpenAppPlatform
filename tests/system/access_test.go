@@ -201,3 +201,59 @@ func TestOwnerSessionsRolesScopeAuditAndRevokedJobs(t *testing.T) {
 		t.Fatal("logged-out cookie accepted")
 	}
 }
+
+func TestOwnerSessionLogsWithoutPreviewToken(t *testing.T) {
+	f := &fake{resources: map[string]operator.Resource{
+		"session-log-fixture": {ID: "session-log-fixture", Name: "Session logs", Image: "nginx:alpine", Port: 80, ArtifactKind: "image", Status: "running:healthy"},
+	}}
+	c, _ := setup(t, f)
+	c.RequireIdentity = true
+	srv := httptest.NewServer((&httpapi.Server{Controller: c, SetupToken: strings.Repeat("s", 32)}).Handler())
+	defer srv.Close()
+	body := strings.NewReader(`{"email":"logs-owner@example.invalid","name":"Owner","password":"owner-password-long"}`)
+	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/auth/setup", body)
+	req.Header.Set("Authorization", "Setup "+strings.Repeat("s", 32))
+	req.Header.Set("X-OAP-CSRF", "1")
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != 200 || len(res.Cookies()) != 1 {
+		t.Fatalf("setup: %d", res.StatusCode)
+	}
+	cookie := res.Cookies()[0]
+	m := domain.Manifest{Name: "session-logs", Environment: "staging", TargetID: "fixture", Components: []domain.Component{{Name: "web", ResourceID: "session-log-fixture", Image: "nginx:alpine", Port: 80, Management: "observe"}}}
+	raw, _ := json.Marshal(m)
+	req, _ = http.NewRequest("POST", srv.URL+"/api/v1/applications", bytes.NewReader(raw))
+	req.AddCookie(cookie)
+	req.Header.Set("X-OAP-CSRF", "1")
+	req.Header.Set("Content-Type", "application/json")
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var app domain.Application
+	if err = json.NewDecoder(res.Body).Decode(&app); err != nil {
+		t.Fatal(err)
+	}
+	res.Body.Close()
+	if res.StatusCode != 201 {
+		t.Fatalf("assembly: %d", res.StatusCode)
+	}
+	req, _ = http.NewRequest("GET", srv.URL+"/api/v1/applications/"+app.ID+"/logs/web", nil)
+	req.AddCookie(cookie)
+	res, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	var output map[string]string
+	if err = json.NewDecoder(res.Body).Decode(&output); err != nil {
+		t.Fatal(err)
+	}
+	if res.StatusCode != 200 || output["logs"] != "hello from fixture" {
+		t.Fatalf("session logs corrupted: %d %q", res.StatusCode, output["logs"])
+	}
+}

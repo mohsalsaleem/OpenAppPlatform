@@ -57,10 +57,10 @@ export function AccountGate({
         <p className="eyebrow">OPEN APP PLATFORM</p>
         <h1>
           {setup
-            ? "Set up your workspace"
+            ? "Set Up Your Workspace"
             : inviteMode
-              ? "Join your workspace"
-              : "Welcome back"}
+              ? "Join Your Workspace"
+              : "Welcome Back"}
         </h1>
         <p className="muted">
           {setup
@@ -72,7 +72,7 @@ export function AccountGate({
         <form onSubmit={submit}>
           {(setup || inviteMode) && (
             <>
-              <label htmlFor="account-name">Your name</label>
+              <label htmlFor="account-name">Your Name</label>
               <input
                 id="account-name"
                 value={name}
@@ -108,7 +108,7 @@ export function AccountGate({
           {(setup || inviteMode) && (
             <>
               <label htmlFor="account-secret">
-                {setup ? "Setup secret" : "Invitation code"}
+                {setup ? "Setup Secret" : "Invitation Code"}
               </label>
               <input
                 id="account-secret"
@@ -129,10 +129,10 @@ export function AccountGate({
             {busy
               ? "Please wait…"
               : setup
-                ? "Create owner account"
+                ? "Create Owner Account"
                 : inviteMode
-                  ? "Accept invitation"
-                  : "Sign in"}
+                  ? "Accept Invitation"
+                  : "Sign In"}
           </button>
         </form>
         <ErrorBox error={error} />

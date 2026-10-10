@@ -53,7 +53,7 @@ export function RuntimeVariables({
     <div className="form-grid runtime-variables">
       <div>
         <label htmlFor={`env-${component.name}`}>
-          Environment variables for {component.name}
+          Environment Variables for {component.name}
         </label>
         <textarea
           id={`env-${component.name}`}
@@ -75,7 +75,7 @@ export function RuntimeVariables({
       </div>
       <div>
         <label htmlFor={`services-${component.name}`}>
-          Service connections for {component.name}
+          Service Connections for {component.name}
         </label>
         <textarea
           id={`services-${component.name}`}
@@ -98,7 +98,7 @@ export function RuntimeVariables({
       {endpointsSupported && (
         <div className="endpoint-field">
           <label htmlFor={`endpoints-${component.name}`}>
-            Service endpoints for {component.name}
+            Service Endpoints for {component.name}
           </label>
           <textarea
             id={`endpoints-${component.name}`}

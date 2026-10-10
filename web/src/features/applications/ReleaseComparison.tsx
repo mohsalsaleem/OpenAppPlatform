@@ -1,3 +1,4 @@
+import { releaseOperation } from "./runtimeSummary";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api, type Deployment } from "../../api";
@@ -42,9 +43,9 @@ export function ReleaseComparison({
   return (
     <section
       className="panel release-comparison"
-      aria-label="Release comparison"
+      aria-label="Release Comparison"
     >
-      <h2>Compare releases</h2>
+      <h2>Compare Releases</h2>
       <p className="small muted">
         Compare frozen requested definitions and image references. This does not
         inspect current runtime, validate rollback compatibility, or restore
@@ -58,7 +59,7 @@ export function ReleaseComparison({
         <>
           <div className="form-grid compact">
             <div>
-              <label htmlFor="compare-from">From release</label>
+              <label htmlFor="compare-from">From Release</label>
               <select
                 id="compare-from"
                 value={fromId}
@@ -69,14 +70,14 @@ export function ReleaseComparison({
               >
                 {releases.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.id.slice(0, 8)} · {r.operation || "deploy"} · v
+                    {r.id.slice(0, 8)} · {releaseOperation(r)} · v
                     {r.definitionVersion}
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label htmlFor="compare-to">To release</label>
+              <label htmlFor="compare-to">To Release</label>
               <select
                 id="compare-to"
                 value={toId}
@@ -87,7 +88,7 @@ export function ReleaseComparison({
               >
                 {releases.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.id.slice(0, 8)} · {r.operation || "deploy"} · v
+                    {r.id.slice(0, 8)} · {releaseOperation(r)} · v
                     {r.definitionVersion}
                   </option>
                 ))}
@@ -105,7 +106,7 @@ export function ReleaseComparison({
               comparison.mutate({ from: fromId, to: toId });
             }}
           >
-            {comparison.isPending ? "Comparing…" : "Compare selected releases"}
+            {comparison.isPending ? "Comparing…" : "Compare Selected Releases"}
           </button>
         </>
       )}

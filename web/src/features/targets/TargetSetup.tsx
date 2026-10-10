@@ -42,10 +42,14 @@ export function TargetSetup({ existingIds = [] }: { existingIds?: string[] }) {
   const recipe = JSON.stringify([{ ...draft, operator: "coolify" }], null, 2);
   return (
     <details className="panel">
-      <summary>Set up an existing Coolify connection</summary>
+      <summary>Set Up an Existing Coolify Connection</summary>
       <p className="muted">
         Prepare an OAP connection to your existing project. Native builds,
         domains and deployment triggers stay with Coolify.
+      </p>
+      <p className="setup-notice">
+        Configuration guide: these fields generate a file entry. They do not
+        save a connection. Follow the server setup steps below.
       </p>
       <div className="form-grid">
         {Object.entries(draft).map(([key, value]) => (
@@ -54,12 +58,12 @@ export function TargetSetup({ existingIds = [] }: { existingIds?: string[] }) {
               (
                 {
                   id: "Target ID",
-                  name: "Connection name",
+                  name: "Connection Name",
                   url: "Coolify URL",
-                  projectId: "Coolify project ID",
-                  serverId: "Coolify server ID",
-                  environment: "Operator environment",
-                  tokenEnv: "Credential environment variable",
+                  projectId: "Coolify Project ID",
+                  serverId: "Coolify Server ID",
+                  environment: "Operator Environment",
+                  tokenEnv: "Credential Environment Variable",
                 } as Record<string, string>
               )[key]
             }
@@ -106,7 +110,7 @@ export function TargetSetup({ existingIds = [] }: { existingIds?: string[] }) {
               navigator.clipboard.writeText(recipe).then(() => setCopied(true))
             }
           >
-            {copied ? "Configuration copied" : "Copy target configuration"}
+            {copied ? "Configuration copied" : "Copy Target Configuration"}
           </button>
         </>
       ) : (

@@ -6,8 +6,10 @@ import { ErrorBox } from "../../components/Feedback";
 
 export function EnvironmentNavigation({
   applicationId,
+  organization = false,
 }: {
   applicationId: string;
+  organization?: boolean;
 }) {
   const client = useQueryClient();
   const [selected, setSelected] = useState("");
@@ -69,10 +71,29 @@ export function EnvironmentNavigation({
     },
   });
   if (!group) return null;
+  if (!organization)
+    return (
+      <nav
+        className="environment-switcher"
+        aria-label="Application Environments"
+      >
+        {group.environments.map((e) => (
+          <Link
+            key={e.id}
+            reloadDocument
+            to={`/applications/${e.id}`}
+            className="environment"
+            aria-current={e.id === applicationId ? "page" : undefined}
+          >
+            {e.manifest.environment}
+          </Link>
+        ))}
+      </nav>
+    );
   return (
     <section className="panel">
       <div className="section-heading">
-        <h2>Environments</h2>
+        <h2>Environment Organization</h2>
         <span className="small muted">{group.name}</span>
       </div>
       {canLink && group.environments.length > 1 && (
@@ -81,23 +102,10 @@ export function EnvironmentNavigation({
           onClick={() => unlink.mutate()}
           disabled={unlink.isPending}
         >
-          Make this environment standalone
+          Make This Environment Standalone
         </button>
       )}
       <ErrorBox error={unlink.error} />
-      <nav className="tabs" aria-label="Application environments">
-        {group.environments.map((e) => (
-          <Link
-            key={e.id}
-            reloadDocument
-            to={`/applications/${e.id}`}
-            className={e.id === applicationId ? "active" : ""}
-            aria-current={e.id === applicationId ? "page" : undefined}
-          >
-            {e.manifest.environment}
-          </Link>
-        ))}
-      </nav>
       {canLink && candidates.length > 0 && (
         <form
           onSubmit={(e) => {
@@ -106,9 +114,9 @@ export function EnvironmentNavigation({
           }}
         >
           <label>
-            Existing environment
+            Existing Environment
             <select
-              aria-label="Existing environment"
+              aria-label="Existing Environment"
               value={selected}
               onChange={(e) => setSelected(e.target.value)}
             >
@@ -127,7 +135,7 @@ export function EnvironmentNavigation({
             permissions stay with each environment.
           </p>
           <button className="button" disabled={!selected || link.isPending}>
-            Link environment
+            Link Environment
           </button>
           <ErrorBox error={link.error} />
         </form>

@@ -70,11 +70,11 @@ export function RollbackReview({
           plan.mutate();
         }}
       >
-        Review rollback to {release.id.slice(0, 8)}
+        Review Rollback to {release.id.slice(0, 8)}
       </button>
       {open && (
         <DeploymentDialog onClose={() => !apply.isPending && setOpen(false)}>
-          <h2 id="deploy-title">Review image rollback</h2>
+          <h2 id="deploy-title">Review Image Rollback</h2>
           <p>
             Creates a new standard release using this snapshot’s immutable
             images. Existing configuration and topology must match. Requests may
@@ -138,7 +138,7 @@ export function RollbackReview({
               }
               onClick={() => apply.mutate()}
             >
-              {apply.isPending ? "Queuing…" : "Roll back images"}
+              {apply.isPending ? "Queuing…" : "Roll Back Images"}
             </button>
           </div>
         </DeploymentDialog>

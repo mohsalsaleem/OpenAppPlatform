@@ -43,7 +43,7 @@ export function ExistingEnvironment({ targets }: { targets: Target[] }) {
     return null;
   return (
     <details className="panel">
-      <summary>Connect another existing Coolify environment</summary>
+      <summary>Connect Another Existing Coolify Environment</summary>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -57,7 +57,7 @@ export function ExistingEnvironment({ targets }: { targets: Target[] }) {
         </p>
         <div className="form-grid">
           <label>
-            Existing operator connection
+            Existing Operator Connection
             <select
               value={sourceTargetId}
               onChange={(e) => setSource(e.target.value)}
@@ -73,15 +73,15 @@ export function ExistingEnvironment({ targets }: { targets: Target[] }) {
             </select>
           </label>
           <label>
-            New connection name
+            New Connection Name
             <input value={name} onChange={(e) => setName(e.target.value)} />
           </label>
           <label>
-            New target ID
+            New Target ID
             <input value={id} onChange={(e) => setId(e.target.value)} />
           </label>
           <label>
-            Existing operator environment
+            Existing Operator Environment
             <input
               value={environment}
               onChange={(e) => setEnvironment(e.target.value)}
@@ -92,7 +92,7 @@ export function ExistingEnvironment({ targets }: { targets: Target[] }) {
           className="button primary"
           disabled={!valid || connect.isPending}
         >
-          {connect.isPending ? "Verifying…" : "Verify and connect environment"}
+          {connect.isPending ? "Verifying…" : "Verify and Connect Environment"}
         </button>
         <ErrorBox error={connect.error} />
         {connect.isSuccess && (

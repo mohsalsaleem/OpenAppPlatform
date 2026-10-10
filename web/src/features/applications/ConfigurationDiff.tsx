@@ -86,8 +86,8 @@ export function ConfigurationDiff({
   }
   if (!rows.length) return null;
   return (
-    <section className="configuration-diff" aria-label="Configuration changes">
-      <h3>Changes for future releases</h3>
+    <section className="configuration-diff" aria-label="Configuration Changes">
+      <h3>Changes for Future Deployments</h3>
       <p className="small muted">
         Saving updates this environment’s definition. It does not deploy or
         restart components. Variable values and endpoint addresses are hidden in

@@ -12,6 +12,8 @@ export function AssembleApplication() {
   const { id } = useParams();
   const navigate = useNavigate();
   const client = useQueryClient();
+  const [search, setSearch] = useState("");
+  const [availability, setAvailability] = useState("all");
   const [name, setName] = useState("");
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [review, setReview] = useState(false);
@@ -84,11 +86,11 @@ export function AssembleApplication() {
   return (
     <>
       <Link className="back" to="/targets">
-        <ArrowLeft size={16} /> Deployment targets
+        <ArrowLeft size={16} /> Deployment Targets
       </Link>
       <div className="page-heading">
         <div>
-          <h1>Group existing services</h1>
+          <h1>Group Existing Services</h1>
           <p className="muted">
             {target.name} · {target.environment}
           </p>
@@ -104,7 +106,7 @@ export function AssembleApplication() {
       </div>
       <ErrorBox error={resources.error || save.error || layout.error} />
       <label>
-        Reuse a component layout
+        Reuse a Component Layout
         <select
           value={layoutId}
           onChange={(e) => {
@@ -132,7 +134,7 @@ export function AssembleApplication() {
         <section className="panel">
           <div className="section-heading">
             <div>
-              <h2>Existing resources</h2>
+              <h2>Existing Resources</h2>
               <p className="muted">
                 Select up to 16 services. Grouping enables health and logs
                 without changing workloads.
@@ -146,60 +148,35 @@ export function AssembleApplication() {
               }}
               disabled={resources.isFetching}
             >
-              Refresh resources
+              Refresh Resources
             </button>
           </div>
-          {resources.data?.length === 0 && (
-            <p className="muted">No resources found in this target scope.</p>
-          )}
-          {resources.data?.map((r) => {
-            const supported =
-              r.artifactKind === "image" || r.artifactKind === "source";
-            const blocked = !!r.applicationId || !supported || !layoutReady;
-            return (
-              <div className="assembly-resource" key={r.id}>
-                <input
-                  type="checkbox"
-                  aria-label={`Select ${r.name}`}
-                  checked={selected[r.id] !== undefined}
-                  disabled={blocked}
-                  onChange={(e) => {
-                    const next = { ...selected };
-                    if (e.target.checked) {
-                      next[r.id] = r.name
-                        .toLowerCase()
-                        .replace(/[^a-z0-9-]+/g, "-")
-                        .replace(/^-+|-+$/g, "")
-                        .slice(0, 48);
-                      const suggested =
-                        layout.data?.components[chosen.length]?.name;
-                      if (suggested && !Object.values(next).includes(suggested))
-                        next[r.id] = suggested;
-                      if (!/^[a-z]/.test(next[r.id]))
-                        next[r.id] = `service-${chosen.length + 1}`;
-                    } else delete next[r.id];
-                    setSelected(next);
-                  }}
-                />
-                <div className="grow">
-                  <strong>{r.name}</strong>
-                  <p className="small muted">
-                    {r.artifactKind ?? "Unsupported"} · {r.id}
-                  </p>
-                  {r.applicationId && (
-                    <Link
-                      className="assembly-link"
-                      to={`/applications/${r.applicationId}`}
-                    >
-                      Already grouped · open application
-                    </Link>
-                  )}
-                </div>
-                <Status value={r.status} />
-              </div>
-            );
-          })}
-          <div className="form-actions">
+          <div className="form-grid">
+            <label>
+              Search Services
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Name or resource ID"
+              />
+            </label>
+            <label>
+              Availability
+              <select
+                value={availability}
+                onChange={(e) => setAvailability(e.target.value)}
+              >
+                <option value="all">All Services</option>
+                <option value="available">Available to Group</option>
+                <option value="grouped">Already Grouped</option>
+              </select>
+            </label>
+          </div>
+          <p className="small muted" role="status">
+            {chosen.length} selected
+          </p>
+          <div className="form-actions selection-actions">
             <button
               className="primary"
               disabled={
@@ -207,19 +184,84 @@ export function AssembleApplication() {
               }
               onClick={() => setReview(true)}
             >
-              Review {chosen.length} services
+              Review Selection ({chosen.length})
             </button>
-          </div>
+          </div>{" "}
+          {resources.data?.length === 0 && (
+            <p className="muted">No resources found in this target scope.</p>
+          )}
+          {resources.data
+            ?.filter(
+              (r) =>
+                `${r.name} ${r.id}`
+                  .toLowerCase()
+                  .includes(search.toLowerCase()) &&
+                (availability === "all" ||
+                  (availability === "grouped"
+                    ? !!r.applicationId
+                    : !r.applicationId &&
+                      ["image", "source"].includes(r.artifactKind || ""))),
+            )
+            .map((r) => {
+              const supported =
+                r.artifactKind === "image" || r.artifactKind === "source";
+              const blocked = !!r.applicationId || !supported || !layoutReady;
+              return (
+                <div className="assembly-resource" key={r.id}>
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${r.name}`}
+                    checked={selected[r.id] !== undefined}
+                    disabled={blocked}
+                    onChange={(e) => {
+                      const next = { ...selected };
+                      if (e.target.checked) {
+                        next[r.id] = r.name
+                          .toLowerCase()
+                          .replace(/[^a-z0-9-]+/g, "-")
+                          .replace(/^-+|-+$/g, "")
+                          .slice(0, 48);
+                        const suggested =
+                          layout.data?.components[chosen.length]?.name;
+                        if (
+                          suggested &&
+                          !Object.values(next).includes(suggested)
+                        )
+                          next[r.id] = suggested;
+                        if (!/^[a-z]/.test(next[r.id]))
+                          next[r.id] = `service-${chosen.length + 1}`;
+                      } else delete next[r.id];
+                      setSelected(next);
+                    }}
+                  />
+                  <div className="grow">
+                    <strong>{r.name}</strong>
+                    <p className="small muted">
+                      {r.artifactKind ?? "Unsupported"} · {r.id}
+                    </p>
+                    {r.applicationId && (
+                      <Link
+                        className="assembly-link"
+                        to={`/applications/${r.applicationId}`}
+                      >
+                        Already grouped · open application
+                      </Link>
+                    )}
+                  </div>
+                  <Status value={r.status} />
+                </div>
+              );
+            })}
         </section>
       ) : (
         <section className="panel">
-          <h2>Application mapping</h2>
+          <h2>Application Mapping</h2>
           <p className="muted">
             All components start observe-only. No deployment, restart, or
             operator configuration changes.
           </p>
           <div className="configuration-fields">
-            <label htmlFor="assembly-name">Application name</label>
+            <label htmlFor="assembly-name">Application Name</label>
             <input
               id="assembly-name"
               value={name}
@@ -230,7 +272,7 @@ export function AssembleApplication() {
           {chosen.map((r) => (
             <div className="component-form configuration-fields" key={r.id}>
               <label htmlFor={`mapping-${r.id}`}>
-                Component name for {r.name}
+                Component Name for {r.name}
               </label>
               <input
                 id={`mapping-${r.id}`}
@@ -258,7 +300,7 @@ export function AssembleApplication() {
               disabled={save.isPending}
               onClick={() => setReview(false)}
             >
-              Back to selection
+              Back to Selection
             </button>
             <button
               className="primary"
@@ -266,7 +308,7 @@ export function AssembleApplication() {
               onClick={() => save.mutate()}
             >
               <Plus size={16} />
-              {save.isPending ? "Grouping…" : "Create observed application"}
+              {save.isPending ? "Grouping…" : "Create Observed Application"}
             </button>
           </div>
         </section>

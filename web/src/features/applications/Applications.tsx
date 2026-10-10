@@ -2,7 +2,16 @@ import { useCanOperate } from "../../access";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, Box, Plus } from "lucide-react";
-import { api, type ApplicationGroup, type Target } from "../../api";
+import {
+  api,
+  type ApplicationGroup,
+  type Target,
+  type Application,
+  type Instance,
+  type Deployment,
+} from "../../api";
+import { replicaSummary, releaseOperation } from "./runtimeSummary";
+import { Status } from "../../components/Status";
 import { ErrorBox, Loading } from "../../components/Feedback";
 export function Applications() {
   const canOperate = useCanOperate();
@@ -19,7 +28,7 @@ export function Applications() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">KEEP YOUR EXISTING PLATFORM</p>
-          <h1>Your applications</h1>
+          <h1>Applications</h1>
           <p className="muted">
             Group existing services and manage their environments.
           </p>
@@ -27,19 +36,18 @@ export function Applications() {
         {canOperate && (
           <div className="log-buttons">
             <Link className="button primary" to="/targets">
-              Group existing services
+              Group Existing Services
             </Link>
             <Link className="button" to="/applications/new">
-              <Plus size={17} /> New application
+              <Plus size={17} /> New Application
             </Link>
           </div>
         )}
       </div>
       <div className="section-heading application-list-heading">
-        <h2>
-          Applications{" "}
-          <span className="list-count">{q.data?.length ?? "—"}</span>
-        </h2>
+        <span className="small muted">
+          {q.data?.length ?? "—"} applications
+        </span>
         <span className="small muted">
           {targets.data?.length ?? "—"} deployment targets
         </span>
@@ -50,7 +58,7 @@ export function Applications() {
       ) : q.data?.length === 0 ? (
         <div className="empty">
           <Box size={38} />
-          <h2>Bring your existing applications together</h2>
+          <h2>Bring Your Existing Applications Together</h2>
           <p>
             Select services from your existing operator. Their native builds and
             deployments keep working.
@@ -79,13 +87,13 @@ export function Applications() {
               </div>
               <div className="application-count">
                 {g.environments.map((a) => (
-                  <Link
+                  <EnvironmentSummary
                     key={a.id}
-                    to={`/applications/${a.id}`}
-                    className="environment"
-                  >
-                    {a.manifest.environment} <ArrowUpRight size={14} />
-                  </Link>
+                    application={a}
+                    target={targets.data?.find(
+                      (t) => t.id === a.manifest.targetId,
+                    )}
+                  />
                 ))}
               </div>
             </section>
@@ -93,5 +101,60 @@ export function Applications() {
         </div>
       )}
     </>
+  );
+}
+
+function EnvironmentSummary({
+  application: a,
+  target,
+}: {
+  application: Application;
+  target?: Target;
+}) {
+  const instances = useQuery({
+    queryKey: ["instances", a.id],
+    queryFn: () => api<Instance[]>(`/applications/${a.id}/instances`),
+    refetchInterval: 10000,
+  });
+  const releases = useQuery({
+    queryKey: ["deployments", a.id],
+    queryFn: () => api<Deployment[]>(`/applications/${a.id}/deployments`),
+    refetchInterval: 10000,
+  });
+  const latest = releases.data?.[0];
+  return (
+    <div className="environment-summary">
+      <Link to={`/applications/${a.id}`} className="environment">
+        {a.manifest.environment}
+        <ArrowUpRight size={14} />
+      </Link>
+      <span className="small">
+        {replicaSummary(
+          a.manifest.components,
+          instances.data,
+          !!instances.error,
+        )}
+      </span>
+      <span className="small muted">{target?.name || a.manifest.targetId}</span>
+      <div className="latest-summary">
+        {latest ? (
+          <>
+            <span className="small">
+              {releaseOperation(latest)} ·{" "}
+              {new Date(latest.createdAt).toLocaleString()}
+            </span>
+            <Status value={latest.state} />
+          </>
+        ) : (
+          <span className="small muted">
+            {releases.error
+              ? "Deployment history unavailable"
+              : releases.isPending
+                ? "Checking deployments…"
+                : "No recorded deployments"}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }

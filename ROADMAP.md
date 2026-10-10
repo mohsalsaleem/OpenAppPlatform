@@ -197,6 +197,26 @@ restart and database restore checks. Existing Coolify App triggers stay unchange
 [GitHub releases](docs/github-releases.md). Batch 3 acceptance is complete; native source
 management handoff remains unsupported.
 
+### UI audit remediation
+
+The 11 October 2026 UI review is a core usability correction before the next
+ordered roadmap slice. Navigation separates Applications from Infrastructure /
+Deployment Targets, with Workspace Settings beside the workspace identity.
+Use Title Case for navigation, headings, labels and standalone actions; retain
+sentence case for explanatory prose and errors. Application health and runtime
+come before management guidance; detailed ownership rules and environment
+organization live in application Settings. Full identifiers and raw requests
+belong in expandable details. Deployment reviews expose running versus proposed
+images; saved configuration must not be presented as current runtime.
+
+The remediation includes owner-session log redaction, accurate linked GitHub
+release outcomes and rollback labels, effective HTTP readiness gates, retained
+settings drafts, keyboard tabs, grouping search, field-specific validation,
+contrast tokens, and mobile navigation/wrapping. The reproducible local gate
+includes the dedicated UI regression suite alongside native Docker, owner-session
+logging, scoped access and recovery tests. Deployment topology remains planned
+M4 work; this correction does not advance or reorder roadmap features.
+
 ### Next ordered batches
 
 | Order | Deliverable | Acceptance evidence |
@@ -559,6 +579,36 @@ optional metrics integration. Backend and collector deployment are planned, not
 implemented. See [logging and search design](docs/logging-and-search.md). The
 current M0 batch order stays unchanged.
 
+### Deployment Topology View
+
+Requested on 11 October 2026: add a flow diagram to the deployment UI showing
+components, their running instances, and how they are connected. Schedule this in
+M4 after core workflows; it does not change the current delivery order.
+
+Start with a read-only, application/environment-scoped topology built from OAP
+definitions and adapter-reported runtime state. Group replicas under their component
+and show instance health, deployment state, platform/target placement, and available
+endpoints. Selecting a node opens its existing instance details or logs; retain a
+compact table alternative for accessibility and small screens.
+
+Label edges by their actual meaning: declared service links, deployment dependencies,
+or adapter-confirmed network membership/routing. A deployment dependency is not proof
+of a network connection; shared network membership is not proof of communication.
+Distinguish configured relationships from observed runtime evidence, including its
+source and freshness. Show unknown or unavailable data explicitly rather than infer
+traffic from environment variables or imply that a configured connection is working.
+
+This is deployment topology, not distributed tracing. The initial view requires no
+application instrumentation, traffic capture, AI, or new monitoring service. Traffic
+rates, latency, and request paths may be optional later overlays only when supported
+by an explicitly configured data source. Never expose secret values in node or edge
+labels; apply the same application scopes and permissions as the underlying APIs.
+
+**Exit gate:** reproducible E2E fixtures cover multiple components and replicas,
+declared links versus deployment dependencies, healthy/failed/missing instances,
+stale or unsupported adapter evidence, and cross-application scope isolation. The
+diagram and table agree with runtime data and remain usable with AI disabled.
+
 ### Bounded post-release monitoring mode
 
 **Accepted product goal:** make useful release-focused logging and assisted debugging
@@ -726,6 +776,7 @@ workloads on eligible targets.
 | Monitoring and indexed native log search | M1 health/collection baseline; M4 optional VictoriaLogs, collector, scoped search and log alerts |
 | Notifications | M1 event foundation, M2/M4 delivery and workflows |
 | Per-app analytics; custom analytics backend | M4 |
+| Deployment topology flow diagram: components, instances, and connections | M4; read-only declared/runtime topology first, optional measured traffic overlays later |
 | Optional telemetry | M4 |
 | Opt-in feedback and diagnostic sharing | M4; independent consent, preview/redaction, local diagnosis |
 | OAP taints and annotations | M5, sensitive app policies begin in M1/M2 |
@@ -736,11 +787,13 @@ workloads on eligible targets.
 
 ## Next implementation slice
 
-Resume M0 batch 2, GitHub-triggered release ownership, followed by the ordered
-queue above. Source-backed management handoff and GitHub sequencing must
+Complete the UI audit correction, then resume M0 batch 4: configuration/data/schema
+recovery boundaries and acceptance before moving to batch 5 stable endpoints and
+routing. Batches 2 and 3 are already delivered; keep the ordered queue above. Source-backed management handoff and GitHub sequencing must
 be verified before disabling an existing operator trigger. Preserve the KISS stack,
-local pre-push gate, and capability-aware behavior. Auth, remote agents, AI guardrails,
-and generative UI remain deferred; production exposure still requires M1 gates.
+local pre-push gate, and capability-aware behavior. Full owner-grade hardening,
+remote agents, AI guardrails, and generative UI remain later work; production
+exposure still requires M1 gates.
 
 Open decisions include the owner login method, first external secret provider,
 first analytics export, default inference policy, tunnel choice for each client,

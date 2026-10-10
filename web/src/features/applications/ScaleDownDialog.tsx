@@ -44,8 +44,8 @@ export function ScaleDownDialog({
   );
   return (
     <DeploymentDialog onClose={onClose}>
-      <h2 id="deploy-title">Scale down {component}?</h2>
-      <label htmlFor="retirement-count">Remaining instances</label>
+      <h2 id="deploy-title">Scale Down {component}?</h2>
+      <label htmlFor="retirement-count">Remaining Instances</label>
       <select
         id="retirement-count"
         value={wanted}
@@ -61,7 +61,7 @@ export function ScaleDownDialog({
       <p>
         Retire{" "}
         {ordinals.map((ordinal) => `${component} / ${ordinal}`).join(", ")}.
-        Remaining instances keep their current configuration.
+        Remaining Instances keep their current configuration.
       </p>
       <p className="muted">
         Requests on stopped instances can be interrupted. Traffic draining is
@@ -82,7 +82,7 @@ export function ScaleDownDialog({
           disabled={scale.isPending}
           onClick={() => scale.mutate()}
         >
-          {scale.isPending ? "Queuing…" : "Retire instances"}
+          {scale.isPending ? "Queuing…" : "Retire Instances"}
         </button>
       </div>
     </DeploymentDialog>

@@ -18,7 +18,7 @@ export function Targets() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">KEEP YOUR INFRASTRUCTURE</p>
-          <h1>Deployment targets</h1>
+          <h1>Deployment Targets</h1>
           <p className="muted">
             Configured server connections. Credentials remain on the controller.
           </p>
@@ -35,20 +35,10 @@ export function Targets() {
       {q.data?.length === 0 && (
         <div className="empty">
           <Server size={32} />
-          <h2>No targets configured</h2>
+          <h2>No Targets Configured</h2>
           <p>Start the controller with a target configuration file.</p>
         </div>
       )}
-      <div className="note">
-        <Server size={20} />
-        <div>
-          <strong>Bare Docker and Coolify are supported targets.</strong>
-          <p>
-            Direct Docker uses owned containers and application networks. Other
-            operator adapters will use the same application contract.
-          </p>
-        </div>
-      </div>
     </>
   );
 }
@@ -85,11 +75,11 @@ function TargetCard({ target: t }: { target: Target }) {
             onClick={() => check.mutate()}
             disabled={check.isPending}
           >
-            {check.isPending ? "Checking…" : "Verify connection"}
+            {check.isPending ? "Checking…" : "Verify Connection"}
           </button>
           {canOperate && (
             <Link className="button primary" to={`/targets/${t.id}/assemble`}>
-              Group services
+              Group Services
             </Link>
           )}
           <button
@@ -99,7 +89,7 @@ function TargetCard({ target: t }: { target: Target }) {
               if (discover) q.refetch();
             }}
           >
-            Inspect resources
+            Inspect Resources
           </button>
         </div>
       </div>
@@ -113,7 +103,7 @@ function TargetCard({ target: t }: { target: Target }) {
       )}
       {check.data && (
         <details className="workflow-ownership">
-          <summary>OAP adapter capabilities</summary>
+          <summary>Adapter Capabilities</summary>
           <p className="small muted">
             Reported adapter support after a read-only connection check.
             Resource eligibility and your access still apply.

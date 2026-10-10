@@ -375,7 +375,7 @@ func (s *Server) routes() http.Handler {
 					write(w, 502, map[string]string{"code": "logs_unavailable", "message": e.Error()})
 					return
 				}
-				logs = strings.ReplaceAll(logs, s.Token, "[REDACTED]")
+				logs = redactToken(logs, s.Token)
 				write(w, 200, map[string]string{"logs": logs})
 				return
 			}
@@ -384,4 +384,12 @@ func (s *Server) routes() http.Handler {
 	})
 
 	return mux
+}
+
+// An absent preview token must not alter cookie-authenticated log output.
+func redactToken(logs, token string) string {
+	if token == "" {
+		return logs
+	}
+	return strings.ReplaceAll(logs, token, "[REDACTED]")
 }

@@ -6,106 +6,122 @@ test("authentication, application setup, release confirmation, and target discov
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/");
-  await page.getByLabel("Platform access token").fill("invalid");
-  await page.getByRole("button", { name: "Connect to workspace" }).click();
+  await page.getByLabel("Platform Access Token").fill("invalid");
+  await page.getByRole("button", { name: "Connect to Workspace" }).click();
   await expect(page.getByRole("alert")).toContainText(
     "valid platform access token",
   );
   await page
-    .getByLabel("Platform access token")
+    .getByLabel("Platform Access Token")
     .fill(process.env.OAP_API_TOKEN!);
-  await page.getByRole("button", { name: "Connect to workspace" }).click();
+  await page.getByRole("button", { name: "Connect to Workspace" }).click();
   await expect(
-    page.getByRole("heading", { name: "Your applications" }),
+    page.getByRole("heading", { name: "Applications", exact: true }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "New application" }).click();
+  await page.getByRole("link", { name: "New Application" }).click();
   const name = `browser-${Date.now()}`;
-  await page.getByLabel("Application name", { exact: true }).fill(name);
-  await page.getByRole("button", { name: "Add component" }).click();
-  await page.getByLabel("Component name", { exact: true }).nth(1).fill("api");
-  await page.getByLabel("Environment variables for web").fill('{"unfinished":');
+  await page.getByLabel("Application Name", { exact: true }).fill(name);
+  await page.getByRole("button", { name: "Add Component" }).click();
+  await page.getByLabel("Component Name", { exact: true }).nth(1).fill("api");
+  await page
+    .locator("details.advanced-configuration")
+    .filter({ has: page.getByLabel("Environment Variables for web") })
+    .locator("summary")
+    .click();
+  await page.getByLabel("Environment Variables for web").fill('{"unfinished":');
   await expect(
-    page.getByRole("button", { name: "Create application" }),
+    page.getByRole("button", { name: "Create Application" }),
   ).toBeDisabled();
-  await page.getByRole("button", { name: "Remove component 1" }).click();
+  await page.getByRole("button", { name: "Remove Component 1" }).click();
   await expect(
-    page.getByRole("button", { name: "Create application" }),
+    page.getByRole("button", { name: "Create Application" }),
   ).toBeEnabled();
-  await page.getByRole("button", { name: "Add component" }).click();
-  await page.getByLabel("Component name", { exact: true }).nth(1).fill("web");
-  await page.getByRole("button", { name: "Create application" }).click();
+  await page.getByRole("button", { name: "Add Component" }).click();
+  await page.getByLabel("Component Name", { exact: true }).nth(1).fill("web");
+  await page.getByRole("button", { name: "Create Application" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
-  await expect(page.getByText("Ready for your first deployment")).toBeVisible();
-  const workflow = page.getByRole("region", { name: "Workflow ownership" });
-  await workflow.getByText("web · OAP image releases", { exact: true }).click();
+  await expect(page.getByText("Ready for Your First Deployment")).toBeVisible();
+  await page.getByRole("tab", { name: "Settings" }).click();
+  const workflow = page.getByRole("region", { name: "Workflow Ownership" });
+  await workflow.getByText("web · OAP Image Releases", { exact: true }).click();
   await expect(workflow).toContainText("Supply a built image");
   await expect(workflow).toContainText(
-    "OAP coordinates standard image releases",
+    "Open App Platform coordinates image deployments",
   );
-  await expect(page.getByText("api", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Deploy application" }).click();
+  await page.getByRole("tab", { name: "Overview" }).click();
+  await expect(
+    page
+      .getByRole("tabpanel", { name: "Overview" })
+      .getByText("api", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Review Deployment" }).click();
   await expect(page.getByRole("dialog")).toContainText("can cause downtime");
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).not.toBeVisible();
-  await page.getByRole("button", { name: "Deploy application" }).click();
+  await page.getByRole("button", { name: "Review Deployment" }).click();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await page.getByRole("tab", { name: "Settings" }).click();
   await expect(
-    page.getByRole("heading", { name: "Runtime configuration" }),
+    page.getByRole("heading", { name: "Runtime Configuration" }),
   ).toBeVisible();
-  await page
-    .getByLabel("Require operator-reported healthy status for web")
-    .check();
-  await page.getByLabel("Observation timeout for web (seconds)").fill("120");
+  await page.getByLabel("Require Healthy Status for web").check();
+  await page.getByLabel("Observation Timeout for web (seconds)").fill("120");
   await expect(
-    page.getByRole("region", { name: "Configuration changes" }),
+    page.getByRole("region", { name: "Configuration Changes" }),
   ).toContainText("require healthy");
   await expect(
-    page.getByRole("region", { name: "Configuration changes" }),
+    page.getByRole("region", { name: "Configuration Changes" }),
   ).toContainText("120");
-  await page.getByLabel("Container image for web").fill("nginx:1.28-alpine");
+  await page.getByLabel("Container Image for web").fill("nginx:1.28-alpine");
   await expect(
-    page.getByRole("region", { name: "Configuration changes" }),
+    page.getByRole("region", { name: "Configuration Changes" }),
   ).toContainText("nginx:1.28-alpine");
   await page
-    .getByLabel("Environment variables for web")
+    .locator("details.advanced-configuration")
+    .filter({ has: page.getByLabel("Environment Variables for web") })
+    .locator("summary")
+    .click();
+  await page
+    .getByLabel("Environment Variables for web")
     .fill('{"PRIVATE_MARKER":"hidden-from-diff"}');
   await expect(
-    page.getByRole("region", { name: "Configuration changes" }),
+    page.getByRole("region", { name: "Configuration Changes" }),
   ).toContainText("PRIVATE_MARKER");
   await expect(
-    page.getByRole("region", { name: "Configuration changes" }),
+    page.getByRole("region", { name: "Configuration Changes" }),
   ).not.toContainText("hidden-from-diff");
   await page.screenshot({
     path: "../.local/ui-configuration-diff.png",
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Save configuration" }).click();
+  await page.getByRole("button", { name: "Save Configuration" }).click();
   await expect(
     page.getByText("Configuration saved. Deploy when you are ready."),
   ).toBeVisible();
-  await page.getByText("View application definition").click();
-  await expect(page.locator("pre")).toContainText("nginx:1.28-alpine");
+  await page.getByText("View Application Definition").click();
+  await expect(
+    page.getByRole("tabpanel", { name: "Settings" }).locator("pre"),
+  ).toContainText("nginx:1.28-alpine");
   await page.screenshot({
     path: "../.local/ui-configuration.png",
     fullPage: true,
   });
-  await page.getByRole("link", { name: "Deployment targets" }).click();
+  await page.getByRole("link", { name: "Deployment Targets" }).click();
   await page
-    .getByText("Set up an existing Coolify connection", { exact: true })
+    .getByText("Set Up an Existing Coolify Connection", { exact: true })
     .click();
   await page
     .getByLabel("Coolify URL", { exact: true })
     .fill("https://coolify.example.test");
-  await page.getByLabel("Coolify project ID").fill("example-project");
-  await page.getByLabel("Coolify server ID").fill("example-server");
+  await page.getByLabel("Coolify Project ID").fill("example-project");
+  await page.getByLabel("Coolify Server ID").fill("example-server");
   await expect(
-    page.getByRole("button", { name: "Copy target configuration" }),
+    page.getByRole("button", { name: "Copy Target Configuration" }),
   ).toBeVisible();
   await expect(
     page
       .locator("details")
-      .filter({ hasText: "Set up an existing Coolify connection" })
+      .filter({ hasText: "Set Up an Existing Coolify Connection" })
       .locator("pre"),
   ).toContainText('"tokenEnv": "COOLIFY_TOKEN"');
   await page.screenshot({
@@ -113,28 +129,28 @@ test("authentication, application setup, release confirmation, and target discov
     fullPage: true,
   });
   await page
-    .getByRole("button", { name: "Verify connection", exact: true })
+    .getByRole("button", { name: "Verify Connection", exact: true })
     .click();
   await expect(
     page.getByRole("status").filter({ hasText: "Connection verified" }),
   ).toBeVisible();
-  await page.getByText("OAP adapter capabilities", { exact: true }).click();
+  await page.getByText("Adapter Capabilities", { exact: true }).click();
   const adapterCapabilities = page
     .locator("details")
-    .filter({ hasText: "OAP adapter capabilities" });
+    .filter({ hasText: "Adapter Capabilities" });
   await expect(adapterCapabilities).toContainText("Blue-green deployment");
   await expect(adapterCapabilities).toContainText("Unavailable in OAP");
   await page.screenshot({
     path: "../.local/ui-adapter-capabilities.png",
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Inspect resources" }).click();
+  await page.getByRole("button", { name: "Inspect Resources" }).click();
   await expect(
     page.getByText(/resources in this target environment/),
   ).toBeVisible();
   await page.getByRole("link", { name: "Applications", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Your applications" }),
+    page.getByRole("heading", { name: "Applications", exact: true }),
   ).toBeVisible();
   await page.screenshot({ path: "../.local/ui-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -156,13 +172,13 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     "Requires the isolated Docker test environment",
   );
   async function deployAndWait() {
-    await page.getByRole("button", { name: "Deploy application" }).click();
+    await page.getByRole("button", { name: "Review Deployment" }).click();
     const queued = page.waitForResponse(
       (response) =>
         response.request().method() === "POST" &&
         response.url().endsWith("/deployments"),
     );
-    await page.getByRole("button", { name: "Deploy now" }).click();
+    await page.getByRole("button", { name: "Deploy Now" }).click();
     const response = await queued;
     expect(response.status()).toBe(202);
     const release = await response.json();
@@ -182,79 +198,93 @@ test("deploy, inspect live instances, read logs, and update a Docker application
       )
       .toBe("succeeded");
     await expect(
-      page.getByRole("button", { name: "Deploy application" }),
+      page.getByRole("button", { name: "Review Deployment" }),
     ).toBeEnabled();
   }
   await page.goto("/");
   await page
-    .getByLabel("Platform access token")
+    .getByLabel("Platform Access Token")
     .fill(process.env.OAP_API_TOKEN!);
-  await page.getByRole("button", { name: "Connect to workspace" }).click();
-  await page.getByRole("link", { name: "New application" }).click();
+  await page.getByRole("button", { name: "Connect to Workspace" }).click();
+  await page.getByRole("link", { name: "New Application" }).click();
   await page
-    .getByLabel("Application name", { exact: true })
+    .getByLabel("Application Name", { exact: true })
     .fill(`browser-live-${Date.now()}`);
   await page
-    .getByLabel("Container image", { exact: true })
+    .getByLabel("Container Image", { exact: true })
     .fill(process.env.OAP_TEST_DOCKER_IMAGE!);
-  await page.getByLabel("Internal port", { exact: true }).fill("8080");
+  await page.getByLabel("Internal Port", { exact: true }).fill("8080");
   await page
-    .getByLabel("Environment variables for web")
+    .locator("details.advanced-configuration")
+    .filter({ has: page.getByLabel("Environment Variables for web") })
+    .locator("summary")
+    .click();
+  await page
+    .getByLabel("Environment Variables for web")
     .fill('{"OAP_TEST_MESSAGE":');
   await expect(
-    page.getByRole("button", { name: "Create application" }),
+    page.getByRole("button", { name: "Create Application" }),
   ).toBeDisabled();
   await page
-    .getByLabel("Environment variables for web")
+    .getByLabel("Environment Variables for web")
     .fill('{"OAP_TEST_MESSAGE":"browser-v1"}');
   await page
-    .getByLabel("Service connections for web")
+    .getByLabel("Service Connections for web")
     .fill('{"UPSTREAM_URL":"web"}');
-  await page.getByRole("button", { name: "Create application" }).click();
+  await page.getByRole("button", { name: "Create Application" }).click();
   await deployAndWait();
   await page.getByRole("tab", { name: "Overview" }).click();
   const live = page
     .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Live instances" }) });
-  await expect(live).toContainText("running:healthy", { timeout: 15000 });
+    .filter({ has: page.getByRole("heading", { name: "Live Instances" }) });
+  await expect(live).toContainText("Healthy", { timeout: 15000 });
   await page.getByRole("button", { name: "View web instance 1 logs" }).click();
   await expect(page.locator(".log-output")).toContainText("fixture", {
     timeout: 5000,
   });
   await page.getByRole("tab", { name: "Settings" }).click();
   await page
-    .getByLabel("Container image for web")
+    .getByLabel("Container Image for web")
     .fill(process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!);
-  await page.getByLabel("Internal port for web").fill("8025");
-  await page.getByLabel("Health check mode for web").selectOption("http");
-  await page.getByLabel("Health check path for web").fill("/health/custom");
+  await page.getByLabel("Internal Port for web").fill("8025");
+  await page.getByLabel("Health Check Mode for web").selectOption("http");
+  await page.getByLabel("Health Check Path for web").fill("/health/custom");
+  await page.getByText("Check Timing", { exact: true }).click();
   await page.getByLabel("Interval for web (seconds)").fill("1");
-  await page.getByLabel("Attempt timeout for web (seconds)").fill("1");
+  await page.getByLabel("Attempt Timeout for web (seconds)").fill("1");
   await page.getByLabel("Retries for web", { exact: true }).fill("1");
-  await page.getByLabel("Start period for web (seconds)").fill("0");
+  await page.getByLabel("Start Period for web (seconds)").fill("0");
   await expect(
-    page.getByRole("region", { name: "Configuration changes" }),
+    page.getByRole("region", { name: "Configuration Changes" }),
   ).toContainText("HTTP GET /health/custom");
   await page
-    .getByLabel("Health check path for web")
+    .getByLabel("Health Check Path for web")
     .fill("https://outside.invalid/health");
   await expect(
-    page.getByRole("button", { name: "Save configuration" }),
+    page.getByRole("button", { name: "Save Configuration" }),
   ).toBeDisabled();
-  await page.getByLabel("Health check path for web").fill("/health/custom");
+  await page.getByLabel("Health Check Path for web").fill("/health/custom");
   await page
-    .getByLabel("Environment variables for web")
+    .locator("details.advanced-configuration")
+    .filter({ has: page.getByLabel("Environment Variables for web") })
+    .locator("summary")
+    .click();
+  await page
+    .getByLabel("Environment Variables for web")
     .fill('{"OAP_TEST_MESSAGE":"browser-v2"}');
-  await page.getByRole("button", { name: "Save configuration" }).click();
+  await page.getByRole("button", { name: "Save Configuration" }).click();
   await expect(
     page.getByText("Configuration saved. Deploy when you are ready."),
   ).toBeVisible();
   await deployAndWait();
   await page.getByRole("tab", { name: "Overview" }).click();
-  await expect(live).toContainText("running:healthy", { timeout: 15000 });
-  await expect(page.locator(".image-ref")).toContainText(
-    process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!,
-  );
+  await expect(live).toContainText("Healthy", { timeout: 15000 });
+  await expect(
+    page
+      .getByRole("tabpanel", { name: "Overview" })
+      .locator(".image-ref")
+      .first(),
+  ).toContainText(process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!);
   await expect
     .poll(async () => {
       const applicationId = page.url().split("/").at(-1);
@@ -266,24 +296,24 @@ test("deploy, inspect live instances, read logs, and update a Docker application
       return (await response.json())[0].resource.image;
     })
     .toBe(process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!);
-  await expect(page.locator(".release-banner")).toContainText("succeeded");
+  await expect(page.locator(".release-banner")).toContainText("Completed");
   await expect(
     page.getByText("HTTP GET /health/custom", { exact: false }).first(),
   ).toBeVisible();
   await page.getByRole("tab", { name: "Activity" }).click();
   await page
-    .getByRole("button", { name: "Compare selected releases", exact: true })
+    .getByRole("button", { name: "Compare Selected Releases", exact: true })
     .click();
-  const comparison = page.getByRole("region", { name: "Release comparison" });
+  const comparison = page.getByRole("region", { name: "Release Comparison" });
   await expect(comparison).toContainText("internal port");
   await expect(comparison).toContainText("8025");
   await expect(comparison).toContainText("Changed (value hidden)");
   await expect(comparison).not.toContainText("browser-v2");
   const selectedFrom = await page
-    .getByLabel("From release", { exact: true })
+    .getByLabel("From Release", { exact: true })
     .inputValue();
   const selectedTo = await page
-    .getByLabel("To release", { exact: true })
+    .getByLabel("To Release", { exact: true })
     .inputValue();
   const historyPattern = `**/api/v1/applications/${page.url().split("/").at(-1)}/deployments`;
   await page.route(historyPattern, async (route) => {
@@ -298,18 +328,18 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     });
   });
   await expect(
-    page.getByLabel("From release", { exact: true }).locator("option").first(),
+    page.getByLabel("From Release", { exact: true }).locator("option").first(),
   ).toHaveAttribute("value", "11111111111111111111111111111111");
-  await expect(page.getByLabel("From release", { exact: true })).toHaveValue(
+  await expect(page.getByLabel("From Release", { exact: true })).toHaveValue(
     selectedFrom,
   );
-  await expect(page.getByLabel("To release", { exact: true })).toHaveValue(
+  await expect(page.getByLabel("To Release", { exact: true })).toHaveValue(
     selectedTo,
   );
   await page.unroute(historyPattern);
   await page
     .getByRole("button", {
-      name: `Review rollback to ${selectedFrom.slice(0, 8)}`,
+      name: `Review Rollback to ${selectedFrom.slice(0, 8)}`,
       exact: true,
     })
     .click();
@@ -317,7 +347,7 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     "snapshot configuration/topology differs",
   );
   await expect(
-    page.getByRole("button", { name: "Roll back images", exact: true }),
+    page.getByRole("button", { name: "Roll Back Images", exact: true }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
 
@@ -334,7 +364,7 @@ test("deploy, inspect live instances, read logs, and update a Docker application
       response.request().method() === "POST" &&
       response.url().endsWith("/restarts"),
   );
-  await page.getByRole("button", { name: "Restart now", exact: true }).click();
+  await page.getByRole("button", { name: "Restart Now", exact: true }).click();
   const response = await queuedRestart;
   expect(response.status()).toBe(202);
   const restarted = await response.json();
@@ -352,19 +382,19 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     )
     .toBe("succeeded");
   await page.getByRole("tab", { name: "Overview" }).click();
-  await expect(page.locator(".release-banner")).toContainText("succeeded");
-  await expect(live).toContainText("running:healthy");
+  await expect(page.locator(".release-banner")).toContainText("Completed");
+  await expect(live).toContainText("Healthy");
 
   await page.getByRole("tab", { name: "Settings" }).click();
   await page.getByLabel("Instances for web").fill("2");
-  await page.getByRole("button", { name: "Save configuration" }).click();
+  await page.getByRole("button", { name: "Save Configuration" }).click();
   await expect(
     page.getByText("Configuration saved. Deploy when you are ready."),
   ).toBeVisible();
   await deployAndWait();
   await page.getByRole("tab", { name: "Overview" }).click();
   await page
-    .getByRole("button", { name: "Scale down web", exact: true })
+    .getByRole("button", { name: "Scale Down web", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toContainText(
     "Containers and volumes are retained",
@@ -376,7 +406,7 @@ test("deploy, inspect live instances, read logs, and update a Docker application
       response.url().endsWith("/scale-down"),
   );
   await page
-    .getByRole("button", { name: "Retire instances", exact: true })
+    .getByRole("button", { name: "Retire Instances", exact: true })
     .click();
   const retirementResponse = await queuedRetirement;
   expect(retirementResponse.status()).toBe(202);
@@ -400,7 +430,7 @@ test("deploy, inspect live instances, read logs, and update a Docker application
   await expect(
     page.getByRole("button", { name: "Restart web / 2", exact: true }),
   ).toBeDisabled();
-  await expect(page.locator(".release-banner")).toContainText("succeeded");
+  await expect(page.locator(".release-banner")).toContainText("Completed");
   await page.screenshot({
     path: "../.local/ui-live-instances.png",
     fullPage: true,
@@ -426,11 +456,11 @@ test("group existing Docker services without deploying or restarting", async ({
   );
   await page.goto("/");
   await page
-    .getByLabel("Platform access token")
+    .getByLabel("Platform Access Token")
     .fill(process.env.OAP_API_TOKEN!);
-  await page.getByRole("button", { name: "Connect to workspace" }).click();
-  await page.getByRole("link", { name: "Deployment targets" }).click();
-  await page.getByRole("link", { name: "Group services" }).click();
+  await page.getByRole("button", { name: "Connect to Workspace" }).click();
+  await page.getByRole("link", { name: "Deployment Targets" }).click();
+  await page.getByRole("link", { name: "Group Services" }).click();
   const apps = await (
     await page.request.get("/api/v1/applications", {
       headers: { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` },
@@ -439,44 +469,49 @@ test("group existing Docker services without deploying or restarting", async ({
   const source = apps.find((a: { manifest: { name: string } }) =>
     /^browser-[0-9]/.test(a.manifest.name),
   );
-  await page.getByLabel("Reuse a component layout").selectOption(source.id);
+  await page.getByLabel("Reuse a Component Layout").selectOption(source.id);
   await page.getByLabel("Select existing-observation-fixture").check();
-  await page.getByRole("button", { name: "Review 1 services" }).click();
+  await page.getByRole("button", { name: "Review Selection (1)" }).click();
   await page
-    .getByLabel("Application name", { exact: true })
+    .getByLabel("Application Name", { exact: true })
     .fill(`observed-browser-${Date.now()}`);
   await page
-    .getByLabel("Component name for existing-observation-fixture")
+    .getByLabel("Component Name for existing-observation-fixture")
     .fill("web");
   await page.screenshot({
     path: "../.local/ui-assembly-review.png",
     fullPage: true,
   });
   await page
-    .getByRole("button", { name: "Create observed application" })
+    .getByRole("button", { name: "Create Observed Application" })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Observing existing services" }),
+    page.getByRole("heading", { name: "Observing Existing Services" }),
   ).toBeVisible();
+  await page.getByRole("tab", { name: "Settings" }).click();
   const observedWorkflow = page.getByRole("region", {
-    name: "Workflow ownership",
+    name: "Workflow Ownership",
   });
   await observedWorkflow
-    .getByText("web · Existing workflow", { exact: true })
+    .getByText("web · Existing Workflow", { exact: true })
     .click();
   await expect(observedWorkflow).toContainText("OAP does not start builds");
   await expect(observedWorkflow).toContainText(
     "OAP restart is blocked while observing",
   );
   await expect(
-    page.getByRole("button", { name: "Observe-only application" }),
-  ).toBeDisabled();
+    page.getByText("Managed Externally", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Review Deployment" }),
+  ).toHaveCount(0);
+  await page.getByRole("tab", { name: "Overview" }).click();
   await expect(
     page.getByRole("button", { name: "Restart web / 1", exact: true }),
   ).toBeDisabled();
   await expect(
     page.locator(".step").filter({ hasText: "web / 1" }),
-  ).toContainText("running");
+  ).toContainText("Healthy");
   await page.getByRole("button", { name: "View web instance 1 logs" }).click();
   await expect(page.locator(".log-output")).not.toContainText(
     "Select a deployed component",
@@ -488,8 +523,8 @@ test("group existing Docker services without deploying or restarting", async ({
     path: "../.local/ui-observed-application.png",
     fullPage: true,
   });
-  await page.getByRole("link", { name: "Deployment targets" }).click();
-  await page.getByRole("link", { name: "Group services" }).click();
+  await page.getByRole("link", { name: "Deployment Targets" }).click();
+  await page.getByRole("link", { name: "Group Services" }).click();
   await expect(
     page.getByLabel("Select existing-observation-fixture"),
   ).toBeDisabled();
@@ -510,11 +545,11 @@ test("release control review explains retained changes and abandonment fences", 
 }) => {
   await page.goto("/");
   await page
-    .getByLabel("Platform access token")
+    .getByLabel("Platform Access Token")
     .fill(process.env.OAP_API_TOKEN!);
-  await page.getByRole("button", { name: "Connect to workspace" }).click();
+  await page.getByRole("button", { name: "Connect to Workspace" }).click();
   await expect(
-    page.getByRole("heading", { name: "Your applications" }),
+    page.getByRole("heading", { name: "Applications", exact: true }),
   ).toBeVisible();
   const headers = { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` };
   const apps = await (
@@ -560,24 +595,24 @@ test("release control review explains retained changes and abandonment fences", 
   );
   await page.goto(`/applications/${app.id}`);
   await page.getByRole("tab", { name: "Activity" }).click();
-  await page.getByRole("button", { name: "Review cancellation" }).click();
-  const dialog = page.getByRole("dialog", { name: "Cancel before dispatch" });
+  await page.getByRole("button", { name: "Review Cancellation" }).click();
+  const dialog = page.getByRole("dialog", { name: "Cancel Before Dispatch" });
   await expect(dialog).toContainText(
     "Prepared resources and configuration may remain",
   );
   await expect(
-    dialog.getByRole("button", { name: "Confirm cancellation" }),
+    dialog.getByRole("button", { name: "Confirm Cancellation" }),
   ).toBeDisabled();
   await dialog.getByLabel("Reason").fill("Defer this release");
   await dialog.getByRole("checkbox").check();
   await expect(
-    dialog.getByRole("button", { name: "Confirm cancellation" }),
+    dialog.getByRole("button", { name: "Confirm Cancellation" }),
   ).toBeEnabled();
   await page.screenshot({
     path: "../.local/ui-release-cancellation.png",
     fullPage: true,
   });
-  await dialog.getByRole("button", { name: "Confirm cancellation" }).click();
+  await dialog.getByRole("button", { name: "Confirm Cancellation" }).click();
   await expect(dialog).not.toBeVisible();
   await expect(
     page.getByText("Cancelled before dispatch. Prepared changes may remain.", {
@@ -595,7 +630,7 @@ test("release control review explains retained changes and abandonment fences", 
   };
   await page.reload();
   await expect(
-    page.getByRole("button", { name: "Reconciliation required" }),
+    page.getByRole("button", { name: "Reconciliation Required" }),
   ).toBeDisabled();
   await page.getByRole("tab", { name: "Activity" }).click();
   await expect(
@@ -603,7 +638,7 @@ test("release control review explains retained changes and abandonment fences", 
       exact: false,
     }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Review reconciliation" }).click();
+  await page.getByRole("button", { name: "Review Reconciliation" }).click();
   await expect(page.getByRole("dialog")).toContainText(
     "Every possible provider operation must be terminal",
   );

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../api";
+import { api, type Deployment } from "../../api";
 import { Status } from "../../components/Status";
 import { ErrorBox } from "../../components/Feedback";
 import { useState } from "react";
@@ -31,9 +31,11 @@ type Event = {
 export function SourceEvents({
   applicationId,
   version,
+  releases,
 }: {
   applicationId: string;
   version: number;
+  releases: Deployment[];
 }) {
   const client = useQueryClient();
   const [review, setReview] = useState<Event | null>(null);
@@ -69,7 +71,7 @@ export function SourceEvents({
   return (
     <section className="panel">
       <div className="section-heading">
-        <h2>GitHub activity</h2>
+        <h2>GitHub Activity</h2>
         <span className="small muted">Pinned commits and build results</span>
       </div>
       {events.data.map((e) => (
@@ -80,23 +82,31 @@ export function SourceEvents({
                 {e.binding.repository} · {e.commit.slice(0, 8)}
               </strong>
               <p className="small muted">
-                {e.binding.branch} · definition v{e.definitionVersion}
+                {e.binding.branch} · {new Date(e.updatedAt).toLocaleString()}
               </p>
             </div>
             <Status
-              value={e.state === "released" ? "release queued" : e.state}
+              value={
+                e.state === "released"
+                  ? releases.find((r) => r.id === e.deploymentId)?.state ||
+                    "released"
+                  : e.state
+              }
             />
           </div>
           {Object.entries(e.builds).map(([name, b]) => (
             <div className="step" key={name}>
               <div className="grow">
                 <strong>{name}</strong>
-                <code className="image-ref">
-                  {b.image ||
-                    (b.provider?.id
-                      ? `Provider deployment ${b.provider.id}`
-                      : `Build ${b.id}`)}
-                </code>
+                <details>
+                  <summary>Build Details</summary>
+                  <code className="image-ref">
+                    {b.image ||
+                      (b.provider?.id
+                        ? `Provider deployment ${b.provider.id}`
+                        : `Build ${b.id}`)}
+                  </code>
+                </details>
               </div>
               <Status value={b.state} />
             </div>
@@ -113,7 +123,7 @@ export function SourceEvents({
                   setReview(e);
                 }}
               >
-                Review source recovery
+                Review Source Recovery
               </button>
             )}
         </article>
@@ -161,7 +171,7 @@ export function SourceEvents({
               }
               onClick={() => recover.mutate()}
             >
-              Recover delivery
+              Recover Delivery
             </button>
           </div>
         </DeploymentDialog>

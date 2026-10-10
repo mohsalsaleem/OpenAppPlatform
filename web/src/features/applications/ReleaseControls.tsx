@@ -62,6 +62,13 @@ export function ReleaseControls({ deployment: d }: { deployment: Deployment }) {
     setAck(false);
     mutation.reset();
   };
+  const actionable =
+    canOperate &&
+    ["queued", "running", "attention"].includes(d.state) &&
+    ((d.steps.length > 0 && d.steps.every(preDispatch)) ||
+      (owner && d.operation !== "scale-down"));
+  if (!d.control && !actionable && !(owner && d.state === "abandoned"))
+    return null;
   return (
     <div className="recovery-panel">
       {d.control && (
@@ -78,19 +85,19 @@ export function ReleaseControls({ deployment: d }: { deployment: Deployment }) {
         <div className="log-buttons">
           {d.steps.length > 0 && d.steps.every(preDispatch) && (
             <button className="secondary" onClick={() => review("cancel")}>
-              Review cancellation
+              Review Cancellation
             </button>
           )}
           {owner && d.operation !== "scale-down" && (
             <button className="secondary" onClick={() => review("abandon")}>
-              Review abandonment
+              Review Abandonment
             </button>
           )}
         </div>
       )}
       {owner && d.state === "abandoned" && !d.control?.resolvedAt && (
         <button className="secondary" onClick={() => review("reconcile")}>
-          Review reconciliation
+          Review Reconciliation
         </button>
       )}
       {mode && (
@@ -101,10 +108,10 @@ export function ReleaseControls({ deployment: d }: { deployment: Deployment }) {
         >
           <h2 id="deploy-title">
             {mode === "reconcile"
-              ? "Reconcile abandoned release"
+              ? "Reconcile Abandoned Release"
               : mode === "cancel"
-                ? "Cancel before dispatch"
-                : "Abandon OAP tracking"}
+                ? "Cancel Before Dispatch"
+                : "Close Deployment Tracking"}
           </h2>
           <p className="small muted">
             {mode === "reconcile"

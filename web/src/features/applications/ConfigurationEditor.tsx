@@ -1,7 +1,7 @@
 import { HealthCheckFields, invalidHealthCheck } from "./HealthCheckFields";
 import { ConfigurationDiff } from "./ConfigurationDiff";
 import { useCanOperate } from "../../access";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Save, RotateCcw } from "lucide-react";
 import {
@@ -35,6 +35,15 @@ export function ConfigurationEditor({
   });
   const dirty = JSON.stringify(draft) !== JSON.stringify(base.manifest);
   const stale = app.version !== base.version;
+  useEffect(() => {
+    if (!dirty && !Object.values(invalid).some(Boolean)) return;
+    const prevent = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", prevent);
+    return () => window.removeEventListener("beforeunload", prevent);
+  }, [dirty, invalid]);
   const save = useMutation({
     mutationFn: () =>
       api<Application>(`/applications/${app.id}`, {
@@ -84,10 +93,10 @@ export function ConfigurationEditor({
     <section className="panel">
       <div className="section-heading">
         <div>
-          <h2>Runtime configuration</h2>
+          <h2>Runtime Configuration</h2>
           <p className="muted">
-            Definition version {base.version}. Saving changes future releases;
-            it does not restart your components.
+            Saving updates the configuration for your next deployment. Running
+            instances stay unchanged.
           </p>
         </div>
         <div className="log-buttons">
@@ -96,7 +105,7 @@ export function ConfigurationEditor({
             onClick={reload}
             disabled={save.isPending}
           >
-            <RotateCcw size={15} /> Reload definition
+            <RotateCcw size={15} /> Reload Configuration
           </button>
           <button
             className="primary"
@@ -118,10 +127,16 @@ export function ConfigurationEditor({
             }
           >
             <Save size={15} />
-            {save.isPending ? "Saving…" : "Save configuration"}
+            {save.isPending ? "Saving…" : "Save Configuration"}
           </button>
         </div>
       </div>
+      {dirty && (
+        <p role="status" className="saved-message">
+          Unsaved changes · your draft stays available while switching
+          application tabs.
+        </p>
+      )}
       <ConfigurationDiff before={base.manifest} after={draft} />
       {stale && (
         <div className="error" role="alert">
@@ -149,7 +164,7 @@ export function ConfigurationEditor({
           <div className="form-grid configuration-fields">
             <div>
               <label htmlFor={`config-image-${i}`}>
-                Container image for {c.name}
+                Container Image for {c.name}
               </label>
               <input
                 id={`config-image-${i}`}
@@ -161,7 +176,7 @@ export function ConfigurationEditor({
             <div className="form-grid compact">
               <div>
                 <label htmlFor={`config-port-${i}`}>
-                  Internal port for {c.name}
+                  Internal Port for {c.name}
                 </label>
                 <input
                   id={`config-port-${i}`}
@@ -187,13 +202,13 @@ export function ConfigurationEditor({
                   onChange={(e) => change(i, "instances", +e.target.value)}
                 />
                 <small className="muted">
-                  Increase instances and deploy to scale up. Use Scale down in
+                  Increase instances and deploy to scale up. Use Scale Down in
                   the overview to retire instances where supported.
                 </small>
               </div>
             </div>
             <div>
-              <label htmlFor={`config-host-${i}`}>Host port for {c.name}</label>
+              <label htmlFor={`config-host-${i}`}>Host Port for {c.name}</label>
               <input
                 id={`config-host-${i}`}
                 type="number"
@@ -204,15 +219,15 @@ export function ConfigurationEditor({
                 onChange={(e) => change(i, "hostPort", +e.target.value)}
               />
               <small className="muted">
-                0 keeps the component private. A fixed host port requires one
-                instance.
+                0 adds no host-port mapping. Existing platform routing remains.
+                A fixed host port requires one instance.
               </small>
             </div>
           </div>
           {c.management !== "observe" && (
             <details className="dependency-fields">
               <summary>
-                Startup dependencies for {c.name} ({c.dependsOn?.length || 0})
+                Startup Dependencies for {c.name} ({c.dependsOn?.length || 0})
               </summary>
               <p className="small muted">
                 Selected dependencies must finish every replica’s release
@@ -252,11 +267,20 @@ export function ConfigurationEditor({
           )}
           {c.management !== "observe" && (
             <fieldset className="readiness-fields">
-              <legend>Release readiness for {c.name}</legend>
+              <legend>Deployment Readiness for {c.name}</legend>
+              {c.healthCheck?.mode === "http" && (
+                <p className="small muted">
+                  Healthy status is required by the selected HTTP check.
+                </p>
+              )}
               <label>
                 <input
                   type="checkbox"
-                  checked={!!c.readiness?.requireHealthy}
+                  checked={
+                    c.healthCheck?.mode === "http" ||
+                    !!c.readiness?.requireHealthy
+                  }
+                  disabled={c.healthCheck?.mode === "http"}
                   onChange={(e) =>
                     change(i, "readiness", {
                       ...c.readiness,
@@ -264,10 +288,10 @@ export function ConfigurationEditor({
                     })
                   }
                 />
-                Require operator-reported healthy status for {c.name}
+                Require Healthy Status for {c.name}
               </label>
               <label htmlFor={`readiness-timeout-${i}`}>
-                Observation timeout for {c.name} (seconds)
+                Observation Timeout for {c.name} (seconds)
               </label>
               <input
                 id={`readiness-timeout-${i}`}
@@ -304,23 +328,28 @@ export function ConfigurationEditor({
                 onChange={(value) => change(i, "healthCheck", value)}
               />
             )}
-          <RuntimeVariables
-            component={c}
-            onChange={(field, value) => change(i, field, value)}
-            onValidity={(valid) => setInvalid({ ...invalid, [c.name]: !valid })}
-            environmentSupported={!!capabilities.data?.environment}
-            connectionsSupported={
-              !!(
-                capabilities.data?.applicationDns ||
-                capabilities.data?.serviceEndpoints
-              )
-            }
-            endpointsSupported={!!capabilities.data?.serviceEndpoints}
-          />
+          <details className="advanced-configuration">
+            <summary>Environment and Service Connections</summary>
+            <RuntimeVariables
+              component={c}
+              onChange={(field, value) => change(i, field, value)}
+              onValidity={(valid) =>
+                setInvalid({ ...invalid, [c.name]: !valid })
+              }
+              environmentSupported={!!capabilities.data?.environment}
+              connectionsSupported={
+                !!(
+                  capabilities.data?.applicationDns ||
+                  capabilities.data?.serviceEndpoints
+                )
+              }
+              endpointsSupported={!!capabilities.data?.serviceEndpoints}
+            />
+          </details>
         </div>
       ))}
       <details>
-        <summary>View application definition</summary>
+        <summary>View Application Definition</summary>
         <pre>{JSON.stringify(draft, null, 2)}</pre>
       </details>
     </section>

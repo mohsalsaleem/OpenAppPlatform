@@ -26,7 +26,34 @@ type Event = {
   status: number;
   createdAt: string;
 };
+function auditAction(action: string) {
+  if (action.startsWith("github.push")) return "GitHub Push";
+  const [method, path = ""] = action.split(" ");
+  if (path.endsWith("/auth/setup")) return "Create Owner Account";
+  if (path.endsWith("/auth/invitations/accept")) return "Accept Invitation";
+  if (path.endsWith("/auth/login")) return "Sign In";
+  if (path.endsWith("/auth/logout")) return "Sign Out";
+  if (path.includes("/access/invitations")) return "Create Invitation";
+  if (path.includes("/access/credentials"))
+    return method === "DELETE" ? "Revoke Agent Token" : "Create Agent Token";
+  if (path.includes("/access/members")) return "Update Member Access";
+  if (path.endsWith("/rollbacks")) return "Roll Back Images";
+  if (path.endsWith("/restarts")) return "Restart Instance";
+  if (path.endsWith("/deployments")) return "Deploy Application";
+  if (path.endsWith("/scale-down")) return "Retire Instances";
+  if (path.endsWith("/control")) return "Update Deployment Tracking";
+  if (path.includes("/source")) return "Update GitHub Workflow";
+  if (path.includes("/targets")) return "Update Deployment Target";
+  if (path.includes("/application-groups"))
+    return "Update Environment Organization";
+  if (path.includes("/applications"))
+    return method === "POST"
+      ? "Create or Manage Application"
+      : "Update Application";
+  return "Workspace Action";
+}
 export function Access() {
+  const [section, setSection] = useState("members");
   const client = useQueryClient();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("viewer");
@@ -58,7 +85,7 @@ export function Access() {
         body: JSON.stringify({ email, role }),
       }),
     onSuccess: (v) => {
-      setIssued(`Invitation code: ${v.invite}`);
+      setIssued(`Invitation Code: ${v.invite}`);
       setEmail("");
       client.invalidateQueries({ queryKey: ["audit"] });
     },
@@ -93,12 +120,35 @@ export function Access() {
     <>
       <div className="page-heading">
         <div>
-          <h1>Workspace access</h1>
+          <h1>Workspace Settings</h1>
           <p className="muted">
-            Invite members, scope agent access, and review activity.
+            Workspace Access · manage members, agent tokens and audit history.
           </p>
         </div>
       </div>
+      <nav className="tabs" aria-label="Workspace Access">
+        <button
+          aria-current={section === "members" ? "page" : undefined}
+          className={section === "members" ? "selected" : ""}
+          onClick={() => setSection("members")}
+        >
+          Members
+        </button>
+        <button
+          aria-current={section === "agents" ? "page" : undefined}
+          className={section === "agents" ? "selected" : ""}
+          onClick={() => setSection("agents")}
+        >
+          Agent Tokens
+        </button>
+        <button
+          aria-current={section === "audit" ? "page" : undefined}
+          className={section === "audit" ? "selected" : ""}
+          onClick={() => setSection("audit")}
+        >
+          Audit Log
+        </button>
+      </nav>
       <ErrorBox
         error={
           members.error ||
@@ -112,18 +162,18 @@ export function Access() {
       />
       {issued && (
         <section className="panel">
-          <h2>Save this code</h2>
+          <h2>Save This Code</h2>
           <p className="muted">
             Shown once here. Share invitation codes privately; store agent
             tokens in your secret store.
           </p>
           <pre className="one-time-secret">{issued}</pre>
           <button className="secondary" onClick={() => setIssued("")}>
-            Dismiss code
+            Dismiss Code
           </button>
         </section>
       )}
-      <section className="panel">
+      <section className="panel" hidden={section !== "members"}>
         <h2>Members</h2>
         {members.data?.map((m) => (
           <div className="step" key={m.id}>
@@ -168,7 +218,7 @@ export function Access() {
           }}
         >
           <div>
-            <label htmlFor="invite-email">Invite email</label>
+            <label htmlFor="invite-email">Invite Email</label>
             <input
               id="invite-email"
               type="email"
@@ -178,7 +228,7 @@ export function Access() {
             />
           </div>
           <div>
-            <label htmlFor="invite-role">Member role</label>
+            <label htmlFor="invite-role">Member Role</label>
             <select
               id="invite-role"
               value={role}
@@ -190,13 +240,13 @@ export function Access() {
           </div>
           <div className="form-actions">
             <button className="primary" disabled={invite.isPending}>
-              Create invitation
+              Create Invitation
             </button>
           </div>
         </form>
       </section>
-      <section className="panel">
-        <h2>Agent credentials</h2>
+      <section className="panel" hidden={section !== "agents"}>
+        <h2>Agent Tokens</h2>
         <p className="muted">
           Each token is limited to one application and expires after 30 days.
         </p>
@@ -208,7 +258,7 @@ export function Access() {
           }}
         >
           <div>
-            <label htmlFor="credential-name">Credential name</label>
+            <label htmlFor="credential-name">Token Name</label>
             <input
               id="credential-name"
               value={credentialName}
@@ -218,7 +268,7 @@ export function Access() {
             />
           </div>
           <div>
-            <label htmlFor="credential-app">Application access</label>
+            <label htmlFor="credential-app">Application Access</label>
             <select
               id="credential-app"
               value={applicationId}
@@ -234,7 +284,7 @@ export function Access() {
             </select>
           </div>
           <div>
-            <label htmlFor="credential-scope">Agent scope</label>
+            <label htmlFor="credential-scope">Agent Scope</label>
             <select
               id="credential-scope"
               value={scope}
@@ -246,7 +296,7 @@ export function Access() {
           </div>
           <div className="form-actions">
             <button className="primary" disabled={issue.isPending}>
-              Create agent token
+              Create Agent Token
             </button>
           </div>
         </form>
@@ -271,24 +321,41 @@ export function Access() {
           </div>
         ))}
       </section>
-      <section className="panel">
-        <h2>Audit trail</h2>
+      <section className="panel" hidden={section !== "audit"}>
+        <h2>Audit Log</h2>
         <p className="muted">
           Latest 100 mutation attempts. Request bodies and secrets are excluded.
         </p>
         {audit.data?.map((event) => (
           <div className="step" key={event.id}>
             <div className="grow">
-              <strong>{event.action}</strong>
+              <strong>{auditAction(event.action)}</strong>
+              <details>
+                <summary>Request Details</summary>
+                <code>{event.action}</code>
+                <p className="small">
+                  Event {event.id} · Actor {event.subject} · HTTP{" "}
+                  {event.status || "pending"}
+                </p>
+              </details>
               <p className="small muted">
-                {event.subject}
+                {members.data?.find((m) => m.id === event.subject)?.name ||
+                  (event.kind === "agent"
+                    ? event.credentialName || "Agent"
+                    : "Workspace Member")}
                 {event.kind === "agent"
                   ? ` · Agent: ${event.credentialName}`
                   : ""}{" "}
                 · {new Date(event.createdAt).toLocaleString()}
               </p>
             </div>
-            <span className="environment">{event.status || "Pending"}</span>
+            <span className="environment">
+              {!event.status
+                ? "Pending"
+                : event.status < 400
+                  ? "Succeeded"
+                  : "Rejected"}
+            </span>
           </div>
         ))}
       </section>

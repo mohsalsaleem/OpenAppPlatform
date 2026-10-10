@@ -52,7 +52,7 @@ try{
  platform=spawn('/opt/oap/platform',['-targets','/workspace/.local/observed-targets.json','-web','/workspace/web/dist'],{env,stdio:['ignore','pipe','pipe']});
  let platformLog='';platform.stdout.on('data',b=>platformLog+=b);platform.stderr.on('data',b=>platformLog+=b);
  await waitReady();
- await run('browser','node',['node_modules/@playwright/test/cli.js','test','tests/workspace.spec.ts'],'/workspace/web');
+ await run('browser','node',['node_modules/@playwright/test/cli.js','test','tests/workspace.spec.ts','tests/ui-audit.spec.ts'],'/workspace/web');
  for(const name of await readdir('/workspace/.local'))if(name.endsWith('.png'))await copyFile('/workspace/.local/'+name,'/report/'+name);
  const input=[{jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2024-11-05',capabilities:{},clientInfo:{name:'local-test',version:'1'}}},{jsonrpc:'2.0',id:2,method:'tools/list'},{jsonrpc:'2.0',id:3,method:'tools/call',params:{name:'list_applications',arguments:{}}}].map(v=>JSON.stringify(v)+'\n').join('');
  const mcp=spawn('/opt/oap/oap-mcp',['-url',env.OAP_BASE_URL],{env,stdio:['pipe','pipe','pipe']});let output='';mcp.stdout.on('data',b=>output+=b);mcp.stdin.end(input);const mcpCode=await new Promise((r,j)=>{mcp.on('error',j);mcp.on('close',r)});const messages=output.trim().split('\n').map(JSON.parse);

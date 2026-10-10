@@ -41,7 +41,7 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
   });
   return (
     <div className="recovery-panel">
-      <h3>Recovery controls</h3>
+      <h3>Recovery Controls</h3>
       <p className="small muted">
         Resume a known pre-dispatch phase after preparation or dependency
         checks. After dispatch starts, recheck the exact provider deployment.
@@ -58,7 +58,7 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
             disabled={recovery.isPending}
             onClick={() => recovery.mutate({ retryFinalization: true })}
           >
-            Retry saving replica count
+            Retry Saving Replica Count
           </button>
         )}
       {deployment.steps
@@ -95,7 +95,7 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
           return (
             <div className="recovery-step" key={key}>
               <label htmlFor={`recovery-${deployment.id}-${key}`}>
-                Provider deployment ID for {s.component} / {s.ordinal}
+                Provider Deployment ID for {s.component} / {s.ordinal}
               </label>
               <input
                 id={`recovery-${deployment.id}-${key}`}

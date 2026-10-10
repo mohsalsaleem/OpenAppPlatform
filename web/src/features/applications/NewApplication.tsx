@@ -87,7 +87,7 @@ export function NewApplication() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">APPLICATION SETUP</p>
-          <h1>Create application</h1>
+          <h1>Create Application</h1>
           <p className="muted">
             Define the components. Deploy when you’re ready.
           </p>
@@ -96,14 +96,14 @@ export function NewApplication() {
       <form onSubmit={submit}>
         <section className="panel">
           <div className="section-heading">
-            <h2>Application details</h2>
+            <h2>Application Details</h2>
             <span className="small muted">
               Creating a definition does not deploy workloads.
             </span>
           </div>
           <div className="form-grid">
             <div>
-              <label htmlFor="app-name">Application name</label>
+              <label htmlFor="app-name">Application Name</label>
               <input
                 id="app-name"
                 value={name}
@@ -117,7 +117,7 @@ export function NewApplication() {
               </small>
             </div>
             <div>
-              <label htmlFor="target">Deployment target</label>
+              <label htmlFor="target">Deployment Target</label>
               <select
                 id="target"
                 value={target || targets.data?.[0]?.id || ""}
@@ -135,7 +135,7 @@ export function NewApplication() {
         </section>
         <section className="panel">
           <div className="section-heading">
-            <h2>Web components</h2>
+            <h2>Web Components</h2>
             <button
               type="button"
               className="secondary"
@@ -157,7 +157,7 @@ export function NewApplication() {
               }
               disabled={components.length >= 16}
             >
-              <Plus size={16} /> Add component
+              <Plus size={16} /> Add Component
             </button>
           </div>
           {components.map((c, i) => (
@@ -170,7 +170,7 @@ export function NewApplication() {
                   <button
                     type="button"
                     className="icon-button"
-                    aria-label={`Remove component ${i + 1}`}
+                    aria-label={`Remove Component ${i + 1}`}
                     onClick={() =>
                       setComponents(components.filter((_, n) => n !== i))
                     }
@@ -181,7 +181,7 @@ export function NewApplication() {
               </div>
               <div className="form-grid">
                 <div>
-                  <label htmlFor={`name-${i}`}>Component name</label>
+                  <label htmlFor={`name-${i}`}>Component Name</label>
                   <input
                     id={`name-${i}`}
                     value={c.name}
@@ -196,7 +196,7 @@ export function NewApplication() {
                   />
                 </div>
                 <div>
-                  <label htmlFor={`adopt-${i}`}>Resource ownership</label>
+                  <label htmlFor={`adopt-${i}`}>Resource Ownership</label>
                   <select
                     id={`adopt-${i}`}
                     value={c.resourceId}
@@ -241,7 +241,7 @@ export function NewApplication() {
                   </select>
                 </div>
                 <div>
-                  <label htmlFor={`image-${i}`}>Container image</label>
+                  <label htmlFor={`image-${i}`}>Container Image</label>
                   <input
                     id={`image-${i}`}
                     value={c.image}
@@ -261,7 +261,7 @@ export function NewApplication() {
                 </div>
                 <div className="form-grid compact">
                   <div>
-                    <label htmlFor={`port-${i}`}>Internal port</label>
+                    <label htmlFor={`port-${i}`}>Internal Port</label>
                     <input
                       id={`port-${i}`}
                       type="number"
@@ -296,7 +296,7 @@ export function NewApplication() {
                   </div>
                 </div>
                 <div>
-                  <label htmlFor={`host-port-${i}`}>Host port</label>
+                  <label htmlFor={`host-port-${i}`}>Host Port</label>
                   <input
                     id={`host-port-${i}`}
                     type="number"
@@ -312,36 +312,39 @@ export function NewApplication() {
                     }
                   />
                   <small className="muted">
-                    0 keeps the component private. A fixed host port requires
-                    one instance.
+                    0 adds no host-port mapping. Existing platform routing
+                    remains. A fixed host port requires one instance.
                   </small>
                 </div>
               </div>
-              <RuntimeVariables
-                key={`${selected?.id}-${c.editorId}-${c.resourceId}`}
-                component={c}
-                onChange={(field, value) =>
-                  setComponents(
-                    components.map((v, n) =>
-                      n === i ? { ...v, [field]: value } : v,
-                    ),
-                  )
-                }
-                onValidity={(valid) =>
-                  setInvalid((current) => ({
-                    ...current,
-                    [c.editorId]: !valid,
-                  }))
-                }
-                environmentSupported={!!capabilities.data?.environment}
-                connectionsSupported={
-                  !!(
-                    capabilities.data?.applicationDns ||
-                    capabilities.data?.serviceEndpoints
-                  )
-                }
-                endpointsSupported={!!capabilities.data?.serviceEndpoints}
-              />
+              <details className="advanced-configuration">
+                <summary>Environment and Service Connections</summary>
+                <RuntimeVariables
+                  key={`${selected?.id}-${c.editorId}-${c.resourceId}`}
+                  component={c}
+                  onChange={(field, value) =>
+                    setComponents(
+                      components.map((v, n) =>
+                        n === i ? { ...v, [field]: value } : v,
+                      ),
+                    )
+                  }
+                  onValidity={(valid) =>
+                    setInvalid((current) => ({
+                      ...current,
+                      [c.editorId]: !valid,
+                    }))
+                  }
+                  environmentSupported={!!capabilities.data?.environment}
+                  connectionsSupported={
+                    !!(
+                      capabilities.data?.applicationDns ||
+                      capabilities.data?.serviceEndpoints
+                    )
+                  }
+                  endpointsSupported={!!capabilities.data?.serviceEndpoints}
+                />
+              </details>
             </div>
           ))}
           <ErrorBox error={resources.error || capabilities.error} />
@@ -365,7 +368,7 @@ export function NewApplication() {
               components.some((c) => invalid[c.editorId])
             }
           >
-            {mutation.isPending ? "Creating…" : "Create application"}
+            {mutation.isPending ? "Creating…" : "Create Application"}
           </button>
         </div>
       </form>

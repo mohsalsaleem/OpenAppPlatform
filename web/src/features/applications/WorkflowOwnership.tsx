@@ -10,12 +10,12 @@ export function WorkflowOwnership({
   return (
     <section
       className="panel workflow-ownership"
-      aria-label="Workflow ownership"
+      aria-label="Workflow Ownership"
     >
-      <h2>Workflow ownership</h2>
+      <h2>Workflow Ownership</h2>
       <p className="small muted">
-        Grouping preserves existing triggers. Operator support does not grant
-        OAP permission to manage an observed component.
+        Your existing build and deployment triggers remain in place. Management
+        is configured separately for each component.
       </p>
       {application.manifest.components.map((component) => {
         const observed = component.management === "observe";
@@ -23,7 +23,7 @@ export function WorkflowOwnership({
           <details key={component.name}>
             <summary>
               {component.name} ·{" "}
-              {observed ? "Existing workflow" : "OAP image releases"}
+              {observed ? "Existing Workflow" : "OAP Image Releases"}
             </summary>
             <dl>
               <dt>Build</dt>
@@ -35,10 +35,10 @@ export function WorkflowOwnership({
               <dt>Deploy</dt>
               <dd>
                 {observed
-                  ? "Existing workflow owns deployments. OAP observes health and logs."
+                  ? "The existing workflow owns deployments. OAP observes health and logs."
                   : capabilities
                     ? capabilities.standard
-                      ? "OAP coordinates standard image releases; the target executes them. Requests may be interrupted."
+                      ? "Open App Platform coordinates image deployments through this platform. Deployment may interrupt requests."
                       : "Standard image releases are unsupported by this target."
                     : "Target capability information is unavailable."}
               </dd>
@@ -48,7 +48,7 @@ export function WorkflowOwnership({
                   ? "Use the existing operator. OAP restart is blocked while observing."
                   : capabilities
                     ? capabilities.restart
-                      ? "Available through OAP for bound, active instances with operate access."
+                      ? "Available for active instances when you have permission to operate this application."
                       : "Unsupported by this target."
                     : "Target capability information is unavailable."}
               </dd>
@@ -58,7 +58,7 @@ export function WorkflowOwnership({
                   ? "Native runtime configuration stays with the operator."
                   : "Saving updates the OAP definition. Apply supported runtime changes with a separate deployment."}
               </dd>
-              <dt>Management handoff</dt>
+              <dt>Management Handoff</dt>
               <dd>
                 {observed
                   ? capabilities
