@@ -190,3 +190,44 @@ func TestRestartScopesResourceAndReturnsProviderOperation(t *testing.T) {
 		t.Fatalf("restart %s %v %d", remote, e, calls)
 	}
 }
+
+func TestRollbackSafetyIsScopedReadOnlyAndHidesVariableValues(t *testing.T) {
+	mappings := ""
+	value := "configured"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			t.Error("rollback preview mutated provider")
+			w.WriteHeader(405)
+			return
+		}
+		switch r.URL.Path {
+		case "/api/v1/projects/p/staging":
+			json.NewEncoder(w).Encode(map[string]any{"applications": []any{map[string]any{"uuid": "owned"}}})
+		case "/api/v1/applications/owned":
+			json.NewEncoder(w).Encode(map[string]any{"uuid": "owned", "ports_exposes": "80", "ports_mappings": mappings})
+		case "/api/v1/applications/owned/envs":
+			json.NewEncoder(w).Encode([]any{map[string]any{"uuid": "variable", "key": "MODE", "value": value, "is_literal": true, "is_runtime": true}})
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	defer server.Close()
+	client, err := New(domain.Target{URL: server.URL, ProjectID: "p", Environment: "staging"}, "private-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	component := domain.Component{Port: 80, Env: map[string]string{"MODE": "configured"}}
+	if err = client.CheckRollbackConfiguration(context.Background(), "owned", component); err != nil {
+		t.Fatal(err)
+	}
+	mappings = "8791:80"
+	if err = client.CheckRollbackConfiguration(context.Background(), "owned", component); err == nil {
+		t.Fatal("foreign host mapping accepted")
+	}
+	mappings = ""
+	value = "private-unexpected-value"
+	err = client.CheckRollbackConfiguration(context.Background(), "owned", component)
+	if err == nil || strings.Contains(err.Error(), value) {
+		t.Fatal("variable drift accepted or leaked value")
+	}
+}
