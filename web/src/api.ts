@@ -1,4 +1,5 @@
 export interface Component {
+  dependsOn?: string[];
   readiness?: { requireHealthy?: boolean; timeoutSeconds?: number };
   management?: "observe";
   serviceEndpoints?: Record<string, string>;

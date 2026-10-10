@@ -425,6 +425,19 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 		if e = c.authorizeRelease(ctx, d); e != nil {
 			return fail(step, "attention", e)
 		}
+		if step.Action != "retire" && (step.Phase == "pending" || step.Phase == "prepared") {
+			ready, err := c.dependenciesReady(ctx, a, d, comp)
+			if err != nil {
+				state := "attention"
+				if errors.Is(err, errDependencyFailed) {
+					state = "failed"
+				}
+				return fail(step, state, err)
+			}
+			if !ready {
+				return river.JobSnooze(c.PollInterval)
+			}
+		}
 		switch step.Phase {
 		case "pending":
 			if step.Action == "restart" || step.Action == "retire" {

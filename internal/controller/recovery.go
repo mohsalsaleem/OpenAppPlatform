@@ -81,10 +81,10 @@ func (c *Controller) Recover(ctx context.Context, id string, request Recovery) (
 			return d, domain.ErrConflict
 		}
 		if request.RetryPreparation {
-			if step.RecoveryPhase != "pending" || step.RemoteDeploymentID != "" || request.RemoteDeploymentID != "" {
-				return d, errors.New("only preparation interrupted before dispatch can be retried")
+			if (step.RecoveryPhase != "pending" && step.RecoveryPhase != "prepared") || step.RemoteDeploymentID != "" || request.RemoteDeploymentID != "" {
+				return d, errors.New("only a recorded pre-dispatch phase can be retried")
 			}
-			step.Phase = "pending"
+			step.Phase = step.RecoveryPhase
 			step.Error = ""
 			step.RecoveryPhase = ""
 		} else if step.Action == "retire" {

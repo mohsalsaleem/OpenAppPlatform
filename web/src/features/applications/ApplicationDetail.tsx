@@ -424,6 +424,13 @@ export function ApplicationDetail() {
                     · {c.readiness?.timeoutSeconds || 900}s observation timeout
                   </p>
                 ))}
+              {d.manifest.components
+                .filter((c) => c.dependsOn?.length)
+                .map((c) => (
+                  <p className="small muted" key={`dependencies-${c.name}`}>
+                    {c.name} waits for {c.dependsOn!.join(", ")}
+                  </p>
+                ))}
               {d.steps.map((s) => (
                 <div className="step" key={`${s.component}-${s.ordinal}`}>
                   <div>
@@ -576,6 +583,14 @@ export function ApplicationDetail() {
                   ? "requires operator-reported healthy status"
                   : "uses operator running/health status"}
                 ; observation timeout {c.readiness?.timeoutSeconds || 900}s.
+              </p>
+            ))}
+          {review.manifest.components
+            .filter((c) => c.dependsOn?.length)
+            .map((c) => (
+              <p className="small muted" key={`dependencies-${c.name}`}>
+                {c.name} waits for {c.dependsOn!.join(", ")}; all dependency
+                replicas must pass readiness.
               </p>
             ))}
           <ErrorBox error={deploy.error} />

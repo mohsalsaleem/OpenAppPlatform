@@ -41,12 +41,14 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
   });
   return (
     <div className="recovery-panel">
-      <h3>Recover observation</h3>
+      <h3>Recovery controls</h3>
       <p className="small muted">
-        Recheck the exact provider deployment. This does not dispatch the
-        operation again. If its ID was lost, inspect the operator and enter the
-        ID belonging to this instance. Other unfinished instances resume only
-        after every attention state is resolved.
+        Resume a known pre-dispatch phase after preparation or dependency
+        checks. After dispatch starts, recheck the exact provider deployment.
+        This does not dispatch the operation again. If its ID was lost, inspect
+        the operator and enter the ID belonging to this instance. Other
+        unfinished instances resume only after every attention state is
+        resolved.
       </p>
       <ErrorBox error={recovery.error} />
       {deployment.operation === "scale-down" &&
@@ -64,12 +66,14 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
         .map((s) => {
           const key = `${s.component}-${s.ordinal}`;
           const remote = s.remoteDeploymentId || ids[key] || "";
-          if (s.recoveryPhase === "pending" && !s.remoteDeploymentId)
+          if (
+            ["pending", "prepared"].includes(s.recoveryPhase || "") &&
+            !s.remoteDeploymentId
+          )
             return (
               <div className="recovery-step" key={key}>
                 <p>
-                  {s.component} / {s.ordinal}: resource preparation failed
-                  before dispatch.
+                  {s.component} / {s.ordinal}: paused before dispatch.
                 </p>
                 <button
                   className="secondary"
@@ -82,7 +86,9 @@ export function RecoveryPanel({ deployment }: { deployment: Deployment }) {
                     })
                   }
                 >
-                  Retry preparation
+                  {s.recoveryPhase === "prepared"
+                    ? "Recheck dependencies before dispatch"
+                    : "Retry preparation"}
                 </button>
               </div>
             );

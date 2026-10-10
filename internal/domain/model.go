@@ -27,6 +27,7 @@ type ReadinessPolicy struct {
 }
 
 type Component struct {
+	DependsOn        []string          `json:"dependsOn,omitempty"`
 	Readiness        *ReadinessPolicy  `json:"readiness,omitempty"`
 	Management       string            `json:"management,omitempty"`
 	ServiceEndpoints map[string]string `json:"serviceEndpoints,omitempty"`
@@ -68,7 +69,7 @@ func (m *Manifest) Validate() error {
 		if c.Management != "" && c.Management != "observe" {
 			return errors.New("management must be observe or omitted for existing managed components")
 		}
-		if c.Management == "observe" && (c.ResourceID == "" || c.HostPort != 0 || len(c.Env)+len(c.Services)+len(c.ServiceEndpoints) > 0) {
+		if c.Management == "observe" && (c.ResourceID == "" || c.HostPort != 0 || len(c.Env)+len(c.Services)+len(c.ServiceEndpoints)+len(c.DependsOn) > 0) {
 			return errors.New("observe-only components require a resourceId and cannot configure runtime settings")
 		}
 		if c.Readiness != nil {
@@ -122,7 +123,8 @@ func (m *Manifest) Validate() error {
 			return err
 		}
 	}
-	return nil
+	_, err := m.OrderedComponents()
+	return err
 }
 
 type Target struct {
@@ -207,7 +209,11 @@ func ResourceName(appID, component string, ordinal int) string {
 }
 func InitialSteps(m Manifest) []Step {
 	steps := []Step{}
-	for _, c := range m.Components {
+	ordered, err := m.OrderedComponents()
+	if err != nil {
+		return steps
+	}
+	for _, c := range ordered {
 		for n := 1; n <= c.Instances; n++ {
 			steps = append(steps, Step{Component: c.Name, Ordinal: n, Phase: "pending", ResourceID: c.ResourceID})
 		}

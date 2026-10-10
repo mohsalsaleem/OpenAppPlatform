@@ -110,3 +110,11 @@ Its image defines a native Docker HEALTHCHECK against `/health/ready`. OAP uses 
 reported result; the manifest does not install or rewrite the probe. See
 [release readiness](../docs/release-readiness.md) for default behavior, bounds and
 recovery.
+
+## Startup ordering
+
+The connected Docker example declares `frontend.dependsOn = ["api"]`. OAP waits
+for every selected API replica's release verification before preparing frontend.
+An affected-component release checks an existing, unselected API without
+redeploying it. Connection environment mappings remain separate from startup edges.
+See [the dependency contract](../docs/release-readiness.md#explicit-startup-dependencies).

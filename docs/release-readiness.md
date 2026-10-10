@@ -76,3 +76,40 @@ work and will not restore application data.
 
 The same observation deadline also bounds retirement waiting; retirement continues
 to use stopped-state verification rather than the healthy requirement.
+
+## Explicit startup dependencies
+
+Managed components may declare `"dependsOn": ["api"]`. References must be unique,
+within the same application, at most 15, and cannot include the component itself.
+Cycles are rejected when creating/updating definitions. Components without edges
+retain definition order. Dependencies are explicit; service environment mappings
+do not infer startup edges. Observed components cannot override their native startup
+ordering, but may be a read-only dependency of a managed, affected-component release.
+
+Release steps use a stable topological order, including every dependency replica
+before a dependent component. The frozen release graph and readiness policy survive
+configuration edits and controller restart. A failed selected dependency prevents
+the dependent's preparation and dispatch and fails the release; other pending steps
+may remain unexecuted. A waiting dependency cannot be bypassed by restarting OAP.
+
+An unselected dependency is not added to the release or rebuilt. Before preparation
+and again before dispatch, OAP inspects its current non-retired bindings against the
+frozen replica count, resource identity/ownership and readiness policy. Missing,
+unhealthy or foreign resources hold the release in attention. Restore the dependency
+and explicitly resume the recorded pre-dispatch phase. Prepared-phase recovery
+resumes prepared work; it does not prepare the resource again or repeat dispatch.
+Once dispatch begins, the existing exact-operation recovery rule still applies.
+Retirement does not enforce startup dependencies.
+
+This is release/start ordering, not continuous dependency monitoring, a transaction
+across services, parallel orchestration, reverse shutdown ordering or a promise that
+health cannot change after a check. Selected dependencies use their recorded release
+verification; unselected ones use live checks. A race between check and provider
+dispatch remains possible. HTTP probes and runtime rollback are still later work.
+
+Settings exposes dependency selection and a readable graph diff; release review and
+activity show frozen edges. The connected Docker example waits for API native health
+before starting its frontend. Local tests cover invalid graphs, replica readiness,
+process restart, immutable graphs, failed dependencies, unselected dependency drift
+before dispatch, safe pre-dispatch recovery, signed GitHub affected-component
+selection and native Docker connectivity/restart/scaling.

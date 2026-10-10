@@ -63,7 +63,12 @@ export function ConfigurationEditor({
   function change(
     index: number,
     field: string,
-    value: string | number | Record<string, string> | Component["readiness"],
+    value:
+      | string
+      | number
+      | Record<string, string>
+      | Component["readiness"]
+      | string[],
   ) {
     setSaved(false);
     setDraft({
@@ -201,6 +206,47 @@ export function ConfigurationEditor({
               </small>
             </div>
           </div>
+          {c.management !== "observe" && (
+            <details className="dependency-fields">
+              <summary>
+                Startup dependencies for {c.name} ({c.dependsOn?.length || 0})
+              </summary>
+              <p className="small muted">
+                Selected dependencies must finish every replica’s release
+                readiness. Services outside the release are inspected without
+                redeployment. This orders starts; it does not continuously
+                monitor dependencies.
+              </p>
+              {draft.components
+                .filter((other) => other.name !== c.name)
+                .map((other) => (
+                  <label key={other.name}>
+                    <input
+                      type="checkbox"
+                      checked={c.dependsOn?.includes(other.name) || false}
+                      onChange={(e) =>
+                        change(
+                          i,
+                          "dependsOn",
+                          e.target.checked
+                            ? [...(c.dependsOn || []), other.name]
+                            : (c.dependsOn || []).filter(
+                                (name) => name !== other.name,
+                              ),
+                        )
+                      }
+                    />
+                    Wait for {other.name} before starting {c.name}
+                  </label>
+                ))}
+              {draft.components.length === 1 && (
+                <p className="small muted">
+                  Add another component through a supported assembly workflow to
+                  define dependencies.
+                </p>
+              )}
+            </details>
+          )}
           {c.management !== "observe" && (
             <fieldset className="readiness-fields">
               <legend>Release readiness for {c.name}</legend>

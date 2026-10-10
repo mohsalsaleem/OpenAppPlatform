@@ -137,3 +137,34 @@ func TestReadinessPolicyValidation(t *testing.T) {
 		t.Fatal("observed policy override accepted")
 	}
 }
+
+func TestDependencyGraphValidationAndStableReleaseOrder(t *testing.T) {
+	m := valid()
+	m.Components[0].DependsOn = []string{"api"}
+	m.Components = append(m.Components, Component{Name: "api", Image: "image:v1", Port: 80, Instances: 2})
+	if err := m.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	steps := InitialSteps(m)
+	if len(steps) != 3 || steps[0].Component != "api" || steps[1].Component != "api" || steps[2].Component != "web" {
+		t.Fatal("dependency replicas were not ordered before dependent")
+	}
+	for _, deps := range [][]string{{"missing"}, {"web"}, {"api", "api"}, {"BAD NAME"}} {
+		bad := m
+		bad.Components = append([]Component(nil), m.Components...)
+		bad.Components[0].DependsOn = deps
+		if bad.Validate() == nil {
+			t.Fatal("invalid dependencies accepted")
+		}
+	}
+	m.Components[1].DependsOn = []string{"web"}
+	if m.Validate() == nil {
+		t.Fatal("cycle accepted")
+	}
+	m.Components[1].DependsOn = nil
+	m.Components[0].ResourceID = "observed"
+	m.Components[0].Management = "observe"
+	if m.Validate() == nil {
+		t.Fatal("observed dependency override accepted")
+	}
+}

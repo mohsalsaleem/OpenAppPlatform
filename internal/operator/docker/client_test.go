@@ -202,6 +202,7 @@ func TestReadinessPolicyDoesNotChangeDockerRuntimeRevision(t *testing.T) {
 	spec := operator.Spec{Name: "web", Ownership: "owner", Component: domain.Component{Name: "web", Image: "image:v1", Port: 80}}
 	before := revision(spec, "immutable-image")
 	spec.Component.Readiness = &domain.ReadinessPolicy{RequireHealthy: true, TimeoutSeconds: 120}
+	spec.Component.DependsOn = []string{"api"}
 	if revision(spec, "immutable-image") != before {
 		t.Fatal("controller policy changed container runtime revision")
 	}

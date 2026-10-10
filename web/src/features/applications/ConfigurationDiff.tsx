@@ -19,6 +19,16 @@ export function ConfigurationDiff({
           after: text(c[field]),
         });
     }
+    const previousDependencies =
+      [...(old.dependsOn || [])].sort().join(", ") || "None";
+    const proposedDependencies =
+      [...(c.dependsOn || [])].sort().join(", ") || "None";
+    if (previousDependencies !== proposedDependencies)
+      rows.push({
+        field: `${c.name} · startup dependencies`,
+        before: previousDependencies,
+        after: proposedDependencies,
+      });
     const oldReadiness = old.readiness ?? {},
       nextReadiness = c.readiness ?? {};
     for (const [field, a, b] of [

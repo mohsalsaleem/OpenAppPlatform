@@ -138,7 +138,7 @@ is verified in local system/browser fixtures; no production resource was touched
 See [application environments](docs/application-environments.md) and
 [target setup and acceptance](docs/target-setup-and-definition-review.md).
 
-**Next slice:** M0 batch 4, release verification and recovery controls. Start with
+**Current slice:** M0 batch 4, release verification and recovery controls. Start with
 configurable readiness and the release snapshot/recovery contract; keep native
 observed workloads read-only. The acceptance work queued this batch; the first readiness slice is delivered. Full configuration promotion, native source authority transitions and the M1
 credential vault remain separate follow-up work. The initial reusable definition
@@ -147,8 +147,10 @@ contract is sanitized naming/layout reuse, not secret or runtime cloning.
 **Batch 4 progress:** optional per-component operator-health gates and bounded
 observation deadlines are frozen with release definitions and honored by recovery.
 Legacy definitions retain running/health acceptance and a 15-minute window.
-This does not configure native HTTP probes. Dependency ordering, release comparison,
-rollback and cancellation/abandonment remain in this batch. Batch 4 stays active.
+This does not configure native HTTP probes. Explicit dependency ordering now gates preparation/dispatch, verifies all selected
+replicas first, and inspects unselected bound dependencies without redeploying them.
+Pre-dispatch dependency holds can resume without repeating an uncertain dispatch.
+Release comparison, rollback and cancellation/abandonment remain in this batch. Batch 4 stays active.
 The slice passed local/native Docker and staging UI verification. No native HTTP
 probe was provisioned and no retained workload was redeployed by these checks.
 See [release readiness](docs/release-readiness.md).

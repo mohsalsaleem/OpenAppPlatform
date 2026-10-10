@@ -53,8 +53,8 @@ func TestDockerComponentConnectivityConfigurationScalingAndRestart(t *testing.T)
 		t.Fatal(e)
 	}
 	m := domain.Manifest{Name: "connected-" + domain.NewID()[:8], TargetID: target.ID, Environment: "staging", Components: []domain.Component{
-		{Name: "api", Kind: "web", Image: image, Port: 8080, Instances: 1, Strategy: "standard", Env: map[string]string{"OAP_TEST_MESSAGE": "config-v1"}},
-		{Name: "web", Kind: "web", Image: image, Port: 8080, HostPort: port, Instances: 1, Strategy: "standard", Services: map[string]string{"UPSTREAM_URL": "api"}},
+		{Name: "api", Kind: "web", Image: image, Port: 8080, Instances: 1, Strategy: "standard", Env: map[string]string{"OAP_TEST_MESSAGE": "config-v1"}, Readiness: &domain.ReadinessPolicy{RequireHealthy: true, TimeoutSeconds: 120}},
+		{Name: "web", Kind: "web", Image: image, Port: 8080, HostPort: port, Instances: 1, Strategy: "standard", Services: map[string]string{"UPSTREAM_URL": "api"}, DependsOn: []string{"api"}},
 	}}
 	app, e := c.CreateApplication(ctx, m)
 	if e != nil {

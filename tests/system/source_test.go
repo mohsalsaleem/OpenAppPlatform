@@ -44,9 +44,15 @@ func TestSignedGitHubDeliveryBuildOnceSelectedReplicasAndRecovery(t *testing.T) 
 	m := manifest()
 	m.Name = "source-app"
 	m.Components[0].Instances = 2
+	m.Components[0].DependsOn = []string{"api"}
 	m.Components = append(m.Components, domain.Component{Name: "api", Image: "nginx:alpine", Port: 80})
 	app, e := c.CreateApplication(ctx, m)
 	if e != nil {
+		t.Fatal(e)
+	}
+	// Source selection releases web only; its existing API dependency is inspected.
+	f.resources["existing-api"] = operator.Resource{ID: "existing-api", Name: "Existing API", Description: "OpenAppPlatform:" + app.ID + ":api", Status: "running:healthy", ArtifactKind: "image"}
+	if e = c.Store.Bind(ctx, "fixture", "existing-api", app.ID, "api", 1); e != nil {
 		t.Fatal(e)
 	}
 	service := access.Service{Pool: c.Store.Pool}

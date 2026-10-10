@@ -20,6 +20,7 @@ func revision(s operator.Spec, imageID string) string {
 	s.Component.Instances = 1
 	// Controller readiness changes do not replace the container runtime.
 	s.Component.Readiness = nil
+	s.Component.DependsOn = nil
 	b, _ := json.Marshal(struct {
 		Spec  operator.Spec
 		Image string
