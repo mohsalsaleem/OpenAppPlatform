@@ -254,7 +254,10 @@ leaves a usable recovery path outside OAP itself. Keep a last-known-good artifac
 a backup, and a direct operator/bootstrap command for recovery.
 
 Show controller health, target reachability, stale observations, failures, recent
-logs, and backup status. Add notification events through a transactional outbox.
+logs, and backup status. Include collector/backend health, ingest lag, collection
+gaps and disk/retention status when optional indexed logging is configured.
+See [lightweight logging and search](docs/logging-and-search.md).
+Add notification events through a transactional outbox.
 No email/chat notification is sent until the owner configures that destination.
 
 **Exit gate:** restore OAP on a fresh server, recover an interrupted release without
@@ -423,6 +426,14 @@ release correlation, bounded queries, retention, and export. Avoid requiring a
 full monitoring stack for basic health visibility; integrate existing monitoring
 backends where useful.
 
+**Accepted logging requirement:** native OAP log search backed by optional
+single-node VictoriaLogs, with proper field/full-text indexing, one host collector,
+trusted app/release correlation, bounded retention and scoped queries. Keep live
+operator logs available without this backend. VictoriaMetrics remains a separate
+optional metrics integration. Backend and collector deployment are planned, not
+implemented. See [logging and search design](docs/logging-and-search.md). The
+current M0 batch order stays unchanged.
+
 Keep three distinct data classes:
 
 | Data | Purpose | Default direction |
@@ -546,7 +557,7 @@ workloads on eligible targets.
 | ChatGPT plugins/apps/MCP integration | M2 |
 | Discovery, grouping, and application assembly | M0 guided/manual; M3 optional AI assistance |
 | Automatic stack detection and optimization; Railpack/Nixpacks alternatives | M3 |
-| Monitoring and logs | M1 baseline, M4 richer integration |
+| Monitoring and indexed native log search | M1 health/collection baseline; M4 optional VictoriaLogs, collector, scoped search and log alerts |
 | Notifications | M1 event foundation, M2/M4 delivery and workflows |
 | Per-app analytics; custom analytics backend | M4 |
 | Optional telemetry | M4 |

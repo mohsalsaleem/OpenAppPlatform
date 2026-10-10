@@ -183,6 +183,7 @@ Persist release artifacts or their retrievable references, configuration version
 | Navigation and API state | React Router and TanStack Query |
 | UI foundation | Tailwind CSS and shadcn/ui |
 | Live progress and logs | Server-Sent Events |
+| Indexed historical log search (optional, planned) | Single-node VictoriaLogs with host collector; native OAP scoped search |
 | API contract | OpenAPI with generated clients |
 | Packaging | Multi-stage Docker image serving compiled UI and API |
 
@@ -267,3 +268,5 @@ These references support integration feasibility; adapter guarantees require ver
 - [Portainer API](https://docs.portainer.io/api/examples)
 - [River documentation](https://riverqueue.com/docs)
 - [sqlc documentation](https://docs.sqlc.dev/en/latest/)
+
+Optional indexed logging and monitoring follow the [logging and search design](logging-and-search.md). Backend deployment is planned; current bounded operator logs remain available.
