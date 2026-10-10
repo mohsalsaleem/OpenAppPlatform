@@ -100,8 +100,17 @@ func TestReleaseComparisonIsSanitizedScopedAndOperatorIndependent(t *testing.T) 
 		defer response.Body.Close()
 		return response.StatusCode
 	}
-	if call(path) != 200 || call(strings.Replace(path, "/applications/"+app.ID, "/applications/"+other.ID, 1)) != 403 || call(strings.Replace(path, newer.ID, foreign.ID, 1)) != 404 {
-		t.Fatal("scoped comparison crossed application boundary")
+	for _, check := range []struct {
+		name, path string
+		status     int
+	}{
+		{"own application", path, 200},
+		{"other application", strings.Replace(path, "/applications/"+app.ID, "/applications/"+other.ID, 1), 404},
+		{"foreign release", strings.Replace(path, newer.ID, foreign.ID, 1), 404},
+	} {
+		if status := call(check.path); status != check.status {
+			t.Fatalf("%s comparison status %d, want %d", check.name, status, check.status)
+		}
 	}
 	if adapterCalls.Load() != 0 || f.deploys != 0 {
 		t.Fatal("comparison contacted or mutated operator")
