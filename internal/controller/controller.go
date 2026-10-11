@@ -57,7 +57,10 @@ func New(ctx context.Context, s *store.Store, f operator.Factory) (*Controller, 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, &Worker{Controller: c})
 	river.AddWorker(workers, &SourceWorker{Controller: c})
-	c.Jobs, e = river.NewClient(driver, &river.Config{Queues: map[string]river.QueueConfig{"default": {MaxWorkers: 4}}, Workers: workers, JobTimeout: time.Minute})
+	river.AddWorker(workers, &RouteReconcileWorker{Controller: c})
+	c.Jobs, e = river.NewClient(driver, &river.Config{Queues: map[string]river.QueueConfig{"default": {MaxWorkers: 4}}, Workers: workers, PeriodicJobs: []*river.PeriodicJob{river.NewPeriodicJob(river.PeriodicInterval(time.Minute), func() (river.JobArgs, *river.InsertOpts) {
+		return RouteReconcileArgs{}, &river.InsertOpts{MaxAttempts: 3, UniqueOpts: river.UniqueOpts{ByPeriod: time.Minute}}
+	}, &river.PeriodicJobOpts{RunOnStart: true})}, JobTimeout: time.Minute})
 	return c, e
 }
 func (c *Controller) Adapter(ctx context.Context, id string) (operator.Adapter, error) {

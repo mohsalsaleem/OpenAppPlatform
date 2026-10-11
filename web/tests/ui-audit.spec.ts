@@ -805,3 +805,103 @@ test("routing review explains unhealthy exclusions and healthy count", async ({
   ).toBeVisible();
   await expect(dialog.getByText(members[1].url, { exact: true })).toBeVisible();
 });
+
+test("automatic membership requires owner opt-in and can be disabled", async ({
+  page,
+}) => {
+  await fixtures(page);
+  let mode: "manual" | "automatic" | "paused" = "manual";
+  await page.route("**/api/v1/applications/audit-app/routes", (route) =>
+    route.fulfill({
+      json: {
+        endpoints: [
+          {
+            name: "oap-route",
+            component: "web",
+            url: "https://shared.example.test",
+            status: "in-sync",
+            current: ["https://backend-1.example.test"],
+            desired: ["https://backend-1.example.test"],
+            excluded: [],
+            automation:
+              mode === "manual"
+                ? undefined
+                : {
+                    enabled: mode === "automatic",
+                    status: mode === "paused" ? "paused" : "in-sync",
+                    message:
+                      mode === "paused"
+                        ? "Native route drift detected. No automatic changes were made."
+                        : "",
+                    checkedAt: "2026-10-11T12:00:00Z",
+                  },
+          },
+        ],
+        publications: [],
+      },
+    }),
+  );
+  await page.route(
+    "**/api/v1/applications/audit-app/route-automation",
+    async (route) => {
+      const body = route.request().postDataJSON();
+      expect(body.name).toBe("oap-route");
+      expect(body.expectedVersion).toBe(3);
+      mode = body.enabled ? "automatic" : "manual";
+      await route.fulfill({
+        json: {
+          enabled: body.enabled,
+          status: body.enabled ? "in-sync" : "disabled",
+          message: "",
+          checkedAt: "2026-10-11T12:00:00Z",
+        },
+      });
+    },
+  );
+  await page.goto("/applications/audit-app");
+  await page.getByRole("tab", { name: "Endpoints", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Review Routing", exact: true }),
+  ).toBeEnabled();
+  await page
+    .getByRole("button", { name: "Enable Automatic Updates", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByText("Native edits pause automation.", { exact: false }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "../.local/ui-automation-consent.png",
+    fullPage: true,
+  });
+  await dialog
+    .getByRole("button", { name: "Enable Automatic Updates", exact: true })
+    .click();
+  await expect(
+    page.getByText("Automatic · Every Minute", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Review Routing", exact: true }),
+  ).toBeDisabled();
+  await page.screenshot({
+    path: "../.local/ui-automation-enabled.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Disable Automatic Updates", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Review Routing", exact: true }),
+  ).toBeEnabled();
+  mode = "paused";
+  await page.reload();
+  await page.getByRole("tab", { name: "Endpoints", exact: true }).click();
+  await expect(
+    page.getByText("Paused · Owner Review Required", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Native route drift detected. No automatic changes were made.",
+    ),
+  ).toBeVisible();
+});

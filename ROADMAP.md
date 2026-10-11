@@ -837,6 +837,10 @@ The [health-aware reviewed routing](docs/health-aware-routing.md) slice now excl
 unhealthy/stopped owned instances from a reviewed backend set, rechecks health
 before apply and preserves the existing route when none are healthy. Recovery
 requires a new owner review; background reconciliation and draining remain open.
+The [opt-in automatic membership](docs/automatic-route-membership.md) slice adds
+owner-controlled minute checks using River, pinned native authority, drift pauses
+and durable publication recovery. Automatic updates remain off until explicitly
+enabled. Domain creation, draining and bare Docker routing remain batch 5 gates.
 
 
 Batches 2 and 3 are already delivered; keep the ordered queue above. Source-backed management handoff and GitHub sequencing must

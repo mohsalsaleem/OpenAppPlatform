@@ -24,6 +24,7 @@ export function Endpoints({
 }) {
   const owner = useIsOwner();
   const client = useQueryClient();
+  const [enableName, setEnableName] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const routes = useQuery({
     queryKey: ["routes", applicationId],
@@ -83,6 +84,19 @@ export function Endpoints({
     onSuccess: () =>
       client.invalidateQueries({ queryKey: ["routes", applicationId] }),
   });
+  const automation = useMutation({
+    mutationFn: ({ name, enabled }: { name: string; enabled: boolean }) =>
+      api
+        .POST("/api/v1/applications/{id}/route-automation", {
+          params: { path: { id: applicationId } },
+          body: { name, enabled, expectedVersion: version },
+        })
+        .then(unwrap),
+    onSuccess: () => {
+      setEnableName(null);
+      client.invalidateQueries({ queryKey: ["routes", applicationId] });
+    },
+  });
   if (routes.isLoading) return <Loading />;
   const uncertain = routes.data?.publications.find(
     (p) => p.state === "publishing",
@@ -97,7 +111,9 @@ export function Endpoints({
           </p>
         </div>
       </div>
-      <ErrorBox error={routes.error || review.error || verify.error} />
+      <ErrorBox
+        error={routes.error || review.error || verify.error || automation.error}
+      />
       {uncertain && (
         <div role="alert" className="notice">
           A routing update needs recovery. Deployments and configuration changes
@@ -146,12 +162,39 @@ export function Endpoints({
                   ? `${endpoint.current.length} current → ${endpoint.desired.length} desired backends · Update Available`
                   : "Review Blocked"}
             </p>
+            <div
+              className="mt-3 text-sm space-y-1"
+              aria-label="Automatic membership"
+            >
+              <h3>Membership Updates</h3>
+              <p className="muted">
+                {endpoint.automation?.enabled
+                  ? endpoint.automation.status === "blocked"
+                    ? "Automatic · Waiting"
+                    : "Automatic · Every Minute"
+                  : endpoint.automation?.status === "paused"
+                    ? "Paused · Owner Review Required"
+                    : "Manual"}
+              </p>
+              {endpoint.automation && (
+                <p className="muted">
+                  Updated{" "}
+                  {new Date(endpoint.automation.checkedAt).toLocaleString()}
+                </p>
+              )}
+              {endpoint.automation?.message && (
+                <p className="muted">{endpoint.automation.message}</p>
+              )}
+            </div>
             {!!endpoint.excluded?.length && (
               <p className="notice mt-2 text-sm">
                 {endpoint.excluded.length}{" "}
                 {endpoint.excluded.length === 1 ? "instance" : "instances"}{" "}
                 excluded from desired routing because they are not healthy.
-                Review and apply to update membership.
+                {endpoint.status === "update-needed" &&
+                  (endpoint.automation?.enabled
+                    ? " The next automatic check will update membership."
+                    : " Review and apply to update membership.")}
               </p>
             )}
             <div
@@ -231,11 +274,29 @@ export function Endpoints({
                 disabled={
                   endpoint.status === "blocked" ||
                   review.isPending ||
-                  !!uncertain
+                  !!uncertain ||
+                  !!endpoint.automation?.enabled
                 }
                 onClick={() => review.mutate(endpoint.name)}
               >
                 Review Routing
+              </Button>
+              <Button
+                variant="outline"
+                disabled={
+                  automation.isPending ||
+                  (!endpoint.automation?.enabled &&
+                    (endpoint.status !== "in-sync" || !!uncertain))
+                }
+                onClick={() =>
+                  endpoint.automation?.enabled
+                    ? automation.mutate({ name: endpoint.name, enabled: false })
+                    : setEnableName(endpoint.name)
+                }
+              >
+                {endpoint.automation?.enabled
+                  ? "Disable Automatic Updates"
+                  : "Enable Automatic Updates"}
               </Button>
               <Button
                 variant="outline"
@@ -263,7 +324,7 @@ export function Endpoints({
               className="flex items-center justify-between gap-4 py-2 text-sm"
             >
               <span>
-                {p.component} ·{" "}
+                {p.component} · {p.automatic ? "Automatic · " : ""}{" "}
                 {p.state === "applied"
                   ? "Applied"
                   : p.state === "publishing"
@@ -272,22 +333,67 @@ export function Endpoints({
                       ? "Cancelled"
                       : "Ready for Review"}
               </span>
-              {owner && p.state === "prepared" && !uncertain && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    publish.reset();
-                    setPlan(p);
-                  }}
-                >
-                  Open Review
-                </Button>
-              )}
+              {owner &&
+                p.state === "prepared" &&
+                !uncertain &&
+                !routes.data?.endpoints.find((e) => e.name === p.name)
+                  ?.automation?.enabled && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      publish.reset();
+                      setPlan(p);
+                    }}
+                  >
+                    Open Review
+                  </Button>
+                )}
             </div>
           ))}
         </div>
       )}
+      <Dialog
+        open={!!enableName}
+        onOpenChange={(open) => {
+          if (!open && !automation.isPending) setEnableName(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enable Automatic Membership Updates</DialogTitle>
+            <DialogDescription>
+              OAP will check this endpoint every minute and add or remove
+              verified owned backends as their health and replica membership
+              change.
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm muted">
+            The shared address and TLS policy stay the same. Native edits pause
+            automation. If no backend is healthy, OAP preserves the existing
+            route. Updates do not drain connections.
+          </p>
+          <ErrorBox error={automation.error} />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={automation.isPending}
+              onClick={() => setEnableName(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={automation.isPending}
+              onClick={() =>
+                enableName &&
+                automation.mutate({ name: enableName, enabled: true })
+              }
+            >
+              Enable Automatic Updates
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={!!plan}
         onOpenChange={(open) => {

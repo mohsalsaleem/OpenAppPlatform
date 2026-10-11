@@ -108,6 +108,20 @@ type OapReleaseClaim struct {
 	Mode      string `json:"mode"`
 }
 
+type OapRouteAutomation struct {
+	ApplicationID string             `json:"application_id"`
+	Name          string             `json:"name"`
+	OwnerID       string             `json:"owner_id"`
+	Enabled       bool               `json:"enabled"`
+	AuthorityHash string             `json:"authority_hash"`
+	DirectoryHash string             `json:"directory_hash"`
+	NativeHash    string             `json:"native_hash"`
+	PendingID     string             `json:"pending_id"`
+	Status        string             `json:"status"`
+	Message       string             `json:"message"`
+	CheckedAt     pgtype.Timestamptz `json:"checked_at"`
+}
+
 type OapRoutePublication struct {
 	ID            string             `json:"id"`
 	ApplicationID string             `json:"application_id"`

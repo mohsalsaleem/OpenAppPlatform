@@ -3939,6 +3939,111 @@
           }
         }
       }
+    },
+    "/api/v1/applications/{id}/route-automation": {
+      "post": {
+        "summary": "Enable or disable automatic backend membership for a configured endpoint",
+        "operationId": "post_route_automation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "expectedVersion",
+                  "enabled"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "expectedVersion": {
+                    "type": "integer"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification evidence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteAutomation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Request blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4987,6 +5092,9 @@
           },
           "directoryHash": {
             "type": "string"
+          },
+          "automatic": {
+            "type": "boolean"
           }
         }
       },
@@ -5036,6 +5144,9 @@
             "items": {
               "$ref": "#/components/schemas/RouteMember"
             }
+          },
+          "automation": {
+            "$ref": "#/components/schemas/RouteAutomation"
           }
         }
       },
@@ -5123,6 +5234,30 @@
           },
           "latencyMs": {
             "type": "integer"
+          }
+        }
+      },
+      "RouteAutomation": {
+        "type": "object",
+        "required": [
+          "enabled",
+          "status",
+          "message",
+          "checkedAt"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }

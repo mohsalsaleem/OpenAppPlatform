@@ -49,6 +49,26 @@ func (s *Server) endpointRoutes(mux *http.ServeMux) {
 		}
 		write(w, 200, report)
 	})
+	mux.HandleFunc("POST /api/v1/applications/{id}/route-automation", func(w http.ResponseWriter, r *http.Request) {
+		if !owner(w, r) {
+			return
+		}
+		var body struct {
+			Name            string `json:"name"`
+			ExpectedVersion int64  `json:"expectedVersion"`
+			Enabled         *bool  `json:"enabled"`
+		}
+		if decode(w, r, &body) != nil || body.Enabled == nil {
+			write(w, 400, map[string]string{"message": "A configured route name, version and enabled flag are required"})
+			return
+		}
+		result, e := s.Controller.SetRouteAutomation(r.Context(), r.PathValue("id"), body.Name, body.ExpectedVersion, *body.Enabled)
+		if e != nil {
+			routeError(w, e)
+			return
+		}
+		write(w, 200, result)
+	})
 	mux.HandleFunc("POST /api/v1/applications/{id}/route-reviews", func(w http.ResponseWriter, r *http.Request) {
 		if !owner(w, r) {
 			return

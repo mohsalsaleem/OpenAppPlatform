@@ -1907,6 +1907,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/applications/{id}/route-automation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enable or disable automatic backend membership for a configured endpoint */
+        post: operations["post_route_automation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2214,6 +2231,7 @@ export interface components {
             added: string[];
             removed: string[];
             directoryHash: string;
+            automatic?: boolean;
         };
         RouteEndpoint: {
             name: string;
@@ -2225,6 +2243,7 @@ export interface components {
             desired: string[];
             verification?: components["schemas"]["EndpointVerification"];
             excluded?: components["schemas"]["RouteMember"][];
+            automation?: components["schemas"]["RouteAutomation"];
         };
         RouteView: {
             endpoints: components["schemas"]["RouteEndpoint"][];
@@ -2246,6 +2265,13 @@ export interface components {
             addresses: string[];
             httpStatus: number;
             latencyMs: number;
+        };
+        RouteAutomation: {
+            enabled: boolean;
+            status: string;
+            message: string;
+            /** Format: date-time */
+            checkedAt: string;
         };
     };
     responses: never;
@@ -4053,6 +4079,81 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EndpointVerification"];
+                };
+            };
+            /** @description Request blocked */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Request blocked */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Request blocked */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Request blocked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Request blocked */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_route_automation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    expectedVersion: number;
+                    enabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Verification evidence */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteAutomation"];
                 };
             };
             /** @description Request blocked */

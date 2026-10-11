@@ -27,6 +27,34 @@ func (q *Queries) GetEndpointVerification(ctx context.Context, arg GetEndpointVe
 	return report, err
 }
 
+const GetRouteAutomation = `-- name: GetRouteAutomation :one
+SELECT application_id, name, owner_id, enabled, authority_hash, directory_hash, native_hash, pending_id, status, message, checked_at FROM oap_route_automation WHERE application_id=$1 AND name=$2
+`
+
+type GetRouteAutomationParams struct {
+	ApplicationID string `json:"application_id"`
+	Name          string `json:"name"`
+}
+
+func (q *Queries) GetRouteAutomation(ctx context.Context, arg GetRouteAutomationParams) (OapRouteAutomation, error) {
+	row := q.db.QueryRow(ctx, GetRouteAutomation, arg.ApplicationID, arg.Name)
+	var i OapRouteAutomation
+	err := row.Scan(
+		&i.ApplicationID,
+		&i.Name,
+		&i.OwnerID,
+		&i.Enabled,
+		&i.AuthorityHash,
+		&i.DirectoryHash,
+		&i.NativeHash,
+		&i.PendingID,
+		&i.Status,
+		&i.Message,
+		&i.CheckedAt,
+	)
+	return i, err
+}
+
 const GetRoutePublication = `-- name: GetRoutePublication :one
 SELECT id,owner_id,plan,state,created_at,updated_at FROM oap_route_publications WHERE application_id=$1 AND id=$2
 `
@@ -96,6 +124,42 @@ func (q *Queries) InsertRoutePublication(ctx context.Context, arg InsertRoutePub
 	return err
 }
 
+const ListRouteAutomation = `-- name: ListRouteAutomation :many
+SELECT application_id, name, owner_id, enabled, authority_hash, directory_hash, native_hash, pending_id, status, message, checked_at FROM oap_route_automation WHERE enabled ORDER BY application_id,name
+`
+
+func (q *Queries) ListRouteAutomation(ctx context.Context) ([]OapRouteAutomation, error) {
+	rows, err := q.db.Query(ctx, ListRouteAutomation)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []OapRouteAutomation{}
+	for rows.Next() {
+		var i OapRouteAutomation
+		if err := rows.Scan(
+			&i.ApplicationID,
+			&i.Name,
+			&i.OwnerID,
+			&i.Enabled,
+			&i.AuthorityHash,
+			&i.DirectoryHash,
+			&i.NativeHash,
+			&i.PendingID,
+			&i.Status,
+			&i.Message,
+			&i.CheckedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const ListRoutePublications = `-- name: ListRoutePublications :many
 SELECT id,owner_id,plan,state,created_at,updated_at FROM oap_route_publications WHERE application_id=$1 ORDER BY (state='publishing') DESC,created_at DESC LIMIT 20
 `
@@ -136,6 +200,17 @@ func (q *Queries) ListRoutePublications(ctx context.Context, applicationID strin
 	return items, nil
 }
 
+const RouteAutomationOwnerActive = `-- name: RouteAutomationOwnerActive :one
+SELECT EXISTS(SELECT 1 FROM oap_users WHERE id=$1 AND role='owner' AND active)
+`
+
+func (q *Queries) RouteAutomationOwnerActive(ctx context.Context, id string) (bool, error) {
+	row := q.db.QueryRow(ctx, RouteAutomationOwnerActive, id)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const SaveEndpointVerification = `-- name: SaveEndpointVerification :exec
 INSERT INTO oap_endpoint_verifications(application_id,name,report) VALUES($1,$2,$3)
 ON CONFLICT(application_id,name) DO UPDATE SET report=excluded.report
@@ -152,6 +227,33 @@ func (q *Queries) SaveEndpointVerification(ctx context.Context, arg SaveEndpoint
 	return err
 }
 
+const SaveRouteAutomation = `-- name: SaveRouteAutomation :exec
+INSERT INTO oap_route_automation(application_id,name,owner_id,enabled,authority_hash,directory_hash,native_hash)
+VALUES($1,$2,$3,true,$4,$5,$6)
+ON CONFLICT(application_id,name) DO UPDATE SET owner_id=excluded.owner_id,enabled=true,authority_hash=excluded.authority_hash,directory_hash=excluded.directory_hash,native_hash=excluded.native_hash,pending_id='',status='idle',message='',checked_at=now()
+`
+
+type SaveRouteAutomationParams struct {
+	ApplicationID string `json:"application_id"`
+	Name          string `json:"name"`
+	OwnerID       string `json:"owner_id"`
+	AuthorityHash string `json:"authority_hash"`
+	DirectoryHash string `json:"directory_hash"`
+	NativeHash    string `json:"native_hash"`
+}
+
+func (q *Queries) SaveRouteAutomation(ctx context.Context, arg SaveRouteAutomationParams) error {
+	_, err := q.db.Exec(ctx, SaveRouteAutomation,
+		arg.ApplicationID,
+		arg.Name,
+		arg.OwnerID,
+		arg.AuthorityHash,
+		arg.DirectoryHash,
+		arg.NativeHash,
+	)
+	return err
+}
+
 const SetRoutePublicationState = `-- name: SetRoutePublicationState :exec
 UPDATE oap_route_publications SET state=$3,updated_at=now() WHERE application_id=$1 AND id=$2
 `
@@ -164,5 +266,32 @@ type SetRoutePublicationStateParams struct {
 
 func (q *Queries) SetRoutePublicationState(ctx context.Context, arg SetRoutePublicationStateParams) error {
 	_, err := q.db.Exec(ctx, SetRoutePublicationState, arg.ApplicationID, arg.ID, arg.State)
+	return err
+}
+
+const UpdateRouteAutomation = `-- name: UpdateRouteAutomation :exec
+UPDATE oap_route_automation SET enabled=$3,native_hash=$4,pending_id=$5,status=$6,message=$7,checked_at=now() WHERE application_id=$1 AND name=$2
+`
+
+type UpdateRouteAutomationParams struct {
+	ApplicationID string `json:"application_id"`
+	Name          string `json:"name"`
+	Enabled       bool   `json:"enabled"`
+	NativeHash    string `json:"native_hash"`
+	PendingID     string `json:"pending_id"`
+	Status        string `json:"status"`
+	Message       string `json:"message"`
+}
+
+func (q *Queries) UpdateRouteAutomation(ctx context.Context, arg UpdateRouteAutomationParams) error {
+	_, err := q.db.Exec(ctx, UpdateRouteAutomation,
+		arg.ApplicationID,
+		arg.Name,
+		arg.Enabled,
+		arg.NativeHash,
+		arg.PendingID,
+		arg.Status,
+		arg.Message,
+	)
 	return err
 }

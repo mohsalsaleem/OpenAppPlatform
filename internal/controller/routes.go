@@ -24,6 +24,7 @@ type RouteMember struct {
 	Status     string `json:"status"`
 }
 type RoutePlan struct {
+	Automatic       bool          `json:"automatic,omitempty"`
 	DirectoryHash   string        `json:"directoryHash"`
 	ID              string        `json:"id"`
 	Name            string        `json:"name"`
@@ -41,6 +42,7 @@ type RoutePlan struct {
 	CreatedAt       time.Time     `json:"createdAt"`
 }
 type Endpoint struct {
+	Automation   *RouteAutomation      `json:"automation,omitempty"`
 	Excluded     []RouteMember         `json:"excluded"`
 	Verification *routing.Verification `json:"verification,omitempty"`
 	Name         string                `json:"name"`
@@ -247,6 +249,12 @@ func (c *Controller) Routes(ctx context.Context, appID string) (RouteView, error
 			return view, err
 		}
 		endpoint.Verification = verification
+		auto, autoErr := db.New(c.Store.Pool).GetRouteAutomation(ctx, db.GetRouteAutomationParams{ApplicationID: appID, Name: b.Name})
+		if autoErr == nil {
+			endpoint.Automation = automationView(auto)
+		} else if !errors.Is(autoErr, pgx.ErrNoRows) {
+			return view, autoErr
+		}
 		view.Endpoints = append(view.Endpoints, endpoint)
 	}
 	rows, e := db.New(c.Store.Pool).ListRoutePublications(ctx, appID)
@@ -285,6 +293,13 @@ func (c *Controller) ReviewRoute(ctx context.Context, appID, name string, versio
 	}
 	if unresolved {
 		return RoutePlan{}, errors.New("resume or cancel the unresolved routing publication first")
+	}
+	auto, autoErr := queries.GetRouteAutomation(ctx, db.GetRouteAutomationParams{ApplicationID: appID, Name: name})
+	if autoErr != nil && !errors.Is(autoErr, pgx.ErrNoRows) {
+		return RoutePlan{}, autoErr
+	}
+	if autoErr == nil && auto.Enabled {
+		return RoutePlan{}, errors.New("disable automatic membership updates before reviewing a manual change")
 	}
 	plan, allowed, e := c.routeSnapshot(ctx, appID, b)
 	if e != nil {
@@ -351,6 +366,15 @@ func (c *Controller) ApplyRoute(ctx context.Context, appID, id string, cancel bo
 	}
 	if row.State == "cancelled" || row.State == "applied" {
 		return plan, domain.ErrConflict
+	}
+	if !cancel && row.State == "prepared" {
+		auto, err := queries.GetRouteAutomation(ctx, db.GetRouteAutomationParams{ApplicationID: appID, Name: plan.Name})
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return plan, err
+		}
+		if err == nil && auto.Enabled {
+			return plan, errors.New("disable automatic updates before manual publication")
+		}
 	}
 	b, e := c.routeBinding(appID, plan.Name)
 	if e != nil {

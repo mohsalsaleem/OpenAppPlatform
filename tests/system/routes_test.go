@@ -237,7 +237,7 @@ func TestRouteHTTPRequiresOwnerSessionAndRecordsMutationAudit(t *testing.T) {
 	}
 	base := "/api/v1/applications/" + app.ID
 	before, _ := os.ReadFile(path)
-	for _, endpoint := range []string{base + "/route-reviews", base + "/route-publications/unknown", base + "/endpoint-verifications"} {
+	for _, endpoint := range []string{base + "/route-reviews", base + "/route-publications/unknown", base + "/endpoint-verifications", base + "/route-automation"} {
 		if code, _ := call("POST", endpoint, agent, true, map[string]any{"name": b.Name, "expectedVersion": app.Version}); code != 403 {
 			t.Fatal("agent native publication was not denied", code)
 		}
@@ -271,6 +271,16 @@ func TestRouteHTTPRequiresOwnerSessionAndRecordsMutationAudit(t *testing.T) {
 	var audit int
 	if e = c.Store.Pool.QueryRow(ctx, "SELECT count(*) FROM oap_audit WHERE user_id=$1 AND status IN (200,201) AND action LIKE '%route-%'", owner).Scan(&audit); e != nil || audit != 2 {
 		t.Fatal("routing audit was not completed", audit, e)
+	}
+	if code, _ = call("POST", base+"/route-automation", session, false, map[string]any{"name": b.Name, "expectedVersion": app.Version}); code != 400 {
+		t.Fatal("missing enabled flag accepted", code)
+	}
+	if code, raw = call("POST", base+"/route-automation", session, false, map[string]any{"name": b.Name, "expectedVersion": app.Version, "enabled": true}); code != 200 {
+		t.Fatal("owner automation grant failed", code, string(raw))
+	}
+	var grantAudit int
+	if e = c.Store.Pool.QueryRow(ctx, "SELECT count(*) FROM oap_audit WHERE user_id=$1 AND status=200 AND action LIKE '%route-automation'", owner).Scan(&grantAudit); e != nil || grantAudit != 1 {
+		t.Fatal("owner grant audit missing", grantAudit, e)
 	}
 }
 
