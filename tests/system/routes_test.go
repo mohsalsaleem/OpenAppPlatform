@@ -319,3 +319,74 @@ func TestEndpointVerificationPersistsAndInvalidatesChangedAuthority(t *testing.T
 		t.Fatal("blocked calls reached the network")
 	}
 }
+
+func TestRouteHealthExclusionRecoveryAndStaleReview(t *testing.T) {
+	c, f, app, ctx, b, path := routeFixture(t)
+	setStatus := func(id, status string) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		r := f.resources[id]
+		r.Status = status
+		f.resources[id] = r
+	}
+	plan, err := c.ReviewRoute(ctx, app.ID, b.Name, app.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	setStatus("backend-two", "running:unhealthy")
+	before, _ := os.ReadFile(path)
+	if _, err = c.ApplyRoute(ctx, app.ID, plan.ID, false); err == nil {
+		t.Fatal("health changed after review but apply succeeded")
+	}
+	after, _ := os.ReadFile(path)
+	if !bytes.Equal(before, after) {
+		t.Fatal("stale health review changed native route")
+	}
+	view, err := c.Routes(ctx, app.ID)
+	if err != nil || len(view.Endpoints[0].Excluded) != 1 || len(view.Endpoints[0].Desired) != 1 {
+		t.Fatal(view, err)
+	}
+	plan, err = c.ReviewRoute(ctx, app.ID, b.Name, app.Version)
+	if err != nil || !plan.Members[1].Excluded || plan.Members[1].Status != "running:unhealthy" {
+		t.Fatal(plan, err)
+	}
+	if _, err = c.ApplyRoute(ctx, app.ID, plan.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	// Recovery is reviewed explicitly; it does not rewrite routing in the background.
+	setStatus("backend-two", "running:healthy")
+	plan, err = c.ReviewRoute(ctx, app.ID, b.Name, app.Version)
+	if err != nil || len(plan.Added) != 1 {
+		t.Fatal(plan, err)
+	}
+	if _, err = c.ApplyRoute(ctx, app.ID, plan.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	setStatus("backend-one", "stopped")
+	plan, err = c.ReviewRoute(ctx, app.ID, b.Name, app.Version)
+	if err != nil || len(plan.Removed) != 1 || plan.Removed[0] != f.resources["backend-one"].URL {
+		t.Fatal(plan, err)
+	}
+	if _, err = c.ApplyRoute(ctx, app.ID, plan.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	before, _ = os.ReadFile(path)
+	setStatus("backend-two", "unknown")
+	if _, err = c.ReviewRoute(ctx, app.ID, b.Name, app.Version); err == nil {
+		t.Fatal("empty healthy set accepted")
+	}
+	after, _ = os.ReadFile(path)
+	if !bytes.Equal(before, after) {
+		t.Fatal("all-unhealthy observation changed native route")
+	}
+	// An excluded backend still requires verified ownership.
+	setStatus("backend-two", "running:healthy")
+	f.mu.Lock()
+	r := f.resources["backend-one"]
+	r.Description = "foreign"
+	f.resources[r.ID] = r
+	f.mu.Unlock()
+	if _, err = c.ReviewRoute(ctx, app.ID, b.Name, app.Version); err == nil {
+		t.Fatal("unhealthy foreign backend ownership bypassed")
+	}
+}

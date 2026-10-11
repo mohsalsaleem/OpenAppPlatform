@@ -833,6 +833,10 @@ separates membership from endpoint reachability, refuses unexpected DNS/redirect
 and expires evidence after configuration changes or ten minutes. Native issuance
 remains delegated to the existing operator; domain creation, automatic membership,
 draining and bare Docker routing remain open.
+The [health-aware reviewed routing](docs/health-aware-routing.md) slice now excludes
+unhealthy/stopped owned instances from a reviewed backend set, rechecks health
+before apply and preserves the existing route when none are healthy. Recovery
+requires a new owner review; background reconciliation and draining remain open.
 
 
 Batches 2 and 3 are already delivered; keep the ordered queue above. Source-backed management handoff and GitHub sequencing must

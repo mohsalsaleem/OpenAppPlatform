@@ -20,6 +20,8 @@ type RouteMember struct {
 	ResourceID string `json:"resourceId"`
 	URL        string `json:"url"`
 	Retired    bool   `json:"retired"`
+	Excluded   bool   `json:"excluded"`
+	Status     string `json:"status"`
 }
 type RoutePlan struct {
 	DirectoryHash   string        `json:"directoryHash"`
@@ -39,6 +41,7 @@ type RoutePlan struct {
 	CreatedAt       time.Time     `json:"createdAt"`
 }
 type Endpoint struct {
+	Excluded     []RouteMember         `json:"excluded"`
 	Verification *routing.Verification `json:"verification,omitempty"`
 	Name         string                `json:"name"`
 	Component    string                `json:"component"`
@@ -140,17 +143,22 @@ func (c *Controller) routeSnapshot(ctx context.Context, appID string, b routing.
 			return RoutePlan{}, nil, errors.New("backend origins must be unique")
 		}
 		allowed[endpoint] = true
-		members = append(members, RouteMember{i.Ordinal, i.ResourceID, endpoint, i.Retired})
+		members = append(members, RouteMember{Ordinal: i.Ordinal, ResourceID: i.ResourceID, URL: endpoint, Retired: i.Retired, Excluded: !i.Retired && r.Status != "running:healthy", Status: r.Status})
 		if !i.Retired {
-			if i.Ordinal < 1 || i.Ordinal > count || active[i.Ordinal] || r.Status != "running:healthy" {
-				return RoutePlan{}, nil, errors.New("all desired backends must be running and healthy")
+			if i.Ordinal < 1 || i.Ordinal > count || active[i.Ordinal] {
+				return RoutePlan{}, nil, errors.New("desired backend ordinals must be unique and within the replica count")
 			}
 			active[i.Ordinal] = true
-			desired = append(desired, endpoint)
+			if r.Status == "running:healthy" {
+				desired = append(desired, endpoint)
+			}
 		}
 	}
 	if len(active) != count {
 		return RoutePlan{}, nil, errors.New("desired backend membership is incomplete")
+	}
+	if len(desired) == 0 {
+		return RoutePlan{}, nil, errors.New("no healthy backends; the existing route is preserved")
 	}
 	sort.Slice(members, func(i, j int) bool { return members[i].Ordinal < members[j].Ordinal })
 	config, e := routing.Render(b, desired)
@@ -184,7 +192,7 @@ func difference(left, right []string) []string {
 func desiredURLs(p RoutePlan) []string {
 	out := []string{}
 	for _, m := range p.Members {
-		if !m.Retired {
+		if !m.Retired && !m.Excluded {
 			out = append(out, m.URL)
 		}
 	}
@@ -199,11 +207,16 @@ func (c *Controller) Routes(ctx context.Context, appID string) (RouteView, error
 		if b.ApplicationID != appID {
 			continue
 		}
-		endpoint := Endpoint{Name: b.Name, Component: b.Component, URL: "https://" + b.Domain, Status: "blocked", Current: []string{}, Desired: []string{}}
+		endpoint := Endpoint{Name: b.Name, Component: b.Component, URL: "https://" + b.Domain, Status: "blocked", Excluded: []RouteMember{}, Current: []string{}, Desired: []string{}}
 		snapshot, allowed, e := c.routeSnapshot(ctx, appID, b)
 		authority, native, directory := "", "", ""
 		if e == nil {
 			endpoint.Desired = desiredURLs(snapshot)
+			for _, member := range snapshot.Members {
+				if member.Excluded {
+					endpoint.Excluded = append(endpoint.Excluded, member)
+				}
+			}
 			var f *routing.File
 			f, e = routing.Open(b)
 			if e == nil {

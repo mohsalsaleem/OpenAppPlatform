@@ -146,6 +146,14 @@ export function Endpoints({
                   ? `${endpoint.current.length} current → ${endpoint.desired.length} desired backends · Update Available`
                   : "Review Blocked"}
             </p>
+            {!!endpoint.excluded?.length && (
+              <p className="notice mt-2 text-sm">
+                {endpoint.excluded.length}{" "}
+                {endpoint.excluded.length === 1 ? "instance" : "instances"}{" "}
+                excluded from desired routing because they are not healthy.
+                Review and apply to update membership.
+              </p>
+            )}
             <div
               className="mt-4 space-y-1 text-sm"
               aria-label="Domain and TLS readiness"
@@ -328,10 +336,18 @@ export function Endpoints({
                 </div>
               </div>
               <p className="muted text-sm">
-                {plan.members.filter((m) => !m.retired).length} healthy backends
-                · Application version {plan.expectedVersion}. Ownership and
-                native configuration are checked again before applying.
+                {plan.members.filter((m) => !m.retired && !m.excluded).length}{" "}
+                healthy backends · Application version {plan.expectedVersion}.
+                Ownership and native configuration are checked again before
+                applying.
               </p>
+              {plan.members
+                .filter((m) => m.excluded)
+                .map((m) => (
+                  <p className="text-sm" key={m.resourceId}>
+                    Instance {m.ordinal}: {m.status} · Excluded from Routing
+                  </p>
+                ))}
               <p className="muted text-sm">
                 Native health checks continue independently of OAP. Connection
                 draining is not available yet.

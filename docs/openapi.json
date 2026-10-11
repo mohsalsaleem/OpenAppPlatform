@@ -4905,6 +4905,12 @@
           },
           "retired": {
             "type": "boolean"
+          },
+          "excluded": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
           }
         }
       },
@@ -5024,6 +5030,12 @@
           },
           "verification": {
             "$ref": "#/components/schemas/EndpointVerification"
+          },
+          "excluded": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RouteMember"
+            }
           }
         }
       },

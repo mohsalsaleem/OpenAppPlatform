@@ -736,3 +736,72 @@ test("endpoint readiness shows DNS TLS expiry and failures separately from membe
     page.getByText("Membership Current", { exact: false }),
   ).toBeVisible();
 });
+
+test("routing review explains unhealthy exclusions and healthy count", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const member = (ordinal: number, excluded: boolean) => ({
+    ordinal,
+    resourceId: `resource-${ordinal}`,
+    url: `https://backend-${ordinal}.example.test`,
+    retired: false,
+    excluded,
+    status: excluded ? "running:unhealthy" : "running:healthy",
+  });
+  const members = [member(1, false), member(2, true)];
+  const plan = {
+    id: "health-plan",
+    name: "oap-route",
+    component: "web",
+    url: "https://shared.example.test",
+    expectedVersion: 3,
+    authorityHash: "a".repeat(64),
+    directoryHash: "d".repeat(64),
+    members,
+    beforeHash: "b".repeat(64),
+    desiredHash: "c".repeat(64),
+    desiredConfig: "{}",
+    added: [],
+    removed: [members[1].url],
+    state: "prepared",
+    createdAt: "2026-10-11T12:00:00Z",
+  };
+  await page.route("**/api/v1/applications/audit-app/routes", (route) =>
+    route.fulfill({
+      json: {
+        endpoints: [
+          {
+            name: plan.name,
+            component: "web",
+            url: plan.url,
+            status: "update-needed",
+            current: members.map((m) => m.url),
+            desired: [members[0].url],
+            excluded: [members[1]],
+          },
+        ],
+        publications: [],
+      },
+    }),
+  );
+  await page.route("**/api/v1/applications/audit-app/route-reviews", (route) =>
+    route.fulfill({ status: 201, json: plan }),
+  );
+  await page.goto("/applications/audit-app");
+  await page.getByRole("tab", { name: "Endpoints", exact: true }).click();
+  await expect(
+    page.getByText("1 instance excluded", { exact: false }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Review Routing", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByText("1 healthy backends", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    dialog.getByText("Instance 2: running:unhealthy · Excluded from Routing"),
+  ).toBeVisible();
+  await expect(dialog.getByText(members[1].url, { exact: true })).toBeVisible();
+});

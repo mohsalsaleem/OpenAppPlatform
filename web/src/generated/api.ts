@@ -2195,6 +2195,8 @@ export interface components {
             resourceId: string;
             url: string;
             retired: boolean;
+            excluded?: boolean;
+            status?: string;
         };
         RoutePlan: {
             id: string;
@@ -2222,6 +2224,7 @@ export interface components {
             current: string[];
             desired: string[];
             verification?: components["schemas"]["EndpointVerification"];
+            excluded?: components["schemas"]["RouteMember"][];
         };
         RouteView: {
             endpoints: components["schemas"]["RouteEndpoint"][];
