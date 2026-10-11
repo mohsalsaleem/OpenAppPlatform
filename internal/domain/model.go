@@ -32,6 +32,7 @@ type Component struct {
 	Readiness        *ReadinessPolicy  `json:"readiness,omitempty"`
 	Management       string            `json:"management,omitempty"`
 	ServiceEndpoints map[string]string `json:"serviceEndpoints,omitempty"`
+	SecretRefs       map[string]string `json:"secretRefs,omitempty"`
 	Env              map[string]string `json:"env,omitempty"`
 	Services         map[string]string `json:"services,omitempty"`
 	Name             string            `json:"name"`
@@ -70,7 +71,7 @@ func (m *Manifest) Validate() error {
 		if c.Management != "" && c.Management != "observe" {
 			return errors.New("management must be observe or omitted for existing managed components")
 		}
-		if c.Management == "observe" && (c.ResourceID == "" || c.HostPort != 0 || len(c.Env)+len(c.Services)+len(c.ServiceEndpoints)+len(c.DependsOn) > 0) {
+		if c.Management == "observe" && (c.ResourceID == "" || c.HostPort != 0 || len(c.Env)+len(c.SecretRefs)+len(c.Services)+len(c.ServiceEndpoints)+len(c.DependsOn) > 0) {
 			return errors.New("observe-only components require a resourceId and cannot configure runtime settings")
 		}
 		if c.HealthCheck != nil {

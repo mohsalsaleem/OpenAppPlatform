@@ -67,7 +67,12 @@ export function ConfigurationDiff({
           after: String(b),
         });
     }
-    for (const field of ["env", "services", "serviceEndpoints"] as const) {
+    for (const field of [
+      "env",
+      "secretRefs",
+      "services",
+      "serviceEndpoints",
+    ] as const) {
       const a = old[field] ?? {},
         b = c[field] ?? {};
       for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {

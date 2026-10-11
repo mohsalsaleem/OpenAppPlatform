@@ -64,7 +64,7 @@ func ValidateRuntime(m domain.Manifest, caps Capabilities) error {
 		if c.HealthCheck != nil && !caps.HTTPHealthChecks {
 			return fmt.Errorf("target does not support native HTTP health checks for %s", c.Name)
 		}
-		if len(c.Env) > 0 && !caps.Environment {
+		if len(c.Env)+len(c.SecretRefs) > 0 && !caps.Environment {
 			return fmt.Errorf("target does not support managed environment variables for %s", c.Name)
 		}
 		if len(c.ServiceEndpoints) > 0 && !caps.ServiceEndpoints {

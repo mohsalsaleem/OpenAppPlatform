@@ -132,6 +132,12 @@ type OapRoutePublication struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
+type OapRuntimeInputPin struct {
+	DeploymentID string `json:"deployment_id"`
+	Component    string `json:"component"`
+	Fingerprint  string `json:"fingerprint"`
+}
+
 type OapRuntimeVariable struct {
 	TargetID     string `json:"target_id"`
 	ResourceID   string `json:"resource_id"`

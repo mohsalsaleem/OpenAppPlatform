@@ -133,6 +133,10 @@ func (s *Server) instanceLogs(ctx context.Context, appID, component string, ordi
 			if err != nil {
 				return "", err
 			}
+			logs, err = s.Controller.RedactRuntimeLogs(ctx, app.ID, logs)
+			if err != nil {
+				return "", err
+			}
 			return redactToken(logs, s.Token), nil
 		}
 	}

@@ -712,3 +712,45 @@ test("release control review explains retained changes and abandonment fences", 
     "Every possible provider operation must be terminal",
   );
 });
+
+test("secret references save names and block an unauthorized deployment", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByLabel("Platform Access Token")
+    .fill(process.env.OAP_API_TOKEN!);
+  await page.getByRole("button", { name: "Connect to Workspace" }).click();
+  await page.getByRole("link", { name: "New Application" }).click();
+  const name = `secret-refs-${Date.now()}`;
+  await page.getByLabel("Application Name", { exact: true }).fill(name);
+  await page
+    .locator("details.advanced-configuration")
+    .filter({ has: page.getByLabel("Environment Variables for web") })
+    .locator("summary")
+    .click();
+  await page
+    .getByLabel("Secret References for web")
+    .fill('{"TOKEN":"token-v1"}');
+  await page.getByRole("button", { name: "Create Application" }).click();
+  await expect(page.getByRole("heading", { name })).toBeVisible();
+  await page.getByRole("tab", { name: "Settings" }).click();
+  await page
+    .locator("details.advanced-configuration")
+    .filter({ has: page.getByLabel("Environment Variables for web") })
+    .locator("summary")
+    .click();
+  await expect(page.getByLabel("Secret References for web")).toHaveValue(
+    '{\n  "TOKEN": "token-v1"\n}',
+  );
+  await page.getByRole("tab", { name: "Overview" }).click();
+  await page.getByRole("button", { name: "Review Deployment" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Deploy Now", exact: true }).click();
+  await expect(
+    page.getByText(
+      "runtime secret reference is missing or not authorized for this application component",
+      { exact: false },
+    ),
+  ).toBeVisible();
+});

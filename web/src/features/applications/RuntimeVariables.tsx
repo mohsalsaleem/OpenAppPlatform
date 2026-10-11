@@ -13,7 +13,7 @@ export function RuntimeVariables({
 }: {
   component: Component;
   onChange: (
-    field: "env" | "services" | "serviceEndpoints",
+    field: "env" | "secretRefs" | "services" | "serviceEndpoints",
     value: Record<string, string>,
   ) => void;
   onValidity: (valid: boolean) => void;
@@ -23,6 +23,7 @@ export function RuntimeVariables({
 }) {
   const [values, setValues] = useState({
     env: JSON.stringify(component.env || {}, null, 2),
+    secretRefs: JSON.stringify(component.secretRefs || {}, null, 2),
     services: JSON.stringify(component.services || {}, null, 2),
     serviceEndpoints: JSON.stringify(component.serviceEndpoints || {}, null, 2),
   });
@@ -31,7 +32,10 @@ export function RuntimeVariables({
     () => onValidity(Object.keys(errors).length === 0),
     [errors, component.name],
   );
-  function edit(field: "env" | "services" | "serviceEndpoints", text: string) {
+  function edit(
+    field: "env" | "secretRefs" | "services" | "serviceEndpoints",
+    text: string,
+  ) {
     setValues({ ...values, [field]: text });
     const next = { ...errors };
     try {
@@ -72,6 +76,29 @@ export function RuntimeVariables({
         {errors.env && (
           <p role="alert" className="error-inline">
             {errors.env}
+          </p>
+        )}
+      </div>
+      <div>
+        <Label htmlFor={`secret-refs-${component.name}`}>
+          Secret References for {component.name}
+        </Label>
+        <Textarea
+          id={`secret-refs-${component.name}`}
+          rows={3}
+          value={values.secretRefs}
+          readOnly={!!component.resourceId || !environmentSupported}
+          onChange={(e) => edit("secretRefs", e.target.value)}
+        />
+        <small className="muted">
+          Map a variable to an authorized reference, such as{" "}
+          {JSON.stringify({ DATABASE_URL: "database-url-v1" })}. Your
+          administrator binds it to this application. Enter reference names
+          only; deployment is blocked when a binding is missing.
+        </small>
+        {errors.secretRefs && (
+          <p role="alert" className="error-inline">
+            {errors.secretRefs}
           </p>
         )}
       </div>

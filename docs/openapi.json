@@ -4173,6 +4173,14 @@
           },
           "resourceId": {
             "type": "string"
+          },
+          "secretRefs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,47}$"
+            },
+            "description": "Runtime variable to immutable administrator-authorized secret reference. Values are never stored in definitions. OAP-owned workloads only; grants bind target, application, component and variable."
           }
         },
         "required": [

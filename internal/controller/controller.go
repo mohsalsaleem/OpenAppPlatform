@@ -15,6 +15,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/routing"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/runtimeinputs"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/source"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 	"github.com/riverqueue/river"
@@ -29,6 +30,7 @@ type DeployArgs struct {
 func (DeployArgs) Kind() string { return "oap_deploy" }
 
 type Controller struct {
+	RuntimeInputs   *runtimeinputs.Inputs
 	EndpointProbe   func(context.Context, routing.Binding) routing.Verification
 	RouteBindings   []routing.Binding
 	SourceHooks     map[string]source.Hook
@@ -352,6 +354,10 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		}
 		d.Steps = []domain.Step{{Component: restart.Component, Ordinal: restart.Ordinal, ResourceID: ref, Phase: "pending", Action: "restart"}}
 	}
+	inputPins, e := c.inputPins(d)
+	if e != nil {
+		return d, e
+	}
 	claims, e := releaseClaims(d)
 	if e != nil {
 		return d, e
@@ -367,6 +373,11 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	e = tx.QueryRow(ctx, "INSERT INTO oap_deployments(id,application_id,state,spec,steps,idempotency_key,request_hash,definition_version,request_hash_version,operation) VALUES($1,$2,$3,$4,$5,$6,$7,$8,2,$9) RETURNING created_at,updated_at", d.ID, appID, d.State, spec, steps, key, requestHash, a.Version, d.Operation).Scan(&d.CreatedAt, &d.UpdatedAt)
 	if e != nil {
 		return d, e
+	}
+	for component, hash := range inputPins {
+		if _, e = tx.Exec(ctx, "INSERT INTO oap_runtime_input_pins(deployment_id,component,fingerprint) VALUES($1,$2,$3)", d.ID, component, hash); e != nil {
+			return d, e
+		}
 	}
 	if e = saveReleaseClaims(ctx, tx, d.ID, claims); e != nil {
 		return d, e
@@ -440,7 +451,7 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 	fail := func(step *domain.Step, state string, err error) error {
 		step.RecoveryPhase = step.Phase
 		step.Phase = state
-		step.Error = err.Error()
+		step.Error = c.RuntimeInputs.Redact(err.Error())
 		d.State = state
 		return c.Store.SaveDeployment(ctx, d)
 	}
@@ -463,6 +474,11 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 		}
 		if e = c.authorizeRelease(ctx, d); e != nil {
 			return fail(step, "attention", e)
+		}
+		if step.Action != "retire" && len(comp.SecretRefs) > 0 {
+			if e = c.verifyInputPin(ctx, d, comp); e != nil {
+				return fail(step, "attention", e)
+			}
 		}
 		if step.RollbackFrom != "" {
 			if e = c.verifyRollbackInstance(ctx, a, d, *step, comp); e != nil {
@@ -507,7 +523,7 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 				}
 				step.ResourceID = comp.ResourceID
 			} else {
-				runtime, e := domain.RuntimeComponent(d.Manifest, comp.Name)
+				runtime, e := c.runtimeComponent(d.Manifest, d.ApplicationID, comp.Name)
 				if e != nil {
 					return fail(step, "failed", e)
 				}
@@ -516,6 +532,9 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 				}
 				r, e := a.Ensure(ctx, operator.Spec{Name: domain.ResourceName(d.ApplicationID, comp.Name, step.Ordinal), Ownership: "OpenAppPlatform:" + d.ApplicationID + ":" + comp.Name, Component: runtime, Variables: c.Store.VariableJournal(d.Manifest.TargetID, d.ApplicationID, comp.Name, step.Ordinal)})
 				if e != nil {
+					if safe := c.RuntimeInputs.Redact(e.Error()); safe != e.Error() {
+						return errors.New(safe)
+					}
 					return e
 				}
 				if step.RollbackFrom != "" && r.ID != step.RollbackResourceID {

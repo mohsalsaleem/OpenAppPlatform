@@ -379,6 +379,11 @@ func (s *Server) routes() http.Handler {
 					write(w, 502, map[string]string{"code": "logs_unavailable", "message": e.Error()})
 					return
 				}
+				logs, e = c.RedactRuntimeLogs(r.Context(), app.ID, logs)
+				if e != nil {
+					write(w, 502, map[string]string{"code": "logs_unavailable", "message": e.Error()})
+					return
+				}
 				logs = redactToken(logs, s.Token)
 				write(w, 200, map[string]string{"logs": logs})
 				return

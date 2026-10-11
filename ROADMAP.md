@@ -5,7 +5,7 @@ operate, manually or through authenticated agents. Its core must stay useful
 without AI, external cloud services, or a collection of infrastructure services.
 
 This roadmap captures priorities from 9 October 2026 and accepted updates through
-10 October 2026. Phases are
+11 October 2026. Phases are
 sequenced by dependency and acceptance criteria, not delivery dates. Listed
 integrations are candidates; they are not installed or enabled by this document.
 
@@ -95,7 +95,8 @@ ambiguous variable creation without a provider identity remains owner-reviewed.
 Connections use explicitly supplied `serviceEndpoints`. Application-scoped private
 DNS and network mutation are not advertised by Coolify. Existing endpoints remain
 operator/owner-managed. Docker supports both app-local DNS and explicit endpoints.
-Coolify retirement remains unsupported. Local Docker, PostgreSQL, browser/mobile,
+Guarded retirement is available for supported OAP-owned Coolify image instances;
+observed native resources retain their existing authority boundaries. Local Docker, PostgreSQL, browser/mobile,
 and MCP regression checks continue to pass.
 
 ### Completed slice: guided discovery and manual application assembly
@@ -138,13 +139,57 @@ is verified in local system/browser fixtures; no production resource was touched
 See [application environments](docs/application-environments.md) and
 [target setup and acceptance](docs/target-setup-and-definition-review.md).
 
-**Current slice:** M0 batch 5, stable endpoints, domains and replica routing.
-Batch 4 is accepted for the supported stateless managed-image release workflow;
-see the [acceptance review](docs/recovery-acceptance.md) for evidence and limits.
-Native observed workloads stay read-only. Stateful provisioning, automatic data
-restore, native source authority transitions and the M1 credential vault remain
-separate follow-up work. The initial reusable definition contract is sanitized
-naming/layout reuse, not secret or runtime cloning.
+**Current priority:** P0.1 runtime secret references (implementation and acceptance
+in progress), then P0.2 workers. M0 workload and configuration breadth, followed by repeatable
+installation. The priority correction below is the authoritative execution order.
+Batch 5 has an accepted, limited Coolify routing pilot; its remaining capabilities
+are deferred and the batch is not complete. Batch 4 is accepted for supported
+stateless managed-image workflows; see the [acceptance review](docs/recovery-acceptance.md).
+Native observed workloads retain their existing action boundaries. Stateful
+provisioning, automatic data restore, source authority transitions and the full M1
+credential vault remain separate work.
+
+### Priority correction: breadth before depth (11 October 2026)
+
+The routing pilot received disproportionate implementation time while workers,
+linked dependencies, sensitive configuration and repeatable installation remained
+unfinished. Freeze its supported scope and follow the queue below. This section
+supersedes older “next slice”, “active batch 5” and ordering statements elsewhere
+in this document; appended acceptance entries remain historical evidence.
+
+**Next tangible milestone:** one logical application containing a frontend, API,
+worker and linked existing database, with coherent UI/API health, logs and supported
+lifecycle actions. Native Coolify GitHub builds and deployments keep working.
+A database link does not grant OAP authority to provision, redeploy or restore it.
+
+| Priority | Scope and deliverable | Acceptance gate | Stop boundary |
+| --- | --- | --- | --- |
+| P0.1 — Runtime inputs | Minimal runtime secret references required by the example; resolve only at the authorized adapter boundary, mask UI/API/logs and omit secret values from definitions and exports. Select the smallest compatible mechanism, reuse operator-managed inputs for observed resources and document access/recovery. | Local tests prove access isolation, redaction, missing-reference failure before dispatch and preservation of native variables; an isolated staging example consumes a dedicated test credential. | No general vault, BYOK provisioning, rotation system or new secret service. |
+| P0.2 — Worker workload | Add a long-running worker kind to the existing definition, controller and supported Docker/Coolify image execution paths. Define non-HTTP readiness and expose capability-aware lifecycle actions. | Deploy a web/API/worker example; inspect worker health/logs, restart and recover an interrupted operation without duplicate instances. Unit tests cover meaningful kind validation; system and browser tests cover the journey. | No scheduled jobs, new scheduler, autoscaling, draining or advanced rollout policy. |
+| P0.3 — Existing dependencies and assembly | Link one existing database to the example, display connection and ownership information and group frontend/API/worker/database in one application. Use explicit endpoints and secret references; dependency health failures must be visible. | Reproducible local fixture and existing Coolify staging acceptance show API/worker connectivity, useful health/logs and unchanged database ownership/data/native triggers. Review the supported actions in the UI. | No database provisioning, migration, queue/storage adapter collection, automatic adoption or data restore. |
+| P0.4 — Everyday configuration | Minimum private registry credential references and per-component CPU/memory limits where the adapter supports them. Unsupported capabilities are explicit; existing native configuration is preserved. | One private-image fixture, missing/invalid credentials and supported limit updates verified locally; scoped staging validation where credentials and native capabilities are available. | No registry service, image optimization/scanning platform, placement engine or broad resource-policy framework. |
+| P0.5 — Repeatable installation | Document and package owner bootstrap, operator connection and the complete example. Keep one Go service/UI plus PostgreSQL. Provide update, compatible rollback, external controller recovery and metadata backup/restore instructions. | A clean isolated install completes the owner walkthrough; reproducible E2E covers assembly, supported release, health/logs, restart and recovery. Run the same supported journey in staging and publish evidence and limits. | No production rollout, multi-server packaging matrix, new infrastructure services or automatic application-data restore. |
+
+P0.1–P0.3 form the first breadth deliverable. P0.4–P0.5 close the remaining
+minimum M0 configuration/install gaps. Implement one priority at a time; advance
+only a small prerequisite when required, recording its reason here. Do not expand
+a completed acceptance gate into another round of hardening unless a reproducible
+failure prevents the stated journey or violates an existing security/authority
+boundary. Complete the local gate and an authorized staging walkthrough before
+claiming delivery; record unsupported capabilities without quietly widening scope.
+
+**Parked until this queue is delivered:** general domain creation, connection
+draining, general bare-Docker routing, rolling/blue-green deployment, source-backed
+management handoff, scheduled jobs, new operators, indexed monitoring, AI diagnosis,
+generative UI, tunnels, multi-server coordination and alternate runtimes. Existing
+routing tests and supported behavior remain maintained. Safety fixes are allowed;
+new route features require an explicit reprioritization. Existing native-source
+build/deploy observation remains useful while delegated lifecycle actions are
+parked; the breadth milestone must not imply those actions exist.
+
+After P0.5, review the M0 exit gate and remaining capability limits before moving
+to the existing M1 trust/recovery/security work. Do not pull M2–M6 features forward
+because a library or integration is readily available.
 
 **Batch 4 progress:** optional per-component operator-health gates and bounded
 observation deadlines are frozen with release definitions and honored by recovery.
@@ -225,7 +270,7 @@ includes the dedicated UI regression suite alongside native Docker, owner-sessio
 logging, scoped access and recovery tests. Deployment topology remains planned
 M4 work; this correction does not advance or reorder roadmap features.
 
-### Next ordered batches
+### Original M0 batches (priority correction above governs execution)
 
 | Order | Deliverable | Acceptance evidence |
 | --- | --- | --- |
@@ -840,10 +885,11 @@ requires a new owner review; background reconciliation and draining remain open.
 The [opt-in automatic membership](docs/automatic-route-membership.md) slice adds
 owner-controlled minute checks using River, pinned native authority, drift pauses
 and durable publication recovery. Automatic updates remain off until explicitly
-enabled. Domain creation, draining and bare Docker routing remain batch 5 gates.
+enabled. Domain creation, draining and general bare Docker routing remain incomplete and
+are parked under the breadth-first priority correction.
 
 
-Batches 2 and 3 are already delivered; keep the ordered queue above. Source-backed management handoff and GitHub sequencing must
+Batches 2 and 3 are already delivered; follow the priority correction above. Source-backed management handoff and GitHub sequencing must
 be verified before disabling an existing operator trigger. Preserve the KISS stack,
 local pre-push gate, and capability-aware behavior. Full owner-grade hardening,
 remote agents, AI guardrails, and generative UI remain later work; production
@@ -867,8 +913,8 @@ SHA-256 receipt in each local run. Coordinated database/filesystem recovery,
 real multi-writer application cutover and arbitrarily stale metadata reconciliation
 remain unsupported. These are native-procedure checks, not OAP automatic restore
 or stateful provisioning. The final supported-recovery acceptance review closes
-batch 4 for stateless managed-image workflows; batch 5 stable endpoints/routing
-is now active. Do not expand
+batch 4 for stateless managed-image workflows. Batch 5 routing is now frozen at
+its accepted pilot scope while the breadth-first queue is active. Do not expand
 these drills into the later stateful-provisioning or owner-backup implementations.
 
 Open decisions include the owner login method, first external secret provider,

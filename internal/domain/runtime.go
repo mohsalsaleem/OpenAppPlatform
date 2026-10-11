@@ -11,7 +11,7 @@ import (
 var envName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,127}$`)
 
 func validateRuntime(c Component, components map[string]Component) error {
-	if len(c.Env)+len(c.Services) > 64 {
+	if len(c.Env)+len(c.SecretRefs)+len(c.Services) > 64 {
 		return errors.New("provide at most 64 runtime variables per component")
 	}
 	bytes := 0
@@ -20,6 +20,18 @@ func validateRuntime(c Component, components map[string]Component) error {
 			return errors.New("environment names must be identifiers and values at most 4096 bytes without NUL")
 		}
 		bytes += len(key) + len(value)
+	}
+	for key, ref := range c.SecretRefs {
+		if !envName.MatchString(key) || !slug.MatchString(ref) {
+			return errors.New("secret references require environment identifiers and lowercase reference slugs")
+		}
+		if _, exists := c.Env[key]; exists {
+			return errors.New("a secret variable cannot also contain plain configuration")
+		}
+		if _, exists := c.Services[key]; exists {
+			return errors.New("a secret variable cannot also contain a service connection")
+		}
+		bytes += len(key) + len(ref)
 	}
 	for variable, name := range c.Services {
 		target, ok := components[name]
@@ -50,7 +62,7 @@ func validateRuntime(c Component, components map[string]Component) error {
 	if bytes > 16<<10 {
 		return errors.New("runtime configuration exceeds 16 KiB")
 	}
-	if c.ResourceID != "" && (len(c.Env) > 0 || len(c.Services) > 0) {
+	if c.ResourceID != "" && (len(c.Env) > 0 || len(c.SecretRefs) > 0 || len(c.Services) > 0) {
 		return errors.New("adopted resource environment must be managed through the operator")
 	}
 	return nil

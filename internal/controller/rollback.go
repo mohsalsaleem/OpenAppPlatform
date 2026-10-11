@@ -192,7 +192,7 @@ func (c *Controller) rollbackPlan(ctx context.Context, tx pgx.Tx, app domain.App
 		if !ok {
 			return plan, original, rollbackInvalid("target cannot verify current rollback configuration")
 		}
-		runtime, err := domain.RuntimeComponent(app.Manifest, comp.Name)
+		runtime, err := c.runtimeComponent(app.Manifest, app.ID, comp.Name)
 		if err != nil {
 			return plan, original, err
 		}
@@ -250,7 +250,7 @@ func (c *Controller) verifyRollbackInstance(ctx context.Context, adapter operato
 	if !ok {
 		return rollbackInvalid("rollback configuration verification is unavailable")
 	}
-	runtime, err := domain.RuntimeComponent(d.Manifest, comp.Name)
+	runtime, err := c.runtimeComponent(d.Manifest, d.ApplicationID, comp.Name)
 	if err != nil {
 		return err
 	}

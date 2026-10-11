@@ -1974,6 +1974,10 @@ export interface components {
              */
             strategy: "standard";
             resourceId?: string;
+            /** @description Runtime variable to immutable administrator-authorized secret reference. Values are never stored in definitions. OAP-owned workloads only; grants bind target, application, component and variable. */
+            secretRefs?: {
+                [key: string]: string;
+            };
         };
         Manifest: {
             name: string;

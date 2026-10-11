@@ -20,6 +20,7 @@ import (
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operators"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/routing"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/runtimeinputs"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/source"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 )
@@ -91,6 +92,15 @@ func run() error {
 	c, e := controller.New(ctx, s, operators.New)
 	if e != nil {
 		return e
+	}
+	if raw := os.Getenv("OAP_RUNTIME_INPUTS"); raw != "" {
+		if preview {
+			return errors.New("runtime secret bindings require owner mode")
+		}
+		c.RuntimeInputs, e = runtimeinputs.Parse([]byte(raw), os.Getenv)
+		if e != nil {
+			return e
+		}
 	}
 	if *sourceFile != "" {
 		if preview {

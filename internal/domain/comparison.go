@@ -139,7 +139,7 @@ func CompareReleases(from, to Deployment) ReleaseComparison {
 		for _, maps := range []struct {
 			field string
 			a, b  map[string]string
-		}{{"environment", a.Env, b.Env}, {"service connections", a.Services, b.Services}, {"service endpoints", a.ServiceEndpoints, b.ServiceEndpoints}} {
+		}{{"environment", a.Env, b.Env}, {"secret references", a.SecretRefs, b.SecretRefs}, {"service connections", a.Services, b.Services}, {"service endpoints", a.ServiceEndpoints, b.ServiceEndpoints}} {
 			keys := map[string]bool{}
 			for key := range maps.a {
 				keys[key] = true

@@ -1,0 +1,14 @@
+{
+  "name": "secret-reference-example",
+  "environment": "staging",
+  "targetId": "local-docker",
+  "components": [{
+    "name": "api",
+    "kind": "web",
+    "image": "REPLACE_WITH_TEST_IMAGE",
+    "port": 8080,
+    "instances": 1,
+    "strategy": "standard",
+    "secretRefs": {"DATABASE_URL": "database-url-v1"}
+  }]
+}
