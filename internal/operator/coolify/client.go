@@ -103,7 +103,24 @@ func resource(a application) operator.Resource {
 	if a.BuildPack == "dockerimage" {
 		kind = "image"
 	}
-	return operator.Resource{Port: port, ArtifactKind: kind, ID: a.UUID, Name: a.Name, Description: a.Description, Status: a.Status, URL: a.FQDN, Image: image}
+	return operator.Resource{Port: port, ArtifactKind: kind, ID: a.UUID, Name: a.Name, Description: a.Description, Status: a.Status, URL: primaryEndpoint(a.FQDN), Image: image}
+}
+
+// Coolify owns domain configuration. Project one usable link without changing
+// the provider's domain list or implying a shared route across replicas.
+func primaryEndpoint(domains string) string {
+	for _, candidate := range strings.Split(domains, ",") {
+		candidate = strings.TrimSpace(candidate)
+		u, err := url.Parse(candidate)
+		if err != nil || u.Hostname() == "" || u.User != nil || strings.ContainsAny(candidate, "\r\n\t ") {
+			continue
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			continue
+		}
+		return u.String()
+	}
+	return ""
 }
 func (c *Client) Discover(ctx context.Context) ([]operator.Resource, error) {
 	var env struct {

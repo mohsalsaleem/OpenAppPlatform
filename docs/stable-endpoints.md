@@ -1,0 +1,31 @@
+# Stable endpoints and routing: M0 batch 5
+
+OAP reuses existing native routes wherever the operator can manage them. Grouping
+and inspection never rewrite Coolify domains or create another proxy. The current
+runtime API exposes a primary instance URL; it does not yet model a shared route
+over all component replicas.
+
+The Coolify adapter projects the first valid HTTP(S) URL from its comma-separated
+domain field for Open Service. Surrounding whitespace is removed. Invalid URLs,
+embedded whitespace, unsupported schemes and credential-bearing URLs are skipped.
+All native configured domains remain unchanged; secondary domains are not yet
+listed by the OAP UI. No endpoint reachability or TLS readiness is inferred from
+this projection. Bare Docker retains its configured host-port endpoint behavior.
+
+## Ordered acceptance work
+
+1. Verify native endpoint identity and domain preservation through replacement,
+   restart and image rollback, including continued requests with OAP stopped.
+2. Define shared component route authority and capabilities. Reuse Coolify's
+   native proxy where supported; specify the minimal routing adapter for bare
+   Docker. Inspect existing ownership and configuration before any route mutation.
+3. Exercise supported replica changes, healthy backend selection and stopped
+   backend removal. Keep traffic and operation identities independent of the
+   controller process and avoid a controller request in the application path.
+4. Verify custom domains/TLS and connection draining. Standard rollout remains
+   the default; optional rollout strategies need separate acceptance. Do not
+   promise zero downtime until the request/connection failure cases are tested.
+
+The first slice fixes endpoint projection only. Shared routing, TLS provisioning
+and draining remain incomplete. Unit tests cover multiple domains, malformed or
+unsafe candidates, native ports/paths and unchanged native domain configuration.

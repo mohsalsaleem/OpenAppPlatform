@@ -138,11 +138,13 @@ is verified in local system/browser fixtures; no production resource was touched
 See [application environments](docs/application-environments.md) and
 [target setup and acceptance](docs/target-setup-and-definition-review.md).
 
-**Current slice:** M0 batch 4, release verification and recovery controls. Start with
-configurable readiness and the release snapshot/recovery contract; keep native
-observed workloads read-only. The acceptance work queued this batch; the first readiness slice is delivered. Full configuration promotion, native source authority transitions and the M1
-credential vault remain separate follow-up work. The initial reusable definition
-contract is sanitized naming/layout reuse, not secret or runtime cloning.
+**Current slice:** M0 batch 5, stable endpoints, domains and replica routing.
+Batch 4 is accepted for the supported stateless managed-image release workflow;
+see the [acceptance review](docs/recovery-acceptance.md) for evidence and limits.
+Native observed workloads stay read-only. Stateful provisioning, automatic data
+restore, native source authority transitions and the M1 credential vault remain
+separate follow-up work. The initial reusable definition contract is sanitized
+naming/layout reuse, not secret or runtime cloning.
 
 **Batch 4 progress:** optional per-component operator-health gates and bounded
 observation deadlines are frozen with release definitions and honored by recovery.
@@ -165,8 +167,11 @@ reject with 409 and the hosted review UI passed without changing stored release 
 Configuration recovery now has a reviewed, version/hash-checked saved-definition
 restore path from a fully verified release. It preserves current saved images,
 requires unchanged component identities/replica counts, blocks active/uncertain work,
-and keeps deployment separate. Runtime/data/schema restoration and stateful recovery
-remain in this batch; this first configuration slice does not complete batch 4. See [release controls](docs/release-controls.md). See [controlled image rollback](docs/image-rollback.md). Batch 4 stays active.
+and keeps deployment separate. Native data/schema and volume recovery procedures
+subsequently passed reproducible drills; automatic stateful recovery remains
+unsupported. See [release controls](docs/release-controls.md),
+[controlled image rollback](docs/image-rollback.md) and the final
+[batch 4 acceptance review](docs/recovery-acceptance.md).
 Readiness and dependency slices passed local/native Docker and staging UI verification;
 comparison passed local snapshot/scope/masking and staging UI/API verification. Native HTTP
 probes were subsequently provisioned on the separate health-check fixture. The later image-only rollback test deliberately redeployed the
@@ -790,9 +795,12 @@ workloads on eligible targets.
 
 ## Next implementation slice
 
-The UI audit and architecture alignment corrections are delivered. Continue M0 batch 4: configuration/data/schema
-recovery boundaries and acceptance before moving to batch 5 stable endpoints and
-routing. Batches 2 and 3 are already delivered; keep the ordered queue above. Source-backed management handoff and GitHub sequencing must
+The UI audit, architecture alignment corrections and supported batch 4 recovery
+acceptance are delivered. Continue M0 batch 5: stable endpoints, domains and
+replica routing. The first slice fixes native Coolify primary endpoint projection
+without changing provider domains. Shared component routing remains incomplete;
+follow the [endpoint acceptance order](docs/stable-endpoints.md).
+Batches 2 and 3 are already delivered; keep the ordered queue above. Source-backed management handoff and GitHub sequencing must
 be verified before disabling an existing operator trigger. Preserve the KISS stack,
 local pre-push gate, and capability-aware behavior. Full owner-grade hardening,
 remote agents, AI guardrails, and generative UI remain later work; production
@@ -815,8 +823,9 @@ archive rejection and a non-root single-writer cutover. It retains an archive an
 SHA-256 receipt in each local run. Coordinated database/filesystem recovery,
 real multi-writer application cutover and arbitrarily stale metadata reconciliation
 remain unsupported. These are native-procedure checks, not OAP automatic restore
-or stateful provisioning. Batch 4 stays active for the final supported-recovery
-acceptance review, then batch 5 stable endpoints/routing follows. Do not expand
+or stateful provisioning. The final supported-recovery acceptance review closes
+batch 4 for stateless managed-image workflows; batch 5 stable endpoints/routing
+is now active. Do not expand
 these drills into the later stateful-provisioning or owner-backup implementations.
 
 Open decisions include the owner login method, first external secret provider,
@@ -833,7 +842,8 @@ Component write claims and dependency read guards replace the previous applicati
 active-release constraint; short application admission/configuration locks remain.
 The operator-first boundary continues to preserve existing native workflows.
 
-This correction does not advance M0 beyond batch 4. Stable routing, native source
+The architecture correction itself did not advance M0 beyond batch 4. Subsequent
+supported recovery acceptance now permits the batch 5 handoff. Stable routing, native source
 mutation, workload breadth, indexed logging, AI diagnosis and additional adapters
 remain scheduled by their existing acceptance gates. See the
 [alignment audit](docs/architecture/alignment-audit.md) for implementation and limits.
