@@ -175,7 +175,7 @@ export function App() {
             </div>
             <p className="nav-label">WORKSPACE</p>
             <nav>
-              <Button asChild variant="ghost">
+              <Button asChild variant="ghost" className="justify-start">
                 <NavLink to="/" end>
                   <Box size={18} /> Applications
                 </NavLink>
@@ -183,7 +183,7 @@ export function App() {
             </nav>
             <p className="nav-label">INFRASTRUCTURE</p>
             <nav aria-label="Infrastructure">
-              <Button asChild variant="ghost">
+              <Button asChild variant="ghost" className="justify-start">
                 <NavLink to="/targets">
                   <Server size={18} /> Deployment Targets
                 </NavLink>

@@ -192,6 +192,16 @@ test("operational hierarchy, deployment image differences, source result, keyboa
   await expect(page.locator(".runtime-summary")).toHaveText(
     "2/2 healthy · 2/2 running",
   );
+  const sidebar = page.locator("aside");
+  const applicationIcon = await sidebar
+    .getByRole("link", { name: "Applications", exact: true })
+    .locator("svg")
+    .boundingBox();
+  const targetIcon = await sidebar
+    .getByRole("link", { name: "Deployment Targets", exact: true })
+    .locator("svg")
+    .boundingBox();
+  expect(Math.abs(applicationIcon!.x - targetIcon!.x)).toBeLessThan(1);
   await expect(
     page.getByText("Saved image differs from the running image.", {
       exact: false,
