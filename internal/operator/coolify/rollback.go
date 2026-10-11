@@ -24,8 +24,13 @@ func (c *Client) CheckRollbackConfiguration(ctx context.Context, ref string, com
 	if component.HostPort != 0 {
 		mappings = strconv.Itoa(component.HostPort) + ":" + strconv.Itoa(component.Port)
 	}
-	if strings.TrimSpace(current.Ports) != strconv.Itoa(component.Port) || strings.TrimSpace(current.Mappings) != mappings {
+	if strings.TrimSpace(current.Ports) != nativePorts(component) || strings.TrimSpace(current.Mappings) != mappings {
 		return errors.New("rollback port configuration differs")
+	}
+	if component.Kind == "worker" {
+		if err := c.checkWorkerConfiguration(ctx, ref); err != nil {
+			return err
+		}
 	}
 	if len(component.Env) > 0 {
 		var rows []variable

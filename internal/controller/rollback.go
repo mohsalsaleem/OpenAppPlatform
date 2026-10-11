@@ -165,7 +165,7 @@ func (c *Controller) rollbackPlan(ctx context.Context, tx pgx.Tx, app domain.App
 		if err != nil {
 			return plan, original, rollbackInvalid("rollback instance cannot be inspected")
 		}
-		if resource.ArtifactKind != "image" || resource.Description != "OpenAppPlatform:"+app.ID+":"+comp.Name || resource.Port != comp.Port {
+		if resource.ArtifactKind != "image" || resource.Description != "OpenAppPlatform:"+app.ID+":"+comp.Name || (comp.Kind != "worker" && resource.Port != comp.Port) {
 			return plan, original, rollbackInvalid("rollback instance ownership or port configuration changed")
 		}
 		var imageReleaseID string
@@ -240,7 +240,7 @@ func (c *Controller) verifyRollbackInstance(ctx context.Context, adapter operato
 	if err != nil {
 		return rollbackInvalid("rollback instance cannot be inspected before execution")
 	}
-	if resource.ArtifactKind != "image" || resource.Description != "OpenAppPlatform:"+d.ApplicationID+":"+comp.Name || resource.Port != comp.Port {
+	if resource.ArtifactKind != "image" || resource.Description != "OpenAppPlatform:"+d.ApplicationID+":"+comp.Name || (comp.Kind != "worker" && resource.Port != comp.Port) {
 		return rollbackInvalid("rollback ownership/configuration drift requires review")
 	}
 	if resource.Image != step.RollbackExpectedImage && resource.Image != comp.Image {

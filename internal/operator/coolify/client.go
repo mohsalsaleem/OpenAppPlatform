@@ -38,7 +38,7 @@ func New(t domain.Target, token string) (*Client, error) {
 	return &Client{base: strings.TrimRight(t.URL, "/"), token: token, target: t, http: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) Capabilities() operator.Capabilities {
-	return operator.Capabilities{HTTPHealthChecks: true, ImageRollback: true, ManagementHandoff: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ServiceEndpoints: true}
+	return operator.Capabilities{Workers: true, HTTPHealthChecks: true, ImageRollback: true, ManagementHandoff: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ServiceEndpoints: true}
 }
 func (c *Client) request(ctx context.Context, method, path string, input, output any) error {
 	var body io.Reader
@@ -199,11 +199,16 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 		if found.ArtifactKind != "image" {
 			return operator.Resource{}, errors.New("owned resource build strategy changed; reconciliation required")
 		}
+		if s.Component.Kind == "worker" {
+			if e = c.checkWorkerConfiguration(ctx, found.ID); e != nil {
+				return operator.Resource{}, e
+			}
+		}
 		if e = c.syncVariables(ctx, found.ID, s); e != nil {
 			return operator.Resource{}, e
 		}
 		// Adopted resources never enter this path. Only controller-owned image workloads can be patched.
-		data := map[string]any{"docker_registry_image_name": image, "docker_registry_image_tag": tag, "ports_exposes": strconv.Itoa(s.Component.Port), "ports_mappings": ""}
+		data := map[string]any{"docker_registry_image_name": image, "docker_registry_image_tag": tag, "ports_exposes": nativePorts(s.Component), "ports_mappings": ""}
 		if s.Component.HostPort != 0 {
 			data["ports_mappings"] = fmt.Sprintf("%d:%d", s.Component.HostPort, s.Component.Port)
 		}
@@ -213,12 +218,15 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 		}
 		return *found, nil
 	}
-	data := map[string]any{"name": s.Name, "description": s.Ownership, "project_uuid": c.target.ProjectID, "server_uuid": c.target.ServerID, "environment_name": c.target.Environment, "docker_registry_image_name": image, "ports_exposes": strconv.Itoa(s.Component.Port), "instant_deploy": false, "limits_memory": "128m", "limits_cpus": "0.25"}
+	data := map[string]any{"name": s.Name, "description": s.Ownership, "project_uuid": c.target.ProjectID, "server_uuid": c.target.ServerID, "environment_name": c.target.Environment, "docker_registry_image_name": image, "ports_exposes": nativePorts(s.Component), "instant_deploy": false, "limits_memory": "128m", "limits_cpus": "0.25"}
 	if tag != "" {
 		data["docker_registry_image_tag"] = tag
 	}
 	if s.Component.HostPort != 0 {
 		data["ports_mappings"] = fmt.Sprintf("%d:%d", s.Component.HostPort, s.Component.Port)
+	}
+	if s.Component.Kind == "worker" {
+		data["autogenerate_domain"] = false
 	}
 	applyHealthCheck(data, s.Component)
 	var result struct {

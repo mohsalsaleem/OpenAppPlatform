@@ -1961,9 +1961,9 @@ export interface components {
              * @default web
              * @enum {string}
              */
-            kind: "web";
+            kind: "web" | "worker";
             image: string;
-            /** @description Zero allowed only for observe-only resources whose operator does not report a port. */
+            /** @description Web services require 1–65535. Workers require zero; observed resources may use zero when the operator reports no port. */
             port: number;
             /** @description Zero adds no host port mapping. Existing operator routes may still expose the resource. */
             hostPort?: number;
@@ -2109,6 +2109,8 @@ export interface components {
             applicationDns: boolean;
             discovery: boolean;
             immutableImages: boolean;
+            /** @description OAP-owned long-running image workers; no ports, public endpoints or HTTP overrides. */
+            workers: boolean;
         };
         Restart: {
             component: string;
@@ -2190,9 +2192,9 @@ export interface components {
              * @default web
              * @enum {string}
              */
-            kind: "web";
+            kind: "web" | "worker";
             image: string;
-            /** @description Zero allowed only for observe-only resources whose operator does not report a port. */
+            /** @description Web services require 1–65535. Workers require zero; observed resources may use zero when the operator reports no port. */
             port: number;
             /** @description Zero adds no host port mapping. Existing operator routes may still expose the resource. */
             hostPort?: number;
@@ -2204,6 +2206,10 @@ export interface components {
              */
             strategy: "standard";
             resourceId?: string;
+            /** @description Runtime variable to immutable administrator-authorized secret reference. Values are never stored in definitions. OAP-owned workloads only; grants bind target, application, component and variable. */
+            secretRefs?: {
+                [key: string]: string;
+            };
         };
         ManifestInput: {
             name: string;

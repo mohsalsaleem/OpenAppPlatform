@@ -202,9 +202,51 @@ export function NewApplication() {
                   />
                 </div>
                 <div>
+                  <Label htmlFor={`kind-${i}`}>Component Type</Label>
+                  <NativeSelect
+                    id={`kind-${i}`}
+                    value={c.kind}
+                    disabled={!!c.resourceId}
+                    onChange={(e) =>
+                      setComponents(
+                        components.map((v, n) =>
+                          n === i
+                            ? {
+                                ...v,
+                                kind: e.target.value as Component["kind"],
+                                port: e.target.value === "worker" ? 0 : 80,
+                                hostPort: 0,
+                                healthCheck:
+                                  e.target.value === "worker"
+                                    ? { mode: "image" }
+                                    : undefined,
+                              }
+                            : v,
+                        ),
+                      )
+                    }
+                  >
+                    <option value="web">Web Service</option>
+                    <option
+                      value="worker"
+                      disabled={!capabilities.data?.workers}
+                    >
+                      Long-Running Worker
+                    </option>
+                  </NativeSelect>
+                  {c.kind === "worker" && (
+                    <small className="muted">
+                      Use an image with a worker entrypoint. Workers have no
+                      public endpoint; readiness uses the running process or an
+                      image health check.
+                    </small>
+                  )}
+                </div>
+                <div>
                   <Label htmlFor={`adopt-${i}`}>Resource Ownership</Label>
                   <NativeSelect
                     id={`adopt-${i}`}
+                    disabled={c.kind === "worker"}
                     value={c.resourceId}
                     onChange={(e) => {
                       const r = resources.data?.find(
@@ -220,6 +262,7 @@ export function NewApplication() {
                                 instances: r ? 1 : v.instances,
                                 hostPort: r ? 0 : v.hostPort,
                                 env: {},
+                                secretRefs: {},
                                 services: {},
                                 serviceEndpoints: {},
                                 port: r?.port || v.port,
@@ -266,23 +309,25 @@ export function NewApplication() {
                   </small>
                 </div>
                 <div className="form-grid compact">
-                  <div>
-                    <Label htmlFor={`port-${i}`}>Internal Port</Label>
-                    <Input
-                      id={`port-${i}`}
-                      type="number"
-                      min="1"
-                      max="65535"
-                      value={c.port}
-                      onChange={(e) =>
-                        setComponents(
-                          components.map((v, n) =>
-                            n === i ? { ...v, port: +e.target.value } : v,
-                          ),
-                        )
-                      }
-                    />
-                  </div>
+                  {c.kind !== "worker" && (
+                    <div>
+                      <Label htmlFor={`port-${i}`}>Internal Port</Label>
+                      <Input
+                        id={`port-${i}`}
+                        type="number"
+                        min="1"
+                        max="65535"
+                        value={c.port}
+                        onChange={(e) =>
+                          setComponents(
+                            components.map((v, n) =>
+                              n === i ? { ...v, port: +e.target.value } : v,
+                            ),
+                          )
+                        }
+                      />
+                    </div>
+                  )}
                   <div>
                     <Label htmlFor={`instances-${i}`}>Instances</Label>
                     <Input
@@ -301,27 +346,29 @@ export function NewApplication() {
                     />
                   </div>
                 </div>
-                <div>
-                  <Label htmlFor={`host-port-${i}`}>Host Port</Label>
-                  <Input
-                    id={`host-port-${i}`}
-                    type="number"
-                    min="0"
-                    max="65535"
-                    value={c.hostPort}
-                    onChange={(e) =>
-                      setComponents(
-                        components.map((v, n) =>
-                          n === i ? { ...v, hostPort: +e.target.value } : v,
-                        ),
-                      )
-                    }
-                  />
-                  <small className="muted">
-                    0 adds no host-port mapping. Existing platform routing
-                    remains. A fixed host port requires one instance.
-                  </small>
-                </div>
+                {c.kind !== "worker" && (
+                  <div>
+                    <Label htmlFor={`host-port-${i}`}>Host Port</Label>
+                    <Input
+                      id={`host-port-${i}`}
+                      type="number"
+                      min="0"
+                      max="65535"
+                      value={c.hostPort}
+                      onChange={(e) =>
+                        setComponents(
+                          components.map((v, n) =>
+                            n === i ? { ...v, hostPort: +e.target.value } : v,
+                          ),
+                        )
+                      }
+                    />
+                    <small className="muted">
+                      0 adds no host-port mapping. Existing platform routing
+                      remains. A fixed host port requires one instance.
+                    </small>
+                  </div>
+                )}
               </div>
               <details className="advanced-configuration">
                 <summary>Environment and Service Connections</summary>

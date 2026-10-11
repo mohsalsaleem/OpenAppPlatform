@@ -1,6 +1,6 @@
 # Open App Platform
 
-An application-first control plane for self-hosted runtimes and deployment operators. Group web services
+An application-first control plane for self-hosted runtimes and deployment operators. Group web services and long-running workers
 into applications, track releases, and keep your existing deployment operator.
 The product experience is inspired by DigitalOcean App Platform. The primary
 operator-backed journey is connect/configure your existing operator, discover
@@ -12,7 +12,7 @@ triggers, domains, volumes and secrets. A custom builder is optional.
 Implemented: Go API and controller, PostgreSQL persistence, River deployment
 jobs, a React dashboard, target-scoped Coolify and direct Docker adapters, versioned configuration editing,
 and a read-only MCP interface. Standard releases
-support multiple web components and instances, explicit Docker-image resource
+support web and worker components and multiple instances, explicit Docker-image resource
 adoption, frozen artifacts, idempotency, progress, live instance inspection,
 per-instance bounded logs, explicit observation recovery, per-instance restart,
 and Docker runtime variables, application DNS connections, and explicit instance retirement.
@@ -21,7 +21,7 @@ Verified locally with PostgreSQL and Chromium, and through a real deployment on
 an isolated staging project in the owner's existing Coolify.
 
 Bare Docker uses a local Unix socket and supports cached-image deployments without
-a registry connection. Dokploy, Dokku, Portainer, workers, jobs, embedded AI
+a registry connection. Dokploy, Dokku, Portainer, scheduled jobs, embedded AI
 diagnosis, rolling deployments, and blue-green remain planned. Native Coolify source tracking
 and an optional signed immutable-image build lane are implemented and staged;
 native source lifecycle handoff and artifact reuse are not.
@@ -112,6 +112,8 @@ credentials. It does not mutate an external Coolify installation. Live fixtures 
 - [Release cancellation and abandonment](docs/release-controls.md)
 - [OpenAPI contract](docs/openapi.json)
 - [Bare Docker targets](docs/bare-docker.md)
+- [Runtime secret references](docs/runtime-secret-references.md)
+- [Long-running workers](docs/workers.md)
 - [Read-only MCP tools](docs/mcp.md)
 - [Verification report](docs/verification.md)
 - [Reproducible local test environment](docs/local-testing.md)
@@ -122,8 +124,8 @@ credentials. It does not mutate an external Coolify installation. Live fixtures 
 The Dockerfile builds the UI and Go binary into a non-root image. Supply a
 PostgreSQL database, first-run setup secret, operator credentials, and a mounted target config;
 pass -targets /path/to/targets.json. The controller can run through Coolify or on
-Docker directly. Running the controller on bare Docker is distinct from the
-future adapter that manages application workloads on bare Docker.
+Docker directly. The direct Docker adapter manages explicitly owned application containers through
+a local Unix socket; no separate scheduler is required.
 
 .coolify/deploy.yaml records product staging and retained integration fixtures.
 The platform is available at https://oap-staging.mohsal.dev in owner mode, with

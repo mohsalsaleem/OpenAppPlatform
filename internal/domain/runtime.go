@@ -35,7 +35,7 @@ func validateRuntime(c Component, components map[string]Component) error {
 	}
 	for variable, name := range c.Services {
 		target, ok := components[name]
-		if !envName.MatchString(variable) || !ok || name == "localhost" {
+		if !envName.MatchString(variable) || !ok || name == "localhost" || target.Kind == "worker" {
 			return errors.New("service variables must name an existing application component")
 		}
 		if _, exists := c.Env[variable]; exists {

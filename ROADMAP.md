@@ -139,8 +139,8 @@ is verified in local system/browser fixtures; no production resource was touched
 See [application environments](docs/application-environments.md) and
 [target setup and acceptance](docs/target-setup-and-definition-review.md).
 
-**Current priority:** P0.1 runtime secret references (implementation and acceptance
-in progress), then P0.2 workers. M0 workload and configuration breadth, followed by repeatable
+**Current priority:** P0.2 long-running workers. P0.1 runtime secret references
+passed local and isolated Coolify staging acceptance. M0 workload and configuration breadth, followed by repeatable
 installation. The priority correction below is the authoritative execution order.
 Batch 5 has an accepted, limited Coolify routing pilot; its remaining capabilities
 are deferred and the batch is not complete. Batch 4 is accepted for supported
@@ -169,6 +169,15 @@ A database link does not grant OAP authority to provision, redeploy or restore i
 | P0.3 — Existing dependencies and assembly | Link one existing database to the example, display connection and ownership information and group frontend/API/worker/database in one application. Use explicit endpoints and secret references; dependency health failures must be visible. | Reproducible local fixture and existing Coolify staging acceptance show API/worker connectivity, useful health/logs and unchanged database ownership/data/native triggers. Review the supported actions in the UI. | No database provisioning, migration, queue/storage adapter collection, automatic adoption or data restore. |
 | P0.4 — Everyday configuration | Minimum private registry credential references and per-component CPU/memory limits where the adapter supports them. Unsupported capabilities are explicit; existing native configuration is preserved. | One private-image fixture, missing/invalid credentials and supported limit updates verified locally; scoped staging validation where credentials and native capabilities are available. | No registry service, image optimization/scanning platform, placement engine or broad resource-policy framework. |
 | P0.5 — Repeatable installation | Document and package owner bootstrap, operator connection and the complete example. Keep one Go service/UI plus PostgreSQL. Provide update, compatible rollback, external controller recovery and metadata backup/restore instructions. | A clean isolated install completes the owner walkthrough; reproducible E2E covers assembly, supported release, health/logs, restart and recovery. Run the same supported journey in staging and publish evidence and limits. | No production rollout, multi-server packaging matrix, new infrastructure services or automatic application-data restore. |
+
+**P0.1 acceptance:** scoped runtime references, missing-grant rejection before
+native mutation, private recovery fingerprints, changed-binding holds and restored
+binding recovery, REST/SSE log masking and fail-closed historical logs are shipped.
+The full local gate (14 browser tests plus native Docker/system/race checks) passed
+on 11 October 2026. A dedicated Coolify staging image workload consumed its granted
+input; native delivery, masked logs and reference-only API snapshots passed.
+See [runtime secret references](docs/runtime-secret-references.md). General vaults,
+rotation and build-time/registry credentials remain deferred as listed above.
 
 P0.1–P0.3 form the first breadth deliverable. P0.4–P0.5 close the remaining
 minimum M0 configuration/install gaps. Implement one priority at a time; advance

@@ -56,11 +56,13 @@ export function HealthCheckFields({
   name,
   healthCheck: h,
   allowExisting,
+  allowHTTP = true,
   onChange,
 }: {
   name: string;
   healthCheck?: HealthCheck;
   allowExisting: boolean;
+  allowHTTP?: boolean;
   onChange: (value: HealthCheck | undefined) => void;
 }) {
   const prefix = `health-${name}`;
@@ -91,7 +93,7 @@ export function HealthCheckFields({
           {allowExisting && (
             <option value="existing">Keep Existing Health Check</option>
           )}
-          <option value="http">Container HTTP Check</option>
+          {allowHTTP && <option value="http">Container HTTP Check</option>}
           <option value="image">Use Image Health Check</option>
         </NativeSelect>
       </Label>

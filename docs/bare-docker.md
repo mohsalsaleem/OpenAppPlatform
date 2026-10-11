@@ -65,11 +65,12 @@ variable names to managed component names. A connection such as
 application network. References must stay within the application and cannot
 point to adopted resources. They are resolved from each frozen release, so a
 port update and its callers' configuration are applied together by that release.
-Deployment order is the manifest order; dependency readiness ordering is not
-implemented. Standard updates can interrupt connectivity.
+Explicit startup dependencies gate dispatch using all dependency replicas;
+unselected bound dependencies are inspected without deployment. Standard updates can interrupt connectivity.
 
 Variables are bounded plain configuration, visible in application definitions
-and release history. They are not a secret store. Docker image defaults remain
+and release history. Use [runtime secret references](runtime-secret-references.md) for sensitive inputs.
+Docker image defaults remain
 available unless overridden. Changing or removing runtime variables changes the
 container revision and requires deployment; saving alone does not apply them.
 

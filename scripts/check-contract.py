@@ -5,6 +5,9 @@ from pathlib import Path
 import re
 ROOT=Path(__file__).resolve().parent.parent
 spec=json.loads((ROOT/'docs/openapi.json').read_text())
+schemas=spec['components']['schemas']
+if set(schemas['Component']['properties']) != set(schemas['ComponentInput']['properties']) or schemas['Component']['properties']['kind']['enum'] != schemas['ComponentInput']['properties']['kind']['enum']:
+    raise SystemExit('Component request/response fields or kinds disagree')
 for path,operations in spec['paths'].items():
     names=re.findall(r'\{([^}]+)\}',path)
     if len(names)!=len(set(names)):

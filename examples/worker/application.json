@@ -1,0 +1,14 @@
+{
+  "name": "worker-example",
+  "environment": "staging",
+  "targetId": "local-docker",
+  "components": [{
+    "name": "worker",
+    "kind": "worker",
+    "image": "REPLACE_WITH_WORKER_IMAGE",
+    "port": 0,
+    "instances": 1,
+    "strategy": "standard",
+    "readiness": {"requireHealthy": true, "timeoutSeconds": 120}
+  }]
+}

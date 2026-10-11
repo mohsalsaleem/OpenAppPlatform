@@ -37,6 +37,11 @@ func applyHealthCheck(data map[string]any, component domain.Component) {
 	}
 }
 func (c *Client) CheckHealthCheck(ctx context.Context, ref string, component domain.Component, _ bool) error {
+	if component.Kind == "worker" {
+		if err := c.checkWorkerConfiguration(ctx, ref); err != nil {
+			return err
+		}
+	}
 	if component.HealthCheck == nil {
 		return nil
 	}

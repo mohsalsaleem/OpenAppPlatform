@@ -178,7 +178,9 @@ export function ConfigurationEditor({
           <p className="small muted">
             {c.resourceId
               ? "Adopted resource: runtime fields are managed by the operator."
-              : "Managed component · standard deployment"}
+              : c.kind === "worker"
+                ? "Long-running worker · standard deployment"
+                : "Web service · standard deployment"}
           </p>
           <div className="form-grid configuration-fields">
             <div>
@@ -193,20 +195,22 @@ export function ConfigurationEditor({
               />
             </div>
             <div className="form-grid compact">
-              <div>
-                <Label htmlFor={`config-port-${i}`}>
-                  Internal Port for {c.name}
-                </Label>
-                <Input
-                  id={`config-port-${i}`}
-                  type="number"
-                  min="1"
-                  max="65535"
-                  value={c.port}
-                  readOnly={!!c.resourceId}
-                  onChange={(e) => change(i, "port", +e.target.value)}
-                />
-              </div>
+              {c.kind !== "worker" && (
+                <div>
+                  <Label htmlFor={`config-port-${i}`}>
+                    Internal Port for {c.name}
+                  </Label>
+                  <Input
+                    id={`config-port-${i}`}
+                    type="number"
+                    min="1"
+                    max="65535"
+                    value={c.port}
+                    readOnly={!!c.resourceId}
+                    onChange={(e) => change(i, "port", +e.target.value)}
+                  />
+                </div>
+              )}
               <div>
                 <Label htmlFor={`config-instances-${i}`}>
                   Instances for {c.name}
@@ -226,22 +230,26 @@ export function ConfigurationEditor({
                 </small>
               </div>
             </div>
-            <div>
-              <Label htmlFor={`config-host-${i}`}>Host Port for {c.name}</Label>
-              <Input
-                id={`config-host-${i}`}
-                type="number"
-                min="0"
-                max="65535"
-                value={c.hostPort || 0}
-                readOnly={!!c.resourceId}
-                onChange={(e) => change(i, "hostPort", +e.target.value)}
-              />
-              <small className="muted">
-                0 adds no host-port mapping. Existing platform routing remains.
-                A fixed host port requires one instance.
-              </small>
-            </div>
+            {c.kind !== "worker" && (
+              <div>
+                <Label htmlFor={`config-host-${i}`}>
+                  Host Port for {c.name}
+                </Label>
+                <Input
+                  id={`config-host-${i}`}
+                  type="number"
+                  min="0"
+                  max="65535"
+                  value={c.hostPort || 0}
+                  readOnly={!!c.resourceId}
+                  onChange={(e) => change(i, "hostPort", +e.target.value)}
+                />
+                <small className="muted">
+                  0 adds no host-port mapping. Existing platform routing
+                  remains. A fixed host port requires one instance.
+                </small>
+              </div>
+            )}
           </div>
           {c.management !== "observe" && (
             <details className="dependency-fields">
@@ -337,6 +345,7 @@ export function ConfigurationEditor({
             capabilities.data?.httpHealthChecks && (
               <HealthCheckFields
                 name={c.name}
+                allowHTTP={c.kind !== "worker"}
                 healthCheck={c.healthCheck}
                 allowExisting={
                   !base.manifest.components.find((b) => b.name === c.name)

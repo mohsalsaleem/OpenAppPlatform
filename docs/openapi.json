@@ -4142,7 +4142,8 @@
           "kind": {
             "type": "string",
             "enum": [
-              "web"
+              "web",
+              "worker"
             ],
             "default": "web"
           },
@@ -4151,7 +4152,7 @@
           },
           "port": {
             "type": "integer",
-            "description": "Zero allowed only for observe-only resources whose operator does not report a port.",
+            "description": "Web services require 1\u201365535. Workers require zero; observed resources may use zero when the operator reports no port.",
             "minimum": 0,
             "maximum": 65535
           },
@@ -4650,6 +4651,10 @@
           },
           "immutableImages": {
             "type": "boolean"
+          },
+          "workers": {
+            "type": "boolean",
+            "description": "OAP-owned long-running image workers; no ports, public endpoints or HTTP overrides."
           }
         },
         "required": [
@@ -4665,7 +4670,8 @@
           "environment",
           "applicationDns",
           "discovery",
-          "immutableImages"
+          "immutableImages",
+          "workers"
         ],
         "additionalProperties": false
       },
@@ -4928,7 +4934,8 @@
           "kind": {
             "type": "string",
             "enum": [
-              "web"
+              "web",
+              "worker"
             ],
             "default": "web"
           },
@@ -4937,7 +4944,7 @@
           },
           "port": {
             "type": "integer",
-            "description": "Zero allowed only for observe-only resources whose operator does not report a port.",
+            "description": "Web services require 1\u201365535. Workers require zero; observed resources may use zero when the operator reports no port.",
             "minimum": 0,
             "maximum": 65535
           },
@@ -4960,6 +4967,14 @@
           },
           "resourceId": {
             "type": "string"
+          },
+          "secretRefs": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,47}$"
+            },
+            "description": "Runtime variable to immutable administrator-authorized secret reference. Values are never stored in definitions. OAP-owned workloads only; grants bind target, application, component and variable."
           }
         },
         "required": [

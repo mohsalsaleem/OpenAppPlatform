@@ -93,8 +93,19 @@ func (m *Manifest) Validate() error {
 		if c.Kind == "" {
 			c.Kind = "web"
 		}
-		if c.Kind != "web" {
-			return errors.New("this milestone supports web components; worker and job lifecycles are not implemented")
+		if c.Kind != "web" && c.Kind != "worker" {
+			return errors.New("kind must be web or worker; scheduled jobs are not implemented")
+		}
+		if c.Kind == "worker" {
+			if c.Port != 0 || c.HostPort != 0 || c.ResourceID != "" {
+				return errors.New("workers require OAP-owned image workloads without ports or existing resource bindings")
+			}
+			if c.HealthCheck != nil && c.HealthCheck.Mode != "image" {
+				return errors.New("workers use non-HTTP image health checks")
+			}
+			if c.HealthCheck == nil {
+				c.HealthCheck = &HealthCheck{Mode: "image"}
+			}
 		}
 		if c.Instances == 0 {
 			c.Instances = 1
@@ -117,7 +128,7 @@ func (m *Manifest) Validate() error {
 		if c.HostPort != 0 && c.Instances != 1 {
 			return errors.New("hostPort requires one instance; shared port routing is not implemented")
 		}
-		if (c.Port < 1 && !(c.Management == "observe" && c.Port == 0)) || c.Port > 65535 {
+		if c.Kind != "worker" && ((c.Port < 1 && !(c.Management == "observe" && c.Port == 0)) || c.Port > 65535) {
 			return errors.New("port must be between 1 and 65535")
 		}
 		if (c.Image == "" && c.Management != "observe") || len(c.Image) > 512 || (c.Image != "" && !imageCharacters.MatchString(c.Image)) || (strings.Contains(c.Image, "@") && !digestSuffix.MatchString(c.Image)) {

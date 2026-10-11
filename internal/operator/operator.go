@@ -8,6 +8,7 @@ import (
 )
 
 type Capabilities struct {
+	Workers           bool `json:"workers"`
 	HTTPHealthChecks  bool `json:"httpHealthChecks"`
 	ImageRollback     bool `json:"imageRollback"`
 	ManagementHandoff bool `json:"managementHandoff"`
@@ -61,7 +62,10 @@ type Restarter interface {
 
 func ValidateRuntime(m domain.Manifest, caps Capabilities) error {
 	for _, c := range m.Components {
-		if c.HealthCheck != nil && !caps.HTTPHealthChecks {
+		if c.Kind == "worker" && !caps.Workers {
+			return fmt.Errorf("target does not support long-running workers for %s", c.Name)
+		}
+		if c.HealthCheck != nil && c.HealthCheck.Mode == "http" && !caps.HTTPHealthChecks {
 			return fmt.Errorf("target does not support native HTTP health checks for %s", c.Name)
 		}
 		if len(c.Env)+len(c.SecretRefs) > 0 && !caps.Environment {

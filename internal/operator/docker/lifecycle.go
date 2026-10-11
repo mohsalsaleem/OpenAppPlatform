@@ -101,7 +101,10 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 		env = append(env, key+"="+value)
 	}
 	sort.Strings(env)
-	input := map[string]any{"Env": env, "Image": imageID, "Labels": labels, "ExposedPorts": map[string]any{port: map[string]any{}}, "HostConfig": host, "NetworkingConfig": map[string]any{"EndpointsConfig": map[string]any{network: map[string]any{"Aliases": []string{s.Component.Name}}}}}
+	input := map[string]any{"Env": env, "Image": imageID, "Labels": labels, "HostConfig": host, "NetworkingConfig": map[string]any{"EndpointsConfig": map[string]any{network: map[string]any{"Aliases": []string{s.Component.Name}}}}}
+	if s.Component.Kind != "worker" {
+		input["ExposedPorts"] = map[string]any{port: map[string]any{}}
+	}
 	if probe := httpHealthCheck(s.Component); probe != nil {
 		input["Healthcheck"] = probe
 	}

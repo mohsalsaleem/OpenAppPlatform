@@ -326,8 +326,10 @@ export function ApplicationDetail() {
                 <div className="grow">
                   <strong>{c.name}</strong>
                   <p>
-                    {c.kind} · {c.instances} instance
-                    {c.instances > 1 ? "s" : ""} · port {c.port}
+                    {c.kind === "worker" ? "Worker" : "Web Service"} ·{" "}
+                    {c.instances} instance
+                    {c.instances > 1 ? "s" : ""}
+                    {c.kind !== "worker" ? ` · port ${c.port}` : ""}
                   </p>
                   {c.healthCheck && (
                     <p className="small muted">

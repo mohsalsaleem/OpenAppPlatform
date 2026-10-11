@@ -754,3 +754,67 @@ test("secret references save names and block an unauthorized deployment", async 
     ),
   ).toBeVisible();
 });
+
+test("a long-running worker deploys beside a web service without HTTP settings", async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  test.skip(
+    !process.env.OAP_TEST_WORKER_IMAGE,
+    "Requires the isolated worker image",
+  );
+  await page.goto("/");
+  await page
+    .getByLabel("Platform Access Token")
+    .fill(process.env.OAP_API_TOKEN!);
+  await page.getByRole("button", { name: "Connect to Workspace" }).click();
+  await page.getByRole("link", { name: "New Application" }).click();
+  const name = `worker-browser-${Date.now()}`;
+  await page.getByLabel("Application Name", { exact: true }).fill(name);
+  await page
+    .getByLabel("Container Image", { exact: true })
+    .fill(process.env.OAP_TEST_DOCKER_IMAGE!);
+  await page.getByLabel("Internal Port", { exact: true }).fill("8080");
+  await page.getByRole("button", { name: "Add Component" }).click();
+  await page
+    .getByLabel("Component Name", { exact: true })
+    .nth(1)
+    .fill("worker");
+  await page
+    .getByLabel("Component Type", { exact: true })
+    .nth(1)
+    .selectOption("worker");
+  await page
+    .getByLabel("Container Image", { exact: true })
+    .nth(1)
+    .fill(process.env.OAP_TEST_WORKER_IMAGE!);
+  await expect(page.getByLabel("Internal Port", { exact: true })).toHaveCount(
+    1,
+  );
+  await expect(page.getByLabel("Host Port", { exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: "Create Application" }).click();
+  await expect(page.getByRole("heading", { name })).toBeVisible();
+  await page.getByRole("tab", { name: "Settings" }).click();
+  await expect(page.getByLabel("Internal Port for worker")).toHaveCount(0);
+  await expect(page.getByLabel("Host Port for worker")).toHaveCount(0);
+  await expect(
+    page
+      .getByLabel("Health Check Mode for worker")
+      .locator("option[value=http]"),
+  ).toHaveCount(0);
+  await page.getByLabel("Require Healthy Status for worker").check();
+  await page.getByRole("button", { name: "Save Configuration" }).click();
+  await expect(
+    page.getByText("Configuration saved. Deploy when you are ready."),
+  ).toBeVisible();
+  await page.getByRole("tab", { name: "Overview" }).click();
+  await page.getByRole("button", { name: "Review Deployment" }).click();
+  await page.getByRole("button", { name: "Deploy Now" }).click();
+  await expect(page.getByText("2/2 healthy", { exact: false })).toBeVisible({
+    timeout: 30000,
+  });
+  await page.screenshot({
+    path: "../.local/ui-worker-overview.png",
+    fullPage: true,
+  });
+});

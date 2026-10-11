@@ -102,6 +102,7 @@ def run(keep=False):
     env['OAP_TEST_RUNNER_IMAGE'] = runner
     env['OAP_TEST_RUN_DIR'] = str(run_dir)
     env['OAP_TEST_FIXTURE_V1'] = 'openappplatform-test-fixture:' + project + '-v1'
+    env['OAP_TEST_WORKER_IMAGE'] = 'openappplatform-test-worker:' + project
     env['OAP_TEST_FIXTURE_V2'] = 'openappplatform-test-fixture:' + project + '-v2'
     compose = docker + ['compose', '--env-file', 'tests/env/images.env', '-f', 'tests/env/compose.yaml', '-p', project]
     record = {'status': 'running', 'runId': run_id, 'fingerprint': fingerprint, 'project': project, 'images': versions}
@@ -115,6 +116,7 @@ def run(keep=False):
         container = subprocess.check_output(docker + ['create', runner], env=env, text=True).strip()
         for version in ['v1', 'v2']:
             command(docker + ['cp', container + ':/opt/oap/fixture-' + version, str(extraction / ('fixture-' + version))], env)
+        command(docker + ['cp', container + ':/opt/oap/worker-fixture', str(extraction / 'worker')], env)
         command(docker + ['rm', container], env)
         container = None
         shutil.copyfile(ROOT / 'tests/env/fixture/Dockerfile', extraction / 'Dockerfile')
@@ -123,6 +125,10 @@ def run(keep=False):
             tag = env['OAP_TEST_FIXTURE_' + version.upper()]
             fixture_tags.append(tag)
             command(docker + ['build', '--pull=false', '--build-arg', 'ALPINE_IMAGE=' + versions['OAP_TEST_ALPINE_IMAGE'], '--build-arg', 'BINARY=fixture-' + version, '--build-arg', 'PORT=' + port, '-t', tag, str(extraction)], env)
+        shutil.copyfile(ROOT / 'tests/env/worker.Dockerfile', extraction / 'worker.Dockerfile')
+        worker_tag=env['OAP_TEST_WORKER_IMAGE']
+        command(docker + ['build','--pull=false','--build-arg','ALPINE_IMAGE='+versions['OAP_TEST_ALPINE_IMAGE'],'-f',str(extraction/'worker.Dockerfile'),'-t',worker_tag,str(extraction)],env)
+        fixture_tags.append(worker_tag)
         with (run_dir / 'fixtures.tar').open('wb') as archive:
             command(docker + ['save'] + fixture_tags, env, stdout=archive)
         command(compose + ['up', '-d', '--wait', '--wait-timeout', '90', 'postgres', 'docker'], env)
@@ -141,8 +147,8 @@ def run(keep=False):
         if fingerprint != source_fingerprint():
             raise RuntimeError('Source files changed during verification; rerun the suite')
         record.update({'status': 'passed', 'suite': suite, 'finishedAt': time.time()})
-    except Exception as error:
-        record.update({'status': 'failed', 'error': str(error), 'finishedAt': time.time()})
+    except (Exception, KeyboardInterrupt) as error:
+        record.update({'status': 'failed', 'error': 'Local verification interrupted' if isinstance(error, KeyboardInterrupt) else str(error), 'finishedAt': time.time()})
         raise
     finally:
         if container:
