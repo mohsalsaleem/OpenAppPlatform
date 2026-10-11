@@ -404,7 +404,13 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     .getByRole("button", { name: "Scale Down web", exact: true })
     .click();
   await expect(page.getByRole("dialog")).toContainText(
-    "Containers and volumes are retained",
+    "Persistent volumes are retained",
+  );
+  await expect(page.getByRole("dialog")).toContainText(
+    "The operator may remove stopped containers",
+  );
+  await expect(page.getByRole("dialog")).toContainText(
+    "OAP retains their instance bindings",
   );
   await expect(page.getByRole("dialog")).toContainText("web / 2");
   const queuedRetirement = page.waitForResponse(

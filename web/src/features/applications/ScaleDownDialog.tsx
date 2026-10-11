@@ -72,7 +72,8 @@ export function ScaleDownDialog({
       </p>
       <p className="muted">
         Requests on stopped instances can be interrupted. Traffic draining is
-        not available. Containers and volumes are retained. The desired replica
+        not available. Persistent volumes are retained. The operator may remove
+        stopped containers; OAP retains their instance bindings. The desired replica
         count changes only after every selected instance is confirmed stopped.
       </p>
       <ErrorBox error={scale.error} />

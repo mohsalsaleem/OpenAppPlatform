@@ -67,6 +67,9 @@ integration:
     last_verified_source_commit: c4f24e9
     verified: 2026-10-11
     scope: stateless_managed_image_demo_with_explicit_native_routing
+    route_membership: reviewed_owner_cli
+    retired_api_application_uuid: il4zhouvr0o2qo0tqw3qwc2r
+    desired_api_instances: 2
 promotion:
   require_human_approval: true
 

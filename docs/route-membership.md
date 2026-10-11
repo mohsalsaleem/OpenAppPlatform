@@ -24,7 +24,8 @@ The Coolify adapter now implements the existing recorded retirement contract for
 managed image instances. It checks target scope and the OAP ownership marker,
 requests a native stop with `docker_cleanup=false`, and observes the resource
 stopped before OAP commits a lower desired count. The application resource is
-retained. The stop API returns no job ID: the recorded resource UUID is an instance
+retained; Coolify removes its stopped containers while preserving persistent
+volumes. The stop API returns no job ID: the recorded resource UUID is an instance
 confirmation reference, not a fabricated provider deployment identity. Uncertain
 responses require normal retirement recovery; observation never repeats the stop.
 Unknown state, source strategy or changed ownership retains the recovery fence.
@@ -82,3 +83,28 @@ native Docker file-protocol drill verifies drift preservation, atomic replacemen
 proxy identity, symlink rejection and idempotent retry without inode replacement.
 Its fixture is not an HTTP proxy; the real HTTP scale/route journey is verified
 against the retained Coolify staging demo.
+
+## Retained demo acceptance
+
+The real demo passed a two→three→two API replica cycle on 11 October 2026.
+Scale-up release `a89ce07c69e28657962ca8784a69d583` verified all three API
+instances. The old two-replica route plan was rejected after the definition changed.
+A fresh plan discovered and added only
+`https://il4zhouvr0o2qo0tqw3qwc2r.mohsal.dev`; 24 requests reached all three
+backend identities with the original frontend boot identity unchanged.
+
+Scale-down release `9183568eb9c3cf2c5af166f52a27f015` completed successfully.
+The native stop was confirmed, the binding retained as retired, and a fresh plan
+removed only that retired URL. Both apply retries returned `alreadyApplied`.
+The native file returned to its original hash
+`eff9a5dc8fbb5d0a8e6db9724938e555c723064ef2acb2833d6c3dc9a59c03fc`.
+24 requests reached the two surviving backends; the original frontend process
+and shared domain stayed unchanged. The third application record remains available
+for later reuse, with its runtime stopped and removed from route membership.
+
+The OAP UI now exposes Coolify Scale Down and displays the retained retirement.
+Route review/apply remains CLI-only. Native-file authority/drift tests passed in
+local run `20261011-134923-56c5c0d7`; the Coolify retirement prerequisite and full
+suite passed `20261011-135626-f09688d7` before staging deployment. Local receipts
+are retained under `.local/preview-membership-*`; later acceptance and copy checks
+are recorded separately rather than changing these historical test reports.

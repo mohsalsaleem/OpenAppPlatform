@@ -810,9 +810,12 @@ manual native route configuration is explicit and does not complete batch 5's
 automatic membership/domain/draining gates.
 The next slice adds [reviewed route membership](docs/route-membership.md): owner
 CLI plans derive healthy managed bindings, retain retirement ownership evidence,
-and reject stale app/target/proxy/file state before native publication. Verify a
-two→three→two replica cycle on the retained demo, including idempotent retry and
-stale-plan rejection. This is a staging publisher pilot, not background
+and reject stale app/target/proxy/file state before native publication. A real
+two→three→two replica cycle passed on the retained demo, including idempotent
+retry, stale-plan rejection and unchanged frontend process/shared URL. Coolify's
+recorded retirement capability is implemented with ownership checks and Docker
+cleanup disabled; the native application and binding are retained, while Coolify
+removes stopped containers. This is a staging publisher pilot, not background
 reconciliation or dashboard/agent route authority; batch 5 stays active.
 Batches 2 and 3 are already delivered; keep the ordered queue above. Source-backed management handoff and GitHub sequencing must
 be verified before disabling an existing operator trigger. Preserve the KISS stack,
