@@ -809,9 +809,15 @@ custom-format backup/restore into an isolated database, incompatible migration
 and corrupt archive checks, post-backup data-loss visibility and read/write
 verification. An OAP system regression verifies image/configuration recovery does
 not rewind application data/schema. See the [example](examples/stateful-recovery/README.md).
-Writer coordination, volume/uploads recovery, application cutover and arbitrarily
-stale metadata reconciliation remain outstanding; batch 4 stays active. This is
-native-procedure acceptance, not OAP automatic restoration or stateful provisioning.
+Native Docker volume recovery acceptance adds a stopped synthetic writer,
+quiesced tar backup, restored uploads/ownership, source preservation, corrupt
+archive rejection and a non-root single-writer cutover. It retains an archive and
+SHA-256 receipt in each local run. Coordinated database/filesystem recovery,
+real multi-writer application cutover and arbitrarily stale metadata reconciliation
+remain unsupported. These are native-procedure checks, not OAP automatic restore
+or stateful provisioning. Batch 4 stays active for the final supported-recovery
+acceptance review, then batch 5 stable endpoints/routing follows. Do not expand
+these drills into the later stateful-provisioning or owner-backup implementations.
 
 Open decisions include the owner login method, first external secret provider,
 first analytics export, default inference policy, tunnel choice for each client,

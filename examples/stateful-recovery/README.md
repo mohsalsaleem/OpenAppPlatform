@@ -27,6 +27,26 @@ The application compatibility acknowledgement is an owner decision; OAP does not
 automatically validate a database schema. This example is a native recovery
 procedure, not OAP-managed stateful provisioning or automated restore.
 
+## Docker uploads and writer cutover
+
+The same local gate runs a separate native Docker volume drill. A synthetic
+non-root file writer is stopped and verified inactive before an uploads archive
+is taken. The source then receives additional writes and a changed upload. The
+archive is restored into a fresh volume; original files and ownership must match
+the earlier snapshot, while the source's later changes remain intact.
+
+The recovered writer starts against the restored volume, proves it can append
+as UID 10001, and stops after validation. The original writer remains stopped
+throughout this cutover. A corrupt tar archive must fail. Each run retains
+`volume-recovery.json` and `application-uploads.tar`, with the archive SHA-256 in
+the receipt. Test containers and volumes are removed after validation.
+
+This is a single-writer filesystem cutover fixture. It does not prove coordinated
+database/filesystem snapshots, multi-writer consistency, a public HTTP traffic
+switch or recovery of an actual customer application. Quiesce and account for
+every real writer and dependency before adapting it. Docker mounted-data rollback
+remains unsupported in OAP's managed runtime contract; use the native procedure.
+
 See the [owner recovery runbook](../../docs/recovery-runbook.md) before adapting
 the procedure to a real application. Real backups need suitable retention,
 encryption, consistency, dependency coverage and independently tested restoration.

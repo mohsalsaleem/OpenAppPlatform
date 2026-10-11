@@ -102,6 +102,15 @@ even when its schema is incompatible with an earlier query. That system test use
 the provider fixture; native PostgreSQL restoration is exercised by the separate
 drill. No schema compatibility automation is claimed.
 
-Writer coordination, volume/uploads recovery, full application cutover and stale
-OAP metadata reconciliation remain outstanding batch 4 work. This procedure does
-not enable stateful provisioning or automatic application-data restore.
+The native Docker volume drill adds a stopped synthetic writer, a quiesced tar
+snapshot, corrupt archive rejection and restoration into a separate volume. It
+checks original uploads, retained source changes, non-root writes after restoration
+and a single-writer cutover with the original writer kept stopped. Its archive and
+SHA-256 receipt are retained alongside the database recovery artifacts. No live
+operator data is touched and no OAP runtime volume support is introduced.
+
+Coordinated database/filesystem recovery, real multi-writer application cutover and
+stale OAP metadata reconciliation remain unsupported. These bounded native drills
+do not enable stateful provisioning or automatic application-data restore. The
+remaining batch 4 acceptance review must distinguish supported stateless release
+recovery from these native owner procedures before the batch 5 routing handoff.

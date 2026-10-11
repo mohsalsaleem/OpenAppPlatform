@@ -128,6 +128,9 @@ def run(keep=False):
         command(compose + ['up', '-d', '--wait', '--wait-timeout', '90', 'postgres', 'docker'], env)
         command([sys.executable, 'tests/env/stateful_recovery.py', '--docker-host', docker[2],
                  '--project', project, '--report-dir', str(run_dir)], env)
+        command([sys.executable, 'tests/env/volume_recovery.py', '--docker-host', docker[2],
+                 '--project', project, '--image', env['OAP_TEST_FIXTURE_V1'],
+                 '--report-dir', str(run_dir)], env)
         command(compose + ['run', '--rm', '--no-deps', 'runner'], env)
         suite = json.loads((run_dir / 'suite.json').read_text())
         if suite.get('status') != 'passed':
