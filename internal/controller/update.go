@@ -8,6 +8,7 @@ import (
 	"maps"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/store/db"
 )
 
 // UpdateApplication changes future release configuration. Existing releases keep
@@ -36,6 +37,13 @@ func (c *Controller) updateApplicationTx(ctx context.Context, tx pgx.Tx, id stri
 	var e error
 	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", id); e != nil {
 		return domain.Application{}, e
+	}
+	unresolved, e := db.New(tx).HasUnresolvedRoutePublication(ctx, db.HasUnresolvedRoutePublicationParams{ApplicationID: id})
+	if e != nil {
+		return domain.Application{}, e
+	}
+	if unresolved {
+		return domain.Application{}, domain.ErrConflict
 	}
 	current, e := c.Store.ApplicationTx(ctx, tx, id)
 	if e != nil {

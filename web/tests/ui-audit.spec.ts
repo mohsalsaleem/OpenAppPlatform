@@ -545,3 +545,113 @@ test("live release snapshots preserve busy components and submit only an availab
     components: ["api"],
   });
 });
+
+test("endpoint reviews expose membership changes and uncertain publication recovery", async ({
+  page,
+}) => {
+  await fixtures(page);
+  const plan = {
+    id: "route-plan",
+    name: "oap-route",
+    component: "web",
+    url: "https://shared.example.test",
+    expectedVersion: 3,
+    authorityHash: "a".repeat(64),
+    directoryHash: "d".repeat(64),
+    members: [1, 2].map((ordinal) => ({
+      ordinal,
+      resourceId: `resource-${ordinal}`,
+      url: `https://backend-${ordinal}.example.test`,
+      retired: false,
+    })),
+    beforeHash: "b".repeat(64),
+    desiredHash: "c".repeat(64),
+    desiredConfig: "{}",
+    added: ["https://backend-2.example.test"],
+    removed: [],
+    state: "prepared",
+    createdAt: "2026-10-11T12:00:00Z",
+  };
+  let applied = false;
+  let uncertain = false;
+  let writes = 0;
+  await page.route("**/api/v1/applications/audit-app/routes", (route) =>
+    route.fulfill({
+      json: {
+        endpoints: [
+          {
+            name: plan.name,
+            component: "web",
+            url: plan.url,
+            status: applied ? "in-sync" : "update-needed",
+            current: applied
+              ? plan.members.map((m) => m.url)
+              : ["https://backend-1.example.test"],
+            desired: plan.members.map((m) => m.url),
+          },
+        ],
+        publications: uncertain
+          ? [{ ...plan, state: "publishing" }]
+          : applied
+            ? [{ ...plan, state: "applied" }]
+            : [],
+      },
+    }),
+  );
+  await page.route("**/api/v1/applications/audit-app/route-reviews", (route) =>
+    route.fulfill({ status: 201, json: plan }),
+  );
+  await page.route(
+    "**/api/v1/applications/audit-app/route-publications/route-plan",
+    async (route) => {
+      writes++;
+      if (writes === 1) {
+        uncertain = true;
+        await route.fulfill({
+          status: 422,
+          json: { message: "Publication needs recovery" },
+        });
+      } else {
+        applied = true;
+        uncertain = false;
+        await route.fulfill({ json: { ...plan, state: "applied" } });
+      }
+    },
+  );
+  await page.goto("/applications/audit-app");
+  await page.getByRole("tab", { name: "Endpoints", exact: true }).click();
+  await expect(page.getByRole("link", { name: plan.url })).toBeVisible();
+  await page
+    .getByRole("button", { name: "Review Routing", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("heading", { name: "Add Backends" }),
+  ).toBeVisible();
+  await expect(dialog.getByText(plan.added[0], { exact: true })).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Apply Routing", exact: true })
+    .click();
+  await expect(dialog.getByText("Publication needs recovery")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByText("A routing update needs recovery.", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Review Routing", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: "Review Recovery", exact: true })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: "Cancel If Unchanged" }),
+  ).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Resume Update", exact: true })
+    .click();
+  await expect(dialog).not.toBeVisible();
+  await expect(
+    page.getByText("Membership Current", { exact: false }),
+  ).toBeVisible();
+  await expect(page.getByText("web · Applied", { exact: true })).toBeVisible();
+});

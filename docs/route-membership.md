@@ -1,4 +1,4 @@
-# Reviewed native route membership: staging pilot
+# Reviewed native route membership: CLI staging pilot
 
 `scripts/coolify-route-membership.py` discovers a managed image component's current
 healthy bindings through OAP, reviews additions/removals, and updates an existing
@@ -108,3 +108,11 @@ local run `20261011-134923-56c5c0d7`; the Coolify retirement prerequisite and fu
 suite passed `20261011-135626-f09688d7` before staging deployment. Local receipts
 are retained under `.local/preview-membership-*`; later acceptance and copy checks
 are recorded separately rather than changing these historical test reports.
+
+## Subsequent UI/API workflow
+
+The [Endpoints workflow](endpoint-management.md) adds persisted human-owner reviews,
+publication audit and crash fencing for an explicitly mounted native staging route.
+The CLI acceptance above remains historical. Do not run the CLI and UI publishers
+concurrently; the CLI native lock and API admission lock are separate. Automatic
+reconciliation and the other batch 5 gates remain open.

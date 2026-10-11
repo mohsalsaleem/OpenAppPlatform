@@ -19,6 +19,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/httpapi"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operators"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/routing"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/source"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 )
@@ -109,6 +110,15 @@ func run() error {
 		c.SourceHooks = map[string]source.Hook{}
 		for _, hook := range config.Hooks {
 			c.SourceHooks[hook.ID] = hook
+		}
+	}
+	if raw := os.Getenv("OAP_NATIVE_ROUTES"); raw != "" {
+		if preview {
+			return errors.New("native route publication requires owner mode")
+		}
+		c.RouteBindings, e = routing.Parse([]byte(raw))
+		if e != nil {
+			return e
 		}
 	}
 	c.RequireIdentity = !preview

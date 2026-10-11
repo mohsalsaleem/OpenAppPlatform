@@ -817,6 +817,13 @@ recorded retirement capability is implemented with ownership checks and Docker
 cleanup disabled; the native application and binding are retained, while Coolify
 removes stopped containers. This is a staging publisher pilot, not background
 reconciliation or dashboard/agent route authority; batch 5 stays active.
+The following [Endpoints workflow](docs/endpoint-management.md) brings existing
+staging route review/apply into the dashboard and API with immutable saved plans,
+owner-session publication audit, native drift checks and durable crash fencing.
+Its supported scope is an administrator-bound native Coolify route; generic
+domain/TLS setup, automatic membership reconciliation, draining and bare Docker
+shared proxy routing remain the next batch 5 acceptance gates.
+
 Batches 2 and 3 are already delivered; keep the ordered queue above. Source-backed management handoff and GitHub sequencing must
 be verified before disabling an existing operator trigger. Preserve the KISS stack,
 local pre-push gate, and capability-aware behavior. Full owner-grade hardening,

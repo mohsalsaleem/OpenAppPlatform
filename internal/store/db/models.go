@@ -102,6 +102,16 @@ type OapReleaseClaim struct {
 	Mode      string `json:"mode"`
 }
 
+type OapRoutePublication struct {
+	ID            string             `json:"id"`
+	ApplicationID string             `json:"application_id"`
+	OwnerID       string             `json:"owner_id"`
+	Plan          []byte             `json:"plan"`
+	State         string             `json:"state"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
 type OapRuntimeVariable struct {
 	TargetID     string `json:"target_id"`
 	ResourceID   string `json:"resource_id"`

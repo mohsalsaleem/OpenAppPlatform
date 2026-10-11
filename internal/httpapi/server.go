@@ -116,6 +116,7 @@ func decode(w http.ResponseWriter, r *http.Request, dst any) error {
 }
 func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
+	s.endpointRoutes(mux)
 	if !s.Preview {
 		s.accessRoutes(mux)
 	}

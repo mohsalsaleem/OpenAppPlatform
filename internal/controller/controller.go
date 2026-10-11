@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/routing"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/source"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 	"github.com/riverqueue/river"
@@ -28,6 +29,7 @@ type DeployArgs struct {
 func (DeployArgs) Kind() string { return "oap_deploy" }
 
 type Controller struct {
+	RouteBindings   []routing.Binding
 	SourceHooks     map[string]source.Hook
 	SourceBuilder   source.Builder
 	RequireIdentity bool

@@ -1,3 +1,4 @@
+import { Endpoints } from "./Endpoints";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useApplicationEvents } from "@/lib/use-application-events";
@@ -301,6 +302,7 @@ export function ApplicationDetail() {
           {Object.entries({
             overview: "Overview",
             deployments: "Activity",
+            endpoints: "Endpoints",
             configuration: "Settings",
             logs: "Logs",
           }).map(([value, label]) => (
@@ -638,6 +640,9 @@ export function ApplicationDetail() {
               </article>
             ))}
           </section>
+        </TabsContent>
+        <TabsContent value="endpoints">
+          <Endpoints applicationId={id!} version={a.version} />
         </TabsContent>
         <TabsContent value="logs" forceMount hidden={tab !== "logs"}>
           <section className="panel">

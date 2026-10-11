@@ -43,3 +43,9 @@ over live OAP bindings and the existing native route file. It removes manual URL
 copying, rejects observed drift and preserves custom native configuration. It is
 staging-only CLI tooling; automatic/background or dashboard route publication
 and draining remain incomplete.
+
+The [Endpoints workflow](endpoint-management.md) now exposes saved owner review/apply
+and recovery through UI/API for explicitly mounted Coolify staging routes. A
+persistent publication fence protects lifecycle admission after uncertain writes.
+Generic domain/TLS creation, automatic reconciliation, draining and bare Docker
+shared routing remain batch 5 gates.

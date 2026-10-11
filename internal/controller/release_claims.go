@@ -90,6 +90,13 @@ func releaseClaims(release domain.Deployment) (map[string]string, error) {
 // a write conflicts with every active reader/writer, including attention work.
 func checkReleaseClaims(ctx context.Context, tx pgx.Tx, app string, claims map[string]string) error {
 	queries := db.New(tx)
+	unresolved, err := queries.HasUnresolvedRoutePublication(ctx, db.HasUnresolvedRoutePublicationParams{ApplicationID: app})
+	if err != nil {
+		return err
+	}
+	if unresolved {
+		return domain.ErrConflict
+	}
 	legacy, err := queries.HasLegacyActiveRelease(ctx, app)
 	if err != nil {
 		return err
