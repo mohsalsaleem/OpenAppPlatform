@@ -30,10 +30,10 @@ The first slice fixes endpoint projection only. Shared routing, TLS provisioning
 and draining remain incomplete. Unit tests cover multiple domains, malformed or
 unsafe candidates, native ports/paths and unchanged native domain configuration.
 
-The [connected preview](../examples/connected-preview/README.md) is the next
-hands-on checkpoint: frontend plus two managed API instances and a reviewed native
+The [connected preview](../examples/connected-preview/README.md) is a verified,
+retained hands-on checkpoint: frontend plus two managed API instances and a reviewed native
 Traefik route. `scripts/render-coolify-route.py` renders bounded provider config;
 it does not publish it or imply an automatic routing adapter. Verify real TLS,
-replacement/rollback, backend outage and controller independence before recording
-the retained staging demo as accepted. Automatic membership and draining remain
+replacement/rollback, backend outage and controller independence as recorded in
+the [staging acceptance](connected-preview-acceptance.md). Automatic membership and draining remain
 separate follow-up work.

@@ -9,6 +9,10 @@ build workflow. Use immutable image digests in `application.json`. Replace the
 target and shared-domain placeholders before creating the application in OAP.
 The example is stateless and contains only synthetic responses.
 
+A retained [live demo](https://r86qkfu0ig6cgeyqs51mrkbh.mohsal.dev/demo) is available.
+See [staging acceptance and the testing walkthrough](../../docs/connected-preview-acceptance.md)
+for the OAP application, exact artifacts, verified operations and current limits.
+
 Deploy `api` first. Capture both native API resource URLs from Live Instances.
 Render a native route using:
 

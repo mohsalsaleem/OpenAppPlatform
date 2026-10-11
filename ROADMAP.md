@@ -800,10 +800,12 @@ acceptance are delivered. Continue M0 batch 5: stable endpoints, domains and
 replica routing. The first slice fixes native Coolify primary endpoint projection
 without changing provider domains. Shared component routing remains incomplete;
 follow the [endpoint acceptance order](docs/stable-endpoints.md).
-The next tangible checkpoint is the [connected preview](examples/connected-preview/README.md):
-one frontend, two API instances and a reviewed shared route on Coolify's existing
-proxy. Verify selected-component update, rollback/return, a stopped backend and
-continued application traffic while OAP is down. Retain the demo for owner testing;
+The [connected preview](examples/connected-preview/README.md) is now a retained
+staging deliverable: one frontend, two API instances and a reviewed shared route
+on Coolify's existing proxy. Selected-component update, rollback/return, a stopped
+backend, recorded restart and continued application traffic while OAP is down are
+verified. See the [acceptance record and walkthrough](docs/connected-preview-acceptance.md).
+Retain the demo for owner testing;
 manual native route configuration is explicit and does not complete batch 5's
 automatic membership/domain/draining gates.
 Batches 2 and 3 are already delivered; keep the ordered queue above. Source-backed management handoff and GitHub sequencing must

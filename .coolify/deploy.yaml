@@ -56,6 +56,17 @@ integration:
     receiver_image: mendhak/http-https-echo@sha256:f55000d9196bd3c853d384af7315f509d21ffb85de315c26e9874033b9f83e15
     verified: 2026-10-10
   lifecycle: retained_for_inspection
+  connected_preview:
+    application_id: 7cc13fa9d4bb51314240aabdcc7b851d
+    frontend_application_uuid: r86qkfu0ig6cgeyqs51mrkbh
+    api_application_uuids: [tewkzpfharq1e47llgbq1zrp, q56odfifosic4u713btkepyt]
+    demo_url: https://r86qkfu0ig6cgeyqs51mrkbh.mohsal.dev/demo
+    shared_api_url: https://oap-api-preview.mohsal.dev
+    native_route_file: /traefik/dynamic/oap-preview-7cc13fa9d4bb.yaml
+    last_verified_image: 127.0.0.1:5001/openappplatform/connected-preview@sha256:f7a3e00c05c2339301e8030296151a719efb54cbe5dc4ef4f8a9f4149400d19f
+    last_verified_source_commit: c4f24e9
+    verified: 2026-10-11
+    scope: stateless_managed_image_demo_with_explicit_native_routing
 promotion:
   require_human_approval: true
 
