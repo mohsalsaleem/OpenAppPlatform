@@ -74,11 +74,21 @@ against the isolated PostgreSQL and Docker fixture environment. The adapter wrap
 loses a response after a real Docker deployment. A reconstructed controller must
 retain the release fence, reject preparation retry and stale recovery, attach the
 exact operation, and finish with one dispatch and the same process boot identity.
-This exercises response uncertainty and controller reconstruction, not an OS-level
-kill or restoration of application data.
+This exercises response uncertainty and controller reconstruction.
+
+`TestNativeDockerProcessKillRecoveryDoesNotRestartRuntime` runs the controller in
+a child process against the same isolated database and real Docker fixture. It
+blocks after native dispatch completes but before the operation ID is persisted.
+The parent verifies the durable dispatch intent and that a competing worker cannot
+change the locked release, then sends SIGKILL to the child. The next controller
+must acquire the released database session lock, retain attention and component
+claims, and recover the exact operation without another dispatch or runtime restart.
+The fault barrier is a test adapter; this kills a real controller process executing
+`Advance`, rather than the complete HTTP server/River daemon. Normal River queue
+reconstruction is covered separately by the existing system tests.
 
 Existing system tests cover interrupted durable dispatch, worker-lock conflicts,
 readiness deadlines, dependency guards and cancellation/abandonment. Existing native
-Docker tests cover verified image rollback. Stateful restoration, stale-metadata
-restore reconciliation and a process-kill acceptance drill remain outstanding batch
-4 work; this runbook and test do not complete that batch.
+Docker tests cover verified image rollback. Stateful restoration and stale-metadata
+restore reconciliation remain outstanding batch 4 work; these tests do not restore
+application data or complete that batch.

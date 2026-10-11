@@ -798,11 +798,14 @@ local pre-push gate, and capability-aware behavior. Full owner-grade hardening,
 remote agents, AI guardrails, and generative UI remain later work; production
 exposure still requires M1 gates.
 
-The next recovery acceptance slice adds a native Docker lost-response/controller
-reconstruction scenario and an [owner recovery runbook](docs/recovery-runbook.md).
-The test requires one dispatch and an unchanged runtime boot identity after exact
-operation recovery. Stateful/data/schema restore, arbitrarily stale metadata
-reconciliation and an OS process-kill drill remain outstanding; batch 4 stays active.
+Recovery acceptance includes native Docker lost-response/controller reconstruction
+and an [owner recovery runbook](docs/recovery-runbook.md). A child controller
+process-kill drill interrupts a completed native dispatch before its response is
+persisted, checks worker-session locking/release and durable attention fencing,
+and requires an unchanged runtime boot identity after exact operation recovery.
+This uses a controller `Advance` subprocess, not the full HTTP/River daemon.
+Stateful/data/schema restore and arbitrarily stale metadata reconciliation remain
+outstanding; batch 4 stays active.
 
 Open decisions include the owner login method, first external secret provider,
 first analytics export, default inference policy, tunnel choice for each client,
