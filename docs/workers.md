@@ -57,3 +57,22 @@ checks cover readiness, logs, restart and a worker-only configuration update,
 including an unchanged web process identity. The existing lifecycle/recovery gate
 remains required before pushing. Staging acceptance uses an isolated workload;
 this does not enable scheduled jobs, autoscaling or advanced rollouts.
+
+## Verified Staging Journey
+
+On 11 October 2026, commit `758cc10` passed the complete local gate (15 browser
+checks, native Docker integration, PostgreSQL and race checks). Lost-response
+recovery kept the original worker process and issued one native dispatch.
+
+The isolated Coolify application
+[application-breadth-preview](https://oap-staging.mohsal.dev/applications/bb2f8cb890eacc584ead8db1507567d3)
+contains frontend, API and worker. All three reported healthy. A frontend request
+reached the API; restarting only the worker changed its boot identity while both
+web boot identities stayed unchanged. Worker logs and the image probe worked,
+with no generated domain or host mapping. Coolify status briefly lagged the native
+healthy container and converged within the bounded observation window.
+
+Native replacement behavior remains controlled by the selected operator. OAP does
+not promise exclusive processing, exactly-once task delivery or a rollout policy;
+workers must handle retries and concurrent consumers according to their task system.
+Existing source-backed workers remain outside this managed-image slice.

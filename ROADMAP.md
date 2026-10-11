@@ -139,8 +139,8 @@ is verified in local system/browser fixtures; no production resource was touched
 See [application environments](docs/application-environments.md) and
 [target setup and acceptance](docs/target-setup-and-definition-review.md).
 
-**Current priority:** P0.2 long-running workers. P0.1 runtime secret references
-passed local and isolated Coolify staging acceptance. M0 workload and configuration breadth, followed by repeatable
+**Current priority:** P0.3 existing dependencies and assembly. P0.1 runtime secret
+references and P0.2 workers passed local and isolated Coolify staging acceptance. M0 workload and configuration breadth, followed by repeatable
 installation. The priority correction below is the authoritative execution order.
 Batch 5 has an accepted, limited Coolify routing pilot; its remaining capabilities
 are deferred and the batch is not complete. Batch 4 is accepted for supported
@@ -178,6 +178,18 @@ on 11 October 2026. A dedicated Coolify staging image workload consumed its gran
 input; native delivery, masked logs and reference-only API snapshots passed.
 See [runtime secret references](docs/runtime-secret-references.md). General vaults,
 rotation and build-time/registry credentials remain deferred as listed above.
+
+**P0.2 acceptance:** OAP-owned image workers run on direct Docker and Coolify,
+with non-HTTP image readiness, health/logs, selected updates and per-instance
+restart. The full local gate passed on 11 October 2026: 15 browser tests plus
+native Docker, PostgreSQL and race checks, including lost-dispatch-response
+recovery with the original worker process and one provider dispatch. Coolify
+staging application `application-breadth-preview` contains frontend/API/worker,
+all healthy; a connected frontend request and worker-only restart passed with
+unchanged frontend/API process identities and no worker public URL. Coolify's
+status briefly lagged its healthy native container; the bounded observation gate
+completed normally. See [workers](docs/workers.md). The database link remains
+P0.3; this acceptance does not claim the four-component milestone is complete.
 
 P0.1–P0.3 form the first breadth deliverable. P0.4–P0.5 close the remaining
 minimum M0 configuration/install gaps. Implement one priority at a time; advance
