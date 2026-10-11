@@ -86,6 +86,12 @@ type OapDeployment struct {
 	Source             []byte             `json:"source"`
 }
 
+type OapEndpointVerification struct {
+	ApplicationID string `json:"application_id"`
+	Name          string `json:"name"`
+	Report        []byte `json:"report"`
+}
+
 type OapInvitation struct {
 	ID          string             `json:"id"`
 	WorkspaceID string             `json:"workspace_id"`

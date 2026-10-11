@@ -29,6 +29,7 @@ type DeployArgs struct {
 func (DeployArgs) Kind() string { return "oap_deploy" }
 
 type Controller struct {
+	EndpointProbe   func(context.Context, routing.Binding) routing.Verification
 	RouteBindings   []routing.Binding
 	SourceHooks     map[string]source.Hook
 	SourceBuilder   source.Builder

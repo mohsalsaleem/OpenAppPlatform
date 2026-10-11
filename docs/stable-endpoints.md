@@ -1,9 +1,9 @@
 # Stable endpoints and routing: M0 batch 5
 
 OAP reuses existing native routes wherever the operator can manage them. Grouping
-and inspection never rewrite Coolify domains or create another proxy. The current
-runtime API exposes a primary instance URL; it does not yet model a shared route
-over all component replicas.
+and inspection never rewrite Coolify domains or create another proxy. The runtime
+API exposes primary instance URLs and explicitly configured shared component
+endpoints through the reviewed Endpoints workflow.
 
 The Coolify adapter projects the first valid HTTP(S) URL from its comma-separated
 domain field for Open Service. Surrounding whitespace is removed. Invalid URLs,
@@ -49,3 +49,9 @@ and recovery through UI/API for explicitly mounted Coolify staging routes. A
 persistent publication fence protects lifecycle admission after uncertain writes.
 Generic domain/TLS creation, automatic reconciliation, draining and bare Docker
 shared routing remain batch 5 gates.
+
+[Domain & TLS readiness](endpoint-verification.md) adds bounded, saved verification
+of configured DNS authority, the public certificate and a readiness response.
+Membership and readiness remain separate signals; certificate issuance stays
+with the native operator. Domain creation, reconciliation, draining and Docker
+shared routing remain incomplete.

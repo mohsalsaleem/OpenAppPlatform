@@ -237,7 +237,7 @@ func TestRouteHTTPRequiresOwnerSessionAndRecordsMutationAudit(t *testing.T) {
 	}
 	base := "/api/v1/applications/" + app.ID
 	before, _ := os.ReadFile(path)
-	for _, endpoint := range []string{base + "/route-reviews", base + "/route-publications/unknown"} {
+	for _, endpoint := range []string{base + "/route-reviews", base + "/route-publications/unknown", base + "/endpoint-verifications"} {
 		if code, _ := call("POST", endpoint, agent, true, map[string]any{"name": b.Name, "expectedVersion": app.Version}); code != 403 {
 			t.Fatal("agent native publication was not denied", code)
 		}
@@ -254,6 +254,16 @@ func TestRouteHTTPRequiresOwnerSessionAndRecordsMutationAudit(t *testing.T) {
 	if code, raw = call("POST", base+"/route-publications/"+plan.ID, session, false, map[string]string{"action": "apply"}); code != 200 {
 		t.Fatal("owner apply failed", code, string(raw))
 	}
+	c.EndpointProbe = func(context.Context, routing.Binding) routing.Verification {
+		return routing.Verification{Status: "verified", CheckedAt: time.Now().UTC(), DNS: "matched", Addresses: []string{"192.0.2.1"}, TLS: "valid", Health: "ready", HTTPStatus: 200}
+	}
+	if code, raw = call("POST", base+"/endpoint-verifications", session, false, map[string]any{"name": b.Name, "expectedVersion": app.Version}); code != 200 {
+		t.Fatal("owner endpoint verification failed", code, string(raw))
+	}
+	var probeAudit int
+	if e = c.Store.Pool.QueryRow(ctx, "SELECT count(*) FROM oap_audit WHERE user_id=$1 AND status=200 AND action LIKE '%endpoint-verifications'", owner).Scan(&probeAudit); e != nil || probeAudit != 1 {
+		t.Fatal("verification audit missing", probeAudit, e)
+	}
 	after, _ := os.ReadFile(path)
 	if routing.Hash(before) == routing.Hash(after) {
 		t.Fatal("owner apply did not update native membership")
@@ -261,5 +271,51 @@ func TestRouteHTTPRequiresOwnerSessionAndRecordsMutationAudit(t *testing.T) {
 	var audit int
 	if e = c.Store.Pool.QueryRow(ctx, "SELECT count(*) FROM oap_audit WHERE user_id=$1 AND status IN (200,201) AND action LIKE '%route-%'", owner).Scan(&audit); e != nil || audit != 2 {
 		t.Fatal("routing audit was not completed", audit, e)
+	}
+}
+
+func TestEndpointVerificationPersistsAndInvalidatesChangedAuthority(t *testing.T) {
+	c, _, app, ctx, b, path := routeFixture(t)
+	// Verification requires current native membership, independently of TLS success.
+	calls := 0
+	c.EndpointProbe = func(context.Context, routing.Binding) routing.Verification {
+		calls++
+		expires := time.Now().Add(time.Hour)
+		return routing.Verification{Status: "verified", CheckedAt: time.Now().UTC(), DNS: "matched", Addresses: []string{"192.0.2.1"}, TLS: "valid", Health: "ready", HTTPStatus: 200, CertificateExpiresAt: &expires}
+	}
+	if _, e := c.VerifyEndpoint(ctx, app.ID, b.Name, app.Version); e == nil || calls != 0 {
+		t.Fatal("unsynchronized route was probed", e)
+	}
+	plan, e := c.ReviewRoute(ctx, app.ID, b.Name, app.Version)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = c.ApplyRoute(ctx, app.ID, plan.ID, false); e != nil {
+		t.Fatal(e)
+	}
+	report, e := c.VerifyEndpoint(ctx, app.ID, b.Name, app.Version)
+	if e != nil || report.Status != "verified" || calls != 1 {
+		t.Fatal(report, e)
+	}
+	fresh := &controller.Controller{Store: c.Store, Factory: c.Factory, RouteBindings: c.RouteBindings}
+	view, e := fresh.Routes(ctx, app.ID)
+	if e != nil || view.Endpoints[0].Verification == nil || view.Endpoints[0].Verification.Status != "verified" {
+		t.Fatal("verification lost after controller recreation", view, e)
+	}
+	raw, _ := os.ReadFile(path)
+	os.WriteFile(path, append(raw, '\n'), 0644)
+	view, e = fresh.Routes(ctx, app.ID)
+	if e != nil || view.Endpoints[0].Verification.Status != "stale" {
+		t.Fatal("native drift retained verified evidence", view, e)
+	}
+	if _, e = c.VerifyEndpoint(ctx, app.ID, b.Name, app.Version+1); !errors.Is(e, domain.ErrConflict) {
+		t.Fatal("stale application version probed", e)
+	}
+	agent := domain.WithPrincipal(context.Background(), domain.Principal{UserID: "agent", WorkspaceID: "default", Role: "owner", Kind: "agent", Scope: "operate"})
+	if _, e = c.VerifyEndpoint(agent, app.ID, b.Name, app.Version); e == nil {
+		t.Fatal("agent triggered trusted network probe")
+	}
+	if calls != 1 {
+		t.Fatal("blocked calls reached the network")
 	}
 }

@@ -3838,6 +3838,107 @@
           }
         }
       }
+    },
+    "/api/v1/applications/{id}/endpoint-verifications": {
+      "post": {
+        "summary": "Verify configured endpoint DNS TLS and readiness",
+        "operationId": "verify_endpoint_readiness",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "expectedVersion"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "expectedVersion": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Verification evidence",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointVerification"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Request blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Request blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Request blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request blocked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4920,6 +5021,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "verification": {
+            "$ref": "#/components/schemas/EndpointVerification"
           }
         }
       },
@@ -4941,6 +5045,72 @@
             "items": {
               "$ref": "#/components/schemas/RoutePlan"
             }
+          }
+        }
+      },
+      "EndpointVerification": {
+        "type": "object",
+        "required": [
+          "status",
+          "checkedAt",
+          "dns",
+          "addresses",
+          "tls",
+          "health",
+          "httpStatus",
+          "latencyMs",
+          "authorityHash",
+          "nativeHash",
+          "directoryHash"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "checkedAt": {
+            "type": "string"
+          },
+          "dns": {
+            "type": "string"
+          },
+          "tls": {
+            "type": "string"
+          },
+          "health": {
+            "type": "string"
+          },
+          "authorityHash": {
+            "type": "string"
+          },
+          "nativeHash": {
+            "type": "string"
+          },
+          "directoryHash": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "certificateExpiresAt": {
+            "type": "string"
+          },
+          "certificateIssuer": {
+            "type": "string"
+          },
+          "certificateFingerprint": {
+            "type": "string"
+          },
+          "addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "httpStatus": {
+            "type": "integer"
+          },
+          "latencyMs": {
+            "type": "integer"
           }
         }
       }

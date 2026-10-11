@@ -827,6 +827,12 @@ The configured staging UI/API flow passed a live two→three→two cycle, stale-
 rejection, publication retries, controller-offline traffic and metadata restore.
 See the acceptance section in `docs/endpoint-management.md`; this does not close
 the remaining batch 5 gates.
+The next [Domain & TLS readiness](docs/endpoint-verification.md) slice adds saved,
+explicit-owner checks of configured DNS addresses, TLS and HTTPS readiness. It
+separates membership from endpoint reachability, refuses unexpected DNS/redirects,
+and expires evidence after configuration changes or ten minutes. Native issuance
+remains delegated to the existing operator; domain creation, automatic membership,
+draining and bare Docker routing remain open.
 
 
 Batches 2 and 3 are already delivered; keep the ordered queue above. Source-backed management handoff and GitHub sequencing must

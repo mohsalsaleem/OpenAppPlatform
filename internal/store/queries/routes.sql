@@ -12,3 +12,10 @@ UPDATE oap_route_publications SET state=$3,updated_at=now() WHERE application_id
 
 -- name: HasUnresolvedRoutePublication :one
 SELECT EXISTS(SELECT 1 FROM oap_route_publications WHERE application_id=$1 AND state='publishing' AND id<>$2);
+
+-- name: SaveEndpointVerification :exec
+INSERT INTO oap_endpoint_verifications(application_id,name,report) VALUES($1,$2,$3)
+ON CONFLICT(application_id,name) DO UPDATE SET report=excluded.report;
+
+-- name: GetEndpointVerification :one
+SELECT report FROM oap_endpoint_verifications WHERE application_id=$1 AND name=$2;

@@ -1890,6 +1890,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/applications/{id}/endpoint-verifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify configured endpoint DNS TLS and readiness */
+        post: operations["verify_endpoint_readiness"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2204,10 +2221,28 @@ export interface components {
             message?: string;
             current: string[];
             desired: string[];
+            verification?: components["schemas"]["EndpointVerification"];
         };
         RouteView: {
             endpoints: components["schemas"]["RouteEndpoint"][];
             publications: components["schemas"]["RoutePlan"][];
+        };
+        EndpointVerification: {
+            status: string;
+            checkedAt: string;
+            dns: string;
+            tls: string;
+            health: string;
+            authorityHash: string;
+            nativeHash: string;
+            directoryHash: string;
+            message?: string;
+            certificateExpiresAt?: string;
+            certificateIssuer?: string;
+            certificateFingerprint?: string;
+            addresses: string[];
+            httpStatus: number;
+            latencyMs: number;
         };
     };
     responses: never;
@@ -3941,6 +3976,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RoutePlan"];
+                };
+            };
+            /** @description Request blocked */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Request blocked */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Request blocked */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Request blocked */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Request blocked */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    verify_endpoint_readiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    expectedVersion: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Verification evidence */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndpointVerification"];
                 };
             };
             /** @description Request blocked */

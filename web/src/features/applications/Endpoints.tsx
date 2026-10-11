@@ -72,6 +72,17 @@ export function Endpoints({
       ]);
     },
   });
+  const verify = useMutation({
+    mutationFn: (name: string) =>
+      api
+        .POST("/api/v1/applications/{id}/endpoint-verifications", {
+          params: { path: { id: applicationId } },
+          body: { name, expectedVersion: version },
+        })
+        .then(unwrap),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: ["routes", applicationId] }),
+  });
   if (routes.isLoading) return <Loading />;
   const uncertain = routes.data?.publications.find(
     (p) => p.state === "publishing",
@@ -86,7 +97,7 @@ export function Endpoints({
           </p>
         </div>
       </div>
-      <ErrorBox error={routes.error || review.error} />
+      <ErrorBox error={routes.error || review.error || verify.error} />
       {uncertain && (
         <div role="alert" className="notice">
           A routing update needs recovery. Deployments and configuration changes
@@ -135,20 +146,103 @@ export function Endpoints({
                   ? `${endpoint.current.length} current → ${endpoint.desired.length} desired backends · Update Available`
                   : "Review Blocked"}
             </p>
+            <div
+              className="mt-4 space-y-1 text-sm"
+              aria-label="Domain and TLS readiness"
+            >
+              <h3>Domain & TLS</h3>
+              {endpoint.verification ? (
+                <>
+                  <p
+                    className={
+                      endpoint.verification.status === "failed"
+                        ? "text-destructive"
+                        : "muted"
+                    }
+                  >
+                    {endpoint.verification.status === "verified"
+                      ? "Verified"
+                      : endpoint.verification.status === "stale"
+                        ? "Check Expired or Configuration Changed"
+                        : endpoint.verification.status === "unconfigured"
+                          ? "Verification Not Configured"
+                          : "Verification Failed"}
+                    {" · "}Checked{" "}
+                    {new Date(endpoint.verification.checkedAt).toLocaleString()}
+                  </p>
+                  <p className="muted">
+                    DNS:{" "}
+                    {endpoint.verification.dns === "matched"
+                      ? "Expected Server Addresses"
+                      : endpoint.verification.dns === "mismatch"
+                        ? "Unexpected Address"
+                        : endpoint.verification.dns === "unconfigured"
+                          ? "Expected Addresses Required"
+                          : endpoint.verification.dns === "failed"
+                            ? "Resolution Failed"
+                            : "Not Checked"}{" "}
+                    · TLS:{" "}
+                    {endpoint.verification.tls === "valid"
+                      ? "Certificate Valid"
+                      : endpoint.verification.tls === "failed"
+                        ? "Connection or Certificate Failed"
+                        : "Not Checked"}{" "}
+                    · Readiness:{" "}
+                    {endpoint.verification.httpStatus
+                      ? `HTTP ${endpoint.verification.httpStatus}`
+                      : "Not Checked"}
+                  </p>
+                  {endpoint.verification.certificateExpiresAt && (
+                    <p className="muted">
+                      Certificate expires{" "}
+                      {new Date(
+                        endpoint.verification.certificateExpiresAt,
+                      ).toLocaleDateString()}{" "}
+                      · {endpoint.verification.certificateIssuer}
+                    </p>
+                  )}
+                  {endpoint.verification.message && (
+                    <p className="muted">{endpoint.verification.message}</p>
+                  )}
+                </>
+              ) : (
+                <p className="muted">
+                  Not checked. Current membership does not confirm DNS, TLS or
+                  endpoint readiness.
+                </p>
+              )}
+            </div>
             {endpoint.message && (
               <p className="text-sm text-destructive">{endpoint.message}</p>
             )}
           </div>
           {owner && (
-            <Button
-              variant="outline"
-              disabled={
-                endpoint.status === "blocked" || review.isPending || !!uncertain
-              }
-              onClick={() => review.mutate(endpoint.name)}
-            >
-              Review Routing
-            </Button>
+            <div className="flex shrink-0 flex-col gap-2">
+              <Button
+                variant="outline"
+                disabled={
+                  endpoint.status === "blocked" ||
+                  review.isPending ||
+                  !!uncertain
+                }
+                onClick={() => review.mutate(endpoint.name)}
+              >
+                Review Routing
+              </Button>
+              <Button
+                variant="outline"
+                disabled={
+                  endpoint.status !== "in-sync" ||
+                  !!uncertain ||
+                  verify.isPending
+                }
+                onClick={() => verify.mutate(endpoint.name)}
+              >
+                {verify.isPending && verify.variables === endpoint.name
+                  ? "Checking Endpoint…"
+                  : "Verify Endpoint"}
+              </Button>
+            </div>
           )}
         </div>
       ))}

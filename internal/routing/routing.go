@@ -14,13 +14,14 @@ import (
 )
 
 type Binding struct {
-	ApplicationID string `json:"applicationId"`
-	Component     string `json:"component"`
-	TargetID      string `json:"targetId"`
-	Name          string `json:"name"`
-	Domain        string `json:"domain"`
-	HealthPath    string `json:"healthPath"`
-	Directory     string `json:"directory"`
+	ExpectedAddresses []string `json:"expectedAddresses,omitempty"`
+	ApplicationID     string   `json:"applicationId"`
+	Component         string   `json:"component"`
+	TargetID          string   `json:"targetId"`
+	Name              string   `json:"name"`
+	Domain            string   `json:"domain"`
+	HealthPath        string   `json:"healthPath"`
+	Directory         string   `json:"directory"`
 }
 
 var namePattern = regexp.MustCompile(`^oap-[a-z0-9-]{1,48}$`)
@@ -45,6 +46,9 @@ func Parse(raw []byte) ([]Binding, error) {
 	}
 	seen := map[string]bool{}
 	for _, b := range bindings {
+		if _, e := expectedAddresses(b.ExpectedAddresses); e != nil {
+			return nil, e
+		}
 		if !appPattern.MatchString(b.ApplicationID) || !slugPattern.MatchString(b.Component) || !slugPattern.MatchString(b.TargetID) || !namePattern.MatchString(b.Name) || !validDomain(b.Domain) || !healthPattern.MatchString(b.HealthPath) || !filepath.IsAbs(b.Directory) || filepath.Clean(b.Directory) != b.Directory {
 			return nil, errors.New("invalid native route authority")
 		}

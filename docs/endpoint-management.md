@@ -86,7 +86,9 @@ and can race the final native check. Use one publishing workflow at a time. A
 native edit or changed authority may require administrator inspection while the
 fence remains; there is no bypass button or automatic guess about who owns drift.
 This workflow has no automatic reconciliation, draining, route creation/deletion,
-TLS readiness probing, production publication or bare Docker proxy transport.
+production publication or bare Docker proxy transport. The subsequent
+[Domain & TLS readiness](endpoint-verification.md) workflow adds bounded verification
+of the existing configured endpoint; it does not create or issue a new domain.
 
 ## Reproducible acceptance
 

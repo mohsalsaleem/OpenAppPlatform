@@ -11,6 +11,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const GetEndpointVerification = `-- name: GetEndpointVerification :one
+SELECT report FROM oap_endpoint_verifications WHERE application_id=$1 AND name=$2
+`
+
+type GetEndpointVerificationParams struct {
+	ApplicationID string `json:"application_id"`
+	Name          string `json:"name"`
+}
+
+func (q *Queries) GetEndpointVerification(ctx context.Context, arg GetEndpointVerificationParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, GetEndpointVerification, arg.ApplicationID, arg.Name)
+	var report []byte
+	err := row.Scan(&report)
+	return report, err
+}
+
 const GetRoutePublication = `-- name: GetRoutePublication :one
 SELECT id,owner_id,plan,state,created_at,updated_at FROM oap_route_publications WHERE application_id=$1 AND id=$2
 `
@@ -118,6 +134,22 @@ func (q *Queries) ListRoutePublications(ctx context.Context, applicationID strin
 		return nil, err
 	}
 	return items, nil
+}
+
+const SaveEndpointVerification = `-- name: SaveEndpointVerification :exec
+INSERT INTO oap_endpoint_verifications(application_id,name,report) VALUES($1,$2,$3)
+ON CONFLICT(application_id,name) DO UPDATE SET report=excluded.report
+`
+
+type SaveEndpointVerificationParams struct {
+	ApplicationID string `json:"application_id"`
+	Name          string `json:"name"`
+	Report        []byte `json:"report"`
+}
+
+func (q *Queries) SaveEndpointVerification(ctx context.Context, arg SaveEndpointVerificationParams) error {
+	_, err := q.db.Exec(ctx, SaveEndpointVerification, arg.ApplicationID, arg.Name, arg.Report)
+	return err
 }
 
 const SetRoutePublicationState = `-- name: SetRoutePublicationState :exec

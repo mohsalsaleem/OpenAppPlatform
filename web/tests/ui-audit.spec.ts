@@ -655,3 +655,84 @@ test("endpoint reviews expose membership changes and uncertain publication recov
   ).toBeVisible();
   await expect(page.getByText("web · Applied", { exact: true })).toBeVisible();
 });
+
+test("endpoint readiness shows DNS TLS expiry and failures separately from membership", async ({
+  page,
+}) => {
+  await fixtures(page);
+  let report: unknown = undefined;
+  let calls = 0;
+  await page.route("**/api/v1/applications/audit-app/routes", (route) =>
+    route.fulfill({
+      json: {
+        endpoints: [
+          {
+            name: "oap-route",
+            component: "web",
+            url: "https://shared.example.test",
+            status: "in-sync",
+            current: ["https://one.example.test"],
+            desired: ["https://one.example.test"],
+            verification: report,
+          },
+        ],
+        publications: [],
+      },
+    }),
+  );
+  await page.route(
+    "**/api/v1/applications/audit-app/endpoint-verifications",
+    async (route) => {
+      calls++;
+      report = {
+        status: calls === 1 ? "verified" : "failed",
+        checkedAt: "2026-10-11T12:00:00Z",
+        dns: calls === 1 ? "matched" : "mismatch",
+        addresses: ["192.0.2.1"],
+        tls: calls === 1 ? "valid" : "skipped",
+        health: calls === 1 ? "ready" : "skipped",
+        httpStatus: calls === 1 ? 200 : 0,
+        latencyMs: 42,
+        authorityHash: "a",
+        nativeHash: "b",
+        directoryHash: "c",
+        certificateExpiresAt: calls === 1 ? "2026-12-31T12:00:00Z" : undefined,
+        certificateIssuer: calls === 1 ? "Test Issuer" : undefined,
+        message:
+          calls === 1 ? undefined : "DNS points to an unexpected address.",
+      };
+      await route.fulfill({ json: report });
+    },
+  );
+  await page.goto("/applications/audit-app");
+  await page.getByRole("tab", { name: "Endpoints", exact: true }).click();
+  await expect(
+    page.getByText(
+      "Not checked. Current membership does not confirm DNS, TLS or endpoint readiness.",
+    ),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Verify Endpoint", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "DNS: Expected Server Addresses · TLS: Certificate Valid · Readiness: HTTP 200",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Certificate expires", { exact: false }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Verify Endpoint", exact: true })
+    .click();
+  await expect(
+    page.getByText("Verification Failed", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("DNS points to an unexpected address.", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Membership Current", { exact: false }),
+  ).toBeVisible();
+});

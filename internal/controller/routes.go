@@ -39,13 +39,14 @@ type RoutePlan struct {
 	CreatedAt       time.Time     `json:"createdAt"`
 }
 type Endpoint struct {
-	Name      string   `json:"name"`
-	Component string   `json:"component"`
-	URL       string   `json:"url"`
-	Status    string   `json:"status"`
-	Message   string   `json:"message,omitempty"`
-	Current   []string `json:"current"`
-	Desired   []string `json:"desired"`
+	Verification *routing.Verification `json:"verification,omitempty"`
+	Name         string                `json:"name"`
+	Component    string                `json:"component"`
+	URL          string                `json:"url"`
+	Status       string                `json:"status"`
+	Message      string                `json:"message,omitempty"`
+	Current      []string              `json:"current"`
+	Desired      []string              `json:"desired"`
 }
 type RouteView struct {
 	Endpoints    []Endpoint  `json:"endpoints"`
@@ -200,6 +201,7 @@ func (c *Controller) Routes(ctx context.Context, appID string) (RouteView, error
 		}
 		endpoint := Endpoint{Name: b.Name, Component: b.Component, URL: "https://" + b.Domain, Status: "blocked", Current: []string{}, Desired: []string{}}
 		snapshot, allowed, e := c.routeSnapshot(ctx, appID, b)
+		authority, native, directory := "", "", ""
 		if e == nil {
 			endpoint.Desired = desiredURLs(snapshot)
 			var f *routing.File
@@ -207,6 +209,11 @@ func (c *Controller) Routes(ctx context.Context, appID string) (RouteView, error
 			if e == nil {
 				var raw []byte
 				raw, e = f.Read()
+				if e == nil {
+					directory, e = f.Identity()
+					native = routing.Hash(raw)
+					authority = snapshot.AuthorityHash
+				}
 				f.Close()
 				if e == nil {
 					endpoint.Current, e = routing.Backends(b, raw, allowed)
@@ -222,6 +229,11 @@ func (c *Controller) Routes(ctx context.Context, appID string) (RouteView, error
 		if e != nil {
 			endpoint.Message = e.Error()
 		}
+		verification, err := c.endpointVerification(ctx, appID, b.Name, authority, native, directory)
+		if err != nil {
+			return view, err
+		}
+		endpoint.Verification = verification
 		view.Endpoints = append(view.Endpoints, endpoint)
 	}
 	rows, e := db.New(c.Store.Pool).ListRoutePublications(ctx, appID)

@@ -30,6 +30,25 @@ func (s *Server) endpointRoutes(mux *http.ServeMux) {
 		}
 		return true
 	}
+	mux.HandleFunc("POST /api/v1/applications/{id}/endpoint-verifications", func(w http.ResponseWriter, r *http.Request) {
+		if !owner(w, r) {
+			return
+		}
+		var body struct {
+			Name            string `json:"name"`
+			ExpectedVersion int64  `json:"expectedVersion"`
+		}
+		if decode(w, r, &body) != nil {
+			write(w, 400, map[string]string{"message": "A configured endpoint name and application version are required"})
+			return
+		}
+		report, e := s.Controller.VerifyEndpoint(r.Context(), r.PathValue("id"), body.Name, body.ExpectedVersion)
+		if e != nil {
+			routeError(w, e)
+			return
+		}
+		write(w, 200, report)
+	})
 	mux.HandleFunc("POST /api/v1/applications/{id}/route-reviews", func(w http.ResponseWriter, r *http.Request) {
 		if !owner(w, r) {
 			return
