@@ -1,0 +1,9 @@
+{
+  "name": "connected-preview",
+  "environment": "staging",
+  "targetId": "replace-with-connected-coolify-target",
+  "components": [
+    {"name": "api", "kind": "web", "image": "replace-with-built-immutable-api-image", "port": 8080, "instances": 2, "strategy": "standard", "readiness": {"requireHealthy": true, "timeoutSeconds": 180}, "healthCheck": {"mode": "http", "path": "/health/ready", "intervalSeconds": 2, "timeoutSeconds": 1, "retries": 10, "startPeriodSeconds": 5}},
+    {"name": "frontend", "kind": "web", "image": "replace-with-built-immutable-frontend-image", "port": 8080, "instances": 1, "strategy": "standard", "services": {"UPSTREAM_URL": "api"}, "serviceEndpoints": {"api": "https://replace-with-shared-api-domain.example.test"}, "dependsOn": ["api"], "readiness": {"requireHealthy": true, "timeoutSeconds": 180}, "healthCheck": {"mode": "http", "path": "/health/ready", "intervalSeconds": 2, "timeoutSeconds": 1, "retries": 10, "startPeriodSeconds": 5}}
+  ]
+}

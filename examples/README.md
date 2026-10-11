@@ -121,6 +121,10 @@ See [the dependency contract](../docs/release-readiness.md#explicit-startup-depe
 
 ## Application data recovery
 
+For a hands-on frontend/two-instance API journey, use the
+[connected application preview](connected-preview/README.md). It reuses Coolify's
+native proxy and makes shared routing ownership and current limits explicit.
+
 The [stateful recovery example](stateful-recovery/README.md) uses native PostgreSQL
 backup/restore to demonstrate incompatible schema changes, isolated restoration,
 read/write verification and the loss of writes made after a backup. It runs in
