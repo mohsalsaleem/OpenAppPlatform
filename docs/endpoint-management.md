@@ -96,3 +96,41 @@ recreation after both sides of a simulated publication interruption, safe cancel
 credential/ownership drift, human-session API permission and mutation audit, and a
 browser journey for review, uncertain outcome and resume. These simulated crash
 boundaries do not replace live proxy traffic verification on staging.
+
+## Live staging acceptance: 11 October 2026
+
+Feature commit `e34b14fa7139cec459be5f6672e40929eaad67a0` passed the complete
+local gate `20261011-145614-437abd03` before push and deployment. The existing
+staging application received an explicitly approved native-directory mount;
+publication remained restricted to the named connected-preview route.
+
+A baseline version-4 review was rejected after scale-up, preserving native bytes.
+Release `39cc2955133d0acbf2c708ece8399f82` verified three API replicas. The owner
+used Endpoints to review and apply publication
+`144c36e74a33e71e2de816c7c32b23f9`, adding only the third backend. Twenty-four
+real frontend requests reached all three instances with the original frontend
+boot identity unchanged.
+
+The owner used the UI to retire the third instance. Release
+`9b6dfe31d07f8bde710d1772e17af34c` confirmed retirement before committing version
+6 with two desired API replicas. Endpoints publication
+`cfe10f8f4cd7ef804302302761448397` removed only the retired backend. Twenty-four
+requests reached both survivors, the frontend process stayed unchanged, and both
+publication retries returned recorded applied receipts without changing native
+bytes. The final file hash was
+`c5203ceaa026d4a3c8c5a245b86c51c48482e66cf76c85defaffcc8787fa76fe`.
+The hostname/TLS/routing policy stayed the same; formatting is now the Go
+renderer's canonical JSON, so this is not a claim of original byte identity.
+
+With OAP staging's container stopped, eight frontend requests succeeded through
+the native route. Restart restored controller access. This drill exposed an
+HTTP shutdown deadline while a browser's live event stream remained connected.
+The subsequent server change propagates process cancellation to every request,
+including streams, and is covered by a real HTTP regression test. This is
+controller shutdown behavior, not traffic draining for application instances.
+
+A fresh PostgreSQL metadata backup restored into a new inactive database with
+all twelve migrations, the owner, previous release/rollback provenance, both new
+release outcomes, applied route receipts and the retired binding verified.
+These bounded probes are functional acceptance, not a zero-downtime guarantee.
+The private receipts and screenshots are retained under `.local/endpoint-ui-*`.

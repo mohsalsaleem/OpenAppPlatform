@@ -263,7 +263,11 @@ export function Endpoints({
                     : "Discard Review"}
                 </Button>
                 <Button
-                  disabled={publish.isPending}
+                  disabled={
+                    publish.isPending ||
+                    (plan.state === "prepared" &&
+                      plan.expectedVersion !== version)
+                  }
                   onClick={() =>
                     publish.mutate({ id: plan.id, action: "apply" })
                   }

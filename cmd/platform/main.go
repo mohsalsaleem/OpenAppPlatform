@@ -140,7 +140,7 @@ func run() error {
 			return errors.New("preview mode or insecure local cookies require a loopback bind address")
 		}
 	}
-	server := &http.Server{Addr: addr, Handler: (&httpapi.Server{Preview: preview, SetupToken: os.Getenv("OAP_SETUP_TOKEN"), SecureCookie: os.Getenv("OAP_COOKIE_SECURE") != "false", Controller: c, Token: os.Getenv("OAP_API_TOKEN"), WebDir: *web}).Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 45 * time.Second, IdleTimeout: 60 * time.Second}
+	server := platformServer(ctx, addr, (&httpapi.Server{Preview: preview, SetupToken: os.Getenv("OAP_SETUP_TOKEN"), SecureCookie: os.Getenv("OAP_COOKIE_SECURE") != "false", Controller: c, Token: os.Getenv("OAP_API_TOKEN"), WebDir: *web}).Handler())
 	listener, e := net.Listen("tcp", addr)
 	if e != nil {
 		return e

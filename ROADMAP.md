@@ -823,6 +823,11 @@ owner-session publication audit, native drift checks and durable crash fencing.
 Its supported scope is an administrator-bound native Coolify route; generic
 domain/TLS setup, automatic membership reconciliation, draining and bare Docker
 shared proxy routing remain the next batch 5 acceptance gates.
+The configured staging UI/API flow passed a live two→three→two cycle, stale-review
+rejection, publication retries, controller-offline traffic and metadata restore.
+See the acceptance section in `docs/endpoint-management.md`; this does not close
+the remaining batch 5 gates.
+
 
 Batches 2 and 3 are already delivered; keep the ordered queue above. Source-backed management handoff and GitHub sequencing must
 be verified before disabling an existing operator trigger. Preserve the KISS stack,
