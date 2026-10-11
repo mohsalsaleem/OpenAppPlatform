@@ -20,6 +20,15 @@ instance must be healthy, with exact ordinals and retained native ownership. Act
 or unresolved application work blocks a plan. Retired instances remain available
 as ownership evidence for removal, but do not become new backends.
 
+The Coolify adapter now implements the existing recorded retirement contract for
+managed image instances. It checks target scope and the OAP ownership marker,
+requests a native stop with `docker_cleanup=false`, and observes the resource
+stopped before OAP commits a lower desired count. The application resource is
+retained. The stop API returns no job ID: the recorded resource UUID is an instance
+confirmation reference, not a fabricated provider deployment identity. Uncertain
+responses require normal retirement recovery; observation never repeats the stop.
+Unknown state, source strategy or changed ownership retains the recovery fence.
+
 For the retained demo:
 
 ```sh

@@ -82,7 +82,7 @@ func (c *Controller) recoverRetirement(ctx context.Context, d *domain.Deployment
 		return errors.New("the recorded provider operation cannot be replaced")
 	}
 	if remote == "" || len(remote) > 256 {
-		return errors.New("supply the exact retired container ID after inspecting Docker")
+		return errors.New("supply the exact retired instance confirmation ID after inspecting the operator")
 	}
 	status, e := retirementStatus(ctx, adapter, *d, *step, remote)
 	if e != nil {
