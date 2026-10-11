@@ -89,6 +89,19 @@ reconstruction is covered separately by the existing system tests.
 
 Existing system tests cover interrupted durable dispatch, worker-lock conflicts,
 readiness deadlines, dependency guards and cancellation/abandonment. Existing native
-Docker tests cover verified image rollback. Stateful restoration and stale-metadata
-restore reconciliation remain outstanding batch 4 work; these tests do not restore
-application data or complete that batch.
+Docker tests cover verified image rollback.
+
+The [application data recovery example](../examples/stateful-recovery/README.md)
+also runs in the local gate using native PostgreSQL `pg_dump`/`pg_restore`. It checks
+an incompatible migration, corrupt archive rejection, restoration into a separate
+database, the explicit loss of post-backup writes, source preservation and restored
+reads/writes. Its receipt and synthetic backup are retained in the run report.
+`TestImageAndConfigurationRecoveryDoNotRewindApplicationDataOrSchema` verifies OAP
+rollback and definition recovery leave a separate application namespace unchanged,
+even when its schema is incompatible with an earlier query. That system test uses
+the provider fixture; native PostgreSQL restoration is exercised by the separate
+drill. No schema compatibility automation is claimed.
+
+Writer coordination, volume/uploads recovery, full application cutover and stale
+OAP metadata reconciliation remain outstanding batch 4 work. This procedure does
+not enable stateful provisioning or automatic application-data restore.

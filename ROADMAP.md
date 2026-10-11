@@ -804,8 +804,14 @@ process-kill drill interrupts a completed native dispatch before its response is
 persisted, checks worker-session locking/release and durable attention fencing,
 and requires an unchanged runtime boot identity after exact operation recovery.
 This uses a controller `Advance` subprocess, not the full HTTP/River daemon.
-Stateful/data/schema restore and arbitrarily stale metadata reconciliation remain
-outstanding; batch 4 stays active.
+Native PostgreSQL data/schema recovery acceptance now includes a reproducible
+custom-format backup/restore into an isolated database, incompatible migration
+and corrupt archive checks, post-backup data-loss visibility and read/write
+verification. An OAP system regression verifies image/configuration recovery does
+not rewind application data/schema. See the [example](examples/stateful-recovery/README.md).
+Writer coordination, volume/uploads recovery, application cutover and arbitrarily
+stale metadata reconciliation remain outstanding; batch 4 stays active. This is
+native-procedure acceptance, not OAP automatic restoration or stateful provisioning.
 
 Open decisions include the owner login method, first external secret provider,
 first analytics export, default inference policy, tunnel choice for each client,

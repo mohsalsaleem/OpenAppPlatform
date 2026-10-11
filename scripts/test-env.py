@@ -126,6 +126,8 @@ def run(keep=False):
         with (run_dir / 'fixtures.tar').open('wb') as archive:
             command(docker + ['save'] + fixture_tags, env, stdout=archive)
         command(compose + ['up', '-d', '--wait', '--wait-timeout', '90', 'postgres', 'docker'], env)
+        command([sys.executable, 'tests/env/stateful_recovery.py', '--docker-host', docker[2],
+                 '--project', project, '--report-dir', str(run_dir)], env)
         command(compose + ['run', '--rm', '--no-deps', 'runner'], env)
         suite = json.loads((run_dir / 'suite.json').read_text())
         if suite.get('status') != 'passed':

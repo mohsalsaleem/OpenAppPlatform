@@ -118,3 +118,10 @@ for every selected API replica's release verification before preparing frontend.
 An affected-component release checks an existing, unselected API without
 redeploying it. Connection environment mappings remain separate from startup edges.
 See [the dependency contract](../docs/release-readiness.md#explicit-startup-dependencies).
+
+## Application data recovery
+
+The [stateful recovery example](stateful-recovery/README.md) uses native PostgreSQL
+backup/restore to demonstrate incompatible schema changes, isolated restoration,
+read/write verification and the loss of writes made after a backup. It runs in
+`make test-local`; OAP does not automate application-data restoration.
