@@ -37,3 +37,9 @@ it does not publish it or imply an automatic routing adapter. Verify real TLS,
 replacement/rollback, backend outage and controller independence as recorded in
 the [staging acceptance](connected-preview-acceptance.md). Automatic membership and draining remain
 separate follow-up work.
+
+The [reviewed membership pilot](route-membership.md) adds owner plan/apply tooling
+over live OAP bindings and the existing native route file. It removes manual URL
+copying, rejects observed drift and preserves custom native configuration. It is
+staging-only CLI tooling; automatic/background or dashboard route publication
+and draining remain incomplete.

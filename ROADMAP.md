@@ -808,6 +808,12 @@ verified. See the [acceptance record and walkthrough](docs/connected-preview-acc
 Retain the demo for owner testing;
 manual native route configuration is explicit and does not complete batch 5's
 automatic membership/domain/draining gates.
+The next slice adds [reviewed route membership](docs/route-membership.md): owner
+CLI plans derive healthy managed bindings, retain retirement ownership evidence,
+and reject stale app/target/proxy/file state before native publication. Verify a
+two→three→two replica cycle on the retained demo, including idempotent retry and
+stale-plan rejection. This is a staging publisher pilot, not background
+reconciliation or dashboard/agent route authority; batch 5 stays active.
 Batches 2 and 3 are already delivered; keep the ordered queue above. Source-backed management handoff and GitHub sequencing must
 be verified before disabling an existing operator trigger. Preserve the KISS stack,
 local pre-push gate, and capability-aware behavior. Full owner-grade hardening,
