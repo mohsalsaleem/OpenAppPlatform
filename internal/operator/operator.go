@@ -8,6 +8,7 @@ import (
 )
 
 type Capabilities struct {
+	DatabaseLinks     bool `json:"databaseLinks"`
 	Workers           bool `json:"workers"`
 	HTTPHealthChecks  bool `json:"httpHealthChecks"`
 	ImageRollback     bool `json:"imageRollback"`
@@ -62,6 +63,10 @@ type Restarter interface {
 
 func ValidateRuntime(m domain.Manifest, caps Capabilities) error {
 	for _, c := range m.Components {
+		if c.Kind == "database" && !caps.DatabaseLinks {
+			return fmt.Errorf("target does not support existing database links for %s", c.Name)
+		}
+
 		if c.Kind == "worker" && !caps.Workers {
 			return fmt.Errorf("target does not support long-running workers for %s", c.Name)
 		}

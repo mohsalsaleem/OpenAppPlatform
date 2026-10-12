@@ -1924,6 +1924,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/applications/{id}/databases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Link an existing PostgreSQL database without transferring lifecycle authority */
+        post: operations["linkExistingDatabase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1961,7 +1978,7 @@ export interface components {
              * @default web
              * @enum {string}
              */
-            kind: "web" | "worker";
+            kind: "web" | "worker" | "database";
             image: string;
             /** @description Web services require 1–65535. Workers require zero; observed resources may use zero when the operator reports no port. */
             port: number;
@@ -1978,6 +1995,8 @@ export interface components {
             secretRefs?: {
                 [key: string]: string;
             };
+            /** @description Descriptive PostgreSQL endpoint without credentials, query or fragment; existing observe-only database only. */
+            databaseEndpoint?: string;
         };
         Manifest: {
             name: string;
@@ -2111,6 +2130,7 @@ export interface components {
             immutableImages: boolean;
             /** @description OAP-owned long-running image workers; no ports, public endpoints or HTTP overrides. */
             workers: boolean;
+            databaseLinks: boolean;
         };
         Restart: {
             component: string;
@@ -2192,7 +2212,7 @@ export interface components {
              * @default web
              * @enum {string}
              */
-            kind: "web" | "worker";
+            kind: "web" | "worker" | "database";
             image: string;
             /** @description Web services require 1–65535. Workers require zero; observed resources may use zero when the operator reports no port. */
             port: number;
@@ -2210,6 +2230,8 @@ export interface components {
             secretRefs?: {
                 [key: string]: string;
             };
+            /** @description Descriptive PostgreSQL endpoint without credentials, query or fragment; existing observe-only database only. */
+            databaseEndpoint?: string;
         };
         ManifestInput: {
             name: string;
@@ -4210,6 +4232,80 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
+            };
+        };
+    };
+    linkExistingDatabase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    resourceId: string;
+                    endpoint: string;
+                    expectedVersion: number;
+                    acknowledge: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Existing database linked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Application"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Sign in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Human owner required */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Stale definition, resource reservation or active work */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unsupported or invalid database link */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

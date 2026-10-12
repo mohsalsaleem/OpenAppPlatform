@@ -4044,6 +4044,89 @@
           }
         }
       }
+    },
+    "/api/v1/applications/{id}/databases": {
+      "post": {
+        "operationId": "linkExistingDatabase",
+        "summary": "Link an existing PostgreSQL database without transferring lifecycle authority",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "resourceId",
+                  "endpoint",
+                  "expectedVersion",
+                  "acknowledge"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "resourceId": {
+                    "type": "string"
+                  },
+                  "endpoint": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "expectedVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "acknowledge": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Existing database linked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Application"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "401": {
+            "description": "Sign in"
+          },
+          "403": {
+            "description": "Human owner required"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Stale definition, resource reservation or active work"
+          },
+          "422": {
+            "description": "Unsupported or invalid database link"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4143,7 +4226,8 @@
             "type": "string",
             "enum": [
               "web",
-              "worker"
+              "worker",
+              "database"
             ],
             "default": "web"
           },
@@ -4182,6 +4266,11 @@
               "pattern": "^[a-z][a-z0-9-]{0,47}$"
             },
             "description": "Runtime variable to immutable administrator-authorized secret reference. Values are never stored in definitions. OAP-owned workloads only; grants bind target, application, component and variable."
+          },
+          "databaseEndpoint": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Descriptive PostgreSQL endpoint without credentials, query or fragment; existing observe-only database only."
           }
         },
         "required": [
@@ -4655,6 +4744,9 @@
           "workers": {
             "type": "boolean",
             "description": "OAP-owned long-running image workers; no ports, public endpoints or HTTP overrides."
+          },
+          "databaseLinks": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -4671,7 +4763,8 @@
           "applicationDns",
           "discovery",
           "immutableImages",
-          "workers"
+          "workers",
+          "databaseLinks"
         ],
         "additionalProperties": false
       },
@@ -4935,7 +5028,8 @@
             "type": "string",
             "enum": [
               "web",
-              "worker"
+              "worker",
+              "database"
             ],
             "default": "web"
           },
@@ -4975,6 +5069,11 @@
               "pattern": "^[a-z][a-z0-9-]{0,47}$"
             },
             "description": "Runtime variable to immutable administrator-authorized secret reference. Values are never stored in definitions. OAP-owned workloads only; grants bind target, application, component and variable."
+          },
+          "databaseEndpoint": {
+            "type": "string",
+            "maxLength": 1024,
+            "description": "Descriptive PostgreSQL endpoint without credentials, query or fragment; existing observe-only database only."
           }
         },
         "required": [

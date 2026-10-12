@@ -38,7 +38,7 @@ func New(t domain.Target, token string) (*Client, error) {
 	return &Client{base: strings.TrimRight(t.URL, "/"), token: token, target: t, http: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) Capabilities() operator.Capabilities {
-	return operator.Capabilities{Workers: true, HTTPHealthChecks: true, ImageRollback: true, ManagementHandoff: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ServiceEndpoints: true}
+	return operator.Capabilities{DatabaseLinks: true, Workers: true, HTTPHealthChecks: true, ImageRollback: true, ManagementHandoff: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ServiceEndpoints: true}
 }
 func (c *Client) request(ctx context.Context, method, path string, input, output any) error {
 	var body io.Reader
@@ -124,9 +124,10 @@ func primaryEndpoint(domains string) string {
 }
 func (c *Client) Discover(ctx context.Context) ([]operator.Resource, error) {
 	var env struct {
-		ID           int           `json:"id"`
-		Name         string        `json:"name"`
-		Applications []application `json:"applications"`
+		ID           int                `json:"id"`
+		Name         string             `json:"name"`
+		Applications []application      `json:"applications"`
+		PostgreSQLs  []databaseResource `json:"postgresqls"`
 	}
 	if e := c.request(ctx, "GET", "/projects/"+url.PathEscape(c.target.ProjectID)+"/"+url.PathEscape(c.target.Environment), nil, &env); e != nil {
 		return nil, e
@@ -137,6 +138,9 @@ func (c *Client) Discover(ctx context.Context) ([]operator.Resource, error) {
 		r.Environment = c.target.Environment
 		r.ProjectID = c.target.ProjectID
 		out = append(out, r)
+	}
+	for _, d := range env.PostgreSQLs {
+		out = append(out, c.databaseResource(d))
 	}
 	return out, nil
 }
@@ -149,6 +153,9 @@ func (c *Client) Inspect(ctx context.Context, id string) (operator.Resource, err
 	found := false
 	for _, r := range resources {
 		if r.ID == id {
+			if r.ArtifactKind == "database" {
+				return r, nil
+			}
 			found = true
 			break
 		}
@@ -176,6 +183,9 @@ func splitImage(image string) (string, string) {
 	return image, "latest"
 }
 func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource, error) {
+	if s.Component.Kind == "database" {
+		return operator.Resource{}, errors.New("database lifecycle remains owned by the operator")
+	}
 
 	resources, e := c.Discover(ctx)
 	if e != nil {
@@ -244,6 +254,16 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	return operator.Resource{ID: result.UUID, Name: s.Name, Description: s.Ownership, Image: s.Component.Image}, nil
 }
 func (c *Client) Deploy(ctx context.Context, id string) (string, error) {
+	resources, err := c.Discover(ctx)
+	if err != nil {
+		return "", err
+	}
+	for _, r := range resources {
+		if r.ID == id && r.ArtifactKind == "database" {
+			return "", errors.New("database lifecycle remains owned by the operator")
+		}
+	}
+
 	var result struct {
 		Deployments []struct {
 			UUID string `json:"deployment_uuid"`
@@ -301,19 +321,31 @@ func (c *Client) Logs(ctx context.Context, id string, lines int) (string, error)
 	if lines < 1 || lines > 200 {
 		lines = 100
 	}
-	if _, e := c.Inspect(ctx, id); e != nil {
+	resource, e := c.Inspect(ctx, id)
+	if e != nil {
 		return "", e
+	}
+	prefix := "/applications/"
+	if resource.ArtifactKind == "database" {
+		prefix = "/databases/"
 	}
 	var res struct {
 		Logs string `json:"logs"`
 	}
-	if e := c.request(ctx, "GET", "/applications/"+url.PathEscape(id)+"/logs?lines="+strconv.Itoa(lines), nil, &res); e != nil {
+	if e := c.request(ctx, "GET", prefix+url.PathEscape(id)+"/logs?lines="+strconv.Itoa(lines), nil, &res); e != nil {
 		return "", e
 	}
 	return strings.ReplaceAll(res.Logs, c.token, "[REDACTED]"), nil
 }
 
 func (c *Client) Restart(ctx context.Context, id string) (string, error) {
+	resource, err := c.Inspect(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	if resource.ArtifactKind == "database" {
+		return "", errors.New("database lifecycle remains owned by the operator")
+	}
 	if _, e := c.Inspect(ctx, id); e != nil {
 		return "", e
 	}

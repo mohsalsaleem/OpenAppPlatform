@@ -211,12 +211,20 @@ export function ConfigurationEditor({
             key={`${c.name}-${base.version}-${editorRevision}`}
           >
             <h2>{c.name}</h2>
+            {c.kind === "database" && (
+              <div className="component-badges">
+                <Badge variant="outline">Operator Managed</Badge>
+                <code className="image-ref">{c.databaseEndpoint}</code>
+              </div>
+            )}
             <p className="small muted">
-              {c.resourceId
-                ? "Adopted resource: runtime fields are managed by the operator."
-                : c.kind === "worker"
-                  ? "Long-running worker · standard deployment"
-                  : "Web service · standard deployment"}
+              {c.kind === "database"
+                ? "Existing database · Operator Managed"
+                : c.resourceId
+                  ? "Adopted resource: runtime fields are managed by the operator."
+                  : c.kind === "worker"
+                    ? "Long-running worker · standard deployment"
+                    : "Web service · standard deployment"}
             </p>
             <div className="form-grid configuration-fields">
               <div>
@@ -230,7 +238,7 @@ export function ConfigurationEditor({
                 />
               </div>
               <div className="form-grid compact">
-                {c.kind !== "worker" && (
+                {c.kind === "web" && (
                   <div>
                     <Label htmlFor={`config-port-${i}`}>Internal Port</Label>
                     <Input
@@ -266,7 +274,7 @@ export function ConfigurationEditor({
                   </details>
                 </div>
               </div>
-              {c.kind !== "worker" && (
+              {c.kind === "web" && (
                 <div>
                   <Label>
                     <Checkbox
@@ -413,7 +421,7 @@ export function ConfigurationEditor({
               capabilities.data?.httpHealthChecks && (
                 <HealthCheckFields
                   name={c.name}
-                  allowHTTP={c.kind !== "worker"}
+                  allowHTTP={c.kind === "web"}
                   healthCheck={c.healthCheck}
                   allowExisting={
                     !base.manifest.components.find((b) => b.name === c.name)

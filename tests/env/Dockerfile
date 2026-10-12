@@ -23,7 +23,8 @@ RUN CGO_ENABLED=0 go build -trimpath -o /opt/oap/platform ./cmd/platform && \
     CGO_ENABLED=0 go build -trimpath -o /opt/oap/oap-mcp ./cmd/oap-mcp && \
     CGO_ENABLED=0 go build -trimpath -ldflags '-X main.version=v1 -X main.port=8080' -o /opt/oap/fixture-v1 ./tests/env/fixture && \
     CGO_ENABLED=0 go build -trimpath -ldflags '-X main.version=v2 -X main.port=8025' -o /opt/oap/fixture-v2 ./tests/env/fixture && \
-    CGO_ENABLED=0 go build -trimpath -o /opt/oap/worker-fixture ./examples/worker
+    CGO_ENABLED=0 go build -trimpath -o /opt/oap/worker-fixture ./examples/worker && \
+    cd examples/application-breadth && CGO_ENABLED=0 go build -trimpath -o /opt/oap/application-fixture .
 
 FROM ${BROWSER_IMAGE} AS runner
 LABEL io.openappplatform.test-cache="true"

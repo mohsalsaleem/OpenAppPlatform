@@ -82,7 +82,7 @@ func (c *Controller) updateApplicationTx(ctx context.Context, tx pgx.Tx, id stri
 	}
 	for _, comp := range m.Components {
 		old, ok := existing[comp.Name]
-		if !ok || old.Kind != comp.Kind || old.ResourceID != comp.ResourceID || old.Management != comp.Management {
+		if !ok || old.Kind != comp.Kind || old.DatabaseEndpoint != comp.DatabaseEndpoint || old.ResourceID != comp.ResourceID || old.Management != comp.Management {
 			return domain.Application{}, errors.New("component identity and resource adoption cannot change through configuration editing")
 		}
 		if old.HealthCheck != nil && comp.HealthCheck == nil {

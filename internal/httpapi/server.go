@@ -124,6 +124,7 @@ func (s *Server) routes() http.Handler {
 	s.streamRoutes(mux)
 	s.sourceRoutes(mux)
 	s.groupRoutes(mux)
+	s.databaseRoutes(mux)
 	s.setupRoutes(mux)
 	s.comparisonRoutes(mux)
 	s.rollbackRoutes(mux)

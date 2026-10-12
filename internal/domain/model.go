@@ -27,6 +27,7 @@ type ReadinessPolicy struct {
 }
 
 type Component struct {
+	DatabaseEndpoint string            `json:"databaseEndpoint,omitempty"`
 	HealthCheck      *HealthCheck      `json:"healthCheck,omitempty"`
 	DependsOn        []string          `json:"dependsOn,omitempty"`
 	Readiness        *ReadinessPolicy  `json:"readiness,omitempty"`
@@ -93,8 +94,18 @@ func (m *Manifest) Validate() error {
 		if c.Kind == "" {
 			c.Kind = "web"
 		}
-		if c.Kind != "web" && c.Kind != "worker" {
-			return errors.New("kind must be web or worker; scheduled jobs are not implemented")
+		if c.Kind != "web" && c.Kind != "worker" && c.Kind != "database" {
+			return errors.New("kind must be web, worker or database; scheduled jobs are not implemented")
+		}
+		if c.Kind == "database" {
+			if c.Management != "observe" || c.ResourceID == "" || c.Port != 0 || c.Instances > 1 || c.HealthCheck != nil || c.Readiness != nil {
+				return errors.New("databases must link one observed existing resource without runtime overrides")
+			}
+			if err := ValidateDatabaseEndpoint(c.DatabaseEndpoint); err != nil {
+				return err
+			}
+		} else if c.DatabaseEndpoint != "" {
+			return errors.New("databaseEndpoint belongs to an observed database")
 		}
 		if c.Kind == "worker" {
 			if c.Port != 0 || c.HostPort != 0 || c.ResourceID != "" {
@@ -258,6 +269,9 @@ func InitialSteps(m Manifest) []Step {
 		return steps
 	}
 	for _, c := range ordered {
+		if c.Kind == "database" {
+			continue
+		}
 		for n := 1; n <= c.Instances; n++ {
 			steps = append(steps, Step{Component: c.Name, Ordinal: n, Phase: "pending", ResourceID: c.ResourceID})
 		}

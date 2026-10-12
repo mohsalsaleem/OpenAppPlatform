@@ -35,7 +35,7 @@ func validateRuntime(c Component, components map[string]Component) error {
 	}
 	for variable, name := range c.Services {
 		target, ok := components[name]
-		if !envName.MatchString(variable) || !ok || name == "localhost" || target.Kind == "worker" {
+		if !envName.MatchString(variable) || !ok || name == "localhost" || (target.Kind == "worker" || target.Kind == "database") {
 			return errors.New("service variables must name an existing application component")
 		}
 		if _, exists := c.Env[variable]; exists {
@@ -105,4 +105,13 @@ func RuntimeComponent(m Manifest, name string) (Component, error) {
 	}
 	component.Env = env
 	return component, nil
+}
+
+// Database endpoints are descriptive metadata; OAP never opens SQL connections.
+func ValidateDatabaseEndpoint(endpoint string) error {
+	u, err := url.Parse(endpoint)
+	if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" || len(endpoint) > 1024 || strings.ContainsAny(endpoint, " \r\n\t") {
+		return errors.New("provide a PostgreSQL endpoint without credentials, query or fragment")
+	}
+	return nil
 }

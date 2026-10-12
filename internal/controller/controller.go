@@ -73,6 +73,17 @@ func (c *Controller) Adapter(ctx context.Context, id string) (operator.Adapter, 
 	return c.Factory(t)
 }
 func (c *Controller) CreateApplication(ctx context.Context, m domain.Manifest) (domain.Application, error) {
+	if c.RequireIdentity {
+		for _, comp := range m.Components {
+			if comp.Kind == "database" {
+				p, ok := domain.Identity(ctx)
+				if !ok || p.Role != "owner" || p.Kind != "session" {
+					return domain.Application{}, errors.New("human owner access is required to link databases")
+				}
+			}
+		}
+	}
+
 	for i := range m.Components {
 		if m.Components[i].ResourceID != "" && m.Components[i].Management == "" {
 			m.Components[i].Management = "observe"
@@ -101,10 +112,14 @@ func (c *Controller) CreateApplication(ctx context.Context, m domain.Manifest) (
 			if e != nil {
 				return domain.Application{}, e
 			}
-			if r.ArtifactKind != "image" && r.ArtifactKind != "source" {
+			if comp.Kind == "database" {
+				if e := validateDatabaseResource(t, comp, r); e != nil {
+					return domain.Application{}, e
+				}
+			} else if r.ArtifactKind != "image" && r.ArtifactKind != "source" {
 				return domain.Application{}, errors.New("unsupported resource type for observation")
 			}
-			if r.Image != comp.Image || r.Port != comp.Port {
+			if r.Image != comp.Image || (comp.Kind != "database" && r.Port != comp.Port) {
 				return domain.Application{}, errors.New("resource configuration changed; refresh discovery")
 			}
 		}
@@ -217,6 +232,12 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		}
 	}
 	for _, comp := range a.Manifest.Components {
+		if comp.Kind == "database" {
+			if selectedComponent(selection, comp.Name) || images[comp.Name] != "" || (restart != nil && restart.Component == comp.Name) || (scaleDown != nil && scaleDown.Component == comp.Name) {
+				return domain.Deployment{}, errors.New("database lifecycle remains owned by the operator")
+			}
+			continue
+		}
 		if comp.Management == "observe" && (len(selection) == 0 || selectedComponent(selection, comp.Name)) && (provenance == nil || images[comp.Name] != "") && ((restart == nil && scaleDown == nil) || (restart != nil && restart.Component == comp.Name) || (scaleDown != nil && scaleDown.Component == comp.Name)) {
 			return domain.Deployment{}, errors.New("observe-only components require an explicit management handoff before lifecycle operations")
 		}
@@ -257,6 +278,9 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	}
 
 	d := domain.Deployment{Operation: "deploy", ID: domain.NewID(), ApplicationID: appID, Manifest: a.Manifest, DefinitionVersion: a.Version, State: "queued", Steps: domain.InitialSteps(a.Manifest)}
+	if len(d.Steps) == 0 {
+		return d, errors.New("application has no managed workload to deploy")
+	}
 	d.Source = provenance
 	if provenance != nil || rollback != nil || len(selection) > 0 {
 		selected := []domain.Step{}

@@ -844,3 +844,109 @@ test("a long-running worker deploys beside a web service without HTTP settings",
     fullPage: true,
   });
 });
+
+test("link an existing PostgreSQL resource with reviewed observe-only actions", async ({
+  page,
+}) => {
+  test.skip(
+    !process.env.OAP_TEST_EXISTING_DATABASE_ID,
+    "Requires an existing database fixture",
+  );
+  await page.goto("/");
+  await page
+    .getByLabel("Platform Access Token")
+    .fill(process.env.OAP_API_TOKEN!);
+  await page.getByRole("button", { name: "Connect to Workspace" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Applications", exact: true }),
+  ).toBeVisible();
+  const capabilities = await page.request.get(
+    "/api/v1/targets/test-docker/capabilities",
+    { headers: { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` } },
+  );
+  expect(capabilities.status()).toBe(200);
+  expect((await capabilities.json()).databaseLinks).toBe(true);
+  const response = await page.request.post("/api/v1/applications", {
+    headers: { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` },
+    data: {
+      name: `database-browser-${Date.now()}`,
+      environment: "staging",
+      targetId: "test-docker",
+      components: [
+        {
+          name: "api",
+          kind: "web",
+          image: process.env.OAP_TEST_DOCKER_IMAGE,
+          port: 8080,
+          instances: 1,
+          strategy: "standard",
+        },
+      ],
+    },
+  });
+  expect(response.status()).toBe(201);
+  const app = await response.json();
+  await page.goto(`/applications/${app.id}`);
+  await expect(
+    page.getByRole("heading", { name: app.manifest.name, exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Link Database", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Existing Resource", { exact: true })
+    .selectOption(process.env.OAP_TEST_EXISTING_DATABASE_ID!);
+  await dialog
+    .getByLabel("Connection Endpoint", { exact: true })
+    .fill("postgresql://private:password@database/browser_fixture");
+  await dialog.getByRole("checkbox").check();
+  await expect(
+    dialog.getByRole("button", { name: "Link Database", exact: true }),
+  ).toBeDisabled();
+  await dialog
+    .getByLabel("Connection Endpoint", { exact: true })
+    .fill(
+      "postgresql://existing-database-browser-fixture:5432/browser_fixture",
+    );
+  await dialog
+    .getByRole("button", { name: "Link Database", exact: true })
+    .click();
+  await expect(dialog).not.toBeVisible();
+  const db = page
+    .locator(".component-group")
+    .filter({ has: page.getByText("database", { exact: true }) });
+  await expect(db).toContainText("PostgreSQL");
+  await expect(db).toContainText("Observe-only");
+  await expect(db).toContainText("Healthy", { timeout: 15000 });
+  await expect(db.getByRole("button", { name: /Restart/ })).toHaveCount(0);
+  await expect(db.getByRole("link", { name: "Open", exact: true })).toHaveCount(
+    0,
+  );
+  await page
+    .getByRole("button", { name: "Review Deployment", exact: true })
+    .click();
+  const review = page.getByRole("dialog");
+  await expect(review.getByRole("checkbox", { name: /database/ })).toHaveCount(
+    0,
+  );
+  await expect(
+    review.getByRole("region", { name: "Databases Outside This Release" }),
+  ).toContainText("database · Operator Managed");
+  await review.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.screenshot({
+    path: "../.local/ui-database-linked.png",
+    fullPage: true,
+  });
+  await page.getByRole("tab", { name: "Settings", exact: true }).click();
+  await page.getByRole("tab", { name: "database", exact: true }).click();
+  await expect(page.getByLabel("Internal Port for database")).toHaveCount(0);
+  await expect(page.getByLabel("Container Image for database")).toHaveAttribute(
+    "readonly",
+    "",
+  );
+  await page.screenshot({
+    path: "../.local/ui-database-settings.png",
+    fullPage: true,
+  });
+});

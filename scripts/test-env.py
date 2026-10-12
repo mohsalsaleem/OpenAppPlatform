@@ -102,6 +102,8 @@ def run(keep=False):
     env['OAP_TEST_RUNNER_IMAGE'] = runner
     env['OAP_TEST_RUN_DIR'] = str(run_dir)
     env['OAP_TEST_FIXTURE_V1'] = 'openappplatform-test-fixture:' + project + '-v1'
+    env['OAP_TEST_DATABASE_IMAGE'] = 'openappplatform-test-database:' + project
+    env['OAP_TEST_APPLICATION_IMAGE'] = 'openappplatform-test-application:' + project
     env['OAP_TEST_WORKER_IMAGE'] = 'openappplatform-test-worker:' + project
     env['OAP_TEST_FIXTURE_V2'] = 'openappplatform-test-fixture:' + project + '-v2'
     compose = docker + ['compose', '--env-file', 'tests/env/images.env', '-f', 'tests/env/compose.yaml', '-p', project]
@@ -117,6 +119,7 @@ def run(keep=False):
         for version in ['v1', 'v2']:
             command(docker + ['cp', container + ':/opt/oap/fixture-' + version, str(extraction / ('fixture-' + version))], env)
         command(docker + ['cp', container + ':/opt/oap/worker-fixture', str(extraction / 'worker')], env)
+        command(docker + ['cp',container+':/opt/oap/application-fixture',str(extraction/'application')],env)
         command(docker + ['rm', container], env)
         container = None
         shutil.copyfile(ROOT / 'tests/env/fixture/Dockerfile', extraction / 'Dockerfile')
@@ -129,6 +132,10 @@ def run(keep=False):
         worker_tag=env['OAP_TEST_WORKER_IMAGE']
         command(docker + ['build','--pull=false','--build-arg','ALPINE_IMAGE='+versions['OAP_TEST_ALPINE_IMAGE'],'-f',str(extraction/'worker.Dockerfile'),'-t',worker_tag,str(extraction)],env)
         fixture_tags.append(worker_tag)
+        shutil.copyfile(ROOT/'tests/env/application-breadth.Dockerfile',extraction/'application.Dockerfile')
+        command(docker+['build','--pull=false','--build-arg','ALPINE_IMAGE='+versions['OAP_TEST_ALPINE_IMAGE'],'-f',str(extraction/'application.Dockerfile'),'-t',env['OAP_TEST_APPLICATION_IMAGE'],str(extraction)],env)
+        command(docker+['tag',versions['OAP_TEST_POSTGRES_IMAGE'],env['OAP_TEST_DATABASE_IMAGE']],env)
+        fixture_tags += [env['OAP_TEST_APPLICATION_IMAGE'],env['OAP_TEST_DATABASE_IMAGE']]
         with (run_dir / 'fixtures.tar').open('wb') as archive:
             command(docker + ['save'] + fixture_tags, env, stdout=archive)
         command(compose + ['up', '-d', '--wait', '--wait-timeout', '90', 'postgres', 'docker'], env)

@@ -14,6 +14,9 @@ func observationTimeout(component domain.Component) time.Duration {
 }
 
 func releaseReady(component domain.Component, status string) bool {
+	if component.Kind == "database" {
+		return status == "running:healthy" || strings.HasPrefix(status, "running:healthy:")
+	}
 	if (component.HealthCheck != nil && component.HealthCheck.Mode == "http") || (component.Readiness != nil && component.Readiness.RequireHealthy) {
 		return status == "running:healthy" || strings.HasPrefix(status, "running:healthy:")
 	}

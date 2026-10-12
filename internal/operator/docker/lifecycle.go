@@ -55,6 +55,10 @@ func (c *Client) network(ctx context.Context, ownership string) (string, error) 
 	return name, e
 }
 func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource, error) {
+	if s.Component.Kind == "database" {
+		return operator.Resource{}, errors.New("database lifecycle remains owned by the operator")
+	}
+
 	imageID, e := c.image(ctx, s.Component.Image)
 	if e != nil {
 		return operator.Resource{}, e

@@ -1,3 +1,4 @@
+import { DatabaseLinkDialog } from "./DatabaseLinkDialog";
 import { Endpoints } from "./Endpoints";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,7 @@ import { ReleaseComparison } from "./ReleaseComparison";
 import { WorkflowOwnership } from "./WorkflowOwnership";
 import { EnvironmentNavigation } from "./EnvironmentNavigation";
 import { SourceEvents } from "./SourceEvents";
-import { useCanOperate } from "../../access";
+import { useCanOperate, useIsOwner } from "../../access";
 import { useState, useEffect, useRef } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -45,6 +46,8 @@ const when = (s: string) =>
   });
 export function ApplicationDetail() {
   const canOperate = useCanOperate();
+  const isOwner = useIsOwner();
+  const [linkDatabase, setLinkDatabase] = useState(false);
   const { id } = useParams();
   const client = useQueryClient();
   const live = useApplicationEvents(id);
@@ -317,6 +320,15 @@ export function ApplicationDetail() {
           <section className="panel">
             <div className="section-heading">
               <h2>Components</h2>
+              {isOwner && capabilities.data?.databaseLinks && (
+                <Button
+                  variant="outline"
+                  disabled={!!active || a.manifest.components.length >= 16}
+                  onClick={() => setLinkDatabase(true)}
+                >
+                  Link Database
+                </Button>
+              )}
               <Button
                 variant="outline"
                 disabled={instances.isFetching}
@@ -340,9 +352,20 @@ export function ApplicationDetail() {
                     </span>
                     <div className="grow">
                       <strong>{c.name}</strong>
+                      {c.kind === "database" && (
+                        <p className="small muted">
+                          <code className="image-ref">
+                            {c.databaseEndpoint}
+                          </code>
+                        </p>
+                      )}
                       <div className="component-badges">
                         <Badge variant="secondary">
-                          {c.kind === "worker" ? "Worker" : "Web Service"}
+                          {c.kind === "database"
+                            ? "PostgreSQL"
+                            : c.kind === "worker"
+                              ? "Worker"
+                              : "Web Service"}
                         </Badge>
                         <Badge variant="outline">
                           {c.management === "observe"
@@ -360,7 +383,7 @@ export function ApplicationDetail() {
                             {healthCheckSummary(c.healthCheck)}
                           </p>
                         )}
-                        {c.kind !== "worker" && (
+                        {c.kind === "web" && (
                           <p className="small muted">Internal Port: {c.port}</p>
                         )}
                         {instances.data
@@ -376,7 +399,9 @@ export function ApplicationDetail() {
                             </div>
                           ))}
                         <span className="small">
-                          Saved for the next deployment
+                          {c.management === "observe"
+                            ? "Observed Image Snapshot"
+                            : "Saved for the next deployment"}
                         </span>
                         <code className="image-ref">
                           {c.image || "Managed by the platform"}
@@ -406,7 +431,8 @@ export function ApplicationDetail() {
                           "OpenAppPlatform:",
                         ) &&
                       a.manifest.targetId &&
-                      capabilities.data?.managementHandoff && (
+                      capabilities.data?.managementHandoff &&
+                      c.kind !== "database" && (
                         <Button
                           variant="outline"
 
@@ -459,23 +485,24 @@ export function ApplicationDetail() {
                           <Terminal size={15} />
                           Logs
                         </Button>
-                        {capabilities.data?.restart && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            aria-label={`Restart ${c.name} / ${primary.ordinal}`}
-                            disabled={
-                              !canOperate ||
-                              !!active ||
-                              !primary.resourceId ||
-                              primary.retired ||
-                              c.management === "observe"
-                            }
-                            onClick={() => setRestartReview(primary)}
-                          >
-                            Restart
-                          </Button>
-                        )}
+                        {capabilities.data?.restart &&
+                          c.kind !== "database" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              aria-label={`Restart ${c.name} / ${primary.ordinal}`}
+                              disabled={
+                                !canOperate ||
+                                !!active ||
+                                !primary.resourceId ||
+                                primary.retired ||
+                                c.management === "observe"
+                              }
+                              onClick={() => setRestartReview(primary)}
+                            >
+                              Restart
+                            </Button>
+                          )}
                       </div>
                     ) : (
                       <div className="component-actions">
@@ -539,24 +566,25 @@ export function ApplicationDetail() {
                             )}
                         </div>
                         <Status value={instance.status} />
-                        {capabilities.data?.restart && (
-                          <Button
-                            variant="outline"
+                        {capabilities.data?.restart &&
+                          c.kind !== "database" && (
+                            <Button
+                              variant="outline"
 
-                            disabled={
-                              !canOperate ||
-                              !!active ||
-                              !instance.resourceId ||
-                              instance.retired ||
-                              a.manifest.components.find(
-                                (c) => c.name === instance.component,
-                              )?.management === "observe"
-                            }
-                            onClick={() => setRestartReview(instance)}
-                          >
-                            Restart {instance.component} / {instance.ordinal}
-                          </Button>
-                        )}
+                              disabled={
+                                !canOperate ||
+                                !!active ||
+                                !instance.resourceId ||
+                                instance.retired ||
+                                a.manifest.components.find(
+                                  (c) => c.name === instance.component,
+                                )?.management === "observe"
+                              }
+                              onClick={() => setRestartReview(instance)}
+                            >
+                              Restart {instance.component} / {instance.ordinal}
+                            </Button>
+                          )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -754,6 +782,16 @@ export function ApplicationDetail() {
             </pre>
           </section>
         </TabsContent>
+        {linkDatabase && (
+          <DatabaseLinkDialog
+            application={a}
+            docker={
+              targets.data?.find((t) => t.id === a.manifest.targetId)
+                ?.operator === "docker"
+            }
+            onClose={() => setLinkDatabase(false)}
+          />
+        )}
         {handoff && (
           <DeploymentDialog onClose={() => setHandoff("")}>
             <h2 id="deploy-title">Enable Management for {handoff}?</h2>
@@ -861,6 +899,21 @@ export function ApplicationDetail() {
             Existing managed instances may restart. Standard deployment can
             cause downtime. No databases or volumes will be removed.
           </p>
+          {review.manifest.components.some((c) => c.kind === "database") && (
+            <div
+              role="region"
+              aria-label="Databases Outside This Release"
+              className="component-badges"
+            >
+              {review.manifest.components
+                .filter((c) => c.kind === "database")
+                .map((c) => (
+                  <Badge key={c.name} variant="outline">
+                    {c.name} · Operator Managed
+                  </Badge>
+                ))}
+            </div>
+          )}
           <fieldset className="rounded-md border p-3 space-y-3">
             <legend className="px-1 text-sm font-medium">
               Components to Deploy

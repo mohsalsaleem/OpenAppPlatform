@@ -55,6 +55,11 @@ func (c *Controller) Instances(ctx context.Context, id string) ([]Instance, erro
 					item.Status = "unavailable"
 					item.Error = "Cannot inspect this instance; check the target and resource."
 				} else {
+					if comp.Kind == "database" {
+						resource.URL = ""
+						resource.Port = 0
+						resource.ArtifactKind = "database"
+					}
 					item.Status = resource.Status
 					item.Resource = &resource
 					if item.Retired {
