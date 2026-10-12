@@ -4,6 +4,7 @@ package docker
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -76,7 +77,7 @@ func New(t domain.Target) (*Client, error) {
 	return &Client{target: t, settings: settings, base: "http://docker", http: &http.Client{Transport: transport, Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) Capabilities() operator.Capabilities {
-	return operator.Capabilities{NamedVolumes: true, ResourceLimits: true, DatabaseLinks: true, Workers: true, HTTPHealthChecks: true, ImageRollback: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ApplicationDNS: true, ServiceEndpoints: true}
+	return operator.Capabilities{RegistryCredentials: true, NamedVolumes: true, ResourceLimits: true, DatabaseLinks: true, Workers: true, HTTPHealthChecks: true, ImageRollback: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ApplicationDNS: true, ServiceEndpoints: true}
 }
 func (c *Client) request(ctx context.Context, method, path string, input, output any) error {
 	var body io.Reader
@@ -263,13 +264,13 @@ func (c *Client) Inspect(ctx context.Context, ref string) (operator.Resource, er
 	}
 	return c.projection(v), nil
 }
-func (c *Client) image(ctx context.Context, ref string) (string, error) {
+func (c *Client) image(ctx context.Context, ref string, auth ...*domain.RegistryAuth) (string, error) {
 	var result struct {
 		ID string `json:"Id"`
 	}
 	e := c.request(ctx, "GET", "/images/"+url.PathEscape(ref)+"/json", nil, &result)
 	if isStatus(e, 404) && c.settings.PullPolicy == "if-missing" {
-		if e = c.pull(ctx, ref); e != nil {
+		if e = c.pull(ctx, ref, auth...); e != nil {
 			return "", e
 		}
 		e = c.request(ctx, "GET", "/images/"+url.PathEscape(ref)+"/json", nil, &result)
@@ -279,11 +280,15 @@ func (c *Client) image(ctx context.Context, ref string) (string, error) {
 	}
 	return result.ID, e
 }
-func (c *Client) pull(ctx context.Context, ref string) error {
+func (c *Client) pull(ctx context.Context, ref string, auth ...*domain.RegistryAuth) error {
 	// Pull responses stream progress and errors; HTTP 200 alone is not success.
 	req, e := http.NewRequestWithContext(ctx, "POST", c.base+"/"+apiVersion+"/images/create?fromImage="+url.QueryEscape(ref), nil)
 	if e != nil {
 		return e
+	}
+	if len(auth) > 0 && auth[0] != nil {
+		raw, _ := json.Marshal(auth[0])
+		req.Header.Set("X-Registry-Auth", base64.URLEncoding.EncodeToString(raw))
 	}
 	res, e := c.http.Do(req)
 	if e != nil {

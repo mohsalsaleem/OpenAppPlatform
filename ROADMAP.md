@@ -155,7 +155,7 @@ configuration for linked resources remains in the operator; direct configuration
 uses consistent Button, Field, Select and Collapsible patterns. Prevent legacy
 global label/control styles and hand-styled link buttons from returning.
 
-**Current priority:** P0.4 everyday configuration. P0.1 runtime secret references,
+**Current priority:** P0.5 repeatable installation, after the P0.4 final local/staging acceptance gate. Standalone Docker uses scoped private pull references and Coolify retains its native server login. P0.1 runtime secret references,
 P0.2 workers and P0.3 existing database links passed local and isolated Coolify
 staging acceptance. The first four-component breadth milestone is delivered. Finish everyday configuration
 and repeatable installation next. The priority correction below is the authoritative execution order.
@@ -194,7 +194,7 @@ The full local gate (14 browser tests plus native Docker/system/race checks) pas
 on 11 October 2026. A dedicated Coolify staging image workload consumed its granted
 input; native delivery, masked logs and reference-only API snapshots passed.
 See [runtime secret references](docs/runtime-secret-references.md). General vaults,
-rotation and build-time/registry credentials remain deferred as listed above.
+rotation and build-time credentials remain deferred. Private pull credential references are the minimum P0.4 scope.
 
 **P0.2 acceptance:** OAP-owned image workers run on direct Docker and Coolify,
 with non-HTTP image readiness, health/logs, selected updates and per-instance
@@ -224,6 +224,18 @@ resource; this is not a database-provisioning feature. Compose databases, other
 engines, cross-target links and SQL execution remain outside this slice.
 See [existing database links](docs/existing-database-links.md) and the
 [complete example](examples/application-breadth/README.md).
+
+**P0.4 delivery:** named volumes and CPU/memory limits have passed native Docker
+and isolated Coolify acceptance. Private pull references now use exact target,
+application, component and registry-host grants for standalone Docker, with
+reference-only definitions and private recovery fingerprints. The reproducible
+fixture verifies missing/invalid credentials, successful authenticated pull and
+execution, redaction and changed-binding holds. Coolify retains its server login;
+OAP credential injection is explicitly unsupported and linked configuration remains
+native. No registry service, credential rotation or general vault was added.
+Final acceptance requires the full browser/owner/system gate and deployed staging
+capabilities plus the unchanged four-component journey. See
+[private registry access](docs/private-registry-access.md).
 
 P0.1–P0.3 form the first breadth deliverable. P0.4–P0.5 close the remaining
 minimum M0 configuration/install gaps. Implement one priority at a time; advance

@@ -1,3 +1,4 @@
+import { RegistryCredentials } from "./RegistryCredentials";
 import { HostPortFields, invalidHostPort } from "./HostPortFields";
 import { Disclosure } from "@/components/Disclosure";
 import { OperatorConfiguration } from "./OperatorConfiguration";
@@ -143,7 +144,15 @@ export function NewApplication() {
               <Label htmlFor="target">Deployment Target</Label>
               <Select
                 value={target || targets.data?.[0]?.id || ""}
-                onValueChange={(value) => setTarget(value)}
+                onValueChange={(value) => {
+                  setTarget(value);
+                  setComponents(
+                    components.map((c) => ({
+                      ...c,
+                      registryCredentialRef: undefined,
+                    })),
+                  );
+                }}
               >
                 <SelectTrigger id="target" className="w-full">
                   <SelectValue />
@@ -298,6 +307,7 @@ export function NewApplication() {
                                 limits: r ? undefined : v.limits,
                                 env: {},
                                 secretRefs: {},
+                                registryCredentialRef: undefined,
                                 services: {},
                                 serviceEndpoints: {},
                                 port: r?.port || v.port,
@@ -351,6 +361,23 @@ export function NewApplication() {
                       <small className="muted">
                         Use an image digest for reproducible releases.
                       </small>
+                      <RegistryCredentials
+                        component={c}
+                        supported={!!capabilities.data?.registryCredentials}
+                        operator={selected?.operator}
+                        onChange={(value) =>
+                          setComponents(
+                            components.map((v, n) =>
+                              n === i
+                                ? {
+                                    ...v,
+                                    registryCredentialRef: value || undefined,
+                                  }
+                                : v,
+                            ),
+                          )
+                        }
+                      />
                     </div>
                     <div className="form-grid compact">
                       {c.kind !== "worker" && (

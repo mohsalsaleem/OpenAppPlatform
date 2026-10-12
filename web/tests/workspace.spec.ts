@@ -1121,3 +1121,67 @@ test("shared shadcn controls keep styles, keyboard select behavior and explicit 
     fullPage: true,
   });
 });
+
+test("private registry controls store references and hold missing grants", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByLabel("Platform Access Token")
+    .fill(process.env.OAP_API_TOKEN!);
+  await page.getByRole("button", { name: "Connect to Workspace" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Applications", exact: true }),
+  ).toBeVisible();
+  const created = await page.request.post("/api/v1/applications", {
+    headers: { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` },
+    data: {
+      name: `registry-browser-${Date.now()}`,
+      environment: "staging",
+      targetId: "test-docker",
+      components: [
+        {
+          name: "web",
+          kind: "web",
+          image: "registry.example/team/private:v1",
+          registryCredentialRef: "registry-read-v1",
+          port: 8080,
+          instances: 1,
+          strategy: "standard",
+        },
+      ],
+    },
+  });
+  expect(created.status()).toBe(201);
+  const app = await created.json();
+  await page.goto(`/applications/${app.id}`);
+  await page.getByRole("tab", { name: "Settings" }).click();
+  const reference = page.getByLabel("Registry Credential Reference for web");
+  await expect(reference).toHaveValue("registry-read-v1");
+  await expect(reference).toHaveAttribute("data-slot", "input");
+  await reference.fill("registry-read-v2");
+  await page.getByRole("button", { name: "Save Configuration" }).click();
+  await expect(
+    page.getByText("Configuration saved. Deploy when you are ready."),
+  ).toBeVisible();
+  const saved = await page.request.get(`/api/v1/applications/${app.id}`, {
+    headers: { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` },
+  });
+  const definition = await saved.json();
+  expect(definition.manifest.components[0].registryCredentialRef).toBe(
+    "registry-read-v2",
+  );
+  expect(JSON.stringify(definition)).not.toContain("serveraddress");
+  const release = await page.request.post(
+    `/api/v1/applications/${app.id}/deployments`,
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.OAP_API_TOKEN}`,
+        "Idempotency-Key": `registry-missing-${Date.now()}`,
+      },
+      data: {},
+    },
+  );
+  expect(release.ok()).toBe(false);
+  expect(await release.text()).toContain("registry credential reference");
+});

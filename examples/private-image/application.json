@@ -1,0 +1,16 @@
+{
+  "name": "private-image",
+  "environment": "staging",
+  "targetId": "docker-local",
+  "components": [
+    {
+      "name": "web",
+      "kind": "web",
+      "image": "ghcr.io/your-org/private-web:v1",
+      "registryCredentialRef": "registry-read-v1",
+      "port": 8080,
+      "instances": 1,
+      "strategy": "standard"
+    }
+  ]
+}

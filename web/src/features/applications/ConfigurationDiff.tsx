@@ -24,10 +24,16 @@ export function ConfigurationDiff({
   for (const c of after.components) {
     const old = before.components.find((o) => o.name === c.name);
     if (!old) continue;
-    for (const field of ["image", "port", "instances", "hostPort"] as const) {
+    for (const field of [
+      "image",
+      "port",
+      "instances",
+      "hostPort",
+      "registryCredentialRef",
+    ] as const) {
       if ((old[field] ?? 0) !== (c[field] ?? 0))
         rows.push({
-          field: `${c.name} · ${field}`,
+          field: `${c.name} · ${field === "registryCredentialRef" ? "Registry Credential Reference" : field}`,
           before: text(old[field]),
           after: text(c[field]),
         });

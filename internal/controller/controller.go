@@ -499,7 +499,7 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 		if e = c.authorizeRelease(ctx, d); e != nil {
 			return fail(step, "attention", e)
 		}
-		if step.Action != "retire" && len(comp.SecretRefs) > 0 {
+		if step.Action != "retire" && (len(comp.SecretRefs) > 0 || comp.RegistryCredentialRef != "") {
 			if e = c.verifyInputPin(ctx, d, comp); e != nil {
 				return fail(step, "attention", e)
 			}

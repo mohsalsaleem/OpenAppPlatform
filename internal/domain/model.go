@@ -26,26 +26,34 @@ type ReadinessPolicy struct {
 	TimeoutSeconds int  `json:"timeoutSeconds,omitempty"`
 }
 
+type RegistryAuth struct {
+	Username      string `json:"username"`
+	Password      string `json:"password"`
+	ServerAddress string `json:"serveraddress"`
+}
+
 type Component struct {
-	Volumes          []VolumeMount     `json:"volumes,omitempty"`
-	Limits           *ResourceLimits   `json:"limits,omitempty"`
-	DatabaseEndpoint string            `json:"databaseEndpoint,omitempty"`
-	HealthCheck      *HealthCheck      `json:"healthCheck,omitempty"`
-	DependsOn        []string          `json:"dependsOn,omitempty"`
-	Readiness        *ReadinessPolicy  `json:"readiness,omitempty"`
-	Management       string            `json:"management,omitempty"`
-	ServiceEndpoints map[string]string `json:"serviceEndpoints,omitempty"`
-	SecretRefs       map[string]string `json:"secretRefs,omitempty"`
-	Env              map[string]string `json:"env,omitempty"`
-	Services         map[string]string `json:"services,omitempty"`
-	Name             string            `json:"name"`
-	Kind             string            `json:"kind"`
-	Image            string            `json:"image"`
-	Port             int               `json:"port"`
-	HostPort         int               `json:"hostPort,omitempty"`
-	Instances        int               `json:"instances"`
-	Strategy         string            `json:"strategy"`
-	ResourceID       string            `json:"resourceId,omitempty"`
+	RegistryCredentialRef string            `json:"registryCredentialRef,omitempty"`
+	RegistryAuth          *RegistryAuth     `json:"-"`
+	Volumes               []VolumeMount     `json:"volumes,omitempty"`
+	Limits                *ResourceLimits   `json:"limits,omitempty"`
+	DatabaseEndpoint      string            `json:"databaseEndpoint,omitempty"`
+	HealthCheck           *HealthCheck      `json:"healthCheck,omitempty"`
+	DependsOn             []string          `json:"dependsOn,omitempty"`
+	Readiness             *ReadinessPolicy  `json:"readiness,omitempty"`
+	Management            string            `json:"management,omitempty"`
+	ServiceEndpoints      map[string]string `json:"serviceEndpoints,omitempty"`
+	SecretRefs            map[string]string `json:"secretRefs,omitempty"`
+	Env                   map[string]string `json:"env,omitempty"`
+	Services              map[string]string `json:"services,omitempty"`
+	Name                  string            `json:"name"`
+	Kind                  string            `json:"kind"`
+	Image                 string            `json:"image"`
+	Port                  int               `json:"port"`
+	HostPort              int               `json:"hostPort,omitempty"`
+	Instances             int               `json:"instances"`
+	Strategy              string            `json:"strategy"`
+	ResourceID            string            `json:"resourceId,omitempty"`
 }
 type Manifest struct {
 	Name        string      `json:"name"`
@@ -67,6 +75,9 @@ func (m *Manifest) Validate() error {
 	names := map[string]bool{}
 	for i := range m.Components {
 		c := &m.Components[i]
+		if c.RegistryCredentialRef != "" && (!slug.MatchString(c.RegistryCredentialRef) || c.ResourceID != "" || c.Management == "observe" || c.Kind == "database") {
+			return errors.New("registry credential references require a lowercase reference slug and an OAP-owned image workload")
+		}
 		if !slug.MatchString(c.Name) || names[c.Name] {
 			return errors.New("component names must be unique lowercase slugs")
 		}

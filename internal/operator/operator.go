@@ -8,23 +8,24 @@ import (
 )
 
 type Capabilities struct {
-	NamedVolumes      bool `json:"namedVolumes"`
-	ResourceLimits    bool `json:"resourceLimits"`
-	DatabaseLinks     bool `json:"databaseLinks"`
-	Workers           bool `json:"workers"`
-	HTTPHealthChecks  bool `json:"httpHealthChecks"`
-	ImageRollback     bool `json:"imageRollback"`
-	ManagementHandoff bool `json:"managementHandoff"`
-	Retirement        bool `json:"retirement"`
-	Restart           bool `json:"restart"`
-	Environment       bool `json:"environment"`
-	ServiceEndpoints  bool `json:"serviceEndpoints"`
-	ApplicationDNS    bool `json:"applicationDns"`
-	Standard          bool `json:"standard"`
-	Rolling           bool `json:"rolling"`
-	BlueGreen         bool `json:"blueGreen"`
-	Discovery         bool `json:"discovery"`
-	ImmutableImages   bool `json:"immutableImages"`
+	RegistryCredentials bool `json:"registryCredentials"`
+	NamedVolumes        bool `json:"namedVolumes"`
+	ResourceLimits      bool `json:"resourceLimits"`
+	DatabaseLinks       bool `json:"databaseLinks"`
+	Workers             bool `json:"workers"`
+	HTTPHealthChecks    bool `json:"httpHealthChecks"`
+	ImageRollback       bool `json:"imageRollback"`
+	ManagementHandoff   bool `json:"managementHandoff"`
+	Retirement          bool `json:"retirement"`
+	Restart             bool `json:"restart"`
+	Environment         bool `json:"environment"`
+	ServiceEndpoints    bool `json:"serviceEndpoints"`
+	ApplicationDNS      bool `json:"applicationDns"`
+	Standard            bool `json:"standard"`
+	Rolling             bool `json:"rolling"`
+	BlueGreen           bool `json:"blueGreen"`
+	Discovery           bool `json:"discovery"`
+	ImmutableImages     bool `json:"immutableImages"`
 }
 type Resource struct {
 	ID           string `json:"id"`
@@ -65,6 +66,9 @@ type Restarter interface {
 
 func ValidateRuntime(m domain.Manifest, caps Capabilities) error {
 	for _, c := range m.Components {
+		if c.RegistryCredentialRef != "" && !caps.RegistryCredentials {
+			return fmt.Errorf("target registry login remains owned by the operator for %s", c.Name)
+		}
 		if len(c.Volumes) > 0 && !caps.NamedVolumes {
 			return fmt.Errorf("target does not support named volumes for %s", c.Name)
 		}

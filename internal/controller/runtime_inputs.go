@@ -24,7 +24,7 @@ func (c *Controller) inputPins(d domain.Deployment) (map[string]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		if len(runtime.SecretRefs) > 0 {
+		if len(runtime.SecretRefs) > 0 || runtime.RegistryCredentialRef != "" {
 			pins[step.Component] = runtimeinputs.Fingerprint(runtime, d.ID)
 		}
 	}

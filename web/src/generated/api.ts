@@ -1999,6 +1999,8 @@ export interface components {
             databaseEndpoint?: string;
             volumes?: components["schemas"]["VolumeMount"][];
             limits?: components["schemas"]["ResourceLimits"];
+            /** @description Scoped private-image credential reference. Direct Docker only; operator login stays native. */
+            registryCredentialRef?: string;
         };
         Manifest: {
             name: string;
@@ -2135,6 +2137,7 @@ export interface components {
             databaseLinks: boolean;
             namedVolumes: boolean;
             resourceLimits: boolean;
+            registryCredentials?: boolean;
         };
         Restart: {
             component: string;
@@ -2238,6 +2241,8 @@ export interface components {
             databaseEndpoint?: string;
             volumes?: components["schemas"]["VolumeMount"][];
             limits?: components["schemas"]["ResourceLimits"];
+            /** @description Scoped private-image credential reference. Direct Docker only; operator login stays native. */
+            registryCredentialRef?: string;
         };
         ManifestInput: {
             name: string;

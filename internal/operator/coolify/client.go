@@ -183,6 +183,9 @@ func splitImage(image string) (string, string) {
 	return image, "latest"
 }
 func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource, error) {
+	if s.Component.RegistryCredentialRef != "" || s.Component.RegistryAuth != nil {
+		return operator.Resource{}, errors.New("registry login remains owned by Coolify")
+	}
 	if err := s.Component.ValidateStorageAndLimits(); err != nil {
 		return operator.Resource{}, err
 	}

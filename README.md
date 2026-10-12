@@ -116,6 +116,7 @@ credentials. It does not mutate an external Coolify installation. Live fixtures 
 - [OpenAPI contract](docs/openapi.json)
 - [Bare Docker targets](docs/bare-docker.md)
 - [Runtime secret references](docs/runtime-secret-references.md)
+- [Private registry access](docs/private-registry-access.md)
 - [Long-running workers](docs/workers.md)
 - [Read-only MCP tools](docs/mcp.md)
 - [Verification report](docs/verification.md)

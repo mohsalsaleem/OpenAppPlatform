@@ -28,7 +28,10 @@ type entry struct {
 	binding Binding
 	value   string
 }
-type Inputs struct{ entries []entry }
+type Inputs struct {
+	entries    []entry
+	registries []registryEntry
+}
 
 var identifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]{0,127}$`)
 var slug = regexp.MustCompile(`^[a-z][a-z0-9-]{0,47}$`)
@@ -98,17 +101,21 @@ func (i *Inputs) Resolve(target, app string, c domain.Component) (domain.Compone
 		return domain.Component{}, errors.New("resolved runtime configuration exceeds 16 KiB")
 	}
 	c.Env = env
-	return c, nil
+	return i.resolveRegistry(target, app, c)
 }
 
 // Fingerprint is private recovery metadata, never part of public definitions.
 func Fingerprint(c domain.Component, nonce string) string {
-	if len(c.SecretRefs) == 0 {
+	if len(c.SecretRefs) == 0 && c.RegistryCredentialRef == "" {
 		return ""
 	}
 	values := map[string]string{}
 	for k, ref := range c.SecretRefs {
 		values[k] = ref + "\x00" + c.Env[k]
+	}
+	if c.RegistryCredentialRef != "" {
+		raw, _ := json.Marshal(c.RegistryAuth)
+		values["registry credential"] = c.RegistryCredentialRef + "\x00" + string(raw)
 	}
 	raw, _ := json.Marshal(struct {
 		Nonce  string
@@ -122,6 +129,9 @@ func (i *Inputs) Redact(text string) string {
 		return text
 	}
 	values := []string{}
+	for _, e := range i.registries {
+		values = append(values, registryRedactions(e.auth)...)
+	}
 	for _, e := range i.entries {
 		if e.value != "" {
 			values = append(values, e.value)

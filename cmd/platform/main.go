@@ -102,6 +102,15 @@ func run() error {
 			return e
 		}
 	}
+	if raw := os.Getenv("OAP_REGISTRY_INPUTS"); raw != "" {
+		if preview {
+			return errors.New("registry credential bindings require owner mode")
+		}
+		c.RuntimeInputs, e = runtimeinputs.AddRegistries(c.RuntimeInputs, []byte(raw), os.Getenv)
+		if e != nil {
+			return e
+		}
+	}
 	if *sourceFile != "" {
 		if preview {
 			return errors.New("GitHub release bindings require owner mode")

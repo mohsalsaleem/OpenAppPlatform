@@ -19,6 +19,9 @@ func revision(s operator.Spec, imageID string) string {
 	// Replica count belongs to application topology, not an instance's runtime.
 	s.Component.Instances = 1
 	// Controller readiness changes do not replace the container runtime.
+	// Pull credentials do not configure or identify the container runtime.
+	s.Component.RegistryCredentialRef = ""
+	s.Component.RegistryAuth = nil
 	s.Component.Readiness = nil
 	s.Component.DependsOn = nil
 	b, _ := json.Marshal(struct {
@@ -62,7 +65,10 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 		return operator.Resource{}, errors.New("database lifecycle remains owned by the operator")
 	}
 
-	imageID, e := c.image(ctx, s.Component.Image)
+	if s.Component.RegistryCredentialRef != "" && s.Component.RegistryAuth == nil {
+		return operator.Resource{}, errors.New("registry credential reference is unresolved")
+	}
+	imageID, e := c.image(ctx, s.Component.Image, s.Component.RegistryAuth)
 	if e != nil {
 		return operator.Resource{}, e
 	}

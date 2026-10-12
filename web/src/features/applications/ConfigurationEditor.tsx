@@ -1,3 +1,4 @@
+import { RegistryCredentials } from "./RegistryCredentials";
 import { HostPortFields, invalidHostPort } from "./HostPortFields";
 import { FieldSet, FieldLegend } from "@/components/ui/field";
 import { Disclosure } from "@/components/Disclosure";
@@ -255,6 +256,14 @@ export function ConfigurationEditor({
                       value={c.image}
                       readOnly={!!c.resourceId}
                       onChange={(e) => change(i, "image", e.target.value)}
+                    />
+                    <RegistryCredentials
+                      component={c}
+                      supported={!!capabilities.data?.registryCredentials}
+                      operator={target?.operator}
+                      onChange={(value) =>
+                        change(i, "registryCredentialRef", value || undefined)
+                      }
                     />
                   </div>
                   <div className="form-grid compact">

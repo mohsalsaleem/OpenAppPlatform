@@ -4281,6 +4281,11 @@
           },
           "limits": {
             "$ref": "#/components/schemas/ResourceLimits"
+          },
+          "registryCredentialRef": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,47}$",
+            "description": "Scoped private-image credential reference. Direct Docker only; operator login stays native."
           }
         },
         "required": [
@@ -4763,6 +4768,9 @@
           },
           "resourceLimits": {
             "type": "boolean"
+          },
+          "registryCredentials": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -5102,6 +5110,11 @@
           },
           "limits": {
             "$ref": "#/components/schemas/ResourceLimits"
+          },
+          "registryCredentialRef": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,47}$",
+            "description": "Scoped private-image credential reference. Direct Docker only; operator login stays native."
           }
         },
         "required": [
