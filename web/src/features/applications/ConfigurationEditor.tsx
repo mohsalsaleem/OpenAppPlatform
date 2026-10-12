@@ -126,7 +126,12 @@ export function ConfigurationEditor({
       <div className="section-heading">
         <div>
           <h2>Runtime Configuration</h2>
-          <Badge variant="outline">Applies on Next Deployment</Badge>
+          <Badge variant="outline">
+            {draft.components.find((c) => c.name === selectedComponent)
+              ?.management === "observe"
+              ? "Operator Managed"
+              : "Applies on Next Deployment"}
+          </Badge>
         </div>
         <div className="log-buttons">
           <Button
@@ -265,13 +270,16 @@ export function ConfigurationEditor({
                     readOnly={!!c.resourceId}
                     onChange={(e) => change(i, "instances", +e.target.value)}
                   />
-                  <details className="field-help">
-                    <summary>Scaling Help</summary>
-                    <p className="small muted">
-                      Increase instances and deploy to scale up. Use Scale Down
-                      in the overview to retire instances where supported.
-                    </p>
-                  </details>
+                  {!c.resourceId && (
+                    <details className="field-help">
+                      <summary>Scaling Help</summary>
+                      <p className="small muted">
+                        Increase instances and deploy to scale up. Use Scale
+                        Down in the overview to retire instances where
+                        supported.
+                      </p>
+                    </details>
+                  )}
                 </div>
               </div>
               {c.kind === "web" && (

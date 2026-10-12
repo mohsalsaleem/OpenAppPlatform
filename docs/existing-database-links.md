@@ -39,5 +39,21 @@ The API is `POST /api/v1/applications/{id}/databases` with `name`, `resourceId`,
 the application to inspect the atomic link; retrying a stale version returns 409.
 Credentials and endpoints are never copied automatically from another environment.
 
-See the [complete example](../examples/application-breadth/README.md). Local and
-isolated staging acceptance must pass before this slice is marked delivered.
+See the [complete example](../examples/application-breadth/README.md). Local and isolated staging acceptance passed on 12 October 2026.
+
+## Accepted Four-Component Journey
+
+Implementation commit `2e69c36` passed the full reproducible local gate (16 browser
+checks, native Docker/PostgreSQL integration and race checks). SQL credentials stayed
+reference-only. API and worker authenticated with a restricted role; a prohibited
+write failed. A database outage held API preparation and recovery restored consumer
+connectivity without database configuration/data changes.
+
+[The staging application](https://oap-staging.mohsal.dev/applications/bb2f8cb890eacc584ead8db1507567d3)
+contains frontend, API, worker and database, all healthy. Release
+`770180d2f27fc6590acc08df31bd7bd7` updated only API/worker. The frontend reached an authenticated
+API SQL read; worker SQL reads and native database logs worked. Definition/release
+responses omitted credentials. Provider configuration, native container configuration,
+storage bindings and seeded data matched their pre-link baseline. The database
+fixture was created and seeded through the operator before OAP linked it; native
+backups remain operator-owned. No production data or native source triggers changed.

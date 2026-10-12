@@ -223,7 +223,7 @@ export function ApplicationDetail() {
   if (!app.data) return <ErrorBox error={app.error} />;
   const a = app.data;
   const latest = releases.data?.[0];
-  const observed = a.manifest.components.some(
+  const observed = a.manifest.components.every(
     (c) => c.management === "observe",
   );
   const active = releases.data?.some(

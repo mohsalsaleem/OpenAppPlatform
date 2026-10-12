@@ -139,9 +139,10 @@ is verified in local system/browser fixtures; no production resource was touched
 See [application environments](docs/application-environments.md) and
 [target setup and acceptance](docs/target-setup-and-definition-review.md).
 
-**Current priority:** P0.3 existing dependencies and assembly. P0.1 runtime secret
-references and P0.2 workers passed local and isolated Coolify staging acceptance. M0 workload and configuration breadth, followed by repeatable
-installation. The priority correction below is the authoritative execution order.
+**Current priority:** P0.4 everyday configuration. P0.1 runtime secret references,
+P0.2 workers and P0.3 existing database links passed local and isolated Coolify
+staging acceptance. The first four-component breadth milestone is delivered. Finish everyday configuration
+and repeatable installation next. The priority correction below is the authoritative execution order.
 Batch 5 has an accepted, limited Coolify routing pilot; its remaining capabilities
 are deferred and the batch is not complete. Batch 4 is accepted for supported
 stateless managed-image workflows; see the [acceptance review](docs/recovery-acceptance.md).
@@ -190,6 +191,23 @@ unchanged frontend/API process identities and no worker public URL. Coolify's
 status briefly lagged its healthy native container; the bounded observation gate
 completed normally. See [workers](docs/workers.md). The database link remains
 P0.3; this acceptance does not claim the four-component milestone is complete.
+
+**P0.3 acceptance:** frontend, API, worker and an existing PostgreSQL resource now
+share one logical application. The owner-reviewed link is observe-only, versioned
+and reserved atomically; no database lifecycle authority or credentials are imported.
+The full local gate passed on 12 October 2026 with 16 browser tests plus native
+Docker/PostgreSQL/race checks. Authenticated API/worker reads, blocked writes using
+a restricted application role, visible database failure, a held API release and
+recovery passed with native database configuration and seeded data preserved.
+Coolify staging `application-breadth-preview` is 4/4 healthy: frontend-to-API SQL
+reads, worker SQL reads, database logs and reference-only definitions/releases passed.
+Only API/worker were released. The native PostgreSQL acceptance fixture was prepared
+through the operator outside OAP; its configuration, storage and seeded data remained
+unchanged through linking and consumer deployment. Normal use links an existing
+resource; this is not a database-provisioning feature. Compose databases, other
+engines, cross-target links and SQL execution remain outside this slice.
+See [existing database links](docs/existing-database-links.md) and the
+[complete example](examples/application-breadth/README.md).
 
 P0.1–P0.3 form the first breadth deliverable. P0.4–P0.5 close the remaining
 minimum M0 configuration/install gaps. Implement one priority at a time; advance

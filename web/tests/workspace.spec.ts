@@ -913,6 +913,9 @@ test("link an existing PostgreSQL resource with reviewed observe-only actions", 
     .getByRole("button", { name: "Link Database", exact: true })
     .click();
   await expect(dialog).not.toBeVisible();
+  await expect(
+    page.getByText("Ready for Your First Deployment", { exact: true }),
+  ).toBeVisible();
   const db = page
     .locator(".component-group")
     .filter({ has: page.getByText("database", { exact: true }) });
@@ -940,6 +943,9 @@ test("link an existing PostgreSQL resource with reviewed observe-only actions", 
   });
   await page.getByRole("tab", { name: "Settings", exact: true }).click();
   await page.getByRole("tab", { name: "database", exact: true }).click();
+  await expect(
+    page.getByText("Scaling Help", { exact: true }),
+  ).not.toBeVisible();
   await expect(page.getByLabel("Internal Port for database")).toHaveCount(0);
   await expect(page.getByLabel("Container Image for database")).toHaveAttribute(
     "readonly",

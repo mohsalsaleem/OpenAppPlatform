@@ -288,3 +288,7 @@ The [target setup and definition review](docs/target-setup-and-definition-review
 flow generates first-connection recipes, verifies configured scopes read-only,
 connects additional existing environments through trusted operators, reuses naming
 layouts and previews masked configuration changes. Native workflows remain intact.
+
+The four-component example now groups frontend, API, worker and an existing
+PostgreSQL dependency with explicit ownership. See [existing database links](docs/existing-database-links.md)
+and [the reproducible example](examples/application-breadth/README.md).
