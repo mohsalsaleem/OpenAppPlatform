@@ -327,183 +327,254 @@ export function ApplicationDetail() {
             </div>
             <ErrorBox error={instances.error} />
             {instances.isPending && <Loading />}
-            {a.manifest.components.map((c) => (
-              <div className="component-group" key={c.name}>
-                <div className="component-row" key={c.name}>
-                  <span className="app-icon">
-                    <ComponentIcon size={20} />
-                  </span>
-                  <div className="grow">
-                    <strong>{c.name}</strong>
-                    <div className="component-badges">
-                      <Badge variant="secondary">
-                        {c.kind === "worker" ? "Worker" : "Web Service"}
-                      </Badge>
-                      <Badge variant="outline">
-                        {c.management === "observe"
-                          ? "Observe-only"
-                          : "OAP Managed"}
-                      </Badge>
-                      <span className="small muted">
-                        {c.instances} configured
-                      </span>
-                    </div>
-                    <details>
-                      <summary>Image Details</summary>
-                      {c.healthCheck && (
-                        <p className="small muted">
-                          {healthCheckSummary(c.healthCheck)}
-                        </p>
-                      )}
-                      {c.kind !== "worker" && (
-                        <p className="small muted">Internal Port: {c.port}</p>
-                      )}
-                      {instances.data
-                        ?.filter((v) => v.component === c.name && !v.retired)
-                        .map((v) => (
-                          <div key={v.ordinal}>
-                            <span className="small">
-                              Running · instance {v.ordinal}
-                            </span>
-                            <code className="image-ref">
-                              {v.resource?.image || "Image unavailable"}
-                            </code>
-                          </div>
-                        ))}
-                      <span className="small">
-                        Saved for the next deployment
-                      </span>
-                      <code className="image-ref">
-                        {c.image || "Managed by the platform"}
-                      </code>
-                    </details>
-                    {instances.data?.some(
-                      (v) =>
-                        !v.retired &&
-                        v.component === c.name &&
-                        v.resource?.image &&
-                        v.resource.image !== c.image,
-                    ) &&
-                      c.management !== "observe" && (
-                        <p className="configuration-drift" role="status">
-                          Saved image differs from the running image. Review
-                          before deploying.
-                        </p>
-                      )}
-                  </div>
-
-                  {c.management === "observe" &&
-                    instances.data?.find((i) => i.component === c.name)
-                      ?.resource?.artifactKind === "image" &&
-                    !instances.data
-                      ?.find((i) => i.component === c.name)
-                      ?.resource?.description?.startsWith("OpenAppPlatform:") &&
-                    a.manifest.targetId &&
-                    capabilities.data?.managementHandoff && (
-                      <Button
-                        variant="outline"
-
-                        onClick={() => setHandoff(c.name)}
-                        disabled={!canOperate || !!active}
-                      >
-                        Enable Management for {c.name}
-                      </Button>
-                    )}
-                  {capabilities.data?.retirement &&
-                    c.instances > 1 &&
-                    !c.resourceId && (
-                      <Button
-                        variant="outline"
-
-                        disabled={!canOperate || !!active}
-                        onClick={() =>
-                          setScaleReview({
-                            component: c.name,
-                            instances: c.instances,
-                            version: a.version,
-                          })
-                        }
-                      >
-                        Scale Down {c.name}
-                      </Button>
-                    )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-
-                    title={`View ${c.name} logs`}
-                    aria-label={`View ${c.name} logs`}
-                    onClick={() => showLogs(c.name)}
-                  >
-                    <Terminal size={18} />
-                  </Button>
-                </div>
-                {instances.data
-                  ?.filter((instance) => instance.component === c.name)
-                  .map((instance) => (
-                    <div
-                      className="step"
-                      key={`${instance.component}-${instance.ordinal}`}
-                    >
-                      <div className="grow">
-                        <strong>
-                          {instance.component} / {instance.ordinal}
-                          {instance.retired
-                            ? " · retained after retirement"
-                            : ""}
-                        </strong>
-                        <p className="small muted">
-                          Checked {when(instance.checkedAt)}
-                        </p>
-                        {instance.error && (
-                          <p className="error-inline">{instance.error}</p>
-                        )}
-                        {instance.resource?.url &&
-                          /^https?:\/\//.test(instance.resource.url) && (
-                            <a
-                              href={instance.resource.url}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Open Service
-                            </a>
-                          )}
+            {a.manifest.components.map((c) => {
+              const rows =
+                instances.data?.filter((v) => v.component === c.name) || [];
+              const primary = rows.find((v) => !v.retired);
+              const expanded = c.instances > 1 || rows.some((v) => v.retired);
+              return (
+                <div className="component-group" key={c.name}>
+                  <div className="component-row" key={c.name}>
+                    <span className="app-icon">
+                      <ComponentIcon size={20} />
+                    </span>
+                    <div className="grow">
+                      <strong>{c.name}</strong>
+                      <div className="component-badges">
+                        <Badge variant="secondary">
+                          {c.kind === "worker" ? "Worker" : "Web Service"}
+                        </Badge>
+                        <Badge variant="outline">
+                          {c.management === "observe"
+                            ? "Observe-only"
+                            : "OAP Managed"}
+                        </Badge>
+                        <span className="small muted">
+                          {c.instances} configured
+                        </span>
                       </div>
-                      <Status value={instance.status} />
-                      {capabilities.data?.restart && (
+                      <details>
+                        <summary>Image Details</summary>
+                        {c.healthCheck && (
+                          <p className="small muted">
+                            {healthCheckSummary(c.healthCheck)}
+                          </p>
+                        )}
+                        {c.kind !== "worker" && (
+                          <p className="small muted">Internal Port: {c.port}</p>
+                        )}
+                        {instances.data
+                          ?.filter((v) => v.component === c.name && !v.retired)
+                          .map((v) => (
+                            <div key={v.ordinal}>
+                              <span className="small">
+                                Running · instance {v.ordinal}
+                              </span>
+                              <code className="image-ref">
+                                {v.resource?.image || "Image unavailable"}
+                              </code>
+                            </div>
+                          ))}
+                        <span className="small">
+                          Saved for the next deployment
+                        </span>
+                        <code className="image-ref">
+                          {c.image || "Managed by the platform"}
+                        </code>
+                      </details>
+                      {instances.data?.some(
+                        (v) =>
+                          !v.retired &&
+                          v.component === c.name &&
+                          v.resource?.image &&
+                          v.resource.image !== c.image,
+                      ) &&
+                        c.management !== "observe" && (
+                          <p className="configuration-drift" role="status">
+                            Saved image differs from the running image. Review
+                            before deploying.
+                          </p>
+                        )}
+                    </div>
+
+                    {c.management === "observe" &&
+                      instances.data?.find((i) => i.component === c.name)
+                        ?.resource?.artifactKind === "image" &&
+                      !instances.data
+                        ?.find((i) => i.component === c.name)
+                        ?.resource?.description?.startsWith(
+                          "OpenAppPlatform:",
+                        ) &&
+                      a.manifest.targetId &&
+                      capabilities.data?.managementHandoff && (
                         <Button
                           variant="outline"
 
-                          disabled={
-                            !canOperate ||
-                            !!active ||
-                            !instance.resourceId ||
-                            instance.retired ||
-                            a.manifest.components.find(
-                              (c) => c.name === instance.component,
-                            )?.management === "observe"
-                          }
-                          onClick={() => setRestartReview(instance)}
+                          onClick={() => setHandoff(c.name)}
+                          disabled={!canOperate || !!active}
                         >
-                          Restart {instance.component} / {instance.ordinal}
+                          Enable Management for {c.name}
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
+                    {capabilities.data?.retirement &&
+                      c.instances > 1 &&
+                      !c.resourceId && (
+                        <Button
+                          variant="outline"
 
-                        aria-label={`View ${instance.component} instance ${instance.ordinal} logs`}
-                        disabled={!instance.resourceId}
-                        onClick={() =>
-                          showLogs(instance.component, instance.ordinal)
-                        }
+                          disabled={!canOperate || !!active}
+                          onClick={() =>
+                            setScaleReview({
+                              component: c.name,
+                              instances: c.instances,
+                              version: a.version,
+                            })
+                          }
+                        >
+                          Scale Down {c.name}
+                        </Button>
+                      )}
+                    {!expanded && primary ? (
+                      <div className="component-actions">
+                        <Status value={primary.status} />
+                        {primary.resource?.url &&
+                          /^https?:\/\//.test(primary.resource.url) && (
+                            <Button asChild variant="outline" size="sm">
+                              <a
+                                href={primary.resource.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Open
+                              </a>
+                            </Button>
+                          )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          aria-label={`View ${c.name} instance ${primary.ordinal} logs`}
+                          disabled={!primary.resourceId}
+                          onClick={() => showLogs(c.name, primary.ordinal)}
+                        >
+                          <Terminal size={15} />
+                          Logs
+                        </Button>
+                        {capabilities.data?.restart && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            aria-label={`Restart ${c.name} / ${primary.ordinal}`}
+                            disabled={
+                              !canOperate ||
+                              !!active ||
+                              !primary.resourceId ||
+                              primary.retired ||
+                              c.management === "observe"
+                            }
+                            onClick={() => setRestartReview(primary)}
+                          >
+                            Restart
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="component-actions">
+                        <span className="small muted">
+                          {replicaSummary(
+                            [c],
+                            instances.data,
+                            !!instances.error,
+                          )}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          aria-label={`View ${c.name} logs`}
+                          disabled={!primary?.resourceId}
+                          onClick={() => showLogs(c.name)}
+                        >
+                          <Terminal size={15} />
+                          Logs
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  {!expanded && primary?.error && (
+                    <p className="error-inline" role="alert">
+                      {primary.error}
+                    </p>
+                  )}
+                  <details
+                    className="component-instance-details"
+                    open={expanded}
+                  >
+                    <summary>Instance Details for {c.name}</summary>
+                    {rows.map((instance) => (
+                      <div
+                        className="step"
+                        key={`${instance.component}-${instance.ordinal}`}
                       >
-                        <Terminal size={18} />
-                      </Button>
-                    </div>
-                  ))}
-              </div>
-            ))}
+                        <div className="grow">
+                          <strong>
+                            {instance.component} / {instance.ordinal}
+                            {instance.retired
+                              ? " · retained after retirement"
+                              : ""}
+                          </strong>
+                          <p className="small muted">
+                            Checked {when(instance.checkedAt)}
+                          </p>
+                          {instance.error && (
+                            <p className="error-inline">{instance.error}</p>
+                          )}
+                          {instance.resource?.url &&
+                            /^https?:\/\//.test(instance.resource.url) && (
+                              <a
+                                href={instance.resource.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Open Service
+                              </a>
+                            )}
+                        </div>
+                        <Status value={instance.status} />
+                        {capabilities.data?.restart && (
+                          <Button
+                            variant="outline"
+
+                            disabled={
+                              !canOperate ||
+                              !!active ||
+                              !instance.resourceId ||
+                              instance.retired ||
+                              a.manifest.components.find(
+                                (c) => c.name === instance.component,
+                              )?.management === "observe"
+                            }
+                            onClick={() => setRestartReview(instance)}
+                          >
+                            Restart {instance.component} / {instance.ordinal}
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+
+                          aria-label={`View ${instance.component} instance ${instance.ordinal} logs`}
+                          disabled={!instance.resourceId}
+                          onClick={() =>
+                            showLogs(instance.component, instance.ordinal)
+                          }
+                        >
+                          <Terminal size={18} />
+                        </Button>
+                      </div>
+                    ))}
+                  </details>
+                </div>
+              );
+            })}
           </section>
           <section className="panel release-banner">
             <div>

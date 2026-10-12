@@ -1486,3 +1486,23 @@ a.button.secondary {
 .field-help summary {
   cursor: pointer;
 }
+
+.component-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.component-instance-details {
+  margin-top: 8px;
+  font-size: 12px;
+}
+.component-instance-details > summary {
+  cursor: pointer;
+  color: var(--muted-foreground);
+}
+@media (max-width: 700px) {
+  .component-actions {
+    width: 100%;
+  }
+}

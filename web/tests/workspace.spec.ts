@@ -240,6 +240,9 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     .locator("section")
     .filter({ has: page.getByRole("heading", { name: "Components" }) });
   await expect(live).toContainText("Healthy", { timeout: 15000 });
+  await expect(
+    live.locator(".component-instance-details .step"),
+  ).not.toBeVisible();
   await page.getByRole("button", { name: "View web instance 1 logs" }).click();
   await expect(page.locator(".log-output")).toContainText("fixture", {
     timeout: 5000,
