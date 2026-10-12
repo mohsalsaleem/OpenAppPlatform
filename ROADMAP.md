@@ -150,6 +150,11 @@ lifecycle actions; runtime edits stay in the operator (or Docker host). Keep
 their Settings view minimal instead of duplicating native Docker configuration
 forms. OAP-owned workloads retain controls required for direct execution.
 
+**UI foundation:** Use the shared shadcn controls and field composition. Runtime
+configuration for linked resources remains in the operator; direct configuration
+uses consistent Button, Field, Select and Collapsible patterns. Prevent legacy
+global label/control styles and hand-styled link buttons from returning.
+
 **Current priority:** P0.4 everyday configuration. P0.1 runtime secret references,
 P0.2 workers and P0.3 existing database links passed local and isolated Coolify
 staging acceptance. The first four-component breadth milestone is delivered. Finish everyday configuration

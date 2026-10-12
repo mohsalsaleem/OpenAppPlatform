@@ -27,6 +27,9 @@ for source in (ROOT/'internal/httpapi').glob('*.go'):
 for source in (ROOT/'web/src').rglob('*.tsx'):
     if 'components/ui' in source.as_posix():
         continue
-    if re.search(r'<(?:button|input|select|textarea|table|dialog)\b',source.read_text()):
+    if re.search(r'<(?:button|input|select|textarea|table|dialog|fieldset|legend|details|summary)\b',source.read_text()):
         raise SystemExit('Use a shared shadcn primitive: '+str(source.relative_to(ROOT)))
+css=(ROOT/'web/src/styles.css').read_text()
+if re.search(r'(?m)^(?:label|summary|\.button|a\.button(?:\.primary|\.secondary)?)\s*\{',css):
+    raise SystemExit('Legacy global control styles compete with shared UI primitives')
 print('HTTP and UI contracts agree')

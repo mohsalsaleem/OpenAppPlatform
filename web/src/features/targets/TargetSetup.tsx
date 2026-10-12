@@ -1,3 +1,4 @@
+import { Disclosure } from "@/components/Disclosure";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -44,8 +45,10 @@ export function TargetSetup({ existingIds = [] }: { existingIds?: string[] }) {
     ].includes(draft.tokenEnv);
   const recipe = JSON.stringify([{ ...draft, operator: "coolify" }], null, 2);
   return (
-    <details className="panel">
-      <summary>Set Up an Existing Coolify Connection</summary>
+    <Disclosure
+      className="panel"
+      title={<>Set Up an Existing Coolify Connection</>}
+    >
       <p className="muted">
         Prepare an OAP connection to your existing project. Native builds,
         domains and deployment triggers stay with Coolify.
@@ -109,7 +112,6 @@ export function TargetSetup({ existingIds = [] }: { existingIds?: string[] }) {
           <pre>{recipe}</pre>
           <Button
             variant="outline"
-            className="button"
             onClick={() =>
               navigator.clipboard.writeText(recipe).then(() => setCopied(true))
             }
@@ -123,6 +125,6 @@ export function TargetSetup({ existingIds = [] }: { existingIds?: string[] }) {
           credential reference.
         </p>
       )}
-    </details>
+    </Disclosure>
   );
 }

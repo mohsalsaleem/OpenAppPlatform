@@ -1,3 +1,4 @@
+import { Disclosure } from "@/components/Disclosure";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Input } from "@/components/ui/input";
@@ -47,8 +48,10 @@ export function ExistingEnvironment({ targets }: { targets: Target[] }) {
   )
     return null;
   return (
-    <details className="panel">
-      <summary>Connect Another Existing Coolify Environment</summary>
+    <Disclosure
+      className="panel"
+      title={<>Connect Another Existing Coolify Environment</>}
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -93,11 +96,7 @@ export function ExistingEnvironment({ targets }: { targets: Target[] }) {
             />
           </Label>
         </div>
-        <Button
-          variant="outline"
-          className="button primary"
-          disabled={!valid || connect.isPending}
-        >
+        <Button variant="outline" disabled={!valid || connect.isPending}>
           {connect.isPending ? "Verifying…" : "Verify and Connect Environment"}
         </Button>
         <ErrorBox error={connect.error} />
@@ -108,6 +107,6 @@ export function ExistingEnvironment({ targets }: { targets: Target[] }) {
           </p>
         )}
       </form>
-    </details>
+    </Disclosure>
   );
 }

@@ -1,3 +1,4 @@
+import { Disclosure } from "@/components/Disclosure";
 import type { ReadResponse } from "../../api";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -86,15 +87,14 @@ export function SourceEvents({
             <div className="step" key={name}>
               <div className="grow">
                 <strong>{name}</strong>
-                <details>
-                  <summary>Build Details</summary>
+                <Disclosure title={<>Build Details</>}>
                   <code className="image-ref">
                     {b.image ||
                       (b.provider?.id
                         ? `Provider deployment ${b.provider.id}`
                         : `Build ${b.id}`)}
                   </code>
-                </details>
+                </Disclosure>
               </div>
               <Status value={b.state} />
             </div>

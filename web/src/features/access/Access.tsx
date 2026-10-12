@@ -1,3 +1,4 @@
+import { Disclosure } from "@/components/Disclosure";
 import type { ReadResponse } from "../../api";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -334,14 +335,13 @@ export function Access() {
             <div className="step" key={event.id}>
               <div className="grow">
                 <strong>{auditAction(event.action)}</strong>
-                <details>
-                  <summary>Request Details</summary>
+                <Disclosure title={<>Request Details</>}>
                   <code>{event.action}</code>
                   <p className="small">
                     Event {event.id} · Actor {event.subject} · HTTP{" "}
                     {event.status || "pending"}
                   </p>
-                </details>
+                </Disclosure>
                 <p className="small muted">
                   {event.kind === "agent"
                     ? `Agent: ${event.credentialName || event.subject || "Unnamed Agent"}`

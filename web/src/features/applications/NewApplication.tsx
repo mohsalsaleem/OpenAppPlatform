@@ -1,8 +1,16 @@
+import { HostPortFields, invalidHostPort } from "./HostPortFields";
+import { Disclosure } from "@/components/Disclosure";
 import { OperatorConfiguration } from "./OperatorConfiguration";
 import { StorageAndLimits, invalidStorageAndLimits } from "./StorageAndLimits";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { NativeSelect } from "@/components/ui/native-select";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { useCanOperate } from "../../access";
 import { useState, type FormEvent } from "react";
@@ -40,6 +48,7 @@ export function NewApplication() {
   const selected = targets.data?.find(
     (t) => t.id === (target || targets.data?.[0]?.id),
   );
+  const [portMapping, setPortMapping] = useState<Record<string, boolean>>({});
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const capabilities = useQuery({
     queryKey: ["capabilities", selected?.id],
@@ -74,7 +83,12 @@ export function NewApplication() {
     e.preventDefault();
     if (
       !selected ||
-      components.some((c) => invalid[c.editorId] || invalidStorageAndLimits(c))
+      components.some(
+        (c) =>
+          invalid[c.editorId] ||
+          invalidStorageAndLimits(c) ||
+          invalidHostPort(c, !!portMapping[c.editorId]),
+      )
     )
       return;
     mutation.mutate({
@@ -127,17 +141,21 @@ export function NewApplication() {
             </div>
             <div>
               <Label htmlFor="target">Deployment Target</Label>
-              <NativeSelect
-                id="target"
+              <Select
                 value={target || targets.data?.[0]?.id || ""}
-                onChange={(e) => setTarget(e.target.value)}
+                onValueChange={(value) => setTarget(value)}
               >
-                {targets.data?.map((t) => (
-                  <option value={t.id} key={t.id}>
-                    {t.name} · {t.environment}
-                  </option>
-                ))}
-              </NativeSelect>
+                <SelectTrigger id="target" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent position="popper">
+                  {targets.data?.map((t) => (
+                    <SelectItem value={t.id} key={t.id}>
+                      {t.name} · {t.environment}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <ErrorBox error={targets.error} />
@@ -209,21 +227,20 @@ export function NewApplication() {
                 </div>
                 <div>
                   <Label htmlFor={`kind-${i}`}>Component Type</Label>
-                  <NativeSelect
-                    id={`kind-${i}`}
+                  <Select
                     value={c.kind}
                     disabled={!!c.resourceId}
-                    onChange={(e) =>
+                    onValueChange={(value) =>
                       setComponents(
                         components.map((v, n) =>
                           n === i
                             ? {
                                 ...v,
-                                kind: e.target.value as Component["kind"],
-                                port: e.target.value === "worker" ? 0 : 80,
+                                kind: value as Component["kind"],
+                                port: value === "worker" ? 0 : 80,
                                 hostPort: 0,
                                 healthCheck:
-                                  e.target.value === "worker"
+                                  value === "worker"
                                     ? { mode: "image" }
                                     : undefined,
                               }
@@ -232,14 +249,19 @@ export function NewApplication() {
                       )
                     }
                   >
-                    <option value="web">Web Service</option>
-                    <option
-                      value="worker"
-                      disabled={!capabilities.data?.workers}
-                    >
-                      Long-Running Worker
-                    </option>
-                  </NativeSelect>
+                    <SelectTrigger id={`kind-${i}`} className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      <SelectItem value="web">Web Service</SelectItem>
+                      <SelectItem
+                        value="worker"
+                        disabled={!capabilities.data?.workers}
+                      >
+                        Long-Running Worker
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                   {c.kind === "worker" && (
                     <small className="muted">
                       Use an image with a worker entrypoint. Workers have no
@@ -250,24 +272,25 @@ export function NewApplication() {
                 </div>
                 <div>
                   <Label htmlFor={`adopt-${i}`}>Resource Ownership</Label>
-                  <NativeSelect
-                    id={`adopt-${i}`}
+                  <Select
                     disabled={c.kind === "worker"}
-                    value={c.resourceId}
-                    onChange={(e) => {
+                    value={c.resourceId || "new"}
+                    onValueChange={(value) => {
+                      setPortMapping((current) => ({
+                        ...current,
+                        [c.editorId]: false,
+                      }));
                       setInvalid((current) => ({
                         ...current,
                         [c.editorId]: false,
                       }));
-                      const r = resources.data?.find(
-                        (r) => r.id === e.target.value,
-                      );
+                      const r = resources.data?.find((r) => r.id === value);
                       setComponents(
                         components.map((v, n) =>
                           n === i
                             ? {
                                 ...v,
-                                resourceId: e.target.value,
+                                resourceId: value === "new" ? "" : value,
                                 image: r?.image || v.image,
                                 instances: r ? 1 : v.instances,
                                 hostPort: r ? 0 : v.hostPort,
@@ -284,22 +307,27 @@ export function NewApplication() {
                       );
                     }}
                   >
-                    <option value="">
-                      Create a new managed resource on deployment
-                    </option>
-                    {resources.data
-                      ?.filter(
-                        (r) =>
-                          !r.applicationId &&
-                          r.image &&
-                          r.artifactKind === "image",
-                      )
-                      .map((r) => (
-                        <option key={r.id} value={r.id}>
-                          Observe {r.name}
-                        </option>
-                      ))}
-                  </NativeSelect>
+                    <SelectTrigger id={`adopt-${i}`} className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper">
+                      <SelectItem value="new">
+                        Create a new managed resource on deployment
+                      </SelectItem>
+                      {resources.data
+                        ?.filter(
+                          (r) =>
+                            !r.applicationId &&
+                            r.image &&
+                            r.artifactKind === "image",
+                        )
+                        .map((r) => (
+                          <SelectItem key={r.id} value={r.id}>
+                            Observe {r.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 {c.resourceId ? (
                   <OperatorConfiguration component={c} target={selected} />
@@ -364,37 +392,28 @@ export function NewApplication() {
                         />
                       </div>
                     </div>
-                    {c.kind !== "worker" && (
-                      <div>
-                        <Label htmlFor={`host-port-${i}`}>Host Port</Label>
-                        <Input
-                          id={`host-port-${i}`}
-                          type="number"
-                          min="0"
-                          max="65535"
-                          value={c.hostPort}
-                          onChange={(e) =>
-                            setComponents(
-                              components.map((v, n) =>
-                                n === i
-                                  ? { ...v, hostPort: +e.target.value }
-                                  : v,
-                              ),
-                            )
-                          }
-                        />
-                        <small className="muted">
-                          0 adds no host-port mapping. Existing platform routing
-                          remains. A fixed host port requires one instance.
-                        </small>
-                      </div>
-                    )}
+                    <HostPortFields
+                      component={c}
+                      enabled={!!portMapping[c.editorId]}
+                      onEnabledChange={(enabled) =>
+                        setPortMapping({
+                          ...portMapping,
+                          [c.editorId]: enabled,
+                        })
+                      }
+                      onPortChange={(port) =>
+                        setComponents(
+                          components.map((v, n) =>
+                            n === i ? { ...v, hostPort: port } : v,
+                          ),
+                        )
+                      }
+                    />
                   </>
                 )}
               </div>
               {!c.resourceId && (
-                <details className="advanced-configuration">
-                  <summary>Environment and Service Connections</summary>
+                <>
                   <StorageAndLimits
                     component={c}
                     capabilities={capabilities.data}
@@ -406,6 +425,13 @@ export function NewApplication() {
                       )
                     }
                   />
+                </>
+              )}
+              {!c.resourceId && (
+                <Disclosure
+                  className="advanced-configuration"
+                  title={<>Environment and Service Connections</>}
+                >
                   <RuntimeVariables
                     key={`${selected?.id}-${c.editorId}-${c.resourceId}`}
                     component={c}
@@ -431,7 +457,7 @@ export function NewApplication() {
                     }
                     endpointsSupported={!!capabilities.data?.serviceEndpoints}
                   />
-                </details>
+                </Disclosure>
               )}
             </div>
           ))}
@@ -444,9 +470,9 @@ export function NewApplication() {
         </section>
         <ErrorBox error={mutation.error} />
         <div className="form-actions">
-          <Link className="button secondary" to="/">
-            Cancel
-          </Link>
+          <Button asChild variant="outline">
+            <Link to="/">Cancel</Link>
+          </Button>
           <Button
             variant="default"
 
@@ -455,7 +481,10 @@ export function NewApplication() {
               !selected ||
               mutation.isPending ||
               components.some(
-                (c) => invalid[c.editorId] || invalidStorageAndLimits(c),
+                (c) =>
+                  invalid[c.editorId] ||
+                  invalidStorageAndLimits(c) ||
+                  invalidHostPort(c, !!portMapping[c.editorId]),
               )
             }
           >

@@ -1,3 +1,4 @@
+import { Disclosure } from "@/components/Disclosure";
 import { Button } from "@/components/ui/button";
 import { ExistingEnvironment } from "./ExistingEnvironment";
 import { TargetSetup } from "./TargetSetup";
@@ -84,9 +85,9 @@ function TargetCard({ target: t }: { target: Target }) {
             {check.isPending ? "Checking…" : "Verify Connection"}
           </Button>
           {canOperate && (
-            <Link className="button primary" to={`/targets/${t.id}/assemble`}>
-              Group Services
-            </Link>
+            <Button asChild variant="default">
+              <Link to={`/targets/${t.id}/assemble`}>Group Services</Link>
+            </Button>
           )}
           <Button
             variant="outline"
@@ -109,8 +110,10 @@ function TargetCard({ target: t }: { target: Target }) {
         </p>
       )}
       {check.data && (
-        <details className="workflow-ownership">
-          <summary>Adapter Capabilities</summary>
+        <Disclosure
+          className="workflow-ownership"
+          title={<>Adapter Capabilities</>}
+        >
           <p className="small muted">
             Reported adapter support after a read-only connection check.
             Resource eligibility and your access still apply.
@@ -159,7 +162,7 @@ function TargetCard({ target: t }: { target: Target }) {
             Native source build/deploy commands and source management handoff
             are unavailable in OAP. Existing operator triggers remain in place.
           </p>
-        </details>
+        </Disclosure>
       )}
       {discover &&
         (q.isPending ? (

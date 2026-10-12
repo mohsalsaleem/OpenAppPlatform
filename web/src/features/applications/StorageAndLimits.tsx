@@ -1,3 +1,5 @@
+import { Badge } from "@/components/ui/badge";
+import { FieldSet, FieldLegend } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,25 +61,32 @@ export function StorageAndLimits({
   const locked = !!saved?.volumes?.length;
   return (
     <div className="storage-and-limits">
-      <fieldset className="readiness-fields">
-        <legend>Resource Limits</legend>
-        <Label>
-          <Checkbox
-            aria-label={`Set Resource Limits for ${c.name}`}
-            checked={!!c.limits}
-            disabled={!capabilities?.resourceLimits || !!saved?.limits}
-            onCheckedChange={(checked) =>
-              onChange({
-                ...c,
-                limits:
-                  checked === true
-                    ? { memoryMiB: 128, cpuMillis: 250 }
-                    : undefined,
-              })
-            }
-          />{" "}
-          Customize CPU and Memory Limits
-        </Label>
+      <FieldSet className="configuration-section gap-3">
+        <FieldLegend className="mb-0">Resource Limits</FieldLegend>
+        {!saved?.limits && (
+          <Label>
+            <Checkbox
+              aria-label={`Set Resource Limits for ${c.name}`}
+              checked={!!c.limits}
+              disabled={!capabilities?.resourceLimits || !!saved?.limits}
+              onCheckedChange={(checked) =>
+                onChange({
+                  ...c,
+                  limits:
+                    checked === true
+                      ? { memoryMiB: 128, cpuMillis: 250 }
+                      : undefined,
+                })
+              }
+            />{" "}
+            Customize CPU and Memory Limits
+          </Label>
+        )}
+        {saved?.limits && (
+          <Badge variant="secondary" className="w-fit">
+            Custom Limits
+          </Badge>
+        )}
         {c.limits && (
           <div className="form-grid compact">
             <div>
@@ -117,58 +126,88 @@ export function StorageAndLimits({
         {!capabilities?.resourceLimits && (
           <p className="small muted">Unavailable on this target.</p>
         )}
-      </fieldset>
-      <fieldset className="readiness-fields">
-        <legend>Persistent Volumes</legend>
-        {mounts.map((v, i) => (
-          <div className="form-grid compact" key={i}>
-            <div>
-              <Label htmlFor={`volume-name-${c.name}-${i}`}>Volume Name</Label>
-              <Input
-                id={`volume-name-${c.name}-${i}`}
-                value={v.name}
-                readOnly={locked}
-                onChange={(e) =>
-                  onChange({
-                    ...c,
-                    volumes: mounts.map((m, n) =>
-                      n === i ? { ...m, name: e.target.value } : m,
-                    ),
-                  })
-                }
-              />
-            </div>
-            <div>
-              <Label htmlFor={`volume-path-${c.name}-${i}`}>Mount Path</Label>
-              <Input
-                id={`volume-path-${c.name}-${i}`}
-                placeholder="/data"
-                value={v.mountPath}
-                readOnly={locked}
-                onChange={(e) =>
-                  onChange({
-                    ...c,
-                    volumes: mounts.map((m, n) =>
-                      n === i ? { ...m, mountPath: e.target.value } : m,
-                    ),
-                  })
-                }
-              />
-            </div>
-            {!locked && (
-              <Button
-                type="button"
-                variant="ghost"
-                aria-label={`Remove Volume ${i + 1} for ${c.name}`}
-                onClick={() =>
-                  onChange({ ...c, volumes: mounts.filter((_, n) => n !== i) })
-                }
-              >
-                <X size={15} />
-              </Button>
-            )}
-          </div>
-        ))}
+      </FieldSet>
+      <FieldSet className="configuration-section gap-3">
+        <FieldLegend className="mb-0">Persistent Volumes</FieldLegend>
+        {locked ? (
+          <dl
+            className="grid gap-3 sm:grid-cols-2"
+            aria-label="Retained Volume Mounts"
+          >
+            {mounts.map((v) => (
+              <div key={v.name} className="rounded-md bg-muted/50 p-3">
+                <dt className="text-sm font-medium">
+                  {v.name}{" "}
+                  <Badge variant="outline" className="ml-2">
+                    Retained
+                  </Badge>
+                </dt>
+                <dd className="mt-1 font-mono text-sm text-muted-foreground">
+                  {v.mountPath}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : (
+          <>
+            {mounts.map((v, i) => (
+              <div className="form-grid compact" key={i}>
+                <div>
+                  <Label htmlFor={`volume-name-${c.name}-${i}`}>
+                    Volume Name
+                  </Label>
+                  <Input
+                    id={`volume-name-${c.name}-${i}`}
+                    value={v.name}
+                    readOnly={locked}
+                    onChange={(e) =>
+                      onChange({
+                        ...c,
+                        volumes: mounts.map((m, n) =>
+                          n === i ? { ...m, name: e.target.value } : m,
+                        ),
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`volume-path-${c.name}-${i}`}>
+                    Mount Path
+                  </Label>
+                  <Input
+                    id={`volume-path-${c.name}-${i}`}
+                    placeholder="/data"
+                    value={v.mountPath}
+                    readOnly={locked}
+                    onChange={(e) =>
+                      onChange({
+                        ...c,
+                        volumes: mounts.map((m, n) =>
+                          n === i ? { ...m, mountPath: e.target.value } : m,
+                        ),
+                      })
+                    }
+                  />
+                </div>
+                {!locked && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-label={`Remove Volume ${i + 1} for ${c.name}`}
+                    onClick={() =>
+                      onChange({
+                        ...c,
+                        volumes: mounts.filter((_, n) => n !== i),
+                      })
+                    }
+                  >
+                    <X size={15} />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </>
+        )}
         {!locked && (
           <Button
             type="button"
@@ -195,7 +234,7 @@ export function StorageAndLimits({
               ? "One instance. Data is retained; the image must provide a writable mount directory. Mounts stay fixed after saving."
               : "Unavailable on this target."}
         </p>
-      </fieldset>
+      </FieldSet>
       {invalidStorageAndLimits(c) && (
         <p className="error-inline" role="alert">
           Check limit ranges, unique volume names and absolute, non-overlapping

@@ -24,9 +24,9 @@ test("authentication, application setup, release confirmation, and target discov
   await page.getByRole("button", { name: "Add Component" }).click();
   await page.getByLabel("Component Name", { exact: true }).nth(1).fill("api");
   await page
-    .locator("details.advanced-configuration")
+    .locator(".advanced-configuration")
     .filter({ has: page.getByLabel("Environment Variables for web") })
-    .locator("summary")
+    .locator('[data-slot="collapsible-trigger"]')
     .click();
   await page.getByLabel("Environment Variables for web").fill('{"unfinished":');
   await expect(
@@ -78,9 +78,9 @@ test("authentication, application setup, release confirmation, and target discov
     page.getByRole("region", { name: "Configuration Changes" }),
   ).toContainText("nginx:1.28-alpine");
   await page
-    .locator("details.advanced-configuration")
+    .locator(".advanced-configuration")
     .filter({ has: page.getByLabel("Environment Variables for web") })
-    .locator("summary")
+    .locator('[data-slot="collapsible-trigger"]')
     .click();
   await page
     .getByLabel("Environment Variables for web")
@@ -121,7 +121,7 @@ test("authentication, application setup, release confirmation, and target discov
   ).toBeVisible();
   await expect(
     page
-      .locator("details")
+      .locator('[data-slot="collapsible"]')
       .filter({ hasText: "Set Up an Existing Coolify Connection" })
       .locator("pre"),
   ).toContainText('"tokenEnv": "COOLIFY_TOKEN"');
@@ -137,7 +137,7 @@ test("authentication, application setup, release confirmation, and target discov
   ).toBeVisible();
   await page.getByText("Adapter Capabilities", { exact: true }).click();
   const adapterCapabilities = page
-    .locator("details")
+    .locator('[data-slot="collapsible"]')
     .filter({ hasText: "Adapter Capabilities" });
   await expect(adapterCapabilities).toContainText("Blue-green deployment");
   await expect(adapterCapabilities).toContainText("Unavailable in OAP");
@@ -217,9 +217,9 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     .fill(process.env.OAP_TEST_DOCKER_IMAGE!);
   await page.getByLabel("Internal Port", { exact: true }).fill("8080");
   await page
-    .locator("details.advanced-configuration")
+    .locator(".advanced-configuration")
     .filter({ has: page.getByLabel("Environment Variables for web") })
-    .locator("summary")
+    .locator('[data-slot="collapsible-trigger"]')
     .click();
   await page
     .getByLabel("Environment Variables for web")
@@ -252,7 +252,10 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     .getByLabel("Container Image for web")
     .fill(process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!);
   await page.getByLabel("Internal Port for web").fill("8025");
-  await page.getByLabel("Health Check Mode for web").selectOption("http");
+  await page.getByLabel("Health Check Mode for web").click();
+  await page
+    .getByRole("option", { name: "Container HTTP Check", exact: true })
+    .click();
   await page.getByLabel("Health Check Path for web").fill("/health/custom");
   await page.getByText("Check Timing", { exact: true }).click();
   await page.getByLabel("Interval for web (seconds)").fill("1");
@@ -270,9 +273,9 @@ test("deploy, inspect live instances, read logs, and update a Docker application
   ).toBeDisabled();
   await page.getByLabel("Health Check Path for web").fill("/health/custom");
   await page
-    .locator("details.advanced-configuration")
+    .locator(".advanced-configuration")
     .filter({ has: page.getByLabel("Environment Variables for web") })
-    .locator("summary")
+    .locator('[data-slot="collapsible-trigger"]')
     .click();
   await page
     .getByLabel("Environment Variables for web")
@@ -738,9 +741,9 @@ test("secret references save names and block an unauthorized deployment", async 
   const name = `secret-refs-${Date.now()}`;
   await page.getByLabel("Application Name", { exact: true }).fill(name);
   await page
-    .locator("details.advanced-configuration")
+    .locator(".advanced-configuration")
     .filter({ has: page.getByLabel("Environment Variables for web") })
-    .locator("summary")
+    .locator('[data-slot="collapsible-trigger"]')
     .click();
   await page
     .getByLabel("Secret References for web")
@@ -749,9 +752,9 @@ test("secret references save names and block an unauthorized deployment", async 
   await expect(page.getByRole("heading", { name })).toBeVisible();
   await page.getByRole("tab", { name: "Settings" }).click();
   await page
-    .locator("details.advanced-configuration")
+    .locator(".advanced-configuration")
     .filter({ has: page.getByLabel("Environment Variables for web") })
-    .locator("summary")
+    .locator('[data-slot="collapsible-trigger"]')
     .click();
   await expect(page.getByLabel("Secret References for web")).toHaveValue(
     '{\n  "TOKEN": "token-v1"\n}',
@@ -793,10 +796,10 @@ test("a long-running worker deploys beside a web service without HTTP settings",
     .getByLabel("Component Name", { exact: true })
     .nth(1)
     .fill("worker");
+  await page.getByLabel("Component Type", { exact: true }).nth(1).click();
   await page
-    .getByLabel("Component Type", { exact: true })
-    .nth(1)
-    .selectOption("worker");
+    .getByRole("option", { name: "Long-Running Worker", exact: true })
+    .click();
   await page
     .getByLabel("Container Image", { exact: true })
     .nth(1)
@@ -804,17 +807,22 @@ test("a long-running worker deploys beside a web service without HTTP settings",
   await expect(page.getByLabel("Internal Port", { exact: true })).toHaveCount(
     1,
   );
-  await expect(page.getByLabel("Host Port", { exact: true })).toHaveCount(1);
+  await expect(page.getByLabel("Map Host Port for web")).toHaveCount(1);
+  await expect(
+    page.getByLabel("Host Port for web", { exact: true }),
+  ).toHaveCount(0);
   await page.getByRole("button", { name: "Create Application" }).click();
   await expect(page.getByRole("heading", { name })).toBeVisible();
   await page.getByRole("tab", { name: "Settings" }).click();
   await expect(page.getByLabel("Internal Port for worker")).toHaveCount(0);
   await expect(page.getByLabel("Host Port for worker")).toHaveCount(0);
+  await page.getByRole("tab", { name: "worker", exact: true }).click();
+  await page.getByLabel("Health Check Mode for worker").click();
   await expect(
-    page
-      .getByLabel("Health Check Mode for worker")
-      .locator("option[value=http]"),
+    page.getByRole("option", { name: "Container HTTP Check", exact: true }),
   ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.getByRole("tab", { name: "web", exact: true }).click();
   await page.getByLabel("Internal Port for web").fill("8090");
   await page.getByRole("tab", { name: "worker", exact: true }).click();
   await expect(page.getByLabel("Internal Port for web")).not.toBeVisible();
@@ -1019,18 +1027,13 @@ test("persistent volume and limit controls validate and retain saved mount ident
   await expect(
     page.getByText("Configuration saved. Deploy when you are ready."),
   ).toBeVisible();
-  await expect(page.getByLabel("Volume Name", { exact: true })).toHaveAttribute(
-    "readonly",
-    "",
-  );
-  await expect(page.getByLabel("Mount Path", { exact: true })).toHaveAttribute(
-    "readonly",
-    "",
-  );
+  await expect(page.getByLabel("Volume Name", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Mount Path", { exact: true })).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Add Volume", exact: true }),
   ).toHaveCount(0);
-  await expect(page.getByLabel("Set Resource Limits for web")).toBeDisabled();
+  await expect(page.getByLabel("Set Resource Limits for web")).toHaveCount(0);
+  await expect(page.getByText("Custom Limits", { exact: true })).toBeVisible();
   await expect(page.getByLabel("Instances for web")).toHaveAttribute(
     "max",
     "1",
@@ -1048,6 +1051,73 @@ test("persistent volume and limit controls validate and retain saved mount ident
   ]);
   await page.screenshot({
     path: "../.local/ui-persistent-storage.png",
+    fullPage: true,
+  });
+});
+
+test("shared shadcn controls keep styles, keyboard select behavior and explicit port mapping", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByLabel("Platform Access Token")
+    .fill(process.env.OAP_API_TOKEN!);
+  await page.getByRole("button", { name: "Connect to Workspace" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Applications", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("link", { name: "New Application", exact: true })
+    .click();
+  const input = page.getByLabel("Application Name", { exact: true });
+  expect(await input.evaluate((el) => getComputedStyle(el).height)).toBe(
+    "36px",
+  );
+  expect(
+    await page
+      .locator('label[for="app-name"]')
+      .evaluate((el) => getComputedStyle(el).fontSize),
+  ).toBe("14px");
+  await expect(
+    page.getByRole("link", { name: "Cancel", exact: true }),
+  ).toHaveAttribute("data-slot", "button");
+  await expect(
+    page.getByRole("button", { name: "Add Volume", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Host Port for web", { exact: true }),
+  ).toHaveCount(0);
+  await page.getByLabel("Map Host Port for web").check();
+  await expect(
+    page.getByLabel("Host Port for web", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Create Application", exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel("Map Host Port for web").uncheck();
+  const kind = page.getByLabel("Component Type", { exact: true });
+  await kind.focus();
+  await kind.press("ArrowDown");
+  await expect(page.getByRole("listbox")).toBeVisible();
+  await page.screenshot({
+    path: "../.local/ui-shadcn-select.png",
+    fullPage: true,
+  });
+  await page.keyboard.press("Escape");
+  await expect(kind).toBeFocused();
+  const disclosure = page.getByRole("button", {
+    name: "Environment and Service Connections",
+    exact: true,
+  });
+  await disclosure.click();
+  await page.getByLabel("Environment Variables for web").fill('{"unfinished":');
+  await disclosure.click();
+  await disclosure.click();
+  await expect(page.getByLabel("Environment Variables for web")).toHaveValue(
+    '{"unfinished":',
+  );
+  await page.screenshot({
+    path: "../.local/ui-shadcn-new-application.png",
     fullPage: true,
   });
 });

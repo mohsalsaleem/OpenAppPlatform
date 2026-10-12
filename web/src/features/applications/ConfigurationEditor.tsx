@@ -1,3 +1,6 @@
+import { HostPortFields, invalidHostPort } from "./HostPortFields";
+import { FieldSet, FieldLegend } from "@/components/ui/field";
+import { Disclosure } from "@/components/Disclosure";
 import { OperatorConfiguration } from "./OperatorConfiguration";
 import { StorageAndLimits, invalidStorageAndLimits } from "./StorageAndLimits";
 import { Button } from "@/components/ui/button";
@@ -163,14 +166,8 @@ export function ConfigurationEditor({
                 save.isPending ||
                 Object.values(invalid).some(Boolean) ||
                 draft.components.some(invalidStorageAndLimits) ||
-                draft.components.some(
-                  (c) =>
-                    portMapping[c.name] &&
-                    (!c.hostPort ||
-                      c.hostPort < 1024 ||
-                      c.hostPort > 65535 ||
-                      !Number.isInteger(c.hostPort) ||
-                      c.instances !== 1),
+                draft.components.some((c) =>
+                  invalidHostPort(c, !!portMapping[c.name]),
                 ) ||
                 draft.components.some((c) =>
                   invalidHealthCheck(c.healthCheck),
@@ -293,67 +290,27 @@ export function ConfigurationEditor({
                         }
                       />
                       {!c.resourceId && (
-                        <details className="field-help">
-                          <summary>Scaling Help</summary>
+                        <Disclosure
+                          className="field-help"
+                          title={<>Scaling Help</>}
+                        >
                           <p className="small muted">
                             Increase instances and deploy to scale up. Use Scale
                             Down in the overview to retire instances where
                             supported.
                           </p>
-                        </details>
+                        </Disclosure>
                       )}
                     </div>
                   </div>
-                  {c.kind === "web" && (
-                    <div>
-                      <Label>
-                        <Checkbox
-                          aria-label={`Map Host Port for ${c.name}`}
-                          checked={portMapping[c.name] || !!c.hostPort}
-                          disabled={!!c.resourceId || c.instances !== 1}
-                          onCheckedChange={(checked) => {
-                            setPortMapping({
-                              ...portMapping,
-                              [c.name]: checked === true,
-                            });
-                            if (checked !== true) change(i, "hostPort", 0);
-                          }}
-                        />
-                        Map Host Port
-                      </Label>
-                      {(portMapping[c.name] || !!c.hostPort) && (
-                        <>
-                          <Label htmlFor={`config-host-${i}`}>Host Port</Label>
-                          <Input
-                            aria-label={`Host Port for ${c.name}`}
-                            id={`config-host-${i}`}
-                            type="number"
-                            min="1024"
-                            max="65535"
-                            value={c.hostPort || 0}
-                            readOnly={!!c.resourceId}
-                            onChange={(e) =>
-                              change(i, "hostPort", +e.target.value)
-                            }
-                          />
-                          {(!c.hostPort ||
-                            c.hostPort < 1024 ||
-                            c.instances !== 1) && (
-                            <p className="error-inline" role="alert">
-                              Choose a port from 1024–65535 for one instance.
-                            </p>
-                          )}
-                        </>
-                      )}
-                      <details className="field-help">
-                        <summary>Port Mapping Help</summary>
-                        <p className="small muted">
-                          0 adds no host-port mapping. Existing platform routing
-                          remains. A fixed host port requires one instance.
-                        </p>
-                      </details>
-                    </div>
-                  )}
+                  <HostPortFields
+                    component={c}
+                    enabled={!!portMapping[c.name]}
+                    onEnabledChange={(enabled) =>
+                      setPortMapping({ ...portMapping, [c.name]: enabled })
+                    }
+                    onPortChange={(port) => change(i, "hostPort", port)}
+                  />
                 </div>
                 <StorageAndLimits
                   component={c}
@@ -372,11 +329,15 @@ export function ConfigurationEditor({
                   }}
                 />
                 {c.management !== "observe" && (
-                  <details className="dependency-fields">
-                    <summary>
-                      Startup Dependencies for {c.name} (
-                      {c.dependsOn?.length || 0})
-                    </summary>
+                  <Disclosure
+                    className="dependency-fields"
+                    title={
+                      <>
+                        Startup Dependencies for {c.name} (
+                        {c.dependsOn?.length || 0})
+                      </>
+                    }
+                  >
                     <p className="small muted">
                       Selected dependencies must finish every replica’s release
                       readiness. Services outside the release are inspected
@@ -410,11 +371,13 @@ export function ConfigurationEditor({
                         workflow to define dependencies.
                       </p>
                     )}
-                  </details>
+                  </Disclosure>
                 )}
                 {c.management !== "observe" && (
-                  <fieldset className="readiness-fields">
-                    <legend>Deployment Readiness for {c.name}</legend>
+                  <FieldSet className="configuration-section gap-3">
+                    <FieldLegend className="mb-0">
+                      Deployment Readiness for {c.name}
+                    </FieldLegend>
                     {c.healthCheck?.mode === "http" && (
                       <p className="small muted">
                         Healthy status is required by the selected HTTP check.
@@ -452,8 +415,10 @@ export function ConfigurationEditor({
                         })
                       }
                     />
-                    <details className="field-help">
-                      <summary>Readiness Help</summary>
+                    <Disclosure
+                      className="field-help"
+                      title={<>Readiness Help</>}
+                    >
                       <p className="small muted">
                         Starts after provider dispatch, including deployment and
                         readiness waiting. This gate uses the operator-reported
@@ -462,8 +427,8 @@ export function ConfigurationEditor({
                         required. Timeout requires recovery review and does not
                         stop the provider.
                       </p>
-                    </details>
-                  </fieldset>
+                    </Disclosure>
+                  </FieldSet>
                 )}
                 {c.management !== "observe" &&
                   !c.resourceId &&
@@ -479,8 +444,10 @@ export function ConfigurationEditor({
                       onChange={(value) => change(i, "healthCheck", value)}
                     />
                   )}
-                <details className="advanced-configuration">
-                  <summary>Environment and Service Connections</summary>
+                <Disclosure
+                  className="advanced-configuration"
+                  title={<>Environment and Service Connections</>}
+                >
                   <RuntimeVariables
                     component={c}
                     onChange={(field, value) => change(i, field, value)}
@@ -496,16 +463,15 @@ export function ConfigurationEditor({
                     }
                     endpointsSupported={!!capabilities.data?.serviceEndpoints}
                   />
-                </details>
+                </Disclosure>
               </>
             )}
           </TabsContent>
         ))}
       </Tabs>
-      <details>
-        <summary>View Application Definition</summary>
+      <Disclosure title={<>View Application Definition</>}>
         <pre>{JSON.stringify(draft, null, 2)}</pre>
-      </details>
+      </Disclosure>
     </section>
   );
 }

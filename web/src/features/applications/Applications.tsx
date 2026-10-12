@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { useCanOperate } from "../../access";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -28,12 +29,14 @@ export function Applications() {
         </div>
         {canOperate && (
           <div className="log-buttons">
-            <Link className="button primary" to="/targets">
-              Group Existing Services
-            </Link>
-            <Link className="button" to="/applications/new">
-              <Plus size={17} /> New Application
-            </Link>
+            <Button asChild variant="default">
+              <Link to="/targets">Group Existing Services</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/applications/new">
+                <Plus size={17} /> New Application
+              </Link>
+            </Button>
           </div>
         )}
       </div>
@@ -57,9 +60,9 @@ export function Applications() {
             Select services from your existing operator. Their native builds and
             deployments keep working.
           </p>
-          <Link to="/targets" className="button primary">
-            Choose a deployment target
-          </Link>
+          <Button asChild variant="default">
+            <Link to="/targets">Choose a deployment target</Link>
+          </Button>
         </div>
       ) : (
         <div className="app-grid">

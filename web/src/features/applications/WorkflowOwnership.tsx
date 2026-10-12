@@ -1,3 +1,4 @@
+import { Disclosure } from "@/components/Disclosure";
 import type { Application, Capabilities } from "../../api";
 
 export function WorkflowOwnership({
@@ -20,11 +21,15 @@ export function WorkflowOwnership({
       {application.manifest.components.map((component) => {
         const observed = component.management === "observe";
         return (
-          <details key={component.name}>
-            <summary>
-              {component.name} ·{" "}
-              {observed ? "Existing Workflow" : "OAP Image Releases"}
-            </summary>
+          <Disclosure
+            key={component.name}
+            title={
+              <>
+                {component.name} ·{" "}
+                {observed ? "Existing Workflow" : "OAP Image Releases"}
+              </>
+            }
+          >
             {component.kind === "database" ? (
               <p className="small muted">
                 Database lifecycle, credentials, storage and backups remain with
@@ -77,7 +82,7 @@ export function WorkflowOwnership({
                 </dd>
               </dl>
             )}
-          </details>
+          </Disclosure>
         );
       })}
     </section>

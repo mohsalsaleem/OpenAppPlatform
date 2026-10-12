@@ -112,7 +112,6 @@ export function EnvironmentNavigation({
       {canLink && group.environments.length > 1 && (
         <Button
           variant="outline"
-          className="button"
           onClick={() => unlink.mutate()}
           disabled={unlink.isPending}
         >
@@ -148,11 +147,7 @@ export function EnvironmentNavigation({
             Linking changes organization only. Deployments, resource IDs and
             permissions stay with each environment.
           </p>
-          <Button
-            variant="outline"
-            className="button"
-            disabled={!selected || link.isPending}
-          >
+          <Button variant="outline" disabled={!selected || link.isPending}>
             Link Environment
           </Button>
           <ErrorBox error={link.error} />

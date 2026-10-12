@@ -1,5 +1,14 @@
+import { Field } from "@/components/ui/field";
+import { FieldSet, FieldLegend } from "@/components/ui/field";
+import { Disclosure } from "@/components/Disclosure";
 import { Label } from "@/components/ui/label";
-import { NativeSelect } from "@/components/ui/native-select";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import type { HealthCheck } from "../../api";
 const timings = [
@@ -67,17 +76,17 @@ export function HealthCheckFields({
 }) {
   const prefix = `health-${name}`;
   return (
-    <fieldset className="readiness-fields">
-      <legend>Health Check for {name}</legend>
-      <Label>
-        Health Check Mode for {name}
-        <NativeSelect
+    <FieldSet className="configuration-section gap-3">
+      <FieldLegend className="mb-0">Health Check for {name}</FieldLegend>
+      <Field className="gap-2">
+        <Label htmlFor={`${prefix}-mode`}>Health Check Mode for {name}</Label>
+        <Select
           value={h?.mode || "existing"}
-          onChange={(e) =>
+          onValueChange={(value) =>
             onChange(
-              e.target.value === "existing"
+              value === "existing"
                 ? undefined
-                : e.target.value === "image"
+                : value === "image"
                   ? { mode: "image" }
                   : {
                       mode: "http",
@@ -90,13 +99,22 @@ export function HealthCheckFields({
             )
           }
         >
-          {allowExisting && (
-            <option value="existing">Keep Existing Health Check</option>
-          )}
-          {allowHTTP && <option value="http">Container HTTP Check</option>}
-          <option value="image">Use Image Health Check</option>
-        </NativeSelect>
-      </Label>
+          <SelectTrigger id={`${prefix}-mode`} className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            {allowExisting && (
+              <SelectItem value="existing">
+                Keep Existing Health Check
+              </SelectItem>
+            )}
+            {allowHTTP && (
+              <SelectItem value="http">Container HTTP Check</SelectItem>
+            )}
+            <SelectItem value="image">Use Image Health Check</SelectItem>
+          </SelectContent>
+        </Select>
+      </Field>
       {h?.mode === "http" && (
         <>
           <p className="small muted">
@@ -120,8 +138,7 @@ export function HealthCheckFields({
             {pathError(h) ||
               "A path inside this container, for example /health/ready."}
           </p>
-          <details>
-            <summary>Check Timing</summary>
+          <Disclosure title={<>Check Timing</>}>
             <div className="form-grid">
               {timings.map((f) => {
                 const value = h[f.key] ?? f.defaultValue;
@@ -158,20 +175,19 @@ export function HealthCheckFields({
                 );
               })}
             </div>
-          </details>
-          <details>
-            <summary>Container Requirements</summary>
+          </Disclosure>
+          <Disclosure title={<>Container Requirements</>}>
             <p className="small muted">
               Runs HTTP GET at 127.0.0.1 on the container’s internal port. The
               image needs wget (Docker) or curl/wget (Coolify).
             </p>
-          </details>
+          </Disclosure>
         </>
       )}
       <p className="small muted">
         Applies on the next image deployment. An image without a health check
         reports running, with health unknown.
       </p>
-    </fieldset>
+    </FieldSet>
   );
 }

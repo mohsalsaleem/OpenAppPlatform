@@ -263,9 +263,9 @@ export function App() {
                       <p>
                         This page is unavailable. Return to your applications.
                       </p>
-                      <Link className="button primary" to="/">
-                        Go to Applications
-                      </Link>
+                      <Button asChild variant="default">
+                        <Link to="/">Go to Applications</Link>
+                      </Button>
                     </section>
                   }
                 />

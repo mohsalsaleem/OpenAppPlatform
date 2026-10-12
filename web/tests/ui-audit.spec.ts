@@ -251,7 +251,10 @@ test("operational hierarchy, deployment image differences, source result, keyboa
   await expect(
     page.getByRole("heading", { name: "Environment Organization" }),
   ).toHaveCount(0);
-  await page.getByLabel("Health Check Mode for web").selectOption("http");
+  await page.getByLabel("Health Check Mode for web").click();
+  await page
+    .getByRole("option", { name: "Container HTTP Check", exact: true })
+    .click();
   await expect(page.getByLabel("Require Healthy Status for web")).toBeChecked();
   await expect(
     page.getByLabel("Require Healthy Status for web"),
@@ -275,8 +278,8 @@ test("operational hierarchy, deployment image differences, source result, keyboa
     "fixture ready\nrequest completed\n",
   );
   await page.getByRole("tab", { name: "Settings" }).click();
-  await expect(page.getByLabel("Health Check Mode for web")).toHaveValue(
-    "http",
+  await expect(page.getByLabel("Health Check Mode for web")).toHaveText(
+    "Container HTTP Check",
   );
   await expect(page.getByLabel("Health Check Path for web")).toHaveValue(
     "https://outside.example/health",
@@ -286,8 +289,8 @@ test("operational hierarchy, deployment image differences, source result, keyboa
     page.getByRole("button", { name: "Save Configuration" }),
   ).toBeEnabled();
   await page.getByRole("button", { name: "Reload Configuration" }).click();
-  await expect(page.getByLabel("Health Check Mode for web")).toHaveValue(
-    "existing",
+  await expect(page.getByLabel("Health Check Mode for web")).toHaveText(
+    "Keep Existing Health Check",
   );
   await page.getByRole("tab", { name: "Overview" }).click();
   await page.screenshot({

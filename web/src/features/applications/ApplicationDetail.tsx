@@ -1,3 +1,5 @@
+import { FieldSet, FieldLegend } from "@/components/ui/field";
+import { Disclosure } from "@/components/Disclosure";
 import { DatabaseLinkDialog } from "./DatabaseLinkDialog";
 import { Endpoints } from "./Endpoints";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -376,8 +378,7 @@ export function ApplicationDetail() {
                           {c.instances} configured
                         </span>
                       </div>
-                      <details>
-                        <summary>Image Details</summary>
+                      <Disclosure title={<>Image Details</>}>
                         {c.healthCheck && (
                           <p className="small muted">
                             {healthCheckSummary(c.healthCheck)}
@@ -406,7 +407,7 @@ export function ApplicationDetail() {
                         <code className="image-ref">
                           {c.image || "Managed by the platform"}
                         </code>
-                      </details>
+                      </Disclosure>
                       {instances.data?.some(
                         (v) =>
                           !v.retired &&
@@ -531,11 +532,11 @@ export function ApplicationDetail() {
                       {primary.error}
                     </p>
                   )}
-                  <details
+                  <Disclosure
                     className="component-instance-details"
-                    open={expanded}
+                    defaultOpen={expanded}
+                    title={<>Instance Details for {c.name}</>}
                   >
-                    <summary>Instance Details for {c.name}</summary>
                     {rows.map((instance) => (
                       <div
                         className="step"
@@ -599,7 +600,7 @@ export function ApplicationDetail() {
                         </Button>
                       </div>
                     ))}
-                  </details>
+                  </Disclosure>
                 </div>
               );
             })}
@@ -708,15 +709,14 @@ export function ApplicationDetail() {
                         {s.component} / {s.ordinal}
                         {s.action ? ` · ${s.action}` : ""}
                       </strong>
-                      <details>
-                        <summary>Instance Details</summary>
+                      <Disclosure title={<>Instance Details</>}>
                         <p className="small muted">
                           {s.resourceId
                             ? `Resource ${s.resourceId}`
                             : "Resource not prepared"}
                           {s.observed ? ` · ${s.observed}` : ""}
                         </p>
-                      </details>
+                      </Disclosure>
                       {s.error && <p className="error-inline">{s.error}</p>}
                     </div>
                     <Status value={s.phase} />
@@ -914,10 +914,8 @@ export function ApplicationDetail() {
                 ))}
             </div>
           )}
-          <fieldset className="rounded-md border p-3 space-y-3">
-            <legend className="px-1 text-sm font-medium">
-              Components to Deploy
-            </legend>
+          <FieldSet className="gap-3">
+            <FieldLegend>Components to Deploy</FieldLegend>
             {review.manifest.components
               .filter((c) => c.management !== "observe")
               .map((c) => (
@@ -944,7 +942,7 @@ export function ApplicationDetail() {
                 dependencies remain protected.
               </p>
             )}
-          </fieldset>
+          </FieldSet>
           <section
             className="deployment-images"
             aria-label="Deployment image changes"

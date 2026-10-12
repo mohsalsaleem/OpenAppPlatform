@@ -1,6 +1,22 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 :root {
+  --background: var(--surface);
+  --foreground: var(--text-primary);
+  --primary: var(--accent);
+  --primary-foreground: #fff;
+  --secondary: var(--slate-100);
+  --secondary-foreground: var(--slate-700);
+  --muted: var(--slate-100);
+  --muted-foreground: var(--text-muted);
+  --border: var(--border-soft);
+  --input: var(--control-border);
+  --ring: var(--accent);
+  --popover: var(--surface);
+  --popover-foreground: var(--text-primary);
+  --radius: 0.5rem;
+
   --success-text: #047857;
   --slate-900: #0f172a;
   --surface-sidebar: #111827;
@@ -35,7 +51,7 @@
   --warning-surface: #fff0e9;
   --danger-surface: #fff1ef;
   --surface: #ffffff;
-  --control-border: #8695a9;
+  --control-border: #d8dce2;
 }
 :root {
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
@@ -381,12 +397,6 @@ p {
 }
 .compact {
   gap: 12px;
-}
-label {
-  display: block;
-  font-weight: 500;
-  font-size: 11px;
-  margin: 0 0 8px;
 }
 small {
   font-size: 10px;
@@ -857,10 +867,6 @@ h1 {
   font-size: 11px;
   border-radius: 5px;
 }
-label {
-  font-size: 12px;
-  margin-bottom: 6px;
-}
 .configuration-fields {
   margin-top: 14px;
 }
@@ -1084,7 +1090,7 @@ pre {
   font-size: 13px;
 }
 
-.workflow-ownership details {
+.workflow-ownership [data-slot="collapsible"] {
   margin-top: 12px;
 }
 .workflow-ownership dl {
@@ -1109,15 +1115,6 @@ pre {
   }
 }
 
-.readiness-fields {
-  margin: 16px 0;
-  border: 1px solid var(--slate-200);
-  border-radius: 8px;
-  padding: 12px;
-}
-.readiness-fields input[type="number"] {
-  max-width: 180px;
-}
 
 .dependency-fields {
   margin: 12px 0;
@@ -1157,18 +1154,6 @@ pre {
 .section-heading,
 .title-line {
   overflow-wrap: anywhere;
-}
-input:not([type="checkbox"]),
-select,
-textarea {
-  border-color: var(--control-border);
-  max-width: 100%;
-}
-label > input:not([type="checkbox"]),
-label > select {
-  display: block;
-  width: 100%;
-  margin-top: 6px;
 }
 .workspace-settings {
   display: inline-flex;
@@ -1213,7 +1198,7 @@ label > select {
   font-size: 13px;
   margin-bottom: 14px;
 }
-.component-row details,
+.component-row [data-slot="collapsible"],
 .deployment-images {
   margin-top: 8px;
 }
@@ -1221,15 +1206,10 @@ label > select {
   border-bottom: 1px solid var(--border);
   padding: 10px 0;
 }
-summary {
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-}
 .advanced-configuration {
   margin: 14px 0;
 }
-.readiness-fields details {
+.configuration-section [data-slot="collapsible"] {
   margin: 10px 0;
 }
 .application-group {
@@ -1372,20 +1352,22 @@ summary {
 }
 
 @theme inline {
-  --color-background: var(--surface);
-  --color-foreground: var(--text-primary);
-  --color-primary: var(--accent);
-  --color-primary-foreground: #fff;
-  --color-secondary: var(--slate-100);
-  --color-secondary-foreground: var(--slate-700);
-  --color-muted: var(--slate-100);
-  --color-muted-foreground: var(--text-muted);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent-surface);
   --color-accent-foreground: var(--text-primary);
   --color-destructive: var(--danger-text);
-  --color-border: var(--border-soft);
-  --color-input: var(--control-border);
-  --color-ring: var(--accent);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-card: var(--surface);
   --color-card-foreground: var(--text-primary);
 }
@@ -1414,35 +1396,8 @@ summary {
   border-top: 1px solid var(--border-soft);
   margin-top: 4px;
 }
-label:has(> [data-slot="checkbox"]) {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-label > [data-slot="checkbox"] {
-  margin-top: 3px;
-  flex-shrink: 0;
-}
 [data-slot="native-select-wrapper"] {
   width: 100%;
-}
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 500;
-}
-a.button.primary {
-  background: var(--accent);
-  color: white;
-}
-a.button.secondary {
-  background: var(--surface);
-  border: 1px solid var(--border-soft);
 }
 [data-slot="tabs-trigger"] {
   min-height: 36px;
@@ -1483,9 +1438,6 @@ a.button.secondary {
   font-size: 12px;
   color: var(--muted-foreground);
 }
-.field-help summary {
-  cursor: pointer;
-}
 
 .component-actions {
   display: flex;
@@ -1497,12 +1449,15 @@ a.button.secondary {
   margin-top: 8px;
   font-size: 12px;
 }
-.component-instance-details > summary {
-  cursor: pointer;
-  color: var(--muted-foreground);
-}
 @media (max-width: 700px) {
   .component-actions {
     width: 100%;
   }
 }
+
+/* Form layout; appearance and interaction states live in shared UI primitives. */
+.form-grid > div:not(.form-grid) { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.component-form { background: transparent; border: 0; padding: 0; }
+.component-form + .component-form { border-top: 1px solid var(--border-soft); padding-top: 20px; margin-top: 20px; }
+.configuration-section { padding: 16px 0; }
+.storage-and-limits { margin-top: 16px; }
