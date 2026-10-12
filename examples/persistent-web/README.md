@@ -15,3 +15,7 @@ This is an isolated persistence demonstration, not a database or backup service.
 Do not store valuable data without an operator backup and tested restore. The
 example uses one writer; OAP rejects scaling it beyond one instance or changing
 its saved mount. See [the storage contract](../../docs/persistent-volumes.md).
+
+For standalone Docker, use [application.docker.json](application.docker.json) and
+follow [the operator-free walkthrough](../../docs/bare-docker.md). It uses a cached
+local image, the `docker-local` target and loopback port 8793.

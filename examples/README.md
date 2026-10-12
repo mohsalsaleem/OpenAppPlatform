@@ -1,11 +1,16 @@
 # Examples
 
-These are executable JSON manifests for the first milestone. Both examples use
-prebuilt Nginx images and standard deployment. They do not configure public
-routing or automatic balancing. Workers, scheduled jobs, source builds, and
-advanced deployment strategies are intentionally not accepted yet.
+These executable JSON manifests cover web components, connected services,
+long-running workers, linked PostgreSQL dependencies and persistent image
+workloads. Standalone Docker and Coolify are supported execution paths. Standard
+deployment can cause downtime; scheduled jobs and advanced rollout strategies
+remain deferred.
 
 ## Configure a target
+
+For standalone Docker, follow [the operator-free setup](../docs/bare-docker.md)
+and use `docker-target.json`. No operator account or credentials are required.
+The following target setup is for Coolify.
 
 Copy targets.json to .local/targets.json, replace the placeholder IDs with a
 non-production project and server, and set COOLIFY_TOKEN in .env.local. The token

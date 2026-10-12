@@ -56,6 +56,9 @@ using Coolify; direct Docker targets use a configured local socket, and it opera
 
 ## Examples
 
+For an operator-free setup, follow [standalone Docker](docs/bare-docker.md),
+including the persistent-volume example.
+
 See [examples](examples/README.md) for a single-component app, a two-component
 app, target configuration, and adoption. Creating a definition does not deploy.
 Standard deployment can restart workloads and cause downtime. Instances are
@@ -84,9 +87,9 @@ npm --prefix web run build  # TypeScript and production UI build
 python3 scripts/run-local.py npm --prefix web run test:e2e
 ```
 
-Browser tests require the local server and a configured Coolify staging target;
-they create application definitions and perform read-only discovery. Install
-Chromium once with cd web && npx playwright install chromium.
+The default browser suite uses the isolated standalone Docker target; Coolify
+credentials are not required. `make test-local` supplies the server, daemon and
+browser. External Coolify tests are opt-in.
 
 The opt-in live suite requires COOLIFY_URL, COOLIFY_TOKEN, COOLIFY_PROJECT_ID,
 COOLIFY_SERVER_ID, COOLIFY_ENVIRONMENT=staging, COOLIFY_TEST_IMAGE as an immutable
@@ -122,7 +125,8 @@ credentials. It does not mutate an external Coolify installation. Live fixtures 
 ## Deployment
 
 The Dockerfile builds the UI and Go binary into a non-root image. Supply a
-PostgreSQL database, first-run setup secret, operator credentials, and a mounted target config;
+PostgreSQL database, first-run setup secret, and a mounted target config;
+operator credentials are needed only for operator targets.
 pass -targets /path/to/targets.json. The controller can run through Coolify or on
 Docker directly. The direct Docker adapter manages explicitly owned application containers through
 a local Unix socket; no separate scheduler is required.

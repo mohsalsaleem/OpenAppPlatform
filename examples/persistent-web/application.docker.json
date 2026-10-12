@@ -1,0 +1,33 @@
+{
+  "name": "docker-persistent-preview",
+  "environment": "staging",
+  "targetId": "docker-local",
+  "components": [
+    {
+      "name": "web",
+      "kind": "web",
+      "image": "oap-persistent-web:dev",
+      "port": 8080,
+      "instances": 1,
+      "strategy": "standard",
+      "volumes": [
+        {
+          "name": "data",
+          "mountPath": "/data"
+        }
+      ],
+      "limits": {
+        "memoryMiB": 128,
+        "cpuMillis": 250
+      },
+      "healthCheck": {
+        "mode": "image"
+      },
+      "readiness": {
+        "requireHealthy": true,
+        "timeoutSeconds": 120
+      },
+      "hostPort": 8793
+    }
+  ]
+}
