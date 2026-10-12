@@ -42,6 +42,9 @@ func (c *Client) CheckHealthCheck(ctx context.Context, ref string, component dom
 			return err
 		}
 	}
+	if err := c.checkStorageAndLimits(ctx, ref, component); err != nil {
+		return err
+	}
 	if component.HealthCheck == nil {
 		return nil
 	}

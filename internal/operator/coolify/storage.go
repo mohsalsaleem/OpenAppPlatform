@@ -5,10 +5,67 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
 )
+
+func applyStorageSafety(data map[string]any, component domain.Component) {
+	if len(component.Volumes) > 0 {
+		data["is_consistent_container_name_enabled"] = true
+	}
+}
+
+func (c *Client) checkStorageAndLimits(ctx context.Context, id string, component domain.Component) error {
+	if len(component.Volumes) == 0 && component.Limits == nil {
+		return nil
+	}
+	var current struct {
+		Memory   string `json:"limits_memory"`
+		CPUs     string `json:"limits_cpus"`
+		Settings struct {
+			Consistent bool `json:"is_consistent_container_name_enabled"`
+		} `json:"settings"`
+	}
+	if err := c.request(ctx, "GET", "/applications/"+url.PathEscape(id), nil, &current); err != nil {
+		return errors.New("native storage and limits cannot be verified")
+	}
+	if l := component.Limits; l != nil {
+		cpu, err := strconv.ParseFloat(current.CPUs, 64)
+		if err != nil || cpu != float64(l.CPUMillis)/1000 || current.Memory != strconv.Itoa(l.MemoryMiB)+"m" {
+			return errors.New("native resource limits differ from the definition")
+		}
+	}
+	if len(component.Volumes) == 0 {
+		return nil
+	}
+	if !current.Settings.Consistent {
+		return errors.New("persistent components require Coolify consistent container names to prevent overlapping writers")
+	}
+	var mounts storages
+	if err := c.request(ctx, "GET", "/applications/"+url.PathEscape(id)+"/storages", nil, &mounts); err != nil {
+		return err
+	}
+	if len(mounts.Files) > 0 || len(mounts.Persistent) != len(component.Volumes) {
+		return errors.New("native persistent mounts differ from the definition")
+	}
+	seen := map[string]bool{}
+	for _, v := range mounts.Persistent {
+		matched := false
+		for _, m := range component.Volumes {
+			if v.Name == id+"-oap-"+m.Name && v.MountPath == m.MountPath && (v.HostPath == nil || *v.HostPath == "") && !seen[m.Name] {
+				seen[m.Name] = true
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return errors.New("native persistent mounts differ from the definition")
+		}
+	}
+	return nil
+}
 
 func applyLimits(data map[string]any, component domain.Component) {
 	if component.Limits != nil {

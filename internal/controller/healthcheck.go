@@ -8,7 +8,7 @@ import (
 )
 
 func verifyHealthCheck(ctx context.Context, adapter operator.Adapter, resource string, component domain.Component, prepared bool) error {
-	if component.HealthCheck == nil {
+	if component.HealthCheck == nil && len(component.Volumes) == 0 && component.Limits == nil {
 		return nil
 	}
 	checker, ok := adapter.(operator.HealthCheckVerifier)

@@ -26,7 +26,10 @@ Persistent components require one instance. Saved mounts cannot be renamed,
 removed, moved or extended through configuration editing. OAP never requests
 volume deletion, host bind mounts, or shared storage. Restart and standard
 replacement reuse the same data. Standard replacement stops the previous writer
-before starting the new one and can cause downtime. Image rollback for a
+before starting the new one and can cause downtime. Coolify persistent
+components enable and verify its consistent-container-name setting to prevent
+native rolling overlap; unavailable settings hold preparation. Explicit limits
+and mounts are rechecked before dispatch and while observing the release. Image rollback for a
 persistent component requires operator review; OAP does not restore data or
 claim that old application code can read a newer data format.
 

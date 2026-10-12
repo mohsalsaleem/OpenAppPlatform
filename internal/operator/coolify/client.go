@@ -229,8 +229,12 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 			data["ports_mappings"] = fmt.Sprintf("%d:%d", s.Component.HostPort, s.Component.Port)
 		}
 		applyLimits(data, s.Component)
+		applyStorageSafety(data, s.Component)
 		applyHealthCheck(data, s.Component)
 		if e = c.request(ctx, "PATCH", "/applications/"+url.PathEscape(found.ID), data, nil); e != nil {
+			return operator.Resource{}, e
+		}
+		if e = c.checkStorageAndLimits(ctx, found.ID, s.Component); e != nil {
 			return operator.Resource{}, e
 		}
 		return *found, nil
@@ -247,6 +251,7 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	}
 	applyHealthCheck(data, s.Component)
 	applyLimits(data, s.Component)
+	applyStorageSafety(data, s.Component)
 	var result struct {
 		UUID string `json:"uuid"`
 	}
@@ -260,6 +265,9 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 		return operator.Resource{}, e
 	}
 	if e = c.syncVariables(ctx, result.UUID, s); e != nil {
+		return operator.Resource{}, e
+	}
+	if e = c.checkStorageAndLimits(ctx, result.UUID, s.Component); e != nil {
 		return operator.Resource{}, e
 	}
 	return operator.Resource{ID: result.UUID, Name: s.Name, Description: s.Ownership, Image: s.Component.Image}, nil

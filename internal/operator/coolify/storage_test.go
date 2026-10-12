@@ -67,3 +67,53 @@ func TestStoragePreparationRetriesAndPreservesNativeMounts(t *testing.T) {
 		t.Fatal(data)
 	}
 }
+
+func TestPersistentWriterModeAndLimitsMustRemainConfigured(t *testing.T) {
+	consistent := true
+	memory := "128m"
+	path := "/data"
+	writes := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "GET" {
+			writes++
+			w.WriteHeader(500)
+			return
+		}
+		if r.URL.Path == "/api/v1/applications/native" {
+			json.NewEncoder(w).Encode(map[string]any{"limits_memory": memory, "limits_cpus": "0.250", "settings": map[string]bool{"is_consistent_container_name_enabled": consistent}})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"persistent_storages": []any{map[string]string{"name": "native-oap-data", "mount_path": path}}, "file_storages": []any{}})
+	}))
+	defer srv.Close()
+	client, err := New(domain.Target{URL: srv.URL}, "fixture")
+	if err != nil {
+		t.Fatal(err)
+	}
+	component := domain.Component{Volumes: []domain.VolumeMount{{Name: "data", MountPath: "/data"}}, Limits: &domain.ResourceLimits{MemoryMiB: 128, CPUMillis: 250}}
+	data := map[string]any{}
+	applyStorageSafety(data, component)
+	if data["is_consistent_container_name_enabled"] != true {
+		t.Fatal("single writer mode omitted")
+	}
+	if err := client.checkStorageAndLimits(context.Background(), "native", component); err != nil {
+		t.Fatal(err)
+	}
+	consistent = false
+	if err := client.checkStorageAndLimits(context.Background(), "native", component); err == nil {
+		t.Fatal("native rolling overlap accepted")
+	}
+	consistent = true
+	memory = "256m"
+	if err := client.checkStorageAndLimits(context.Background(), "native", component); err == nil {
+		t.Fatal("limit drift ignored")
+	}
+	memory = "128m"
+	path = "/other"
+	if err := client.checkStorageAndLimits(context.Background(), "native", component); err == nil {
+		t.Fatal("mount drift ignored")
+	}
+	if writes != 0 {
+		t.Fatal("verification mutated provider")
+	}
+}
