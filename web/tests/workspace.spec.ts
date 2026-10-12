@@ -64,6 +64,7 @@ test("authentication, application setup, release confirmation, and target discov
   await expect(
     page.getByRole("heading", { name: "Runtime Configuration" }),
   ).toBeVisible();
+  await page.getByRole("tab", { name: "web", exact: true }).click();
   await page.getByLabel("Require Healthy Status for web").check();
   await page.getByLabel("Observation Timeout for web (seconds)").fill("120");
   await expect(
@@ -237,7 +238,7 @@ test("deploy, inspect live instances, read logs, and update a Docker application
   await page.getByRole("tab", { name: "Overview" }).click();
   const live = page
     .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Live Instances" }) });
+    .filter({ has: page.getByRole("heading", { name: "Components" }) });
   await expect(live).toContainText("Healthy", { timeout: 15000 });
   await page.getByRole("button", { name: "View web instance 1 logs" }).click();
   await expect(page.locator(".log-output")).toContainText("fixture", {
@@ -298,6 +299,7 @@ test("deploy, inspect live instances, read logs, and update a Docker application
     })
     .toBe(process.env.OAP_TEST_DOCKER_REPLACEMENT_IMAGE!);
   await expect(page.locator(".release-banner")).toContainText("Completed");
+  await page.getByText("Image Details", { exact: true }).click();
   await expect(
     page.getByText("HTTP GET /health/custom", { exact: false }).first(),
   ).toBeVisible();
@@ -802,7 +804,28 @@ test("a long-running worker deploys beside a web service without HTTP settings",
       .getByLabel("Health Check Mode for worker")
       .locator("option[value=http]"),
   ).toHaveCount(0);
+  await page.getByLabel("Internal Port for web").fill("8090");
+  await page.getByRole("tab", { name: "worker", exact: true }).click();
+  await expect(page.getByLabel("Internal Port for web")).not.toBeVisible();
   await page.getByLabel("Require Healthy Status for worker").check();
+  await page.getByRole("tab", { name: "web", exact: true }).click();
+  await expect(page.getByLabel("Internal Port for web")).toHaveValue("8090");
+  await page.getByLabel("Internal Port for web").fill("8080");
+  await page.getByLabel("Map Host Port for web").check();
+  await expect(
+    page.getByRole("button", { name: "Save Configuration" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText("Choose a port from 1024–65535 for one instance."),
+  ).toBeVisible();
+  await page.getByLabel("Map Host Port for web").uncheck();
+  await expect(
+    page.getByLabel("Host Port for web", { exact: true }),
+  ).toHaveCount(0);
+  await page.screenshot({
+    path: "../.local/ui-compact-settings.png",
+    fullPage: true,
+  });
   await page.getByRole("button", { name: "Save Configuration" }).click();
   await expect(
     page.getByText("Configuration saved. Deploy when you are ready."),

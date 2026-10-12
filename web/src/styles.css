@@ -56,14 +56,6 @@ a {
   text-decoration: none;
 }
 
-
-
-
-
-
-
-
-
 .shell {
   display: flex;
   min-height: 100vh;
@@ -577,9 +569,6 @@ pre {
   margin-top: 25px;
 }
 
-
-
-
 @media (max-width: 900px) {
   .sidebar {
     width: 190px;
@@ -695,9 +684,6 @@ pre {
     font-size: 10px;
   }
 }
-
-
-
 
 .configuration-fields {
   margin-top: 20px;
@@ -1385,7 +1371,6 @@ summary {
   overflow-wrap: anywhere;
 }
 
-
 @theme inline {
   --color-background: var(--surface);
   --color-foreground: var(--text-primary);
@@ -1405,17 +1390,99 @@ summary {
   --color-card-foreground: var(--text-primary);
 }
 @layer base {
-  * { @apply border-border; }
-  h1, h2, h3 { @apply font-semibold tracking-tight; }
+  * {
+    @apply border-border;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-semibold tracking-tight;
+  }
 }
 /* Layout only; controls are owned by the shadcn primitives. */
-[data-slot="dialog-content"] { max-height: calc(100dvh - 2rem); overflow-y: auto; }
-[data-slot="dialog-content"] > p { color: var(--text-muted); font-size: 13px; line-height: 1.6; }
-[data-slot="dialog-content"] .form-actions { padding-top: 16px; border-top: 1px solid var(--border-soft); margin-top: 4px; }
-label:has(> [data-slot="checkbox"]) { display: flex; align-items: flex-start; gap: 8px; }
-label > [data-slot="checkbox"] { margin-top: 3px; flex-shrink: 0; }
-[data-slot="native-select-wrapper"] { width: 100%; }
-.button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 6px; padding: 8px 12px; font-size: 13px; font-weight: 500; }
-a.button.primary { background: var(--accent); color: white; }
-a.button.secondary { background: var(--surface); border: 1px solid var(--border-soft); }
-[data-slot="tabs-trigger"] { min-height: 36px; }
+[data-slot="dialog-content"] {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}
+[data-slot="dialog-content"] > p {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+[data-slot="dialog-content"] .form-actions {
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+  margin-top: 4px;
+}
+label:has(> [data-slot="checkbox"]) {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+label > [data-slot="checkbox"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+[data-slot="native-select-wrapper"] {
+  width: 100%;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+}
+a.button.primary {
+  background: var(--accent);
+  color: white;
+}
+a.button.secondary {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+}
+[data-slot="tabs-trigger"] {
+  min-height: 36px;
+}
+
+/* Compact component operations and configuration selection. */
+.component-group + .component-group {
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+.component-group .component-row {
+  border: 0;
+  padding-bottom: 6px;
+}
+.component-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+.component-group .step {
+  padding: 10px 0;
+}
+.component-form[hidden] {
+  display: none;
+}
+.component-selector {
+  margin: 16px 0;
+}
+.component-selector [role="tablist"] {
+  flex-wrap: wrap;
+  height: auto;
+}
+.field-help {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.field-help summary {
+  cursor: pointer;
+}
