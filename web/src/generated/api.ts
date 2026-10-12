@@ -1997,6 +1997,8 @@ export interface components {
             };
             /** @description Descriptive PostgreSQL endpoint without credentials, query or fragment; existing observe-only database only. */
             databaseEndpoint?: string;
+            volumes?: components["schemas"]["VolumeMount"][];
+            limits?: components["schemas"]["ResourceLimits"];
         };
         Manifest: {
             name: string;
@@ -2131,6 +2133,8 @@ export interface components {
             /** @description OAP-owned long-running image workers; no ports, public endpoints or HTTP overrides. */
             workers: boolean;
             databaseLinks: boolean;
+            namedVolumes: boolean;
+            resourceLimits: boolean;
         };
         Restart: {
             component: string;
@@ -2232,6 +2236,8 @@ export interface components {
             };
             /** @description Descriptive PostgreSQL endpoint without credentials, query or fragment; existing observe-only database only. */
             databaseEndpoint?: string;
+            volumes?: components["schemas"]["VolumeMount"][];
+            limits?: components["schemas"]["ResourceLimits"];
         };
         ManifestInput: {
             name: string;
@@ -2304,6 +2310,14 @@ export interface components {
             message: string;
             /** Format: date-time */
             checkedAt: string;
+        };
+        VolumeMount: {
+            name: string;
+            mountPath: string;
+        };
+        ResourceLimits: {
+            memoryMiB: number;
+            cpuMillis: number;
         };
     };
     responses: never;

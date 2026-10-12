@@ -1,3 +1,4 @@
+import { StorageAndLimits, invalidStorageAndLimits } from "./StorageAndLimits";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -70,7 +71,11 @@ export function NewApplication() {
   });
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (!selected || components.some((c) => invalid[c.editorId])) return;
+    if (
+      !selected ||
+      components.some((c) => invalid[c.editorId] || invalidStorageAndLimits(c))
+    )
+      return;
     mutation.mutate({
       name,
       targetId: selected.id,
@@ -261,6 +266,8 @@ export function NewApplication() {
                                 image: r?.image || v.image,
                                 instances: r ? 1 : v.instances,
                                 hostPort: r ? 0 : v.hostPort,
+                                volumes: r ? [] : v.volumes,
+                                limits: r ? undefined : v.limits,
                                 env: {},
                                 secretRefs: {},
                                 services: {},
@@ -372,6 +379,17 @@ export function NewApplication() {
               </div>
               <details className="advanced-configuration">
                 <summary>Environment and Service Connections</summary>
+                <StorageAndLimits
+                  component={c}
+                  capabilities={capabilities.data}
+                  onChange={(next) =>
+                    setComponents(
+                      components.map((v, n) =>
+                        n === i ? { ...v, ...next } : v,
+                      ),
+                    )
+                  }
+                />
                 <RuntimeVariables
                   key={`${selected?.id}-${c.editorId}-${c.resourceId}`}
                   component={c}
@@ -419,7 +437,9 @@ export function NewApplication() {
               !canOperate ||
               !selected ||
               mutation.isPending ||
-              components.some((c) => invalid[c.editorId])
+              components.some(
+                (c) => invalid[c.editorId] || invalidStorageAndLimits(c),
+              )
             }
           >
             {mutation.isPending ? "Creating…" : "Create Application"}

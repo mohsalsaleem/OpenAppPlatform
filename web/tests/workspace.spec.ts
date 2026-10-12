@@ -956,3 +956,87 @@ test("link an existing PostgreSQL resource with reviewed observe-only actions", 
     fullPage: true,
   });
 });
+
+test("persistent volume and limit controls validate and retain saved mount identity", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByLabel("Platform Access Token")
+    .fill(process.env.OAP_API_TOKEN!);
+  await page.getByRole("button", { name: "Connect to Workspace" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Applications", exact: true }),
+  ).toBeVisible();
+  const response = await page.request.post("/api/v1/applications", {
+    headers: { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` },
+    data: {
+      name: `storage-browser-${Date.now()}`,
+      environment: "staging",
+      targetId: "test-docker",
+      components: [
+        {
+          name: "web",
+          kind: "web",
+          image: process.env.OAP_TEST_DOCKER_IMAGE,
+          port: 8080,
+          instances: 1,
+          strategy: "standard",
+        },
+      ],
+    },
+  });
+  expect(response.status()).toBe(201);
+  const app = await response.json();
+  await page.goto(`/applications/${app.id}`);
+  await page.getByRole("tab", { name: "Settings", exact: true }).click();
+  await page.getByLabel("Set Resource Limits for web").check();
+  await page.getByLabel("Memory (MiB)", { exact: true }).fill("256");
+  await page.getByLabel("CPU (millicores)", { exact: true }).fill("500");
+  await page.getByRole("button", { name: "Add Volume", exact: true }).click();
+  await page.getByLabel("Volume Name", { exact: true }).fill("uploads");
+  await page
+    .getByLabel("Mount Path", { exact: true })
+    .fill("/var/run/docker.sock");
+  await expect(
+    page.getByRole("button", { name: "Save Configuration", exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel("Mount Path", { exact: true }).fill("/data/uploads");
+  await page
+    .getByRole("button", { name: "Save Configuration", exact: true })
+    .click();
+  await expect(
+    page.getByText("Configuration saved. Deploy when you are ready."),
+  ).toBeVisible();
+  await expect(page.getByLabel("Volume Name", { exact: true })).toHaveAttribute(
+    "readonly",
+    "",
+  );
+  await expect(page.getByLabel("Mount Path", { exact: true })).toHaveAttribute(
+    "readonly",
+    "",
+  );
+  await expect(
+    page.getByRole("button", { name: "Add Volume", exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByLabel("Set Resource Limits for web")).toBeDisabled();
+  await expect(page.getByLabel("Instances for web")).toHaveAttribute(
+    "max",
+    "1",
+  );
+  const saved = await page.request.get(`/api/v1/applications/${app.id}`, {
+    headers: { Authorization: `Bearer ${process.env.OAP_API_TOKEN}` },
+  });
+  const definition = await saved.json();
+  expect(definition.manifest.components[0].limits).toEqual({
+    memoryMiB: 256,
+    cpuMillis: 500,
+  });
+  expect(definition.manifest.components[0].volumes).toEqual([
+    { name: "uploads", mountPath: "/data/uploads" },
+  ]);
+  await page.screenshot({
+    path: "../.local/ui-persistent-storage.png",
+    fullPage: true,
+  });
+});

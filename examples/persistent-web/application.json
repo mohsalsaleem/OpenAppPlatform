@@ -1,0 +1,17 @@
+{
+  "name": "persistent-preview",
+  "environment": "staging",
+  "targetId": "your-target",
+  "components": [{
+    "name": "web",
+    "kind": "web",
+    "image": "your-registry/persistent-web:preview",
+    "port": 8080,
+    "instances": 1,
+    "strategy": "standard",
+    "volumes": [{ "name": "data", "mountPath": "/data" }],
+    "limits": { "memoryMiB": 128, "cpuMillis": 250 },
+    "healthCheck": { "mode": "image" },
+    "readiness": { "requireHealthy": true, "timeoutSeconds": 120 }
+  }]
+}

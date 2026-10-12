@@ -1,3 +1,4 @@
+import { StorageAndLimits, invalidStorageAndLimits } from "./StorageAndLimits";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -111,7 +112,9 @@ export function ConfigurationEditor({
       | Record<string, string>
       | Component["healthCheck"]
       | Component["readiness"]
-      | string[],
+      | string[]
+      | Component["volumes"]
+      | Component["limits"],
   ) {
     setSaved(false);
     setDraft({
@@ -152,6 +155,7 @@ export function ConfigurationEditor({
               stale ||
               save.isPending ||
               Object.values(invalid).some(Boolean) ||
+              draft.components.some(invalidStorageAndLimits) ||
               draft.components.some(
                 (c) =>
                   portMapping[c.name] &&
@@ -265,9 +269,9 @@ export function ConfigurationEditor({
                     id={`config-instances-${i}`}
                     type="number"
                     min={base.manifest.components[i].instances}
-                    max={c.resourceId ? 1 : 4}
+                    max={c.resourceId || c.volumes?.length ? 1 : 4}
                     value={c.instances}
-                    readOnly={!!c.resourceId}
+                    readOnly={!!c.resourceId || !!c.volumes?.length}
                     onChange={(e) => change(i, "instances", +e.target.value)}
                   />
                   {!c.resourceId && (
@@ -331,6 +335,20 @@ export function ConfigurationEditor({
                 </div>
               )}
             </div>
+            <StorageAndLimits
+              component={c}
+              saved={base.manifest.components.find((v) => v.name === c.name)}
+              capabilities={capabilities.data}
+              onChange={(next) => {
+                setSaved(false);
+                setDraft({
+                  ...draft,
+                  components: draft.components.map((v, n) =>
+                    n === i ? next : v,
+                  ),
+                });
+              }}
+            />
             {c.management !== "observe" && (
               <details className="dependency-fields">
                 <summary>

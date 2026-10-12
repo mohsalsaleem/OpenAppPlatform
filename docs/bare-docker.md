@@ -90,3 +90,7 @@ count is committed only after every selected container is stopped and identified
 Partial progress stays visible; uncertain stop outcomes require observation
 recovery. Stopped bindings remain reserved and can be reactivated during later
 scale-up. Retired instances started directly in Docker are shown as drift.
+
+Named mounts and CPU/memory limits are available for owned image components. See
+[persistent volumes and resource limits](persistent-volumes.md) for retention,
+permissions, one-writer restrictions and operator-managed backups.

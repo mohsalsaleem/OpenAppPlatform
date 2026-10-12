@@ -8,6 +8,8 @@ import (
 )
 
 type Capabilities struct {
+	NamedVolumes      bool `json:"namedVolumes"`
+	ResourceLimits    bool `json:"resourceLimits"`
 	DatabaseLinks     bool `json:"databaseLinks"`
 	Workers           bool `json:"workers"`
 	HTTPHealthChecks  bool `json:"httpHealthChecks"`
@@ -63,6 +65,12 @@ type Restarter interface {
 
 func ValidateRuntime(m domain.Manifest, caps Capabilities) error {
 	for _, c := range m.Components {
+		if len(c.Volumes) > 0 && !caps.NamedVolumes {
+			return fmt.Errorf("target does not support named volumes for %s", c.Name)
+		}
+		if c.Limits != nil && !caps.ResourceLimits {
+			return fmt.Errorf("target does not support resource limits for %s", c.Name)
+		}
 		if c.Kind == "database" && !caps.DatabaseLinks {
 			return fmt.Errorf("target does not support existing database links for %s", c.Name)
 		}

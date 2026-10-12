@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
 	"net/url"
 	"strconv"
 	"strings"
@@ -16,6 +17,9 @@ func (c *Client) CheckRollbackConfiguration(ctx context.Context, ref string, com
 	}
 	if !c.owned(container) || len(container.Mounts) != 0 {
 		return errors.New("rollback requires an owned container without mounted data")
+	}
+	if err := c.checkLimits(container, operator.Spec{Component: component}); err != nil {
+		return err
 	}
 	expectedKey := strconv.Itoa(component.Port) + "/tcp"
 	count := 0

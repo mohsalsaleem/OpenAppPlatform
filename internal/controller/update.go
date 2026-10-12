@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
 	"maps"
+	"slices"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store/db"
@@ -84,6 +85,12 @@ func (c *Controller) updateApplicationTx(ctx context.Context, tx pgx.Tx, id stri
 		old, ok := existing[comp.Name]
 		if !ok || old.Kind != comp.Kind || old.DatabaseEndpoint != comp.DatabaseEndpoint || old.ResourceID != comp.ResourceID || old.Management != comp.Management {
 			return domain.Application{}, errors.New("component identity and resource adoption cannot change through configuration editing")
+		}
+		if old.Limits != nil && comp.Limits == nil {
+			return domain.Application{}, errors.New("saved limits require explicit replacement values")
+		}
+		if len(old.Volumes) > 0 && !slices.Equal(old.Volumes, comp.Volumes) {
+			return domain.Application{}, errors.New("saved volume mounts cannot be changed or removed; migrate data through the operator")
 		}
 		if old.HealthCheck != nil && comp.HealthCheck == nil {
 			return domain.Application{}, errors.New("select image health check explicitly to remove a managed HTTP override")

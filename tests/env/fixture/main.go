@@ -23,6 +23,24 @@ func main() {
 	log.Printf("fixture %s listening on %s", version, port)
 	boot := fmt.Sprint(time.Now().UnixNano())
 	mux := http.NewServeMux()
+	if os.Getenv("FIXTURE_VOLUME") == "enabled" {
+		mux.HandleFunc("POST /volume", func(w http.ResponseWriter, r *http.Request) {
+			b, err := io.ReadAll(io.LimitReader(r.Body, 1024))
+			if err != nil || os.WriteFile("/data/marker", b, 0600) != nil {
+				http.Error(w, "volume write failed", 500)
+				return
+			}
+			w.WriteHeader(204)
+		})
+		mux.HandleFunc("GET /volume", func(w http.ResponseWriter, r *http.Request) {
+			b, err := os.ReadFile("/data/marker")
+			if err != nil {
+				http.Error(w, "volume read failed", 500)
+				return
+			}
+			w.Write(b)
+		})
+	}
 	mux.HandleFunc("GET /upstream", func(w http.ResponseWriter, r *http.Request) {
 		endpoint := os.Getenv("UPSTREAM_URL")
 		if endpoint == "" {

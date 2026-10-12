@@ -2,7 +2,7 @@ ARG ALPINE_IMAGE
 FROM ${ALPINE_IMAGE}
 ARG BINARY
 ARG PORT
-RUN adduser -D -u 10001 fixture
+RUN adduser -D -u 10001 fixture && mkdir /data && chown fixture:fixture /data
 USER fixture
 COPY ${BINARY} /fixture
 ENV FIXTURE_PORT=${PORT}

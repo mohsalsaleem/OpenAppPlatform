@@ -151,6 +151,9 @@ func (c *Controller) rollbackPlan(ctx context.Context, tx pgx.Tx, app domain.App
 		if comp.Name == "" || (!registryContentRef.MatchString(comp.Image) && !(target.Operator == "docker" && dockerContentID.MatchString(comp.Image))) {
 			return plan, original, rollbackInvalid("rollback image must be a recorded registry digest or Docker content ID")
 		}
+		if len(comp.Volumes) > 0 {
+			return plan, original, rollbackInvalid("persistent components require operator review of data compatibility before image rollback")
+		}
 		instanceKey := step.Component + ":" + strconv.Itoa(step.Ordinal)
 		if step.Ordinal < 1 || step.Ordinal > comp.Instances || uniqueInstances[instanceKey] {
 			return plan, original, rollbackInvalid("source snapshot has invalid or duplicate instance verification")

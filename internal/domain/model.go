@@ -27,6 +27,8 @@ type ReadinessPolicy struct {
 }
 
 type Component struct {
+	Volumes          []VolumeMount     `json:"volumes,omitempty"`
+	Limits           *ResourceLimits   `json:"limits,omitempty"`
 	DatabaseEndpoint string            `json:"databaseEndpoint,omitempty"`
 	HealthCheck      *HealthCheck      `json:"healthCheck,omitempty"`
 	DependsOn        []string          `json:"dependsOn,omitempty"`
@@ -69,6 +71,9 @@ func (m *Manifest) Validate() error {
 			return errors.New("component names must be unique lowercase slugs")
 		}
 		names[c.Name] = true
+		if err := c.ValidateStorageAndLimits(); err != nil {
+			return err
+		}
 		if c.Management != "" && c.Management != "observe" {
 			return errors.New("management must be observe or omitted for existing managed components")
 		}

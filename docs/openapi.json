@@ -4271,6 +4271,16 @@
             "type": "string",
             "maxLength": 1024,
             "description": "Descriptive PostgreSQL endpoint without credentials, query or fragment; existing observe-only database only."
+          },
+          "volumes": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "$ref": "#/components/schemas/VolumeMount"
+            }
+          },
+          "limits": {
+            "$ref": "#/components/schemas/ResourceLimits"
           }
         },
         "required": [
@@ -4747,6 +4757,12 @@
           },
           "databaseLinks": {
             "type": "boolean"
+          },
+          "namedVolumes": {
+            "type": "boolean"
+          },
+          "resourceLimits": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -4764,7 +4780,9 @@
           "discovery",
           "immutableImages",
           "workers",
-          "databaseLinks"
+          "databaseLinks",
+          "namedVolumes",
+          "resourceLimits"
         ],
         "additionalProperties": false
       },
@@ -5074,6 +5092,16 @@
             "type": "string",
             "maxLength": 1024,
             "description": "Descriptive PostgreSQL endpoint without credentials, query or fragment; existing observe-only database only."
+          },
+          "volumes": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "$ref": "#/components/schemas/VolumeMount"
+            }
+          },
+          "limits": {
+            "$ref": "#/components/schemas/ResourceLimits"
           }
         },
         "required": [
@@ -5380,6 +5408,44 @@
           "checkedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "VolumeMount": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "mountPath"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,47}$"
+          },
+          "mountPath": {
+            "type": "string",
+            "maxLength": 256
+          }
+        }
+      },
+      "ResourceLimits": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "memoryMiB",
+          "cpuMillis"
+        ],
+        "properties": {
+          "memoryMiB": {
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 65536
+          },
+          "cpuMillis": {
+            "type": "integer",
+            "minimum": 50,
+            "maximum": 64000
           }
         }
       }

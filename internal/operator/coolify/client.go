@@ -38,7 +38,7 @@ func New(t domain.Target, token string) (*Client, error) {
 	return &Client{base: strings.TrimRight(t.URL, "/"), token: token, target: t, http: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) Capabilities() operator.Capabilities {
-	return operator.Capabilities{DatabaseLinks: true, Workers: true, HTTPHealthChecks: true, ImageRollback: true, ManagementHandoff: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ServiceEndpoints: true}
+	return operator.Capabilities{NamedVolumes: true, ResourceLimits: true, DatabaseLinks: true, Workers: true, HTTPHealthChecks: true, ImageRollback: true, ManagementHandoff: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ServiceEndpoints: true}
 }
 func (c *Client) request(ctx context.Context, method, path string, input, output any) error {
 	var body io.Reader
@@ -183,6 +183,9 @@ func splitImage(image string) (string, string) {
 	return image, "latest"
 }
 func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource, error) {
+	if err := s.Component.ValidateStorageAndLimits(); err != nil {
+		return operator.Resource{}, err
+	}
 	if s.Component.Kind == "database" {
 		return operator.Resource{}, errors.New("database lifecycle remains owned by the operator")
 	}
@@ -214,6 +217,9 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 				return operator.Resource{}, e
 			}
 		}
+		if e = c.syncStorage(ctx, found.ID, s); e != nil {
+			return operator.Resource{}, e
+		}
 		if e = c.syncVariables(ctx, found.ID, s); e != nil {
 			return operator.Resource{}, e
 		}
@@ -222,6 +228,7 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 		if s.Component.HostPort != 0 {
 			data["ports_mappings"] = fmt.Sprintf("%d:%d", s.Component.HostPort, s.Component.Port)
 		}
+		applyLimits(data, s.Component)
 		applyHealthCheck(data, s.Component)
 		if e = c.request(ctx, "PATCH", "/applications/"+url.PathEscape(found.ID), data, nil); e != nil {
 			return operator.Resource{}, e
@@ -239,6 +246,7 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 		data["autogenerate_domain"] = false
 	}
 	applyHealthCheck(data, s.Component)
+	applyLimits(data, s.Component)
 	var result struct {
 		UUID string `json:"uuid"`
 	}
@@ -247,6 +255,9 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	}
 	if result.UUID == "" {
 		return operator.Resource{}, errors.New("Coolify create returned no resource id")
+	}
+	if e = c.syncStorage(ctx, result.UUID, s); e != nil {
+		return operator.Resource{}, e
 	}
 	if e = c.syncVariables(ctx, result.UUID, s); e != nil {
 		return operator.Resource{}, e

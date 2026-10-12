@@ -55,6 +55,9 @@ func (c *Client) network(ctx context.Context, ownership string) (string, error) 
 	return name, e
 }
 func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource, error) {
+	if err := s.Component.ValidateStorageAndLimits(); err != nil {
+		return operator.Resource{}, err
+	}
 	if s.Component.Kind == "database" {
 		return operator.Resource{}, errors.New("database lifecycle remains owned by the operator")
 	}
@@ -69,7 +72,23 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 		if !c.owned(active) || active.Config.Labels[prefix+"owner"] != s.Ownership || active.Config.Labels[prefix+"reference"] != s.Name {
 			return operator.Resource{}, errors.New("container name belongs to another owner")
 		}
+		if len(active.Mounts) > 0 && len(s.Component.Volumes) == 0 && active.Config.Labels[prefix+"revision"] != rev {
+			return operator.Resource{}, errors.New("replacement cannot omit existing mounted data; review storage through the operator")
+		}
+		if len(s.Component.Volumes) > 0 && (len(active.Mounts) > 0 || active.Config.Labels[prefix+"revision"] == rev) {
+			if err := c.checkMounts(active, s); err != nil {
+				return operator.Resource{}, err
+			}
+		}
 		if active.Config.Labels[prefix+"revision"] == rev {
+			if err := c.checkLimits(active, s); err != nil {
+				return operator.Resource{}, err
+			}
+			if len(s.Component.Volumes) > 0 {
+				if _, err := c.mounts(ctx, s); err != nil {
+					return operator.Resource{}, err
+				}
+			}
 			return c.projection(active), nil
 		}
 	} else if !isStatus(e, 404) {
@@ -82,6 +101,19 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 			return operator.Resource{}, errors.New("candidate container belongs to another owner")
 		}
 		if candidate.Config.Labels[prefix+"revision"] == rev {
+			if len(s.Component.Volumes) > 0 {
+				if err := c.checkMounts(candidate, s); err != nil {
+					return operator.Resource{}, err
+				}
+			}
+			if err := c.checkLimits(candidate, s); err != nil {
+				return operator.Resource{}, err
+			}
+			if len(s.Component.Volumes) > 0 {
+				if _, err := c.mounts(ctx, s); err != nil {
+					return operator.Resource{}, err
+				}
+			}
 			return operator.Resource{ID: s.Name, Name: s.Name, Image: s.Component.Image, ArtifactKind: "image", Status: "prepared"}, nil
 		}
 		if e = c.removeStopped(ctx, candidate); e != nil {
@@ -97,6 +129,17 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	port := strconv.Itoa(s.Component.Port) + "/tcp"
 	labels := map[string]string{prefix + "target": c.target.ID, prefix + "environment": c.target.Environment, prefix + "reference": s.Name, prefix + "owner": s.Ownership, prefix + "revision": rev, prefix + "artifact": s.Component.Image, prefix + "port": strconv.Itoa(s.Component.Port)}
 	host := map[string]any{"NetworkMode": network, "RestartPolicy": map[string]string{"Name": "unless-stopped"}, "Memory": int64(128 << 20), "NanoCpus": int64(250000000)}
+	if s.Component.Limits != nil {
+		host["Memory"] = int64(s.Component.Limits.MemoryMiB) << 20
+		host["NanoCpus"] = int64(s.Component.Limits.CPUMillis) * 1000000
+	}
+	if len(s.Component.Volumes) > 0 {
+		mounts, err := c.mounts(ctx, s)
+		if err != nil {
+			return operator.Resource{}, err
+		}
+		host["Mounts"] = mounts
+	}
 	if s.Component.HostPort != 0 {
 		host["PortBindings"] = map[string]any{port: []map[string]string{{"HostIp": c.settings.HostBindIP, "HostPort": strconv.Itoa(s.Component.HostPort)}}}
 	}

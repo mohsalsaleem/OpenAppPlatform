@@ -16,6 +16,10 @@ export function ConfigurationDiff({
   after: Manifest;
 }) {
   const rows: { field: string; before: string; after: string }[] = [];
+  const limitsText = (v: Manifest["components"][number]["limits"]) =>
+    v ? `${v.memoryMiB} MiB · ${v.cpuMillis / 1000} CPU` : "Native Defaults";
+  const volumeText = (v: Manifest["components"][number]["volumes"]) =>
+    v?.length ? v.map((m) => `${m.name} → ${m.mountPath}`).join(", ") : "None";
   const text = (v: unknown) => (v === undefined ? "Not set" : String(v));
   for (const c of after.components) {
     const old = before.components.find((o) => o.name === c.name);
@@ -26,6 +30,20 @@ export function ConfigurationDiff({
           field: `${c.name} · ${field}`,
           before: text(old[field]),
           after: text(c[field]),
+        });
+    }
+    for (const field of ["limits", "volumes"] as const) {
+      if (
+        JSON.stringify(old[field] ?? null) !== JSON.stringify(c[field] ?? null)
+      )
+        rows.push({
+          field: `${c.name} · ${field === "limits" ? "Resource Limits" : "Persistent Volumes"}`,
+          before:
+            field === "limits"
+              ? limitsText(old.limits)
+              : volumeText(old.volumes),
+          after:
+            field === "limits" ? limitsText(c.limits) : volumeText(c.volumes),
         });
     }
     const previousDependencies =
