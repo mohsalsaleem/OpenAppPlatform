@@ -43,7 +43,8 @@ project, its network, and its socket/data volumes.
 The image build rejects sqlc/OpenAPI generation drift using pinned generators,
 then checks Go static analysis and TypeScript/Vite compilation. The
 runner executes all packages containing Go tests with the race detector, including
-PostgreSQL system tests and the real Docker lifecycle/replacement test. It then
+PostgreSQL system tests and the real Docker lifecycle/replacement test. It also builds the shipping image and runs the [packaged installation drill](installation.md)
+against a separate owner-mode metadata database in the disposable Engine. It then
 starts a fresh platform and runs browser setup/configuration/target-discovery
 checks and a real MCP stdio handshake/application read.
 

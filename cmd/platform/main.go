@@ -45,6 +45,13 @@ func run() error {
 	if preview && len(os.Getenv("OAP_API_TOKEN")) < 24 {
 		return errors.New("OAP_API_TOKEN must contain at least 24 characters")
 	}
+	addr := os.Getenv("OAP_ADDR")
+	if addr == "" {
+		addr = "127.0.0.1:8787"
+	}
+	if e := validateHTTPBinding(addr, preview, os.Getenv("OAP_COOKIE_SECURE") != "false", os.Getenv("OAP_LOCAL_HTTP_PUBLISHED_IP")); e != nil {
+		return e
+	}
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
 		return errors.New("DATABASE_URL is required")
@@ -149,16 +156,6 @@ func run() error {
 		defer cancel()
 		c.Jobs.Stop(stop)
 	}()
-	addr := os.Getenv("OAP_ADDR")
-	if addr == "" {
-		addr = "127.0.0.1:8787"
-	}
-	if preview || os.Getenv("OAP_COOKIE_SECURE") == "false" {
-		host, _, err := net.SplitHostPort(addr)
-		if err != nil || net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback() {
-			return errors.New("preview mode or insecure local cookies require a loopback bind address")
-		}
-	}
 	server := platformServer(ctx, addr, (&httpapi.Server{Preview: preview, SetupToken: os.Getenv("OAP_SETUP_TOKEN"), SecureCookie: os.Getenv("OAP_COOKIE_SECURE") != "false", Controller: c, Token: os.Getenv("OAP_API_TOKEN"), WebDir: *web}).Handler())
 	listener, e := net.Listen("tcp", addr)
 	if e != nil {

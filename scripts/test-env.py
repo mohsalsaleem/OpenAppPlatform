@@ -111,7 +111,7 @@ def run(keep=False):
     container = None
     try:
         build = docker + ['build', '--pull=false', '-f', 'tests/env/Dockerfile', '-t', runner]
-        build += ['--build-arg', 'GO_IMAGE=' + versions['OAP_TEST_GO_IMAGE'], '--build-arg', 'BROWSER_IMAGE=' + versions['OAP_TEST_BROWSER_IMAGE'], str(context)]
+        build += ['--build-arg', 'GO_IMAGE=' + versions['OAP_TEST_GO_IMAGE'], '--build-arg', 'BROWSER_IMAGE=' + versions['OAP_TEST_BROWSER_IMAGE'], '--build-arg', 'ENGINE_IMAGE=' + versions['OAP_TEST_ENGINE_IMAGE'], str(context)]
         command(build, env)
         extraction = run_dir / 'fixture-build'
         extraction.mkdir()
@@ -123,7 +123,10 @@ def run(keep=False):
         command(docker + ['rm', container], env)
         container = None
         shutil.copyfile(ROOT / 'tests/env/fixture/Dockerfile', extraction / 'Dockerfile')
-        fixture_tags = []
+        runtime_tag = 'openappplatform-test-install:' + project
+        env['OAP_TEST_PLATFORM_IMAGE'] = runtime_tag
+        command(docker + ['build', '--pull=false', '--label', 'io.openappplatform.test-cache=true', '-t', runtime_tag, '--build-arg', 'NODE_IMAGE=' + versions['OAP_TEST_BROWSER_IMAGE'], '--build-arg', 'GO_IMAGE=' + versions['OAP_TEST_GO_IMAGE'], '--build-arg', 'RUNTIME_IMAGE=' + versions['OAP_TEST_ALPINE_IMAGE'], str(context)], env)
+        fixture_tags = [runtime_tag]
         for version, port in [('v1', '8080'), ('v2', '8025')]:
             tag = env['OAP_TEST_FIXTURE_' + version.upper()]
             fixture_tags.append(tag)

@@ -1,11 +1,14 @@
-FROM node:22-alpine AS web
+ARG NODE_IMAGE=node:22-alpine
+ARG GO_IMAGE=golang:1.26-alpine
+ARG RUNTIME_IMAGE=alpine:3.23
+FROM ${NODE_IMAGE} AS web
 WORKDIR /web
 COPY web/package*.json ./
 RUN npm ci
 COPY web/ ./
 RUN npm run build
 
-FROM golang:1.26-alpine AS backend
+FROM ${GO_IMAGE} AS backend
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -13,7 +16,7 @@ COPY cmd/ cmd/
 COPY internal/ internal/
 RUN CGO_ENABLED=0 go build -trimpath -o /platform ./cmd/platform && CGO_ENABLED=0 go build -trimpath -o /oap-mcp ./cmd/oap-mcp && CGO_ENABLED=0 go build -trimpath -o /oap-admin ./cmd/oap-admin && CGO_ENABLED=0 go build -trimpath -o /oap-build-client ./cmd/oap-build-client
 
-FROM alpine:3.23
+FROM ${RUNTIME_IMAGE} AS runtime
 RUN apk add --no-cache ca-certificates && adduser -D -u 10001 platform
 WORKDIR /app
 COPY --from=backend /platform /app/platform

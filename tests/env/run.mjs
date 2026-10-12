@@ -39,6 +39,7 @@ try{
   report.steps.at(-1).package=packages[index];report.steps.at(-1).skipped=skipped;await persist();
   if(skipped.some(name=>!report.expectedSkips.includes(name)))throw Error(`Unexpected test skip: ${skipped.join(', ')}`);
  }
+ await run('installation','python3',['tests/env/installation.py'],'/workspace',360000);
  async function dockerRequest(path,body) {
   return await new Promise((resolve,reject)=>{ const req=http.request({socketPath:env.OAP_TEST_DOCKER_SOCKET,path:'/v1.45'+path,method:'POST',headers:{'Content-Type':'application/json'}},res=>{let raw='';res.on('data',b=>raw+=b);res.on('end',()=>{if(res.statusCode<200||res.statusCode>=300)return reject(Error('observation fixture HTTP '+res.statusCode));resolve(raw?JSON.parse(raw):{})})});req.on('error',reject);if(body)req.write(JSON.stringify(body));req.end(); });
  }

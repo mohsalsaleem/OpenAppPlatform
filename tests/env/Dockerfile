@@ -1,5 +1,7 @@
 ARG GO_IMAGE
 ARG BROWSER_IMAGE
+ARG ENGINE_IMAGE
+FROM ${ENGINE_IMAGE} AS cli
 FROM ${GO_IMAGE} AS core
 LABEL io.openappplatform.test-cache="true"
 WORKDIR /workspace
@@ -33,6 +35,8 @@ COPY web/package.json web/package-lock.json ./web/
 RUN PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm --prefix web ci
 COPY . .
 COPY --from=core /opt/oap /opt/oap
+COPY --from=cli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=cli /usr/local/libexec/docker/cli-plugins/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
 COPY --from=core /go/bin/sqlc /usr/local/bin/sqlc
 RUN node -e 'const p=require("./web/node_modules/@playwright/test/package.json");if(p.version!=="1.64.0")throw Error("Playwright browser/package versions must match")' && python3 scripts/generate.py --check && python3 scripts/check-contract.py && npm --prefix web run build
 ENTRYPOINT ["node", "/workspace/tests/env/run.mjs"]

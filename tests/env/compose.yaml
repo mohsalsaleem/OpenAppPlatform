@@ -21,6 +21,7 @@ services:
     command: ['dockerd', '--host=unix:///run/oap-test/docker.sock', '--storage-driver=overlay2']
     volumes:
       - docker-socket:/run/oap-test
+      - ${OAP_TEST_RUN_DIR:?}:/report
     tmpfs:
       - /var/lib/docker:exec,size=1073741824
     healthcheck:
@@ -40,6 +41,7 @@ services:
     environment:
       TEST_DATABASE_URL: postgres://oap:oap-test-only@postgres:5432/oap_test?sslmode=disable
       OAP_TEST_DOCKER_SOCKET: /run/oap-test/docker.sock
+      OAP_TEST_PLATFORM_IMAGE: ${OAP_TEST_PLATFORM_IMAGE:?}
       OAP_TEST_APPLICATION_IMAGE: ${OAP_TEST_APPLICATION_IMAGE:?}
       OAP_TEST_DATABASE_IMAGE: ${OAP_TEST_DATABASE_IMAGE:?}
       OAP_TEST_WORKER_IMAGE: ${OAP_TEST_WORKER_IMAGE:?}

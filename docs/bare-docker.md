@@ -16,6 +16,9 @@ The adapter uses Engine API v1.45 and requires a compatible daemon. Socket acces
 is privileged; configure targets on the server rather than accepting arbitrary
 socket paths from application manifests.
 
+For the packaged non-root installation, use the [owner installation guide](installation.md).
+The source-development walkthrough below remains available.
+
 ## Start without an operator
 
 From the repository root, prepare the Docker target and the compiled UI:
@@ -49,8 +52,8 @@ Use the development database credentials only for this local walkthrough.
 
 A containerized OAP installation needs an explicitly mounted Unix socket and
 permission for its non-root runtime to access it; a target URL alone does not
-provide that access. Do not make the socket world-writable. Container installation
-packaging is tracked in P0.5.
+provide that access. Do not make the socket world-writable. The [installation package](installation.md) probes the container-visible socket group
+and configures the non-root runtime without changing host permissions.
 
 ## Offline example
 
@@ -66,8 +69,8 @@ private. Fixed host ports require one instance; multi-instance routing is not
 implemented. Docker networks provide component aliases but are not health-aware
 load balancers.
 
-pullPolicy defaults to never. if-missing enables public registry pulling; private
-registry authentication is a future capability. Existing cached images can be
+pullPolicy defaults to never. if-missing enables registry pulling; [private pull references](private-registry-access.md)
+provide scoped credentials. Existing cached images can be
 used without any registry connection. Image tags are convenient for development;
 use digest references for portable artifact identity.
 

@@ -54,3 +54,23 @@ func TestProcessShutdownClosesAnOpenEventStream(t *testing.T) {
 		t.Fatal("stream did not close cleanly", string(body), e)
 	}
 }
+
+func TestInsecureHTTPRequiresLoopbackAndCannotWidenPreview(t *testing.T) {
+	for _, v := range []struct {
+		addr, published          string
+		preview, secure, allowed bool
+	}{
+		{"127.0.0.1:8787", "", false, false, true},
+		{"0.0.0.0:8787", "", false, false, false},
+		{"0.0.0.0:8787", "127.0.0.1", false, false, true},
+		{"0.0.0.0:8787", "0.0.0.0", false, false, false},
+		{"0.0.0.0:8787", "localhost", false, false, false},
+		{"0.0.0.0:8787", "127.0.0.1", true, false, false},
+		{"127.0.0.1:8787", "", true, false, true},
+		{"0.0.0.0:8787", "", false, true, true},
+	} {
+		if got := validateHTTPBinding(v.addr, v.preview, v.secure, v.published) == nil; got != v.allowed {
+			t.Fatalf("unexpected binding admission: %+v", v)
+		}
+	}
+}

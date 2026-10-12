@@ -67,5 +67,25 @@ func (s *Store) migrateFS(ctx context.Context, source fs.FS) error {
 			return e
 		}
 	}
+	rows, e := tx.Query(ctx, "SELECT version FROM oap_schema_migrations")
+	if e != nil {
+		return e
+	}
+	for rows.Next() {
+		var version int
+		if e = rows.Scan(&version); e != nil {
+			rows.Close()
+			return e
+		}
+		if !seen[version] {
+			rows.Close()
+			return errors.New("database contains migrations unknown to this image; downgrade is not compatible")
+		}
+	}
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return e
+	}
 	return tx.Commit(ctx)
 }

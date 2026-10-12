@@ -106,6 +106,8 @@ credentials. It does not mutate an external Coolify installation. Live fixtures 
 
 ## Documentation
 
+- [Owner-mode installation, updates and metadata recovery](docs/installation.md)
+
 - [Roadmap](ROADMAP.md)
 
 - [Product and architecture](docs/product-and-architecture.md)

@@ -155,7 +155,7 @@ configuration for linked resources remains in the operator; direct configuration
 uses consistent Button, Field, Select and Collapsible patterns. Prevent legacy
 global label/control styles and hand-styled link buttons from returning.
 
-**Current priority:** P0.5 repeatable installation, after the P0.4 final local/staging acceptance gate. Standalone Docker uses scoped private pull references and Coolify retains its native server login. P0.1 runtime secret references,
+**Current priority:** P0.5 repeatable installation. P0.4 passed the final local/staging acceptance gate. Standalone Docker uses scoped private pull references and Coolify retains its native server login. P0.1 runtime secret references,
 P0.2 workers and P0.3 existing database links passed local and isolated Coolify
 staging acceptance. The first four-component breadth milestone is delivered. Finish everyday configuration
 and repeatable installation next. The priority correction below is the authoritative execution order.
@@ -244,6 +244,17 @@ a completed acceptance gate into another round of hardening unless a reproducibl
 failure prevents the stated journey or violates an existing security/authority
 boundary. Complete the local gate and an authorized staging walkthrough before
 claiming delivery; record unsupported capabilities without quietly widening scope.
+
+**P0.5 implementation:** owner-mode Compose packaging, immutable image references,
+container-visible Docker socket group configuration and operator-only setup are
+implemented. Containerized local owner HTTP required a small prerequisite: an
+explicit loopback-publication declaration derived from the Compose bind IP.
+Public insecure-cookie bindings and container-wide preview remain rejected. Quiesced metadata archives restore only into new offline databases;
+read-only image preflight and startup reject incompatible migration ledgers.
+Acceptance is the fresh packaged owner/four-component journey, process recovery,
+compatible image replacement/rollback and isolated metadata restore, followed by
+the existing staging journey. This does not automate stale-backup reconciliation
+or application-data restore. See [installation](docs/installation.md).
 
 **Parked until this queue is delivered:** general domain creation, connection
 draining, general bare-Docker routing, rolling/blue-green deployment, source-backed

@@ -19,8 +19,22 @@ func main() {
 	}
 }
 func run() error {
+	if len(os.Args) == 2 && os.Args[1] == "check-schema" {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		s, e := store.Open(ctx, os.Getenv("DATABASE_URL"))
+		if e != nil {
+			return fmt.Errorf("cannot connect to the installation database")
+		}
+		defer s.Pool.Close()
+		if e = s.CheckSchema(ctx); e != nil {
+			return e
+		}
+		fmt.Println("Image accepts the applied metadata migration ledger.")
+		return nil
+	}
 	if len(os.Args) != 2 || os.Args[1] != "reset-owner-password" {
-		return fmt.Errorf("usage: oap-admin reset-owner-password < password-file")
+		return fmt.Errorf("usage: oap-admin check-schema | reset-owner-password < password-file")
 	}
 	raw, e := io.ReadAll(io.LimitReader(os.Stdin, 258))
 	if e != nil {
