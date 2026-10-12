@@ -544,6 +544,14 @@ test("group existing Docker services without deploying or restarting", async ({
     page.getByRole("heading", { name: "Observing Existing Services" }),
   ).toBeVisible();
   await page.getByRole("tab", { name: "Settings" }).click();
+  await expect(
+    page.getByRole("region", { name: "Inherited Configuration for web" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Container Image for web")).toHaveCount(0);
+  await expect(page.getByLabel("Instances for web")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Save Configuration", exact: true }),
+  ).toHaveCount(0);
   const observedWorkflow = page.getByRole("region", {
     name: "Workflow Ownership",
   });
@@ -947,10 +955,13 @@ test("link an existing PostgreSQL resource with reviewed observe-only actions", 
     page.getByText("Scaling Help", { exact: true }),
   ).not.toBeVisible();
   await expect(page.getByLabel("Internal Port for database")).toHaveCount(0);
-  await expect(page.getByLabel("Container Image for database")).toHaveAttribute(
-    "readonly",
-    "",
-  );
+  await expect(page.getByLabel("Container Image for database")).toHaveCount(0);
+  await expect(
+    page.getByRole("region", { name: "Inherited Configuration for database" }),
+  ).toContainText("Runtime configuration stays");
+  await expect(
+    page.getByRole("button", { name: "Save Configuration", exact: true }),
+  ).toHaveCount(0);
   await page.screenshot({
     path: "../.local/ui-database-settings.png",
     fullPage: true,

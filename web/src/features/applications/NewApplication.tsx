@@ -1,3 +1,4 @@
+import { OperatorConfiguration } from "./OperatorConfiguration";
 import { StorageAndLimits, invalidStorageAndLimits } from "./StorageAndLimits";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -254,6 +255,10 @@ export function NewApplication() {
                     disabled={c.kind === "worker"}
                     value={c.resourceId}
                     onChange={(e) => {
+                      setInvalid((current) => ({
+                        ...current,
+                        [c.editorId]: false,
+                      }));
                       const r = resources.data?.find(
                         (r) => r.id === e.target.value,
                       );
@@ -296,126 +301,138 @@ export function NewApplication() {
                       ))}
                   </NativeSelect>
                 </div>
-                <div>
-                  <Label htmlFor={`image-${i}`}>Container Image</Label>
-                  <Input
-                    id={`image-${i}`}
-                    value={c.image}
-                    readOnly={!!c.resourceId}
-                    onChange={(e) =>
-                      setComponents(
-                        components.map((v, n) =>
-                          n === i ? { ...v, image: e.target.value } : v,
-                        ),
-                      )
-                    }
-                    required
-                  />
-                  <small className="muted">
-                    Use an image digest for reproducible releases.
-                  </small>
-                </div>
-                <div className="form-grid compact">
-                  {c.kind !== "worker" && (
+                {c.resourceId ? (
+                  <OperatorConfiguration component={c} target={selected} />
+                ) : (
+                  <>
                     <div>
-                      <Label htmlFor={`port-${i}`}>Internal Port</Label>
+                      <Label htmlFor={`image-${i}`}>Container Image</Label>
                       <Input
-                        id={`port-${i}`}
-                        type="number"
-                        min="1"
-                        max="65535"
-                        value={c.port}
+                        id={`image-${i}`}
+                        value={c.image}
+                        readOnly={!!c.resourceId}
                         onChange={(e) =>
                           setComponents(
                             components.map((v, n) =>
-                              n === i ? { ...v, port: +e.target.value } : v,
+                              n === i ? { ...v, image: e.target.value } : v,
                             ),
                           )
                         }
+                        required
                       />
+                      <small className="muted">
+                        Use an image digest for reproducible releases.
+                      </small>
                     </div>
-                  )}
-                  <div>
-                    <Label htmlFor={`instances-${i}`}>Instances</Label>
-                    <Input
-                      id={`instances-${i}`}
-                      type="number"
-                      min="1"
-                      max={c.resourceId ? "1" : "4"}
-                      value={c.instances}
-                      onChange={(e) =>
-                        setComponents(
-                          components.map((v, n) =>
-                            n === i ? { ...v, instances: +e.target.value } : v,
-                          ),
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-                {c.kind !== "worker" && (
-                  <div>
-                    <Label htmlFor={`host-port-${i}`}>Host Port</Label>
-                    <Input
-                      id={`host-port-${i}`}
-                      type="number"
-                      min="0"
-                      max="65535"
-                      value={c.hostPort}
-                      onChange={(e) =>
-                        setComponents(
-                          components.map((v, n) =>
-                            n === i ? { ...v, hostPort: +e.target.value } : v,
-                          ),
-                        )
-                      }
-                    />
-                    <small className="muted">
-                      0 adds no host-port mapping. Existing platform routing
-                      remains. A fixed host port requires one instance.
-                    </small>
-                  </div>
+                    <div className="form-grid compact">
+                      {c.kind !== "worker" && (
+                        <div>
+                          <Label htmlFor={`port-${i}`}>Internal Port</Label>
+                          <Input
+                            id={`port-${i}`}
+                            type="number"
+                            min="1"
+                            max="65535"
+                            value={c.port}
+                            onChange={(e) =>
+                              setComponents(
+                                components.map((v, n) =>
+                                  n === i ? { ...v, port: +e.target.value } : v,
+                                ),
+                              )
+                            }
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <Label htmlFor={`instances-${i}`}>Instances</Label>
+                        <Input
+                          id={`instances-${i}`}
+                          type="number"
+                          min="1"
+                          max={c.resourceId ? "1" : "4"}
+                          value={c.instances}
+                          onChange={(e) =>
+                            setComponents(
+                              components.map((v, n) =>
+                                n === i
+                                  ? { ...v, instances: +e.target.value }
+                                  : v,
+                              ),
+                            )
+                          }
+                        />
+                      </div>
+                    </div>
+                    {c.kind !== "worker" && (
+                      <div>
+                        <Label htmlFor={`host-port-${i}`}>Host Port</Label>
+                        <Input
+                          id={`host-port-${i}`}
+                          type="number"
+                          min="0"
+                          max="65535"
+                          value={c.hostPort}
+                          onChange={(e) =>
+                            setComponents(
+                              components.map((v, n) =>
+                                n === i
+                                  ? { ...v, hostPort: +e.target.value }
+                                  : v,
+                              ),
+                            )
+                          }
+                        />
+                        <small className="muted">
+                          0 adds no host-port mapping. Existing platform routing
+                          remains. A fixed host port requires one instance.
+                        </small>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
-              <details className="advanced-configuration">
-                <summary>Environment and Service Connections</summary>
-                <StorageAndLimits
-                  component={c}
-                  capabilities={capabilities.data}
-                  onChange={(next) =>
-                    setComponents(
-                      components.map((v, n) =>
-                        n === i ? { ...v, ...next } : v,
-                      ),
-                    )
-                  }
-                />
-                <RuntimeVariables
-                  key={`${selected?.id}-${c.editorId}-${c.resourceId}`}
-                  component={c}
-                  onChange={(field, value) =>
-                    setComponents(
-                      components.map((v, n) =>
-                        n === i ? { ...v, [field]: value } : v,
-                      ),
-                    )
-                  }
-                  onValidity={(valid) =>
-                    setInvalid((current) => ({
-                      ...current,
-                      [c.editorId]: !valid,
-                    }))
-                  }
-                  environmentSupported={!!capabilities.data?.environment}
-                  connectionsSupported={
-                    !!(
-                      capabilities.data?.applicationDns ||
-                      capabilities.data?.serviceEndpoints
-                    )
-                  }
-                  endpointsSupported={!!capabilities.data?.serviceEndpoints}
-                />
-              </details>
+              {!c.resourceId && (
+                <details className="advanced-configuration">
+                  <summary>Environment and Service Connections</summary>
+                  <StorageAndLimits
+                    component={c}
+                    capabilities={capabilities.data}
+                    onChange={(next) =>
+                      setComponents(
+                        components.map((v, n) =>
+                          n === i ? { ...v, ...next } : v,
+                        ),
+                      )
+                    }
+                  />
+                  <RuntimeVariables
+                    key={`${selected?.id}-${c.editorId}-${c.resourceId}`}
+                    component={c}
+                    onChange={(field, value) =>
+                      setComponents(
+                        components.map((v, n) =>
+                          n === i ? { ...v, [field]: value } : v,
+                        ),
+                      )
+                    }
+                    onValidity={(valid) =>
+                      setInvalid((current) => ({
+                        ...current,
+                        [c.editorId]: !valid,
+                      }))
+                    }
+                    environmentSupported={!!capabilities.data?.environment}
+                    connectionsSupported={
+                      !!(
+                        capabilities.data?.applicationDns ||
+                        capabilities.data?.serviceEndpoints
+                      )
+                    }
+                    endpointsSupported={!!capabilities.data?.serviceEndpoints}
+                  />
+                </details>
+              )}
             </div>
           ))}
           <ErrorBox error={resources.error || capabilities.error} />

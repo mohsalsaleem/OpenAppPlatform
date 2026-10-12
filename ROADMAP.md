@@ -144,6 +144,12 @@ path. Core lifecycle, configuration, volumes, limits and recovery must work
 without an operator account or credentials. Shared features require native
 Docker acceptance coverage; operator adapters add their own capability checks.
 
+**Configuration ownership:** Existing linked/adopted resources inherit their
+native runtime configuration. OAP exposes grouping, health/logs and permitted
+lifecycle actions; runtime edits stay in the operator (or Docker host). Keep
+their Settings view minimal instead of duplicating native Docker configuration
+forms. OAP-owned workloads retain controls required for direct execution.
+
 **Current priority:** P0.4 everyday configuration. P0.1 runtime secret references,
 P0.2 workers and P0.3 existing database links passed local and isolated Coolify
 staging acceptance. The first four-component breadth milestone is delivered. Finish everyday configuration
