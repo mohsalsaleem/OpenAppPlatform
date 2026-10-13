@@ -58,7 +58,7 @@ func CompareReleases(from, to Deployment) ReleaseComparison {
 		included := selected(d)
 		for _, component := range d.Manifest.Components {
 			if included[component.Name] {
-				out.Artifacts = append(out.Artifacts, ReleaseArtifact{Component: component.Name, Image: component.Image, Immutable: digestSuffix.MatchString(component.Image)})
+				out.Artifacts = append(out.Artifacts, ReleaseArtifact{Component: component.Name, Image: component.Image, Immutable: digestSuffix.MatchString(component.Image) || cachedImageID.MatchString(component.Image)})
 			}
 		}
 		sort.Slice(out.Artifacts, func(i, j int) bool { return out.Artifacts[i].Component < out.Artifacts[j].Component })

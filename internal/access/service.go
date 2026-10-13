@@ -222,13 +222,20 @@ func (s Service) principal(ctx context.Context, where, arg string) (domain.Princ
 	return p, nil
 }
 func (s Service) Rate(ctx context.Context, key string) bool {
+	allowed, err := s.RateChecked(ctx, key)
+	return err == nil && allowed
+}
+
+// RateChecked lets bounded read interfaces distinguish a storage outage from
+// an exhausted budget. Existing callers retain fail-closed boolean behavior.
+func (s Service) RateChecked(ctx context.Context, key string) (bool, error) {
 	_, e := s.Pool.Exec(ctx, "DELETE FROM oap_auth_attempts WHERE until_at<now()")
 	if e != nil {
-		return false
+		return false, e
 	}
 	var count int
 	e = s.Pool.QueryRow(ctx, `INSERT INTO oap_auth_attempts(key,count,until_at) VALUES($1,1,now()+interval '1 minute') ON CONFLICT(key) DO UPDATE SET count=oap_auth_attempts.count+1 RETURNING count`, Hash(key)).Scan(&count)
-	return e == nil && count <= 10
+	return e == nil && count <= 10, e
 }
 func (s Service) BeginAudit(ctx context.Context, p domain.Principal, action string) (string, error) {
 	id := domain.NewID()

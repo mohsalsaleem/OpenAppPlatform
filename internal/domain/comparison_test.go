@@ -24,3 +24,12 @@ func TestReleaseComparisonHidesAllRuntimeMapValues(t *testing.T) {
 		t.Fatal("equal snapshots differ")
 	}
 }
+
+func TestReleaseComparisonRecognizesCachedContentIDsWithoutClaimingRuntime(t *testing.T) {
+	image := "sha256:" + strings.Repeat("a", 64)
+	d := Deployment{Manifest: Manifest{Components: []Component{{Name: "web", Image: image}}}, Steps: []Step{{Component: "web", Ordinal: 1}}}
+	result := CompareReleases(d, d)
+	if len(result.To.Artifacts) != 1 || !result.To.Artifacts[0].Immutable {
+		t.Fatal("cached content ID reported as mutable")
+	}
+}

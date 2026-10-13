@@ -15,6 +15,7 @@ import (
 var ErrNotFound = errors.New("not found")
 var ErrConflict = errors.New("conflict")
 var imageCharacters = regexp.MustCompile(`^[A-Za-z0-9/._:@-]+$`)
+var cachedImageID = regexp.MustCompile(`^sha256:[a-f0-9]{64}$`)
 var digestSuffix = regexp.MustCompile(`@sha256:[a-f0-9]{64}$`)
 
 var slug = regexp.MustCompile(`^[a-z][a-z0-9-]{0,47}$`)

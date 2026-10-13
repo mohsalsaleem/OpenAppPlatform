@@ -19,17 +19,24 @@ type Instance struct {
 }
 
 func (c *Controller) Instances(ctx context.Context, id string) ([]Instance, error) {
+	out, _, err := c.instancesBounded(ctx, id, 0)
+	return out, err
+}
+
+// A positive limit is used by incident sampling; legacy instance inspection
+// retains its existing complete projection.
+func (c *Controller) instancesBounded(ctx context.Context, id string, limit int) ([]Instance, bool, error) {
 	app, err := c.Store.Application(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	bindings, err := c.Store.Bindings(ctx, id)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	adapter, err := c.Adapter(ctx, app.Manifest.TargetID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	out := []Instance{}
 	for _, comp := range app.Manifest.Components {
@@ -40,6 +47,12 @@ func (c *Controller) Instances(ctx context.Context, id string) ([]Instance, erro
 			}
 		}
 		for ordinal := 1; ordinal <= maximum; ordinal++ {
+			if limit > 0 && len(out) >= limit {
+				return out, true, nil
+			}
+			if limit > 0 && ctx.Err() != nil {
+				return out, true, ctx.Err()
+			}
 			item := Instance{Component: comp.Name, Ordinal: ordinal, Status: "not deployed", CheckedAt: time.Now().UTC()}
 			for _, b := range bindings {
 				if b.Component == comp.Name && b.Ordinal == ordinal {
@@ -74,5 +87,5 @@ func (c *Controller) Instances(ctx context.Context, id string) ([]Instance, erro
 			out = append(out, item)
 		}
 	}
-	return out, nil
+	return out, false, nil
 }

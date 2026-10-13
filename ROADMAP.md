@@ -74,8 +74,10 @@ not acceptance of the new standalone headless milestones.
 M2.5 and M2.6 add the JSON CLI, shared bounded waits/errors, headless owner
 setup, bounded named-agent creation grants and packaged install/update/rescue.
 M2.6 passed local gate `20261013-214602-ceb6aceb` at `c2e1eee`.
-Current gaps include portable lifecycle/MCP parity acceptance, unified incident
-evidence, standalone shared ingress/TLS and the complete install-to-fix dogfood.
+M2.7 passed local gate `20261013-222818-1c1a5624` at `187e7d2`, adding the
+portable lifecycle and shared CLI/API/stdio-MCP action plans. Current gaps include
+unified incident acceptance, standalone shared ingress/TLS and the complete
+install-to-fix dogfood.
 App-scoped credentials still cannot create applications; creation needs an
 explicit bounded onboarding grant. Read-only MCP deployment summaries remain
 separate from durable executable plans. No whole M2 acceptance is implied.
@@ -97,9 +99,11 @@ Only the ordered active queue authorizes the next implementation slice. Deferred
 items are preserved requirements, not parallel work or prerequisites. M2.5 passed
 gate `20261013-210851-28d984b5` at `6b9359c`; see [machine CLI](docs/agent-cli.md).
 M2.6 passed gate `20261013-214602-ceb6aceb` at `c2e1eee`; see
-[headless bootstrap](docs/headless-bootstrap.md). The active slice is **M2.7**;
-see [portable lifecycle](docs/portable-lifecycle.md). Its full local standalone
-acceptance is required before M2.8 begins. M2.8–M2.9 remain unaccepted.
+[headless bootstrap](docs/headless-bootstrap.md). M2.7 passed gate `20261013-222818-1c1a5624` at `187e7d2`; see
+[portable lifecycle](docs/portable-lifecycle.md). The active slice is **M2.8**;
+see [bounded incident diagnosis](docs/incident-diagnosis.md). Its full local
+standalone acceptance is required before **M2.9**, the combined headless dogfood
+and measured footprint. M2.9 remains unaccepted.
 
 ## Ordered active queue
 

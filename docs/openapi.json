@@ -5826,6 +5826,70 @@
           }
         }
       }
+    },
+    "/api/v1/applications/{id}/incident": {
+      "get": {
+        "summary": "Bounded app-scoped incident evidence; optional managed log sample, no repair execution",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "component",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ordinal",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current bounded evidence; health does not establish application behavior",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Incident"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid selection, denied scope, rate limit or unavailable metadata"
+          },
+          "401": {
+            "description": "Invalid selection, denied scope, rate limit or unavailable metadata"
+          },
+          "403": {
+            "description": "Invalid selection, denied scope, rate limit or unavailable metadata"
+          },
+          "404": {
+            "description": "Invalid selection, denied scope, rate limit or unavailable metadata"
+          },
+          "422": {
+            "description": "Invalid selection, denied scope, rate limit or unavailable metadata"
+          },
+          "429": {
+            "description": "Invalid selection, denied scope, rate limit or unavailable metadata"
+          },
+          "503": {
+            "description": "Invalid selection, denied scope, rate limit or unavailable metadata"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7878,6 +7942,346 @@
           "expiresAt",
           "createdAt",
           "summary"
+        ],
+        "additionalProperties": false
+      },
+      "IncidentObservation": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "ordinal": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "retired": {
+            "type": "boolean"
+          },
+          "resourceId": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "errorCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "component",
+          "ordinal",
+          "status",
+          "retired",
+          "checkedAt"
+        ],
+        "additionalProperties": false
+      },
+      "IncidentStep": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "ordinal": {
+            "type": "integer"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "recoveryPhase": {
+            "type": "string"
+          },
+          "remoteOperationId": {
+            "type": "string"
+          },
+          "errorCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "component",
+          "ordinal",
+          "phase"
+        ],
+        "additionalProperties": false
+      },
+      "IncidentOperation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncidentStep"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "state",
+          "action",
+          "definitionVersion",
+          "createdAt",
+          "updatedAt",
+          "steps"
+        ],
+        "additionalProperties": false
+      },
+      "IncidentEvent": {
+        "type": "object",
+        "properties": {
+          "operationId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "operationId",
+          "state",
+          "action",
+          "recordedAt"
+        ],
+        "additionalProperties": false
+      },
+      "IncidentLog": {
+        "type": "object",
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "ordinal": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "not_requested",
+              "sampled",
+              "unavailable"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "sampledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "missingReason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "truncated"
+        ],
+        "additionalProperties": false
+      },
+      "IncidentNextAction": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "allowed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "request": {
+            "$ref": "#/components/schemas/ActionRequest"
+          }
+        },
+        "required": [
+          "action",
+          "allowed",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "VerificationCriterion": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed",
+              "missing",
+              "pending"
+            ]
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "detail"
+        ],
+        "additionalProperties": false
+      },
+      "Incident": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "applicationId": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "snapshotConsistent": {
+            "type": "boolean"
+          },
+          "untrustedEvidence": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "observed_healthy",
+              "issue",
+              "inconclusive"
+            ]
+          },
+          "limits": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "observations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncidentObservation"
+            }
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncidentOperation"
+            }
+          },
+          "timeline": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncidentEvent"
+            }
+          },
+          "comparison": {
+            "$ref": "#/components/schemas/ReleaseComparison"
+          },
+          "logs": {
+            "$ref": "#/components/schemas/IncidentLog"
+          },
+          "nextActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IncidentNextAction"
+            }
+          },
+          "verification": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerificationCriterion"
+            }
+          },
+          "applicationBehaviorVerified": {
+            "type": "boolean"
+          },
+          "missingEvidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "applicationId",
+          "definitionVersion",
+          "targetId",
+          "environment",
+          "generatedAt",
+          "validUntil",
+          "snapshotConsistent",
+          "untrustedEvidence",
+          "state",
+          "limits",
+          "observations",
+          "operations",
+          "timeline",
+          "logs",
+          "nextActions",
+          "verification",
+          "applicationBehaviorVerified",
+          "missingEvidence"
         ],
         "additionalProperties": false
       }

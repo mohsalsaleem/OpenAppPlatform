@@ -49,12 +49,25 @@ func (c *Controller) verifyInputPin(ctx context.Context, d domain.Deployment, co
 // References are immutable: a changed/missing value requires an explicit future
 // rotation workflow; it must not expose old values retained in provider logs.
 func (c *Controller) RedactRuntimeLogs(ctx context.Context, appID, logs string) (string, error) {
-	rows, err := c.Store.Pool.Query(ctx, `SELECT DISTINCT d.id,d.spec,p.component,p.fingerprint FROM oap_runtime_input_pins p JOIN oap_deployments d ON d.id=p.deployment_id WHERE d.application_id=$1`, appID)
+	return c.redactRuntimeLogs(ctx, appID, logs, 0)
+}
+func (c *Controller) redactRuntimeLogs(ctx context.Context, appID, logs string, limit int) (string, error) {
+	query := `SELECT DISTINCT d.id,d.spec,p.component,p.fingerprint FROM oap_runtime_input_pins p JOIN oap_deployments d ON d.id=p.deployment_id WHERE d.application_id=$1`
+	if limit > 0 {
+		query += " LIMIT 129"
+	}
+
+	rows, err := c.Store.Pool.Query(ctx, query, appID)
 	if err != nil {
 		return "", errors.New("runtime log redaction verification is unavailable")
 	}
 	defer rows.Close()
+	count := 0
 	for rows.Next() {
+		count++
+		if limit > 0 && count > limit {
+			return "", errors.New("historical redaction coverage exceeds incident limit")
+		}
 		var id, name, expected string
 		var m domain.Manifest
 		if err = rows.Scan(&id, &m, &name, &expected); err != nil {

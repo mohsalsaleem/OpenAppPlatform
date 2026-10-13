@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "get_incident_context",
+    "arguments": {"applicationId": "REPLACE_WITH_APPLICATION_ID", "component": "web", "ordinal": 1}
+  }
+}

@@ -89,3 +89,6 @@ configuration and seeded data must remain unchanged. Focused policy tests cover
 concurrent creation/capacity, reserved keys, exact review, stale definitions/targets,
 changed private inputs, expiry, HTTP scope, pause and revocation. These become
 acceptance only after the full local gate passes.
+
+M2.7 passed local gate `20261013-222818-1c1a5624` at `187e7d2`.
+The next accepted execution order is [M2.8 incident diagnosis](incident-diagnosis.md), followed by M2.9 combined dogfood; this does not mark all of M2 complete.

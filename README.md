@@ -323,3 +323,5 @@ PostgreSQL dependency with explicit ownership. See [existing database links](doc
 and [the reproducible example](examples/application-breadth/README.md).
 
 The current standalone agent lifecycle work is documented in [Portable application lifecycle](docs/portable-lifecycle.md), with versioned specifications and shared CLI/API/MCP action plans. See [ROADMAP](ROADMAP.md) for acceptance status and execution order.
+
+Agent diagnosis uses the [bounded incident view](docs/incident-diagnosis.md), keeping runtime health, release outcome, freshness and external application verification distinct.

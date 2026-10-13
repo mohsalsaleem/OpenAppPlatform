@@ -121,6 +121,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /api/v1/applications/{id}/capabilities", s.applicationCapabilities)
 	s.endpointRoutes(mux)
 	s.diagnosticRoutes(mux)
+	s.incidentRoutes(mux)
 	s.planRoutes(mux)
 	s.specificationRoutes(mux)
 	s.remoteMCPRoutes(mux)

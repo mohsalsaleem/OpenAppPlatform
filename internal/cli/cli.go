@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -231,6 +232,8 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 	timeout := fs.Duration("timeout", 2*time.Minute, "bounded wait duration")
 	credential := fs.String("credential-file", getenv("OAP_CREDENTIAL_FILE"), "origin-bound private credential")
 	output := fs.String("out", "", "new private credential file")
+	component := fs.String("component", "", "select incident logs for one component")
+	ordinal := fs.Int("ordinal", 0, "select incident log instance (1..4)")
 	plan := fs.String("plan", "", "deployment plan ID")
 	credentialID := fs.String("credential", "", "agent credential ID")
 	session := fs.String("session-file", getenv("OAP_SESSION_FILE"), "private owner session JSON")
@@ -238,11 +241,15 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 		return finish(nil, failure("invalid_arguments", "Provide flags before one command; use help for command contracts", false, "help"), 2)
 	}
 	command := fs.Args()[0]
+	if command != "incident" && (*component != "" || *ordinal != 0) {
+		return finish(nil, failure("invalid_arguments", "Component/ordinal flags are only supported by incident; release selection belongs in the action request", false, "inspect_schema"), 2)
+	}
+
 	if command == "schema" {
 		return finish(json.RawMessage(docs.OpenAPI), nil, 0)
 	}
 	if command == "help" {
-		return finish(map[string]any{"commands": []string{"help", "schema", "meta", "targets", "capabilities", "apps", "create", "get", "update", "instances", "diagnostics", "deploy", "operation", "wait", "verify", "setup", "login", "grant", "app-grant", "revoke", "agent-control", "set-agent-control", "plan", "get-plan", "approve", "execute-plan", "target-capabilities", "resources", "whoami", "validate-spec", "diff-spec", "export-spec", "action-plan", "get-action-plan", "review-action-input", "approve-action", "execute-action"}, "flagsBeforeCommand": true, "contextFlags": []string{"url", "app", "target", "environment", "operation"}, "input": "--file path.json or --file -; deploy requires --key and expectedVersion > 0; agent create requires --key", "auth": "OAP_API_TOKEN or --session-file; no credentials in flags/output", "wait": "--timeout 1s..30m; observes without cancelling", "verification": "current instance health only, not end-to-end application behavior", "exitCodes": map[string]int{"success": 0, "input": 2, "denied": 3, "rejected": 4, "unavailable": 5, "operationStopped": 6, "timeout": 7}}, nil, 0)
+		return finish(map[string]any{"commands": []string{"help", "schema", "meta", "targets", "capabilities", "apps", "create", "get", "update", "instances", "diagnostics", "deploy", "operation", "wait", "verify", "setup", "login", "grant", "app-grant", "revoke", "agent-control", "set-agent-control", "plan", "get-plan", "approve", "execute-plan", "target-capabilities", "resources", "whoami", "validate-spec", "diff-spec", "export-spec", "incident", "action-plan", "get-action-plan", "review-action-input", "approve-action", "execute-action"}, "flagsBeforeCommand": true, "contextFlags": []string{"url", "app", "target", "environment", "operation", "component", "ordinal"}, "input": "--file path.json or --file -; deploy requires --key and expectedVersion > 0; agent create requires --key", "auth": "OAP_API_TOKEN or --session-file; no credentials in flags/output", "wait": "--timeout 1s..30m; observes without cancelling", "verification": "current instance health only, not end-to-end application behavior", "exitCodes": map[string]int{"success": 0, "input": 2, "denied": 3, "rejected": 4, "unavailable": 5, "operationStopped": 6, "timeout": 7}}, nil, 0)
 	}
 	c := Client{URL: *endpoint, Token: getenv("OAP_API_TOKEN")}
 	if *session != "" {
@@ -450,7 +457,7 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 	case "create":
 		method = "POST"
 		path = "/api/v1/applications"
-	case "get", "update", "instances", "diagnostics", "capabilities", "verify", "deploy":
+	case "get", "update", "instances", "diagnostics", "capabilities", "verify", "deploy", "incident":
 		if !idPattern.MatchString(*app) {
 			return emitFailure(nil, failure("invalid_application", "Provide --app ID", false, "check_context"))
 		}
@@ -458,7 +465,7 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 		switch command {
 		case "update":
 			method = "PUT"
-		case "instances", "diagnostics", "capabilities":
+		case "instances", "diagnostics", "capabilities", "incident":
 			path += "/" + command
 		case "verify":
 			path += "/instances"
@@ -468,6 +475,21 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 		}
 	default:
 		return emitFailure(nil, failure("unknown_command", "Use help for supported commands", false, "help"))
+	}
+	if command == "incident" {
+		if *ordinal < 0 || *ordinal > 4 || (*component == "" && *ordinal != 0) || (*component != "" && !idPattern.MatchString(*component)) {
+			return emitFailure(nil, failure("invalid_incident_selection", "Select one component and optional ordinal 1..4", false, "check_context"))
+		}
+		query := url.Values{}
+		if *component != "" {
+			query.Set("component", *component)
+		}
+		if *ordinal > 0 {
+			query.Set("ordinal", strconv.Itoa(*ordinal))
+		}
+		if len(query) > 0 {
+			path += "?" + query.Encode()
+		}
 	}
 	var body []byte
 	if method != "GET" && method != "DELETE" {
