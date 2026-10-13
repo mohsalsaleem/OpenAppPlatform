@@ -1003,7 +1003,7 @@ test("owner pauses agent access with a reason and resumes without exposing secre
 
 test("owner reviews an exact digest plan before approving its unchanged hash",async({page})=>{
  await fixtures(page);
- let plan={id:"f".repeat(32),applicationId:app.id,credentialId:"named-agent-id",definitionVersion:3,targetId:target.id,environment:"staging",components:["web"],images:{web:proposed},planHash:"c".repeat(64),expiresAt:new Date(Date.now()+1800000).toISOString(),effect:"Standard lifecycle may cause downtime."};let approvals=0;
+ let plan={id:"f".repeat(32),deploymentId:"",applicationId:app.id,credentialId:"named-agent-id",definitionVersion:3,targetId:target.id,environment:"staging",components:["web"],images:{web:proposed},planHash:"c".repeat(64),expiresAt:new Date(Date.now()+1800000).toISOString(),effect:"Standard lifecycle may cause downtime."};let approvals=0;
  await page.route("**/api/v1/applications/audit-app/plans",route=>route.fulfill({json:[plan]}));
  await page.route("**/api/v1/applications/audit-app/plans/*/approve",async route=>{expect(route.request().postDataJSON()).toEqual({planHash:plan.planHash});approvals++;plan={...plan,approvedAt:new Date().toISOString()} as typeof plan;await route.fulfill({json:plan})});
  await page.goto(`/applications/${app.id}?tab=deployments`);await page.getByRole("button",{name:"Review Plans",exact:true}).click();
@@ -1011,6 +1011,9 @@ test("owner reviews an exact digest plan before approving its unchanged hash",as
  await expect(page.getByText(`web · ${proposed}`,{exact:true})).toBeVisible();
  await page.getByRole("button",{name:"Approve This Plan",exact:true}).click();
  await expect(page.getByText("Approved",{exact:true})).toBeVisible();await expect(page.getByRole("button",{name:"Approve This Plan",exact:true})).toBeDisabled();expect(approvals).toBe(1);
+ plan={...plan,deploymentId:"submitted-operation"};await page.getByRole("button",{name:"Review Plans",exact:true}).click();
+ await expect(page.getByText("Submitted",{exact:true})).toBeVisible();
+ await expect(page.getByRole("link",{name:"View Operation",exact:true})).toHaveAttribute("href",`/applications/${app.id}?tab=deployments#operation-submitted-operation`);
  await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:"../.local/ui-m2-plan-review.png",fullPage:true});
 });

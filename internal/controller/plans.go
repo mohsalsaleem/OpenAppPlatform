@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/access"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/runtimeinputs"
 )
 
 type DeploymentPlan struct {
@@ -92,9 +93,13 @@ func (c *Controller) CreateDeploymentPlan(ctx context.Context, appID string, ver
 	raw, _ := json.Marshal(v)
 	sum := sha256.Sum256(append(raw, []byte(definitionHash(a.Manifest))...))
 	v.PlanHash = hex.EncodeToString(sum[:])
+	snapshot, err := c.planSnapshotHash(a, v.ID, components, resolved)
+	if err != nil {
+		return DeploymentPlan{}, err
+	}
 	cs, _ := json.Marshal(components)
 	im, _ := json.Marshal(resolved)
-	err = c.Store.Pool.QueryRow(ctx, `INSERT INTO oap_deployment_plans(id,application_id,credential_id,definition_version,definition_hash,components,images,plan_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING expires_at`, v.ID, appID, p.CredentialID, version, definitionHash(a.Manifest), cs, im, v.PlanHash).Scan(&v.ExpiresAt)
+	err = c.Store.Pool.QueryRow(ctx, `INSERT INTO oap_deployment_plans(id,application_id,credential_id,definition_version,definition_hash,components,images,plan_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING expires_at`, v.ID, appID, p.CredentialID, version, snapshot, cs, im, v.PlanHash).Scan(&v.ExpiresAt)
 	return v, err
 }
 func (c *Controller) DeploymentPlan(ctx context.Context, appID, id string) (DeploymentPlan, error) {
@@ -134,7 +139,11 @@ func (c *Controller) ApproveDeploymentPlan(ctx context.Context, appID, id, hash 
 	if err != nil {
 		return DeploymentPlan{}, err
 	}
-	result, err := tx.Exec(ctx, `UPDATE oap_deployment_plans SET approved_by=$3,approved_at=now() WHERE id=$1 AND application_id=$2 AND plan_hash=$4 AND expires_at>now() AND definition_version=$5 AND definition_hash=$6 AND deployment_id IS NULL`, id, appID, p.CredentialID, hash, a.Version, definitionHash(a.Manifest))
+	snapshot, err := c.storedPlanSnapshotHash(ctx, tx, a, id)
+	if err != nil {
+		return DeploymentPlan{}, domain.ErrConflict
+	}
+	result, err := tx.Exec(ctx, `UPDATE oap_deployment_plans SET approved_by=$3,approved_at=now() WHERE id=$1 AND application_id=$2 AND plan_hash=$4 AND expires_at>now() AND definition_version=$5 AND definition_hash=$6 AND deployment_id IS NULL`, id, appID, p.CredentialID, hash, a.Version, snapshot)
 	if err != nil {
 		return DeploymentPlan{}, err
 	}
@@ -168,8 +177,12 @@ func (c *Controller) validateDeploymentPlan(ctx context.Context, tx pgx.Tx, a do
 		return nil
 	}
 	p, _ := domain.Identity(ctx)
+	snapshot, err := c.storedPlanSnapshotHash(ctx, tx, a, id)
+	if err != nil {
+		return domain.ErrConflict
+	}
 	var valid bool
-	err := tx.QueryRow(ctx, `SELECT definition_version=$3 AND definition_hash=$4 AND credential_id=$5 AND approved_at IS NOT NULL AND expires_at>now() AND deployment_id IS NULL AND EXISTS(SELECT 1 FROM oap_credentials c JOIN oap_users u ON u.id=c.user_id WHERE c.id=approved_by AND c.kind='session' AND c.revoked_at IS NULL AND c.expires_at>now() AND u.active AND u.role='owner') FROM oap_deployment_plans WHERE id=$1 AND application_id=$2 FOR UPDATE`, id, a.ID, a.Version, definitionHash(a.Manifest), p.CredentialID).Scan(&valid)
+	err = tx.QueryRow(ctx, `SELECT definition_version=$3 AND definition_hash=$4 AND credential_id=$5 AND approved_at IS NOT NULL AND expires_at>now() AND deployment_id IS NULL AND EXISTS(SELECT 1 FROM oap_credentials c JOIN oap_users u ON u.id=c.user_id WHERE c.id=approved_by AND c.kind='session' AND c.revoked_at IS NULL AND c.expires_at>now() AND u.active AND u.role='owner') FROM oap_deployment_plans WHERE id=$1 AND application_id=$2 FOR UPDATE`, id, a.ID, a.Version, snapshot, p.CredentialID).Scan(&valid)
 	if err != nil || !valid {
 		return domain.ErrConflict
 	}
@@ -182,4 +195,43 @@ func (c *Controller) linkDeploymentPlan(ctx context.Context, tx pgx.Tx, id strin
 	}
 	_, err := tx.Exec(ctx, "UPDATE oap_deployment_plans SET deployment_id=$2 WHERE id=$1", plan, id)
 	return err
+}
+
+// Snapshot fingerprints are private DB metadata, never part of the public plan/hash.
+// Bind resolved inputs for the planned image registry, not just reference names.
+func (c *Controller) planSnapshotHash(a domain.Application, id string, components []string, images map[string]string) (string, error) {
+	pins := map[string]string{}
+	for _, name := range components {
+		component, err := domain.RuntimeComponent(a.Manifest, name)
+		if err != nil {
+			return "", err
+		}
+		component.Image = images[name]
+		component, err = c.RuntimeInputs.Resolve(a.Manifest.TargetID, a.ID, component)
+		if err != nil {
+			return "", err
+		}
+		pins[name] = runtimeinputs.Fingerprint(component, id)
+	}
+	raw, _ := json.Marshal(struct {
+		Definition string
+		Inputs     map[string]string
+	}{definitionHash(a.Manifest), pins})
+	sum := sha256.Sum256(raw)
+	return hex.EncodeToString(sum[:]), nil
+}
+func (c *Controller) storedPlanSnapshotHash(ctx context.Context, tx pgx.Tx, a domain.Application, id string) (string, error) {
+	var selection, artifacts []byte
+	if err := tx.QueryRow(ctx, "SELECT components,images FROM oap_deployment_plans WHERE id=$1 AND application_id=$2 FOR UPDATE", id, a.ID).Scan(&selection, &artifacts); err != nil {
+		return "", err
+	}
+	var components []string
+	var images map[string]string
+	if err := json.Unmarshal(selection, &components); err != nil {
+		return "", err
+	}
+	if err := json.Unmarshal(artifacts, &images); err != nil {
+		return "", err
+	}
+	return c.planSnapshotHash(a, id, components, images)
 }

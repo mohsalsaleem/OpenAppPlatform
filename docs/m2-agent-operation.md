@@ -30,7 +30,11 @@ A deploy-authorized agent may POST `/api/v1/applications/{id}/plans`:
 A plan selects 1–16 managed image components. Each image must be a digest reference;
 mutable tags, observed/database components and overrides outside the selection
 are rejected. The stored plan binds the creator credential, application, complete
-definition hash/version, selected components and images. It contains no env values.
+definition hash/version, selected components and images. Private runtime/registry fingerprints also bind
+the resolved inputs at creation, approval and admission. Changed or missing inputs
+reject approval/execution; the public plan/hash never includes those fingerprints
+or values. Older unconsumed plans require fresh creation/review after this
+precondition upgrade. It contains no env values.
 Creation is limited to 10 requests per credential per minute. Plans expire after
 30 minutes; the read feed returns only the latest 20. This bounds requests/feed,
 not total historical metadata retention.
@@ -108,4 +112,9 @@ who independently supplies privileged host/DB credentials bypasses OAP controls.
 Local unit/system/browser tests exercise scoped context, prompt-injection text as
 inert data, missing evidence, cross-app denials, plan/hash/version/expiry checks,
 creator restrictions, duplicate execution, pause/revocation and owner UI controls.
-Full local and named staging acceptance remain required before claiming delivery.
+Baseline acceptance passed full local gate `20261013-191145-e411542d` and
+Coolify staging at `c0b0360`, with one owner-approved worker operation, identical
+retry, scoped remote inspection, denial checks and revoked temporary credentials.
+Linked database configuration/data and four healthy components were preserved.
+A Submitted plan is an admission receipt; use View Operation for its actual outcome.
+Each newer candidate still requires its own full local and named staging acceptance.

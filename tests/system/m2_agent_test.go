@@ -19,6 +19,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/httpapi"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/mcp"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/runtimeinputs"
 )
 
 func TestM2ScopedRemoteDiagnosticsPlansPauseAndRecovery(t *testing.T) {
@@ -270,5 +271,85 @@ func TestM2ScopedRemoteDiagnosticsPlansPauseAndRecovery(t *testing.T) {
 	}
 	if f.deploys != 2 {
 		t.Fatal("unexpected additional workload dispatch")
+	}
+}
+
+func TestM2PlanRuntimeInputsRemainPrivateAndFreezeAcrossReview(t *testing.T) {
+	ctx := context.Background()
+	f := &inputAdapter{fake: &fake{resources: map[string]operator.Resource{}}}
+	c, _ := setup(t, f)
+	c.RequireIdentity = true
+	service := access.Service{Pool: c.Store.Pool}
+	user, err := service.Register(ctx, "m2-input@example.invalid", "Owner", "m2-private-input-password", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	session, err := service.Issue(ctx, user, "session", "Owner", "operate", "", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, err := service.Principal(ctx, session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := manifest()
+	m.Components[0].Instances = 1
+	m.Components[0].Image = "example/web@sha256:" + strings.Repeat("a", 64)
+	m.Components[0].SecretRefs = map[string]string{"TOKEN": "token-v1"}
+	app, err := c.CreateApplication(ctx, m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := service.IssueRestricted(ctx, user, "Plan Creator", "operate", app.ID, time.Hour, domain.AgentPermissions{Actions: []string{"deploy"}, TargetID: "fixture", Environment: "staging"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor, err := service.Principal(ctx, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	agentCtx := domain.WithPrincipal(ctx, actor)
+	ownerCtx := domain.WithPrincipal(ctx, owner)
+	if _, err = c.CreateDeploymentPlan(agentCtx, app.ID, app.Version, []string{"web"}, nil); err == nil {
+		t.Fatal("missing secret plan created")
+	}
+	c.RuntimeInputs = inputGrants(t, app.ID, "plan-private-input-original")
+	plan, err := c.CreateDeploymentPlan(agentCtx, app.ID, app.Version, []string{"web"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var private string
+	if err = c.Store.Pool.QueryRow(ctx, "SELECT definition_hash FROM oap_deployment_plans WHERE id=$1", plan.ID).Scan(&private); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(plan)
+	if strings.Contains(string(raw), "plan-private-input-original") || strings.Contains(string(raw), private) {
+		t.Fatal("private input fingerprint/value leaked")
+	}
+	c.RuntimeInputs = inputGrants(t, app.ID, "plan-private-input-changed")
+	if _, err = c.ApproveDeploymentPlan(ownerCtx, app.ID, plan.ID, plan.PlanHash); !errors.Is(err, domain.ErrConflict) {
+		t.Fatal("changed input approved", err)
+	}
+	c.RuntimeInputs = inputGrants(t, app.ID, "plan-private-input-original")
+	if _, err = c.ApproveDeploymentPlan(ownerCtx, app.ID, plan.ID, plan.PlanHash); err != nil {
+		t.Fatal(err)
+	}
+	for _, inputs := range []*runtimeinputs.Inputs{nil, inputGrants(t, app.ID, "plan-private-input-changed")} {
+		c.RuntimeInputs = inputs
+		if _, err = c.ExecuteDeploymentPlan(agentCtx, app.ID, plan.ID); !errors.Is(err, domain.ErrConflict) {
+			t.Fatal("changed/missing approved input executed", err)
+		}
+	}
+	if f.ensures != 0 || f.deploys != 0 {
+		t.Fatal("input mismatch reached provider")
+	}
+	c.RuntimeInputs = inputGrants(t, app.ID, "plan-private-input-original")
+	release, err := c.ExecuteDeploymentPlan(agentCtx, app.ID, plan.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	retry, err := c.ExecuteDeploymentPlan(agentCtx, app.ID, plan.ID)
+	if err != nil || retry.ID != release.ID {
+		t.Fatal("restored approved input retry changed admission", err)
 	}
 }

@@ -618,7 +618,13 @@ separate from the single-server agent baseline.
 | M2.3 | Persistent owner pause and scoped agent revocation | Deny agent reads/new dispatches, preserve owner recovery and disclose in-flight effects; no control DB access |
 | M2.4 | Opt-in authenticated remote inspection and versioned runbook | Named agent inspects and executes one authorized REST plan on staging; existing HTTPS ingress, no mandatory tunnel or identity service |
 
-Current implementation is under local/staging acceptance; see
+M2.1–M2.4 minimal baseline passed full local gate `20261013-191145-e411542d`
+and scoped Coolify staging acceptance at `c0b0360`. A named temporary agent
+inspected scoped context and completed one owner-approved worker digest release;
+identical retries reused the operation, cross-app/self-approval/mutation denials
+passed, and both acceptance credentials were revoked. Four components stayed
+healthy and linked database configuration/data remained unchanged. The owner UI
+also distinguishes plan submission from the linked operation outcome. See
 [M2 baseline and limits](docs/m2-agent-operation.md). OAuth/ChatGPT-specific client
 acceptance, tunnel provisioning, BYOK internal inference, application database query
 tools and per-app expiring override policies remain open M2 extensions. These are
