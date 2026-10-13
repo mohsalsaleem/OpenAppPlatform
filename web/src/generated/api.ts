@@ -938,6 +938,11 @@ export interface paths {
                             applicationId: string;
                             expiresAt: string;
                             revoked: boolean;
+                            permissions: {
+                                actions: ("deploy" | "restart" | "scale-down" | "rollback" | "recover" | "control" | "configure")[];
+                                targetId: string;
+                                environment: string;
+                            } | null;
                         }[];
                     };
                 };
@@ -962,6 +967,9 @@ export interface paths {
                         /** @enum {string} */
                         scope: "read" | "operate";
                         applicationId: string;
+                        actions?: ("deploy" | "restart" | "scale-down" | "rollback" | "recover" | "control" | "configure")[];
+                        targetId?: string;
+                        environment?: string;
                     };
                 };
             };

@@ -1,3 +1,6 @@
+import { FieldSet, FieldLegend } from "@/components/ui/field";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { Disclosure } from "@/components/Disclosure";
 import type { ReadResponse } from "../../api";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -11,6 +14,8 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { unwrap, api } from "../../api";
 import { ErrorBox } from "../../components/Feedback";
+const actionLabels = { deploy: "Deploy", restart: "Restart", "scale-down": "Retire Instances", rollback: "Roll Back Images", recover: "Recover Operations", control: "Cancel or Close Tracking", configure: "Edit Configuration" } as const;
+type AgentAction = keyof typeof actionLabels;
 type Member = ReadResponse<"/api/v1/access/members">[number];
 
 function auditAction(action: string) {
@@ -50,6 +55,7 @@ export function Access() {
   const [credentialName, setCredentialName] = useState("");
   const [scope, setScope] = useState<"read" | "operate">("read");
   const [applicationId, setApplicationId] = useState("");
+ const [actions,setActions] = useState<AgentAction[]>([]);
   const [issued, setIssued] = useState("");
   const members = useQuery({
     queryKey: ["members"],
@@ -84,7 +90,7 @@ export function Access() {
     mutationFn: () =>
       api
         .POST("/api/v1/access/credentials", {
-          body: { name: credentialName, scope, applicationId },
+          body: { name: credentialName, scope, applicationId, actions:scope==="read" ? [] : actions },
         })
         .then(unwrap),
     onSuccess: (v) => {
@@ -247,7 +253,7 @@ export function Access() {
         <section className="panel">
           <h2>Agent Tokens</h2>
           <p className="muted">
-            Each token is limited to one application and expires after 30 days.
+            New tokens are pinned to one application, target and environment for 30 days.
           </p>
           <form
             className="form-grid configuration-fields"
@@ -293,8 +299,28 @@ export function Access() {
                 <option value="operate">Operate · changes allowed</option>
               </NativeSelect>
             </div>
+            {applicationId && (
+              <div className="col-span-full flex flex-wrap gap-2" aria-label="Token Boundaries">
+                <Badge variant="outline">Target: {apps.data?.find(a=>a.id===applicationId)?.manifest.targetId}</Badge>
+                <Badge variant="outline">Environment: {apps.data?.find(a=>a.id===applicationId)?.manifest.environment}</Badge>
+              </div>
+            )}
+            {scope === "operate" && (
+              <FieldSet className="col-span-full">
+                <FieldLegend className="text-sm font-medium mb-3">Allowed Actions</FieldLegend>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(Object.entries(actionLabels) as [AgentAction,string][]).map(([value,label])=>(
+                    <div key={value} className="flex items-center gap-2">
+                      <Checkbox id={`agent-action-${value}`} checked={actions.includes(value)} onCheckedChange={checked=>setActions(current=>checked===true ? [...current,value] : current.filter(action=>action!==value))}/>
+                      <Label htmlFor={`agent-action-${value}`}>{label}</Label>
+                    </div>
+                  ))}
+                </div>
+                <p className="small muted mt-3">Recovery requires its action and the underlying operation’s permission.</p>
+              </FieldSet>
+            )}
             <div className="form-actions">
-              <Button variant="default" disabled={issue.isPending}>
+              <Button variant="default" disabled={issue.isPending || (scope==="operate" && actions.length===0)}>
                 Create Agent Token
               </Button>
             </div>
@@ -309,6 +335,12 @@ export function Access() {
                     .name ?? c.applicationId}{" "}
                   · expires {new Date(c.expiresAt).toLocaleDateString()}
                 </p>
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {c.permissions ? <>
+                    <Badge variant="outline">{c.permissions.targetId} · {c.permissions.environment}</Badge>
+                    {c.scope==="read" ? <Badge variant="secondary">Read Only</Badge> : c.permissions.actions.map(action=><Badge key={action} variant="secondary">{actionLabels[action]}</Badge>)}
+                  </> : <Badge variant="outline">Legacy · {c.scope==="operate" ? "All Application Actions" : "Read Only"}</Badge>}
+                </div>
               </div>
               <Button
                 variant="outline"

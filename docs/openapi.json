@@ -2106,6 +2106,27 @@
                   },
                   "applicationId": {
                     "type": "string"
+                  },
+                  "actions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "deploy",
+                        "restart",
+                        "scale-down",
+                        "rollback",
+                        "recover",
+                        "control",
+                        "configure"
+                      ]
+                    }
+                  },
+                  "targetId": {
+                    "type": "string"
+                  },
+                  "environment": {
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -2148,6 +2169,41 @@
                       },
                       "revoked": {
                         "type": "boolean"
+                      },
+                      "permissions": {
+                        "type": [
+                          "object",
+                          "null"
+                        ],
+                        "properties": {
+                          "actions": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": [
+                                "deploy",
+                                "restart",
+                                "scale-down",
+                                "rollback",
+                                "recover",
+                                "control",
+                                "configure"
+                              ]
+                            }
+                          },
+                          "targetId": {
+                            "type": "string"
+                          },
+                          "environment": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "actions",
+                          "targetId",
+                          "environment"
+                        ],
+                        "additionalProperties": false
                       }
                     },
                     "required": [
@@ -2156,7 +2212,8 @@
                       "scope",
                       "applicationId",
                       "expiresAt",
-                      "revoked"
+                      "revoked",
+                      "permissions"
                     ],
                     "additionalProperties": false
                   }

@@ -47,7 +47,8 @@ func (c *Controller) RestoreConfiguration(ctx context.Context, appID string, req
 			return domain.Application{}, access.ErrDenied
 		}
 		current, err := (access.Service{Pool: c.Store.Pool}).ByID(ctx, p.CredentialID)
-		if err != nil || !current.Operates(appID) {
+		app, appErr := c.Store.Application(ctx, appID)
+		if err != nil || appErr != nil || !current.Allows(appID, "configure", app.Manifest.TargetID, app.Manifest.Environment) {
 			return domain.Application{}, access.ErrDenied
 		}
 	}

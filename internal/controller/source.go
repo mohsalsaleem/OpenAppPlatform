@@ -74,7 +74,7 @@ func scanSource(row pgx.Row) (SourceEvent, error) {
 }
 func (c *Controller) ReceiveSource(ctx context.Context, h source.Hook, delivery string, body []byte, push source.Push) (SourceEvent, error) {
 	p, ok := domain.Identity(ctx)
-	if !ok || (h.Mode != "coolify-github-app" && !p.Operates(h.ApplicationID)) {
+	if !ok || !c.sourceAuthorized(ctx, p, h) {
 		return SourceEvent{}, access.ErrDenied
 	}
 	sum := sha256.Sum256(body)
@@ -177,7 +177,7 @@ func (c *Controller) AdvanceSource(ctx context.Context, id string) error {
 	}
 	hold := func(message string) error { v.State = "attention"; v.Error = message; return c.saveSource(ctx, v) }
 	p, e := (access.Service{Pool: c.Store.Pool}).ByID(ctx, v.CredentialID)
-	if e != nil || (v.Hook.Mode != "coolify-github-app" && !p.Operates(v.ApplicationID)) || (p.ApplicationID != "" && p.ApplicationID != v.ApplicationID) {
+	if e != nil || !c.sourceAuthorized(ctx, p, v.Hook) {
 		return hold("Source credential expired or was revoked; explicit owner recovery is required")
 	}
 	if v.Hook.Mode == "coolify-github-app" {
@@ -404,4 +404,9 @@ func (c *Controller) observeNativeSource(ctx context.Context, v SourceEvent) err
 		return river.JobSnooze(5 * time.Second)
 	}
 	return nil
+}
+
+func (c *Controller) sourceAuthorized(ctx context.Context, p domain.Principal, h source.Hook) bool {
+	app, err := c.Store.Application(ctx, h.ApplicationID)
+	return err == nil && p.Reads(app.ID, app.Manifest.TargetID, app.Manifest.Environment) && (h.Mode == "coolify-github-app" || p.Allows(app.ID, "deploy", app.Manifest.TargetID, app.Manifest.Environment))
 }

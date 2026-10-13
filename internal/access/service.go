@@ -9,8 +9,10 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/mail"
+	"slices"
 	"strings"
 	"time"
 
@@ -136,11 +138,37 @@ func (s Service) Login(ctx context.Context, email, password string) (string, err
 	return id, nil
 }
 func (s Service) Issue(ctx context.Context, user, kind, name, scope, app string, ttl time.Duration) (string, error) {
+	return s.issue(ctx, user, kind, name, scope, app, ttl, nil)
+}
+
+// IssueRestricted is used for new owner-issued agents; legacy/internal callers remain stable.
+func (s Service) IssueRestricted(ctx context.Context, user, name, scope, app string, ttl time.Duration, permissions domain.AgentPermissions) (string, error) {
+	if permissions.TargetID == "" || permissions.Environment == "" || permissions.Actions == nil || (scope == "operate" && len(permissions.Actions) == 0) || (scope == "read" && len(permissions.Actions) > 0) {
+		return "", ErrDenied
+	}
+	var target, environment string
+	if err := s.Pool.QueryRow(ctx, "SELECT spec->>'targetId',environment FROM oap_applications WHERE id=$1 AND workspace_id='default'", app).Scan(&target, &environment); err != nil || target != permissions.TargetID || environment != permissions.Environment {
+		return "", ErrDenied
+	}
+	seen := map[string]bool{}
+	for _, action := range permissions.Actions {
+		if !slices.Contains(domain.AgentActions, action) || seen[action] {
+			return "", ErrDenied
+		}
+		seen[action] = true
+	}
+	return s.issue(ctx, user, "agent", name, scope, app, ttl, &permissions)
+}
+func (s Service) issue(ctx context.Context, user, kind, name, scope, app string, ttl time.Duration, permissions *domain.AgentPermissions) (string, error) {
 	if (kind != "session" && kind != "agent") || (scope != "read" && scope != "operate") || len(name) < 1 || len(name) > 80 || ttl <= 0 || ttl > 30*24*time.Hour {
 		return "", ErrDenied
 	}
 	secret := Secret()
-	_, e := s.Pool.Exec(ctx, "INSERT INTO oap_credentials(id,user_id,token_hash,kind,name,scope,application_id,expires_at) VALUES($1,$2,$3,$4,$5,$6,NULLIF($7,''),$8)", domain.NewID(), user, Hash(secret), kind, name, scope, app, time.Now().Add(ttl))
+	var raw []byte
+	if permissions != nil {
+		raw, _ = json.Marshal(permissions)
+	}
+	_, e := s.Pool.Exec(ctx, "INSERT INTO oap_credentials(id,user_id,token_hash,kind,name,scope,application_id,expires_at,permissions) VALUES($1,$2,$3,$4,$5,$6,NULLIF($7,''),$8,$9)", domain.NewID(), user, Hash(secret), kind, name, scope, app, time.Now().Add(ttl), raw)
 	return secret, e
 }
 func (s Service) Principal(ctx context.Context, secret string) (domain.Principal, error) {
@@ -154,9 +182,13 @@ func (s Service) ByID(ctx context.Context, id string) (domain.Principal, error) 
 }
 func (s Service) principal(ctx context.Context, where, arg string) (domain.Principal, error) {
 	var p domain.Principal
-	e := s.Pool.QueryRow(ctx, "SELECT u.id,c.id,u.workspace_id,u.name,u.role,c.kind,c.scope,COALESCE(c.application_id,'') FROM oap_credentials c JOIN oap_users u ON u.id=c.user_id AND u.workspace_id=c.workspace_id WHERE "+where+" AND u.active AND c.revoked_at IS NULL AND c.expires_at>now()", arg).Scan(&p.UserID, &p.CredentialID, &p.WorkspaceID, &p.Name, &p.Role, &p.Kind, &p.Scope, &p.ApplicationID)
+	var raw []byte
+	e := s.Pool.QueryRow(ctx, "SELECT u.id,c.id,u.workspace_id,u.name,u.role,c.kind,c.scope,COALESCE(c.application_id,''),c.permissions FROM oap_credentials c JOIN oap_users u ON u.id=c.user_id AND u.workspace_id=c.workspace_id WHERE "+where+" AND u.active AND c.revoked_at IS NULL AND c.expires_at>now()", arg).Scan(&p.UserID, &p.CredentialID, &p.WorkspaceID, &p.Name, &p.Role, &p.Kind, &p.Scope, &p.ApplicationID, &raw)
 	if e != nil {
 		return p, ErrDenied
+	}
+	if len(raw) > 0 && json.Unmarshal(raw, &p.Permissions) != nil {
+		return domain.Principal{}, ErrDenied
 	}
 	return p, nil
 }

@@ -155,7 +155,7 @@ configuration for linked resources remains in the operator; direct configuration
 uses consistent Button, Field, Select and Collapsible patterns. Prevent legacy
 global label/control styles and hand-styled link buttons from returning.
 
-**Current priority:** M1.1 Auth/Scopes and Mutation Audit. The supported M0 exit
+**Current priority:** Finish M1.1 acceptance, then M1.2 Recovery and Target State. The supported M0 exit
 review is accepted; P0.1–P0.5 passed their local and scoped staging gates. See
 [the exit review](docs/m0-exit-review.md). P0.4 passed the final local/staging acceptance gate. Standalone Docker uses scoped private pull references and Coolify retains its native server login. P0.1 runtime secret references,
 P0.2 workers and P0.3 existing database links passed local and isolated Coolify
@@ -427,7 +427,7 @@ into a separate platform before covering this queue.
 | M1.5 — Container and Image Baseline | Capability-aware policies for owned workloads and explicit auditable exceptions; show resolved artifact/architecture/provenance and protect active/rollback/retained images. | A supported workload runs under policy, an unsafe/incompatible request is rejected before mutation, and native/inherited configuration is preserved. | No scanning platform, arbitrary image pruning or alternate runtime. |
 | M1.6 — Basic Visibility and Dogfooding | Controller/target/release/backup visibility, deterministic release/change context and notification event outbox. AI remains optional and no notification is sent without a configured destination. | An isolated failure is explainable from scoped context; a staging update/recovery drill has a usable external path and traceable outcomes. | No indexed logging/analytics stack, model inference, tunnels or notification-provider expansion. |
 
-M1.1 implementation is in progress: the first slice adds transactional request-to-operation correlation, live recorded outcomes and an Audit Log operation control, including GitHub source events and duplicate requests. Action/target/environment restrictions remain pending; this does not complete M1.1 or advance the priority to M1.2.
+M1.1 now includes transactional operation/source audit correlation plus explicit agent action allowlists and target/environment pins. Legacy identity/release IDs and permissions remain intact. Its acceptance checks cover narrow issuance, wrong action/pin denial, queued expiry/revocation/permission holds, GitHub build authority and exact-operation audit controls. Complete local and scoped staging acceptance before advancing to M1.2 Recovery and Target State.
 
 Start with M1.1. Review the M1 exit gate after these slices; do not pull M2–M6
 work forward. General routing and advanced rollout strategies stay parked under
@@ -943,10 +943,12 @@ workloads on eligible targets.
 | celld | M6 |
 | Cloudflare Durable Objects | M6 |
 
-## Next implementation slice
+## Historical implementation slice (superseded by the M1 breadth queue)
+
+The following batch 5 notes are historical; the current priority and ordered M1 queue above govern new work.
 
 The UI audit, architecture alignment corrections and supported batch 4 recovery
-acceptance are delivered. Continue M0 batch 5: stable endpoints, domains and
+acceptance are delivered. The former next step was M0 batch 5: stable endpoints, domains and
 replica routing. The first slice fixes native Coolify primary endpoint projection
 without changing provider domains. Shared component routing remains incomplete;
 follow the [endpoint acceptance order](docs/stable-endpoints.md).

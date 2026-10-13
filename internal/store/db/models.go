@@ -68,24 +68,26 @@ type OapCredential struct {
 	ExpiresAt     pgtype.Timestamptz `json:"expires_at"`
 	RevokedAt     pgtype.Timestamptz `json:"revoked_at"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	Permissions   []byte             `json:"permissions"`
 }
 
 type OapDeployment struct {
-	ID                 string             `json:"id"`
-	ApplicationID      string             `json:"application_id"`
-	State              string             `json:"state"`
-	Spec               []byte             `json:"spec"`
-	Steps              []byte             `json:"steps"`
-	IdempotencyKey     string             `json:"idempotency_key"`
-	RequestHash        string             `json:"request_hash"`
-	CreatedAt          pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
-	DefinitionVersion  int64              `json:"definition_version"`
-	RequestHashVersion int32              `json:"request_hash_version"`
-	Operation          string             `json:"operation"`
-	WorkspaceID        string             `json:"workspace_id"`
-	CredentialID       pgtype.Text        `json:"credential_id"`
-	Source             []byte             `json:"source"`
+	ID                  string             `json:"id"`
+	ApplicationID       string             `json:"application_id"`
+	State               string             `json:"state"`
+	Spec                []byte             `json:"spec"`
+	Steps               []byte             `json:"steps"`
+	IdempotencyKey      string             `json:"idempotency_key"`
+	RequestHash         string             `json:"request_hash"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	DefinitionVersion   int64              `json:"definition_version"`
+	RequestHashVersion  int32              `json:"request_hash_version"`
+	Operation           string             `json:"operation"`
+	WorkspaceID         string             `json:"workspace_id"`
+	CredentialID        pgtype.Text        `json:"credential_id"`
+	Source              []byte             `json:"source"`
+	AuthorizationAction string             `json:"authorization_action"`
 }
 
 type OapEndpointVerification struct {

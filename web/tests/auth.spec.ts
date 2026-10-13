@@ -270,6 +270,30 @@ test("owner setup, sessions, invitations, read-only membership, and scoped agent
     path: "../.local/ui-workspace-access.png",
     fullPage: true,
   });
+  await page.getByLabel("Token Name", { exact: true }).fill("Restart-only browser agent");
+  await page.getByLabel("Application Access", { exact: true }).selectOption(auditApp.id);
+  await page.getByLabel("Agent Scope", { exact: true }).selectOption("operate");
+  await expect(page.getByRole("button", { name: "Create Agent Token", exact: true })).toBeDisabled();
+  await page.getByLabel("Restart", { exact: true }).check();
+  await expect(page.getByText("Target: test-docker", { exact: true })).toBeVisible();
+  await expect(page.getByText("Environment: staging", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Create Agent Token", exact: true }).click();
+  const secretText = await page.locator(".one-time-secret").innerText();
+  const restrictedToken = secretText.replace("Agent token: ", "").trim();
+  await page.getByRole("button", { name: "Dismiss Code", exact: true }).click();
+  expect((await page.request.post(`/api/v1/applications/${auditApp.id}/deployments`, { headers: { Authorization: `Bearer ${restrictedToken}`, "Idempotency-Key": "forbidden-agent-deploy" }, data: {} })).status()).toBe(403);
+  const restartResponse = await page.request.post(`/api/v1/applications/${auditApp.id}/restarts`, {
+    headers: { Authorization: `Bearer ${restrictedToken}`, "Idempotency-Key": "restricted-browser-restart" },
+    data: { component: "web", ordinal: 1, expectedVersion: auditApp.version },
+  });
+  expect(restartResponse.status()).toBe(202);
+  const restrictedOperation=await restartResponse.json();
+  await page.getByRole("tab", { name: "Audit Log", exact: true }).click();
+  const restrictedRow=page.locator(".step").filter({hasText:"Agent: Restart-only browser agent"}).filter({has:page.getByRole("link",{name:"View Operation"})});
+  await expect(restrictedRow.getByText("Completed",{exact:true})).toBeVisible({timeout:60000});
+  await expect(restrictedRow.getByRole("link",{name:"View Operation"})).toHaveAttribute("href",`/applications/${auditApp.id}?tab=deployments#operation-${restrictedOperation.id}`);
+  await page.getByRole("tab", { name: "Agent Tokens", exact: true }).click();
+  await page.screenshot({path:"../.local/ui-agent-permissions.png",fullPage:true});
   await page.getByRole("button", { name: "Sign Out" }).click();
   await expect(
     page.getByRole("heading", { name: "Welcome Back" }),
