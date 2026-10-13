@@ -2062,6 +2062,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/access/backups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Owner-only read-only view of trusted host backup reports; never serves archives */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Configured report feed (or explicitly unconfigured) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            configured: boolean;
+                            reports: components["schemas"]["BackupReport"][];
+                            invalidReports: number;
+                            truncated: boolean;
+                        };
+                    };
+                };
+                /** @description Owner browser session required */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Configured report mount unavailable */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2461,6 +2516,23 @@ export interface components {
                 id: string;
                 applicationId: string;
             }[];
+        };
+        BackupReport: {
+            version: number;
+            id: string;
+            /** @enum {string} */
+            action: "backup" | "restore-check";
+            /** @enum {string} */
+            status: "running" | "succeeded" | "failed";
+            source: string;
+            coverage: string;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            sha256: string;
+            sizeBytes: number;
+            errorCode: string;
         };
     };
     responses: never;

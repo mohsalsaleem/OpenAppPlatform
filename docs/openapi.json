@@ -4286,6 +4286,54 @@
           }
         }
       }
+    },
+    "/api/v1/access/backups": {
+      "get": {
+        "summary": "Owner-only read-only view of trusted host backup reports; never serves archives",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Configured report feed (or explicitly unconfigured)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "reports": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/BackupReport"
+                      }
+                    },
+                    "invalidReports": {
+                      "type": "integer"
+                    },
+                    "truncated": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "configured",
+                    "reports",
+                    "invalidReports",
+                    "truncated"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner browser session required"
+          },
+          "503": {
+            "description": "Configured report mount unavailable"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5683,6 +5731,69 @@
           "message",
           "nativeSourceObservation",
           "heldOperations"
+        ],
+        "additionalProperties": false
+      },
+      "BackupReport": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "backup",
+              "restore-check"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "succeeded",
+              "failed"
+            ]
+          },
+          "source": {
+            "type": "string"
+          },
+          "coverage": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer"
+          },
+          "errorCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "id",
+          "action",
+          "status",
+          "source",
+          "coverage",
+          "startedAt",
+          "updatedAt",
+          "sha256",
+          "sizeBytes",
+          "errorCode"
         ],
         "additionalProperties": false
       }

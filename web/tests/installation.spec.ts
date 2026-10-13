@@ -183,6 +183,21 @@ test("fresh packaged installation supports the complete owner application journe
       )
       .toBe("succeeded");
   }
+  if (phase === "backup-reports") {
+    await page.getByRole("link",{name:"Workspace Settings",exact:true}).click();
+    await page.getByRole("tab",{name:"Backups",exact:true}).click();
+    const reportsResponse=await page.request.get("/api/v1/access/backups");
+    expect(reportsResponse.status()).toBe(200);
+    const reports=await reportsResponse.json();
+    expect(reports.configured).toBe(true);
+    expect(reports.invalidReports).toBe(0);
+    expect(reports.reports.some((r:any)=>r.action==="backup" && r.status==="succeeded" && r.sha256.length===64)).toBe(true);
+    expect(reports.reports.some((r:any)=>r.action==="restore-check" && r.status==="succeeded")).toBe(true);
+    expect(reports.reports.some((r:any)=>r.action==="restore-check" && r.status==="failed" && r.errorCode==="checksum-mismatch")).toBe(true);
+    await expect(page.getByText("Application Data Excluded",{exact:true})).toBeVisible();
+    await expect(page.getByText("Archive checksum or format did not match.",{exact:true})).toBeVisible();
+    await page.screenshot({path:process.env.OAP_INSTALL_REPORT+"/install-backup-reports.png",fullPage:true});
+  }
   const definition = await page.request.get(`/api/v1/applications/${app.id}`);
   expect(JSON.stringify(await definition.json())).not.toContain(
     "postgres://fixture_reader:",

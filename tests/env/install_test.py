@@ -44,3 +44,36 @@ class InstallationSafetyTest(unittest.TestCase):
             self.assertFalse(archive.exists())
             with self.assertRaises(ValueError):
                 installer.restore_check(tmp, archive, 'oap')
+
+
+class BackupReportingTest(unittest.TestCase):
+    def test_blocked_backup_records_safe_failure_and_preserves_archive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / 'secret-path.dump'
+            with patch.object(installer, 'compose', return_value=b'running-container\n'):
+                with self.assertRaises(ValueError):
+                    installer.backup(tmp, archive)
+            reports = list((Path(tmp) / 'backup-reports').glob('*.json'))
+            self.assertEqual(len(reports), 1)
+            import json
+            value = json.loads(reports[0].read_text())
+            self.assertEqual(value['status'], 'failed')
+            self.assertEqual(value['errorCode'], 'controller-running')
+            self.assertNotIn('secret-path', reports[0].read_text())
+            self.assertFalse(archive.exists())
+            self.assertEqual(reports[0].stat().st_mode & 0o777, 0o644)
+
+    def test_private_errors_and_unavailable_reporting_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            archive = Path(tmp) / 'metadata.dump'
+            with patch.object(installer, '_backup', side_effect=RuntimeError('password=private-value')):
+                with self.assertRaises(RuntimeError):
+                    installer.backup(tmp, archive)
+            report = next((Path(tmp) / 'backup-reports').glob('*.json')).read_text()
+            self.assertNotIn('private-value', report)
+            self.assertIn('operation-failed', report)
+            with patch.object(installer, 'write_report', side_effect=OSError('unavailable')):
+                with patch.object(installer, '_backup') as operation:
+                    with self.assertRaises(OSError):
+                        installer.backup(tmp, archive)
+                    operation.assert_not_called()

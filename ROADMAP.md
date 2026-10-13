@@ -36,7 +36,65 @@ integrations are candidates; they are not installed or enabled by this document.
 - Make risky behavior explicit: remote exposure, irreversible data changes,
   privileged containers, paid provisioning, and automatic mutations.
 - Every capability needs a clear failure mode, recovery path, and small operational
-  footprint before it becomes part of the default installation.
+  footprint before it becomes part of the default installation. Define and measure
+  that footprint under the lightweight requirement below.
+
+## Cross-cutting requirement: define and preserve lightweight OAP
+
+OAP is an incremental management layer over existing operators. “Lightweight” must
+be defined by measured resource use and operational burden, not just a small
+container image or a short dependency list. This requirement applies to every
+phase; record its acceptance work with M1 visibility/dogfooding without changing
+the current feature priority.
+
+### Definition and accounting
+
+- Keep the default deployment to one Go service with its bundled UI and PostgreSQL.
+  No required sidecars, per-workload OAP agents, separate queue, identity service,
+  model runtime, logging/search cluster, registry or build service.
+- Reuse operator-owned builds, execution, routing, certificates, health information
+  and logs. Add optional gap-fillers only when needed, with explicit ownership and
+  a visible resource/maintenance cost. Standalone Docker follows the same rule;
+  its optional ingress and other enabled services are accounted for separately.
+- Measure the **incremental OAP footprint**: service CPU/RSS, database CPU/RSS and
+  storage, connections, network/operator API calls, image size, startup/recovery
+  time, and UI payload/latency. Report the existing operator/runtime and application
+  workloads separately. Include dedicated PostgreSQL in the baseline; disclose
+  whole-server cost and attributable overhead when sharing a database server.
+- Lightweight also means a one-person installation, update, backup and recovery
+  process, bounded storage growth, few credentials/configuration decisions, and
+  useful core operation with AI and optional integrations disabled.
+
+### Planned measurable budgets
+
+Define and publish a reproducible reference profile before enforcing performance
+budgets: a modest single-server host, 10 logical applications / 50 components,
+explicitly listed operators and versions, and a fixed observation configuration.
+Measure idle, one active dashboard, a deployment burst, target outage/recovery and
+controller restart. Keep workload image builds on their existing operator lane;
+report OAP-owned optional builds separately rather than hiding their cost.
+
+Use provisional starting goals of at most **256 MiB OAP service RSS**, **512 MiB
+combined service + dedicated PostgreSQL RSS at idle**, and **1% of one CPU core on
+average at idle**. These are proposed targets, not claims about current behavior;
+validate or revise them from measurements and publish the reason. Also establish
+budgets for operator API request rate/concurrency, database/storage growth, UI
+payload and response latency, and startup/recovery time from the reference runs.
+
+Prefer cached observations, batching, visible-page subscriptions and bounded
+polling/backoff. Bound discovery size, log reads, queries, retries and concurrency.
+An idle or disconnected browser must not create unbounded operator traffic, and a
+target outage must not create a retry storm. Optional AI, indexed logs, analytics,
+telemetry and certificate management must not become hidden baseline costs.
+
+### Acceptance and regression checks
+
+Publish a repeatable benchmark command and resource report covering the declared
+profile and each scenario. Verify that OAP outages do not stop existing operator
+workloads or routes. Track regressions against the agreed budgets alongside local
+system/E2E acceptance; document any deliberate exception and its owner-visible
+tradeoff. Keep performance checks reproducible and local while automatic Git CI
+remains disabled. Do not add a monitoring platform just to measure the footprint.
 
 ## Current foundation
 
@@ -155,7 +213,7 @@ configuration for linked resources remains in the operator; direct configuration
 uses consistent Button, Field, Select and Collapsible patterns. Prevent legacy
 global label/control styles and hand-styled link buttons from returning.
 
-**Current priority:** M1.2 Recovery and Target State. M1.1 passed local and scoped staging acceptance on 13 October 2026. The supported M0 exit
+**Current priority:** M1.3 Metadata Backup Visibility. M1.1 and the M1.2 baseline passed local and scoped staging acceptance on 13 October 2026. The supported M0 exit
 review is accepted; P0.1–P0.5 passed their local and scoped staging gates. See
 [the exit review](docs/m0-exit-review.md). P0.4 passed the final local/staging acceptance gate. Standalone Docker uses scoped private pull references and Coolify retains its native server login. P0.1 runtime secret references,
 P0.2 workers and P0.3 existing database links passed local and isolated Coolify
@@ -364,6 +422,34 @@ M4 work; this correction does not advance or reorder roadmap features.
 | 6 | First useful workload and configuration breadth | Worker lifecycle, linked existing databases/queues/storage, minimal runtime secret references, private registry access, and configurable resource limits. Add a single execution path at a time with real examples. Scheduled jobs require a durable schedule identity and proof that restart does not create duplicate active schedulers. Stateful provisioning waits for backup/restore and storage guarantees. |
 | 7 | Reproducible installation and staging dogfooding | Package/bootstrap one Go service, UI, and PostgreSQL; run OAP through a supported operator in staging. Demonstrate update, compatible rollback, controller recovery from outside OAP, and metadata backup/restore. MIT licensing is established; retain third-party notices. |
 
+### Planned domain feature: automatic Let’s Encrypt certificates
+
+Add opt-in automatic TLS certificate issuance and renewal through Let’s Encrypt
+(ACME) to the deferred stable-endpoint/domain work. Provide an explicit automatic
+SSL enable/disable control per supported domain or endpoint, based on the target’s
+capabilities and who owns its ingress.
+
+- **Operator-managed ingress:** inherit and show the operator’s certificate policy.
+  Enable/disable through an adapter only when the operator exposes a supported
+  control and the owner explicitly authorizes OAP to manage it; otherwise link to
+  the native operator control. Avoid a second certificate issuer for the same domain.
+- **Standalone Docker:** offer an optional ACME-capable ingress/proxy integration
+  with persistent certificate/account storage and automatic renewal. Automatic SSL
+  can be disabled so owners can use supplied certificates or externally terminated
+  TLS. Keep HTTP exposure and redirects separate, explicit choices.
+- **Disable behavior:** stop OAP-managed issuance/renewal without deleting existing
+  certificates or account keys. Explain certificate expiry and require a reviewed
+  transition before removing HTTPS or switching certificate ownership.
+- **Acceptance:** verify domain ownership/challenge prerequisites, issue using the
+  ACME staging environment in reproducible tests, exercise renewal, failure,
+  controller/proxy restart and enable/disable transitions, and show redacted
+  certificate status, expiry and renewal diagnostics. Keep private keys and any
+  DNS challenge credentials out of definitions, audit output and logs.
+
+This remains planned with the deferred routing/domain work; it does not change the
+current M1 breadth queue or enable certificate management automatically on existing
+operator resources.
+
 Minimum secret references and registry credentials must precede any batch that
 needs private artifacts or sensitive runtime inputs. They are not permission to
 store secrets in plain manifests. M1 retains the full encrypted store, BYOK,
@@ -429,7 +515,7 @@ into a separate platform before covering this queue.
 
 M1.1 now includes transactional operation/source audit correlation plus explicit agent action allowlists and target/environment pins. Legacy identity/release IDs and permissions remain intact. Its acceptance checks cover narrow issuance, wrong action/pin denial, queued expiry/revocation/permission holds, GitHub build authority and exact-operation audit controls. Local migration/API/browser and scoped Coolify staging acceptance passed. The temporary restart-only acceptance credential was revoked; legacy credentials and existing database configuration/data were preserved.
 
-Continue with M1.2. Its first slice records bounded target connection observations, classifies unknown/connected/unreachable/failed/stale evidence, and links held operations to their existing recovery controls. Rechecking discovery never resumes or redispatches lifecycle work. Verify local outage/restart/browser and scoped staging acceptance before moving to M1.3. Review the M1 exit gate after these slices; do not pull M2–M6
+M1.2 now records bounded target observations, classifies unknown/connected/unreachable/failed/stale evidence, and links held operations to existing recovery controls. Local outage/restart/browser and scoped staging acceptance passed; rechecking does not redispatch work. Continue with M1.3: owner-visible, bounded, read-only host backup reports; coverage and external configuration/key dependencies; isolated restore and failure evidence; manual retention guidance. Complete local packaged/API/browser and scoped staging acceptance before advancing to M1.4. Review the M1 exit gate after these slices; do not pull M2–M6
 work forward. General routing and advanced rollout strategies stay parked under
 the accepted breadth-first correction.
 
@@ -911,7 +997,7 @@ workloads on eligible targets.
 
 | Requested area | Primary phase |
 | --- | --- |
-| KISS, one-person, self-hosted stack | Product rules and every phase |
+| KISS, one-person, self-hosted stack; measured lightweight footprint | Product rules and every phase; reference budgets/benchmarks in M1 visibility and dogfooding |
 | Auth; agent identity, auth, and audit | M1, extended in M2 |
 | Crash recovery and stale states; retries and timeouts | M1 |
 | Backups and restore | M1 |
@@ -925,6 +1011,7 @@ workloads on eligible targets.
 | Manual overrides | M2, placement extensions in M5 |
 | Disable AI; BYOK models; API-first agents | M2 and product rules |
 | GitHub release triggers; repositories and exact build artifacts | M0 core ownership; M3 build/stack extensions |
+| Automatic Let’s Encrypt SSL; operator/standalone enable-disable controls | Deferred M0 stable-endpoint/domain work; capability-aware ingress ownership |
 | Environments, routes, optional rollout strategies | M0 environment/routing contracts; optional rolling/blue-green after verification |
 | Workers, jobs, linked dependencies | M0 verified workload slices; stateful provisioning after backup/storage gates |
 | Skills | M2 |

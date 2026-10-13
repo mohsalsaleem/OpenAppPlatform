@@ -119,6 +119,7 @@ func (s *Server) routes() http.Handler {
 	s.endpointRoutes(mux)
 	if !s.Preview {
 		s.accessRoutes(mux)
+		s.backupRoutes(mux)
 	}
 	c := s.Controller
 	s.streamRoutes(mux)

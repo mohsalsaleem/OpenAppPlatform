@@ -1,3 +1,4 @@
+import { Backups } from "./Backups";
 import { FieldSet, FieldLegend } from "@/components/ui/field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -137,6 +138,7 @@ export function Access() {
         <TabsTrigger value="members">Members</TabsTrigger>
         <TabsTrigger value="agents">Agent Tokens</TabsTrigger>
         <TabsTrigger value="audit">Audit Log</TabsTrigger>
+ <TabsTrigger value="backups">Backups</TabsTrigger>
       </TabsList>
       <ErrorBox
         error={
@@ -354,6 +356,7 @@ export function Access() {
           ))}
         </section>
       </TabsContent>
+      <TabsContent value="backups">{section==="backups" && <Backups/>}</TabsContent>
       <TabsContent
         value="audit"
         forceMount

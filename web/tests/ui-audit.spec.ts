@@ -938,3 +938,20 @@ test("target outage evidence survives navigation and rechecks never retry operat
   await expect(page.getByText("Stale",{exact:true})).toBeVisible();
   expect(checks).toBe(2);
 });
+
+test("metadata backup results keep coverage, failures and pending attempts distinct", async ({page})=>{
+ await fixtures(page);
+ const report={version:1,id:"a".repeat(32),action:"backup",status:"succeeded",source:"host-helper",coverage:"metadata-only",startedAt:"2026-10-13T10:00:00Z",updatedAt:"2026-10-13T10:01:00Z",sha256:"b".repeat(64),sizeBytes:1024,errorCode:""};
+ await page.route("**/api/v1/access/backups",route=>route.fulfill({json:{configured:true,invalidReports:0,truncated:false,reports:[report,{...report,id:"c".repeat(32),action:"restore-check",status:"failed",sha256:"",sizeBytes:0,errorCode:"checksum-mismatch"},{...report,id:"d".repeat(32),status:"running",sha256:"",sizeBytes:0}]}}));
+ await page.goto("/access");await page.getByRole("tab",{name:"Backups",exact:true}).click();
+ await expect(page.getByText("Application Data Excluded",{exact:true})).toBeVisible();
+ await expect(page.getByText("Configuration & Keys Saved Separately",{exact:true})).toBeVisible();
+ await expect(page.getByText("Archive checksum or format did not match.",{exact:true})).toBeVisible();
+ await expect(page.getByText("Result Pending",{exact:true})).toBeVisible();
+ await expect(page.getByRole("button",{name:"Refresh Reports",exact:true})).toBeVisible();
+ await page.screenshot({path:"../.local/ui-backup-reports.png",fullPage:true});
+ await page.getByRole("button",{name:"Backup & Recovery Steps",exact:true}).click();
+ await expect(page.getByText(/Retention: keep at least two verified archives/)).toBeVisible();
+ await page.setViewportSize({width:390,height:844});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

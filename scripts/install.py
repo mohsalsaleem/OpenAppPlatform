@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Small local installation and quiesced metadata backup helpers; no env loading."""
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -45,6 +46,8 @@ def init(directory, image, socket=None, operator_only=False, port=8878):
         gid = int(result.stdout.strip())
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     directory.chmod(0o700)
+    (directory / 'backup-reports').mkdir(mode=0o755, exist_ok=True)
+    (directory / 'backup-reports').chmod(0o755)
     files = 'compose.yaml' if operator_only else 'compose.yaml:compose.docker.yaml'
     env = {
         'COMPOSE_PROJECT_NAME': 'oap-' + secrets.token_hex(4),
@@ -56,6 +59,7 @@ def init(directory, image, socket=None, operator_only=False, port=8878):
         'OAP_COOKIE_SECURE': 'false',
         'OAP_BIND_ADDR': '127.0.0.1',
         'OAP_HTTP_PORT': str(port),
+        'OAP_BACKUP_REPORTS_DIR': '/app/backup-reports',
     }
     if not operator_only:
         env.update(OAP_DOCKER_SOCKET=str(socket), OAP_DOCKER_GID=str(gid))
@@ -109,7 +113,7 @@ SELECT json_build_object('migrations',(SELECT json_agg(json_build_object('versio
 """))
 
 
-def backup(directory, archive):
+def _backup(directory, archive):
     directory, archive = Path(directory).resolve(), Path(archive).resolve()
     stopped(directory)
     if archive.exists() or archive.with_suffix(archive.suffix + '.json').exists():
@@ -127,7 +131,7 @@ def backup(directory, archive):
     return receipt
 
 
-def restore_check(directory, archive, database):
+def _restore_check(directory, archive, database):
     directory, archive = Path(directory).resolve(), Path(archive).resolve()
     if not re.fullmatch(r'oap_restore_[a-z0-9_]{1,40}', database):
         raise ValueError('Restore only into a new oap_restore_<name> database; existing databases are never overwritten')
@@ -143,6 +147,68 @@ def restore_check(directory, archive, database):
     if metadata(directory, database) != receipt['metadata']:
         raise RuntimeError('Restored metadata identity counts or migration ledger differ')
     return {'database': database, 'metadataVerified': True, 'controllerStarted': False}
+
+
+def report_time():
+    return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+
+def write_report(directory, report):
+    # Summary only: archive paths, passwords, configuration values and raw errors stay private.
+    directory = Path(directory).resolve()
+    directory.mkdir(mode=0o755, parents=True, exist_ok=True)
+    directory.chmod(0o755)
+    temporary = directory / ('.' + report['id'] + '.' + secrets.token_hex(4) + '.tmp')
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+    os.fchmod(fd, 0o644)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            json.dump(report, stream)
+            stream.write('\n')
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, directory / (report['id'] + '.json'))
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def report_error(error):
+    if isinstance(error, KeyboardInterrupt):
+        return 'interrupted'
+    text = str(error)
+    if text.startswith('Stop the platform'): return 'controller-running'
+    if text.startswith('Backup destination already exists'): return 'destination-exists'
+    if text.startswith('Backup checksum or archive format is invalid'): return 'checksum-mismatch'
+    if text.startswith('Restore only into a new'): return 'invalid-restore-target'
+    return 'operation-failed'
+
+
+def reported(action, directory, archive, callback):
+    reports = Path(directory).resolve() / 'backup-reports'
+    now = report_time()
+    report = {'version': 1, 'id': secrets.token_hex(16), 'action': action,
+              'status': 'running', 'source': 'host-helper', 'coverage': 'metadata-only',
+              'startedAt': now, 'updatedAt': now, 'sha256': '', 'sizeBytes': 0, 'errorCode': ''}
+    write_report(reports, report)  # If the intent cannot be recorded, do not start the backup.
+    try:
+        result = callback()
+        data = Path(archive).read_bytes()
+        report.update(status='succeeded', sha256=hashlib.sha256(data).hexdigest(), sizeBytes=len(data))
+        report['updatedAt'] = report_time()
+        write_report(reports, report)
+        return result
+    except BaseException as error:
+        report.update(status='failed', errorCode=report_error(error), sha256='', sizeBytes=0, updatedAt=report_time())
+        write_report(reports, report)
+        raise
+
+
+def backup(directory, archive):
+    return reported('backup', directory, archive, lambda: _backup(directory, archive))
+
+
+def restore_check(directory, archive, database):
+    return reported('restore-check', directory, archive, lambda: _restore_check(directory, archive, database))
 
 
 def main():

@@ -173,3 +173,36 @@ screenshots are under `.local/test-env/runs/<run-ID>/installation/`.
 This is the single-server M0 package. Multi-server installation matrices,
 PostgreSQL major upgrades, automatic data restore and general routing remain
 separate roadmap work.
+
+
+## Owner-visible backup reports
+
+The packaged installation mounts `backup-reports/` read-only at
+`/app/backup-reports` and sets `OAP_BACKUP_REPORTS_DIR`. The helper writes a bounded
+summary of each backup/isolated restore attempt there: intent, terminal result,
+archive SHA256/size and a fixed failure code. Archives and private checksum/metadata
+sidecars remain separate, private host files. Reports never contain archive paths,
+configuration/secret values or raw errors. The report directory is readable by the
+non-root runtime; its parent installation directory stays private.
+
+Open Workspace Settings → Backups to inspect the results. An attempt without a
+terminal report is Result Pending, not a verified backup: inspect the host before
+retrying. A report is historical evidence, not proof that the archive still exists.
+The reader accepts only valid bounded summaries, rejects extra fields/symlinks,
+and returns at most 100 reports from a scan of at most 500 entries. Inspect invalid
+or truncated feeds and archive older report files manually.
+
+Operator-managed installations can opt into the same report format through a
+read-only metadata-only directory mount and `OAP_BACKUP_REPORTS_DIR`. The trusted
+host workflow owns quiescence, archive creation and isolated restore verification;
+OAP does not take over native workload backups. Mount only summaries, never the
+archive directory or a directory containing private configuration. No report
+upload/mutation API is exposed; only an owner browser session can read the feed.
+
+Coverage is OAP metadata, access records/credential verifiers, definitions,
+bindings and operation history. Workload databases and volumes, deployment files,
+secret values and future secret-store recovery keys require separate copies.
+Keep archives private; they contain sensitive metadata even though reports are
+redacted. Keep at least two verified archives plus an independent off-host copy;
+remove old copies manually only after a newer isolated restore and dependency
+check. No archive deletion, storage provider or backup scheduler is added.

@@ -21,6 +21,13 @@ environments:
       commit: 490677c9542cebf0faa61de98808ab1e01ac13ce
       provider_deployment_uuid: tpj8hmtxkcjz3keixiqrtuzk
       verified: 2026-10-11
+    backup_reports:
+      mount_path: /app/backup-reports
+      host_path: /home/saleem/.config/openappplatform/staging/backup-reports
+      read_only: true
+      runtime_env: OAP_BACKUP_REPORTS_DIR
+      coverage: metadata-only
+      execution: trusted-host-helper
     auth_mode: owner
     owner_setup: complete
     configuration_storage_uuid: a2q7lc8ehu6twekwj1bcng8m

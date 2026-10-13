@@ -189,6 +189,7 @@ def run():
         ready()
         same_workloads(before)
         browser('verify')
+        browser('backup-reports')
         compose(['stop', 'platform'])
         restored_container = project + '-restored-controller'
         password = values()['POSTGRES_PASSWORD']
