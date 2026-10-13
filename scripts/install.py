@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Small local installation and quiesced metadata backup helpers; no env loading."""
 import argparse
+import fcntl
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -211,9 +212,111 @@ def restore_check(directory, archive, database):
     return reported('restore-check', directory, archive, lambda: _restore_check(directory, archive, database))
 
 
+
+PROTOCOL_VERSION = 1
+JSON_OUTPUT = False
+
+
+def installation_values(directory):
+    directory = Path(directory).absolute()
+    info = directory.lstat()
+    config = directory / '.env'
+    metadata = config.lstat()
+    if not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o077 or not stat.S_ISREG(metadata.st_mode) or metadata.st_mode & 0o077 or metadata.st_size > 65536:
+        raise ValueError('Installation directory/configuration must be private regular files')
+    result = dict(line.split('=', 1) for line in config.read_text().splitlines() if line and not line.startswith('#'))
+    if not IMAGE.fullmatch(result.get('OAP_IMAGE', '')) or not re.fullmatch(r'oap-[a-f0-9]{8}', result.get('COMPOSE_PROJECT_NAME', '')):
+        raise ValueError('Installation identity or immutable image is invalid')
+    return directory, result
+
+
+def rewrite_values(directory, values):
+    temporary = directory / ('.env.' + secrets.token_hex(6))
+    try:
+        private_write(temporary, ''.join(key + '=' + value + '\n' for key, value in values.items()))
+        with temporary.open('rb') as stream:
+            os.fsync(stream.fileno())
+        os.replace(temporary, directory / '.env')
+        descriptor = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def preflight_image(directory, values, image):
+    # Compose resolves the candidate image from this transient environment; the
+    # private installed config is unchanged until the read-only preflight passes.
+    env = os.environ.copy()
+    env['OAP_IMAGE'] = image
+    result = subprocess.run(['docker', 'compose', '--project-directory', str(directory),
+                             'run', '--rm', '--no-deps', '-T', '--entrypoint', '/app/oap-admin',
+                             'platform', 'check-schema'], cwd=directory, env=env,
+                            capture_output=True, timeout=90)
+    if result.returncode:
+        raise ValueError('Candidate image/schema preflight failed; installation configuration remains unchanged')
+
+
+def lifecycle(directory, action, image=None):
+    directory, values = installation_values(directory)
+    lock = directory / '.lifecycle.lock'
+    fd = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        raise ValueError('Another installation operation is running')
+    try:
+        if action == 'check':
+            raw = compose(directory, ['ps', '--format', 'json'])
+            if len(raw) > 65536:
+                raise ValueError('Installation status exceeds bounds')
+            rows = json.loads(raw) if raw.lstrip().startswith(b'[') else [json.loads(line) for line in raw.splitlines() if line.strip()]
+            services = [{'service': row.get('Service', ''), 'state': row.get('State', ''), 'health': row.get('Health', '')} for row in rows]
+            return {'schemaVersion': PROTOCOL_VERSION, 'action': action, 'services': services,
+                    'healthy': all(any(row['service'] == name and row['state'] == 'running' and row['health'] == 'healthy' for row in services) for name in ('platform', 'postgres'))}
+        if action == 'start':
+            compose(directory, ['up', '-d', '--wait', '--wait-timeout', '90'])
+        else:
+            candidate = image or values['OAP_IMAGE']
+            if not IMAGE.fullmatch(candidate):
+                raise ValueError('Use an immutable OAP image digest/content ID')
+            preflight_image(directory, values, candidate)
+            if candidate != values['OAP_IMAGE']:
+                values['OAP_PREVIOUS_IMAGE'] = values['OAP_IMAGE']
+                values['OAP_IMAGE'] = candidate
+                rewrite_values(directory, values)
+            compose(directory, ['up', '-d', '--no-deps', '--force-recreate', '--wait', '--wait-timeout', '90', 'platform'])
+        return {'schemaVersion': PROTOCOL_VERSION, 'action': action, 'image': values['OAP_IMAGE'],
+                'runtimeVerified': True, 'applicationDataRestored': False}
+    finally:
+        os.close(fd)
+        # The advisory lock is released even after a crash; keep the inode so
+        # another process cannot accidentally lock a replacement file.
+
+
+def owner_setup(directory, binary, output):
+    directory, values = installation_values(directory)
+    raw = sys.stdin.buffer.read(65537)
+    if len(raw) > 65536:
+        raise ValueError('Owner setup input exceeds 64 KiB')
+    json.loads(raw)
+    port = values.get('OAP_HTTP_PORT', '')
+    if not port.isdigit() or not 1024 <= int(port) <= 65535 or values.get('OAP_BIND_ADDR') != '127.0.0.1':
+        raise ValueError('Owner setup helper requires the private loopback installation')
+    env = {key: value for key, value in os.environ.items() if key not in ('OAP_API_TOKEN', 'OAP_CREDENTIAL_FILE', 'OAP_SESSION_FILE', 'OAP_URL')}
+    env['OAP_SETUP_TOKEN'] = values['OAP_SETUP_TOKEN']
+    result = subprocess.run([binary, '--url', 'http://127.0.0.1:' + port, '--out', output, '--file', '-', 'setup'], input=raw, env=env, capture_output=True, timeout=30)
+    if result.returncode:
+        raise ValueError('Owner setup failed; inspect setup status and use login for an existing owner')
+    return {'schemaVersion': PROTOCOL_VERSION, 'ok': True, 'action': 'owner-setup', 'ownerEstablished': True, 'credentialSaved': True}
+
 def main():
+    global JSON_OUTPUT
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['init', 'backup', 'restore-check'])
+    parser.add_argument('action', choices=['init', 'start', 'check', 'update', 'recover', 'owner-setup', 'backup', 'restore-check'])
     parser.add_argument('--directory', default='.local/install')
     parser.add_argument('--image')
     parser.add_argument('--docker-socket')
@@ -221,18 +324,43 @@ def main():
     parser.add_argument('--port', type=int, default=8878)
     parser.add_argument('--archive')
     parser.add_argument('--database')
+    parser.add_argument('--json', action='store_true')
+    parser.add_argument('--protocol-version', type=int, default=1)
+    parser.add_argument('--cli-bin', default=str(ROOT / 'bin/oap'))
+    parser.add_argument('--out')
     args = parser.parse_args()
-    if args.action == 'init':
+    JSON_OUTPUT = args.json or args.action in ('start', 'check', 'update', 'recover', 'owner-setup')
+    if args.protocol_version != PROTOCOL_VERSION:
+        raise ValueError('Unsupported installation protocol version')
+    if args.action in ('start', 'check', 'update', 'recover'):
+        if args.action == 'update' and not args.image:
+            raise ValueError('Update requires an exact candidate image')
+        result = lifecycle(args.directory, args.action, args.image)
+        result['ok'] = result.get('healthy', True)
+        print(json.dumps(result))
+        if args.action == 'check' and not result['healthy']:
+            sys.exit(4)
+    elif args.action == 'owner-setup':
+        if not args.out:
+            raise ValueError('Owner setup requires --out private credential file')
+        print(json.dumps(owner_setup(args.directory, args.cli_bin, args.out)))
+    elif args.action == 'init':
         if not args.image:
             parser.error('--image is required')
         path = init(args.directory, args.image, args.docker_socket, args.operator_only, args.port)
-        print('Prepared owner-mode installation:', path)
-        print('Private setup secret is in .env. Run docker compose up -d --wait from that directory.')
+        if args.json:
+            print(json.dumps({'schemaVersion': PROTOCOL_VERSION, 'ok': True, 'action': 'init', 'prepared': True, 'started': False}))
+        else:
+            print('Prepared owner-mode installation:', path)
+            print('Private setup secret is in .env. Run docker compose up -d --wait from that directory.')
     elif args.action == 'backup':
         if not args.archive:
             parser.error('--archive is required')
         backup(args.directory, args.archive)
-        print('Quiesced metadata archive and checksum receipt saved privately.')
+        if args.json:
+            print(json.dumps({'schemaVersion': PROTOCOL_VERSION, 'ok': True, 'action': 'backup', 'archiveSaved': True, 'applicationDataIncluded': False}))
+        else:
+            print('Quiesced metadata archive and checksum receipt saved privately.')
     else:
         if not args.archive or not args.database:
             parser.error('--archive and --database are required')
@@ -243,8 +371,14 @@ if __name__ == '__main__':
     try:
         main()
     except ValueError as error:
-        print(str(error), file=sys.stderr)
+        if JSON_OUTPUT:
+            print(json.dumps({'schemaVersion': 1, 'ok': False, 'error': {'code': 'installation_rejected', 'message': str(error)}}))
+        else:
+            print(str(error), file=sys.stderr)
         sys.exit(1)
     except (RuntimeError, OSError, subprocess.SubprocessError):
-        print('Installation operation failed. Check paths, socket permissions, image identity and controller state; existing data is retained.', file=sys.stderr)
+        if JSON_OUTPUT:
+            print(json.dumps({'schemaVersion': 1, 'ok': False, 'error': {'code': 'installation_unavailable', 'message': 'Inspect installation, controller state and the retained configuration before retrying'}}))
+        else:
+            print('Installation operation failed. Check paths, socket permissions, image identity and controller state; existing data is retained.', file=sys.stderr)
         sys.exit(1)

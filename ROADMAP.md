@@ -95,8 +95,10 @@ Only the ordered active queue authorizes the next implementation slice. Deferred
 items are preserved requirements, not parallel work or prerequisites. The next
 slice is **M2.5**, implemented by the [machine CLI slice](docs/agent-cli.md).
 Its reproducible acceptance runs in the full local gate and retains a
-`cli-acceptance.json` receipt. After that gate passes, **M2.6 is next**; no
-headless bootstrap or broader agent grant is claimed by the CLI alone.
+`cli-acceptance.json` receipt. M2.5 passed gate `20261013-210851-28d984b5` at `6b9359c`.
+**M2.6** is implemented by [headless bootstrap](docs/headless-bootstrap.md);
+its fresh named-agent Compose journey retains `headless-acceptance.json`. Once
+that full gate passes, **M2.7 is next**. This is not acceptance of M2.7–M2.9.
 
 ## Ordered active queue
 

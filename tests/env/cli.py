@@ -25,7 +25,7 @@ with socket.socket() as listener:
     listener.bind(('127.0.0.1', 0))
     host_port = listener.getsockname()[1]
 manifest = {'name': 'cli-acceptance', 'targetId': 'test-docker', 'environment': 'staging', 'components': [{'name': 'web', 'kind': 'web', 'image': os.environ['OAP_TEST_DOCKER_IMAGE'], 'port': 8080, 'hostPort': host_port, 'instances': 1, 'strategy': 'standard', 'env': {'OAP_TEST_MESSAGE': 'headless-cli'}}]}
-app = cli('--target', 'test-docker', '--environment', 'staging', '--file', '-', 'create', body=manifest)['data']
+app = cli('--target', 'test-docker', '--environment', 'staging', '--key', 'cli-create-1', '--file', '-', 'create', body=manifest)['data']
 app_id = app['id']
 context = ['--app', app_id, '--target', 'test-docker', '--environment', 'staging']
 assert cli('--app', app_id, 'instances')['data'][0]['status'] == 'not deployed'

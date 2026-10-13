@@ -397,7 +397,19 @@
             }
           }
         },
-        "parameters": []
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Required for onboarding agents; same credential/key and normalized manifest reuse one creation. Existing owner creation remains compatible.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ]
       }
     },
     "/api/v1/applications/{id}": {
@@ -1737,24 +1749,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "name": {
-                      "type": "string"
-                    },
-                    "role": {
-                      "type": "string"
-                    },
-                    "kind": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "name",
-                    "role",
-                    "kind"
-                  ],
-                  "additionalProperties": false
+                  "$ref": "#/components/schemas/Principal"
                 }
               }
             }
@@ -2045,15 +2040,24 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "token",
+                    "credentialId",
+                    "expiresInSeconds"
+                  ],
                   "properties": {
                     "token": {
+                      "type": "string",
+                      "writeOnly": true
+                    },
+                    "credentialId": {
                       "type": "string"
+                    },
+                    "expiresInSeconds": {
+                      "type": "integer",
+                      "const": 2592000
                     }
-                  },
-                  "required": [
-                    "token"
-                  ],
-                  "additionalProperties": false
+                  }
                 }
               }
             }
@@ -5247,6 +5251,118 @@
         ],
         "description": "Scope-checked eligibility for deploy/restart/configure, not admission or a complete lifecycle permission catalog. Missing current runtime/input/conflict evidence is explicit."
       }
+    },
+    "/api/v1/access/onboarding-grants": {
+      "post": {
+        "summary": "Owner issues bounded standalone onboarding grant",
+        "responses": {
+          "201": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "token",
+                    "credentialId",
+                    "expiresInSeconds"
+                  ],
+                  "properties": {
+                    "token": {
+                      "type": "string",
+                      "writeOnly": true
+                    },
+                    "credentialId": {
+                      "type": "string"
+                    },
+                    "expiresInSeconds": {
+                      "type": "integer",
+                      "const": 86400
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or expired credential"
+          },
+          "403": {
+            "description": "Role, scope or CSRF rejected"
+          },
+          "409": {
+            "description": "Already configured or conflicting account"
+          },
+          "422": {
+            "description": "Invalid input"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-OAP-CSRF",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "1"
+              ]
+            },
+            "description": "Required for browser-cookie and public account writes."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "targetId",
+                  "environment",
+                  "maxApplications",
+                  "actions"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "targetId": {
+                    "type": "string"
+                  },
+                  "environment": {
+                    "type": "string"
+                  },
+                  "maxApplications": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                  },
+                  "actions": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "deploy",
+                        "restart",
+                        "configure",
+                        "recover"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "post_onboarding_grant",
+        "description": "One Docker target/environment, 24-hour expiry, explicit lifecycle actions on newly created applications only, maximum 1\u201310 apps."
+      }
     }
   },
   "components": {
@@ -6988,6 +7104,109 @@
           "updatedAt",
           "inferenceEnabled"
         ]
+      },
+      "AgentPermissions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "actions",
+          "targetId",
+          "environment"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "deploy",
+                "restart",
+                "configure",
+                "recover",
+                "rollback",
+                "scale-down",
+                "control"
+              ]
+            }
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "createApplications": {
+            "type": "boolean"
+          },
+          "maxApplications": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          }
+        }
+      },
+      "Principal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "userId",
+          "credentialId",
+          "workspaceId",
+          "name",
+          "role",
+          "kind",
+          "scope"
+        ],
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "credentialId": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string",
+            "const": "default"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "operator",
+              "viewer"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "session",
+              "agent"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "read",
+              "operate"
+            ]
+          },
+          "applicationId": {
+            "type": "string"
+          },
+          "managedApplicationIds": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "type": "string"
+            }
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/AgentPermissions"
+          }
+        }
       }
     }
   }

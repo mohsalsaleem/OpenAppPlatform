@@ -48,6 +48,14 @@ func (c *Controller) recordCredential(ctx context.Context, tx pgx.Tx, id, app st
 			return access.ErrDenied
 		}
 	}
+	current.CredentialID = p.CredentialID
+	if current.TargetGrant() {
+		var owned bool
+		if err := tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM oap_agent_applications WHERE credential_id=$1 AND application_id=$2)", p.CredentialID, app).Scan(&owned); err != nil || !owned {
+			return access.ErrDenied
+		}
+		current.ManagedApplicationIDs = []string{app}
+	}
 	d, e := c.Store.DeploymentTx(ctx, tx, id)
 	if e != nil {
 		return e

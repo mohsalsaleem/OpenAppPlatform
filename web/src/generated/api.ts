@@ -568,11 +568,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": {
-                            name: string;
-                            role: string;
-                            kind: string;
-                        };
+                        "application/json": components["schemas"]["Principal"];
                     };
                 };
                 /** @description Missing or expired credential */
@@ -982,6 +978,9 @@ export interface paths {
                     content: {
                         "application/json": {
                             token: string;
+                            credentialId: string;
+                            /** @constant */
+                            expiresInSeconds: 2592000;
                         };
                     };
                 };
@@ -3042,6 +3041,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/access/onboarding-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Owner issues bounded standalone onboarding grant
+         * @description One Docker target/environment, 24-hour expiry, explicit lifecycle actions on newly created applications only, maximum 1–10 apps.
+         */
+        post: operations["post_onboarding_grant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3530,6 +3549,29 @@ export interface components {
             updatedAt: string;
             inferenceEnabled: boolean;
         };
+        AgentPermissions: {
+            actions: ("deploy" | "restart" | "configure" | "recover" | "rollback" | "scale-down" | "control")[];
+            targetId: string;
+            environment: string;
+            createApplications?: boolean;
+            maxApplications?: number;
+        };
+        Principal: {
+            userId: string;
+            credentialId: string;
+            /** @constant */
+            workspaceId: "default";
+            name: string;
+            /** @enum {string} */
+            role: "owner" | "operator" | "viewer";
+            /** @enum {string} */
+            kind: "session" | "agent";
+            /** @enum {string} */
+            scope: "read" | "operate";
+            applicationId?: string;
+            managedApplicationIds?: string[];
+            permissions?: components["schemas"]["AgentPermissions"];
+        };
     };
     responses: never;
     parameters: never;
@@ -3813,7 +3855,10 @@ export interface operations {
     post_create_application_definition: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required for onboarding agents; same credential/key and normalized manifest reuse one creation. Existing owner creation remains compatible. */
+                "Idempotency-Key"?: string;
+            };
             path?: never;
             cookie?: never;
         };
@@ -5620,6 +5665,72 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Error"];
                 };
+            };
+        };
+    };
+    post_onboarding_grant: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required for browser-cookie and public account writes. */
+                "X-OAP-CSRF"?: "1";
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    targetId: string;
+                    environment: string;
+                    maxApplications: number;
+                    actions: ("deploy" | "restart" | "configure" | "recover")[];
+                };
+            };
+        };
+        responses: {
+            /** @description Successful operation */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        token: string;
+                        credentialId: string;
+                        /** @constant */
+                        expiresInSeconds: 86400;
+                    };
+                };
+            };
+            /** @description Missing or expired credential */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Role, scope or CSRF rejected */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Already configured or conflicting account */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid input */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

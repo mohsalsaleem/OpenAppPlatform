@@ -15,14 +15,16 @@ The bundled schema describes the client release, not live server introspection.
 Set `OAP_URL` to an HTTPS origin or loopback HTTP origin. Set `OAP_API_TOKEN` to a
 privately supplied named agent token. Tokens are never command-line flags. Existing
 owner-mode agents remain app-scoped: app creation/listing and target enumeration
-are not granted by this CLI. Broader headless grants arrive in M2.6.
+are not granted by this CLI. The [M2.6 headless slice](headless-bootstrap.md) adds a separate bounded
+standalone onboarding grant; existing app-scoped credentials remain unchanged.
 
 For current owner-authorized API operations, `--session-file` or `OAP_SESSION_FILE`
 accepts an existing owner session in a private regular JSON file with a `session`
 field. The file must deny group/other access; symlinks are rejected. Protect and
 remove it when no longer needed. The CLI never prints or persists sessions and
-will not combine an owner session with an agent token. This is not headless login,
-bootstrap, agent impersonation or a new credential issuance mechanism.
+will not combine an owner session with an agent token. This legacy file input remains supported. M2.6 `setup`, `login`, `grant` and
+`app-grant` exclusively save origin-bound private files with `--out`;
+`--credential-file` reads those files without exposing credentials.
 
 Use explicit `--app`, `--operation`, and optional `--target` / `--environment`
 assertions. Assertions check current definition or frozen operation context before
@@ -105,4 +107,5 @@ Focused tests cover redirects, oversized responses, private session files,
 auth/conflict/rate-limit errors, held/terminal states and deadline behavior. The
 owner-mode system regression checks app-scoped capability grants and sibling denial.
 M2.5 is accepted only when the full local gate passes; M2.6 then becomes the next
-implementation slice. End-to-end named-agent bootstrap remains unimplemented.
+implementation slice. Fresh named-agent bootstrap and external controller rescue are covered by the
+separate M2.6 acceptance, not by this preview-authority CLI fixture.

@@ -229,6 +229,10 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 	key := fs.String("key", "", "stable mutation key")
 	operation := fs.String("operation", "", "operation ID")
 	timeout := fs.Duration("timeout", 2*time.Minute, "bounded wait duration")
+	credential := fs.String("credential-file", getenv("OAP_CREDENTIAL_FILE"), "origin-bound private credential")
+	output := fs.String("out", "", "new private credential file")
+	plan := fs.String("plan", "", "deployment plan ID")
+	credentialID := fs.String("credential", "", "agent credential ID")
 	session := fs.String("session-file", getenv("OAP_SESSION_FILE"), "private owner session JSON")
 	if fs.Parse(args) != nil || len(fs.Args()) != 1 || *timeout <= 0 || *timeout > 30*time.Minute {
 		return finish(nil, failure("invalid_arguments", "Provide flags before one command; use help for command contracts", false, "help"), 2)
@@ -238,7 +242,7 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 		return finish(json.RawMessage(docs.OpenAPI), nil, 0)
 	}
 	if command == "help" {
-		return finish(map[string]any{"commands": []string{"help", "schema", "meta", "targets", "capabilities", "apps", "create", "get", "update", "instances", "diagnostics", "deploy", "operation", "wait", "verify"}, "flagsBeforeCommand": true, "contextFlags": []string{"url", "app", "target", "environment", "operation"}, "input": "--file path.json or --file -; deploy requires --key and expectedVersion > 0", "auth": "OAP_API_TOKEN or --session-file; no credentials in flags/output", "wait": "--timeout 1s..30m; observes without cancelling", "verification": "current instance health only, not end-to-end application behavior", "exitCodes": map[string]int{"success": 0, "input": 2, "denied": 3, "rejected": 4, "unavailable": 5, "operationStopped": 6, "timeout": 7}}, nil, 0)
+		return finish(map[string]any{"commands": []string{"help", "schema", "meta", "targets", "capabilities", "apps", "create", "get", "update", "instances", "diagnostics", "deploy", "operation", "wait", "verify", "setup", "login", "grant", "app-grant", "revoke", "agent-control", "set-agent-control", "plan", "get-plan", "approve", "execute-plan", "target-capabilities", "resources", "whoami"}, "flagsBeforeCommand": true, "contextFlags": []string{"url", "app", "target", "environment", "operation"}, "input": "--file path.json or --file -; deploy requires --key and expectedVersion > 0; agent create requires --key", "auth": "OAP_API_TOKEN or --session-file; no credentials in flags/output", "wait": "--timeout 1s..30m; observes without cancelling", "verification": "current instance health only, not end-to-end application behavior", "exitCodes": map[string]int{"success": 0, "input": 2, "denied": 3, "rejected": 4, "unavailable": 5, "operationStopped": 6, "timeout": 7}}, nil, 0)
 	}
 	c := Client{URL: *endpoint, Token: getenv("OAP_API_TOKEN")}
 	if *session != "" {
@@ -266,6 +270,76 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 	}
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
+	if *credential != "" {
+		if c.Token != "" || c.Session != "" {
+			return emitFailure(nil, failure("ambiguous_identity", "Select one credential source", false, "select_identity"))
+		}
+		stored, f := readCredential(*credential, *endpoint)
+		if f != nil {
+			return emitFailure(nil, f)
+		}
+		c.Token = stored.Token
+		c.Session = stored.Session
+	}
+	if command == "setup" || command == "login" || command == "grant" || command == "app-grant" {
+		if *file == "" {
+			return emitFailure(nil, failure("input_required", "Provide authentication/grant arguments as private JSON", false, "inspect_schema"))
+		}
+		body, err := readInput(*file, in)
+		if err != nil {
+			return emitFailure(nil, failure("invalid_input", "Provide one bounded JSON document", false, "inspect_schema"))
+		}
+		if command != "grant" && command != "app-grant" && (c.Token != "" || c.Session != "") {
+			return emitFailure(nil, failure("ambiguous_identity", "Owner login/setup uses its own input, not an existing identity", false, "select_identity"))
+		}
+		reserved, f := reserveCredential(*output)
+		if f != nil {
+			return emitFailure(nil, f)
+		}
+		saved := false
+		defer func() {
+			reserved.Close()
+			if !saved {
+				os.Remove(*output)
+			}
+		}()
+		var stored credentialFile
+		var public any
+		if command == "grant" || command == "app-grant" {
+			grantPath := "/api/v1/access/onboarding-grants"
+			if command == "app-grant" {
+				grantPath = "/api/v1/access/credentials"
+			}
+			raw, f := c.Call(ctx, "POST", grantPath, body, "")
+			if f != nil {
+				return emitFailure(nil, f)
+			}
+			var issued struct {
+				Token            string `json:"token"`
+				CredentialID     string `json:"credentialId"`
+				ExpiresInSeconds int    `json:"expiresInSeconds"`
+			}
+			if json.Unmarshal(raw, &issued) != nil || issued.Token == "" || issued.CredentialID == "" {
+				return emitFailure(nil, failure("invalid_response", "Issued agent credential response is incomplete", false, "inspect_audit"))
+			}
+			base, _ := origin(*endpoint)
+			stored = credentialFile{SchemaVersion: 1, Origin: base, Token: issued.Token, CredentialID: issued.CredentialID}
+			public = map[string]any{"credentialId": issued.CredentialID, "expiresInSeconds": issued.ExpiresInSeconds}
+		} else {
+			var raw json.RawMessage
+			stored, raw, f = ownerAuthenticate(ctx, *endpoint, command, getenv("OAP_SETUP_TOKEN"), body)
+			if f != nil {
+				return emitFailure(nil, f)
+			}
+			public = raw
+		}
+		if f = saveCredential(reserved, stored); f != nil {
+			return emitFailure(map[string]string{"credentialId": stored.CredentialID}, f)
+		}
+		saved = true
+		return finish(public, nil, 0)
+	}
+
 	if command == "wait" || command == "operation" {
 		result.OperationID = *operation
 		if !idPattern.MatchString(*operation) {
@@ -299,6 +373,49 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 	method, path := "GET", "/api/v1/"+command
 	switch command {
 	case "meta", "targets":
+	case "whoami":
+		path = "/api/v1/auth/me"
+	case "agent-control":
+		path = "/api/v1/access/agent-control"
+	case "set-agent-control":
+		method = "PUT"
+		path = "/api/v1/access/agent-control"
+	case "revoke":
+		if !idPattern.MatchString(*credentialID) {
+			return emitFailure(nil, failure("invalid_credential", "Provide --credential ID", false, "check_context"))
+		}
+		method = "DELETE"
+		path = "/api/v1/access/credentials/" + *credentialID
+	case "target-capabilities", "resources":
+		if !idPattern.MatchString(*target) {
+			return emitFailure(nil, failure("invalid_target", "Provide --target ID", false, "check_context"))
+		}
+		path = "/api/v1/targets/" + *target + "/resources"
+		if command == "target-capabilities" {
+			path = "/api/v1/targets/" + *target + "/capabilities"
+		}
+	case "plan", "get-plan", "approve", "execute-plan":
+		if !idPattern.MatchString(*app) {
+			return emitFailure(nil, failure("invalid_application", "Provide --app ID", false, "check_context"))
+		}
+		path = "/api/v1/applications/" + *app + "/plans"
+		if command != "plan" {
+			if !idPattern.MatchString(*plan) {
+				return emitFailure(nil, failure("invalid_plan", "Provide --plan ID", false, "check_context"))
+			}
+			path += "/" + *plan
+		}
+		if command == "plan" {
+			method = "POST"
+		}
+		if command == "approve" {
+			method = "POST"
+			path += "/approve"
+		}
+		if command == "execute-plan" {
+			method = "POST"
+			path += "/execute"
+		}
 	case "apps":
 		path = "/api/v1/applications"
 	case "create":
@@ -324,7 +441,7 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 		return emitFailure(nil, failure("unknown_command", "Use help for supported commands", false, "help"))
 	}
 	var body []byte
-	if method != "GET" {
+	if method != "GET" && method != "DELETE" {
 		if *file == "" {
 			return emitFailure(nil, failure("input_required", "Provide --file JSON; configuration save and deploy are separate", false, "inspect_schema"))
 		}
@@ -337,15 +454,15 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 			ExpectedVersion int64 `json:"expectedVersion"`
 		}
 		_ = json.Unmarshal(body, &v)
-		if command != "create" && v.ExpectedVersion < 1 {
+		if (command == "update" || command == "deploy" || command == "plan" || command == "set-agent-control") && v.ExpectedVersion < 1 {
 			return emitFailure(nil, failure("version_required", "Supply expectedVersion > 0 from the current application", false, "refresh_application"))
 		}
-		if command == "deploy" && (!idPattern.MatchString(*key) || strings.HasPrefix(*key, "plan:")) {
+		if (command == "deploy" || (command == "create" && c.Token != "")) && (!idPattern.MatchString(*key) || strings.HasPrefix(*key, "plan:")) {
 			return emitFailure(nil, failure("key_required", "Provide a stable --key for this release and reuse it on retries", false, "supply_idempotency_key"))
 		}
 	}
 	// Assertions fail before mutation; they never choose a hidden default target.
-	if *target != "" || *environment != "" {
+	if (*target != "" || *environment != "") && command != "resources" && command != "target-capabilities" {
 		var manifest domain.Manifest
 		if command == "create" {
 			_ = json.Unmarshal(body, &manifest)
@@ -373,14 +490,14 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 			}
 		}
 	}
-	if command == "deploy" {
+	if command == "deploy" || command == "create" {
 		result.IdempotencyKey = *key
 	}
 	raw, f := c.Call(ctx, method, path, body, *key)
 	if f != nil {
 		return emitFailure(nil, f)
 	}
-	if command == "deploy" {
+	if command == "deploy" || command == "execute-plan" {
 		var v domain.Deployment
 		if json.Unmarshal(raw, &v) != nil || v.ID == "" {
 			return emitFailure(nil, failure("invalid_response", "Release admission response lacks an operation ID; inspect before retry", false, "inspect_operation"))

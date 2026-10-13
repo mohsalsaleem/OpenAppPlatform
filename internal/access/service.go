@@ -143,7 +143,7 @@ func (s Service) Issue(ctx context.Context, user, kind, name, scope, app string,
 
 // IssueRestricted is used for new owner-issued agents; legacy/internal callers remain stable.
 func (s Service) IssueRestricted(ctx context.Context, user, name, scope, app string, ttl time.Duration, permissions domain.AgentPermissions) (string, error) {
-	if permissions.TargetID == "" || permissions.Environment == "" || permissions.Actions == nil || (scope == "operate" && len(permissions.Actions) == 0) || (scope == "read" && len(permissions.Actions) > 0) {
+	if permissions.CreateApplications || permissions.MaxApplications != 0 || permissions.TargetID == "" || permissions.Environment == "" || permissions.Actions == nil || (scope == "operate" && len(permissions.Actions) == 0) || (scope == "read" && len(permissions.Actions) > 0) {
 		return "", ErrDenied
 	}
 	var target, environment string
@@ -189,6 +189,29 @@ func (s Service) principal(ctx context.Context, where, arg string) (domain.Princ
 	}
 	if len(raw) > 0 && json.Unmarshal(raw, &p.Permissions) != nil {
 		return domain.Principal{}, ErrDenied
+	}
+	if p.TargetGrant() {
+		var valid bool
+		if err := s.Pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM oap_targets WHERE id=$1 AND spec->>'operator'='docker' AND spec->>'environment'=$2)", p.Permissions.TargetID, p.Permissions.Environment).Scan(&valid); err != nil || !valid {
+			return domain.Principal{}, ErrDenied
+		}
+		rows, err := s.Pool.Query(ctx, "SELECT application_id FROM oap_agent_applications WHERE credential_id=$1 ORDER BY application_id LIMIT 10", p.CredentialID)
+		if err != nil {
+			return domain.Principal{}, ErrDenied
+		}
+		for rows.Next() {
+			var app string
+			if rows.Scan(&app) != nil {
+				rows.Close()
+				return domain.Principal{}, ErrDenied
+			}
+			p.ManagedApplicationIDs = append(p.ManagedApplicationIDs, app)
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return domain.Principal{}, ErrDenied
+		}
 	}
 	if p.Kind == "agent" {
 		control, err := s.Control(ctx)

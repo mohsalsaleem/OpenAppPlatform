@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/access"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/routing"
@@ -75,6 +76,16 @@ func (c *Controller) Adapter(ctx context.Context, id string) (operator.Adapter, 
 	return c.Factory(t)
 }
 func (c *Controller) CreateApplication(ctx context.Context, m domain.Manifest) (domain.Application, error) {
+	if p, ok := domain.Identity(ctx); ok && p.TargetGrant() {
+		if !p.Creates(m.TargetID, m.Environment) {
+			return domain.Application{}, access.ErrDenied
+		}
+		for _, comp := range m.Components {
+			if comp.ResourceID != "" || comp.Management == "observe" || comp.Kind == "database" {
+				return domain.Application{}, errors.New("onboarding grants create new owned workloads; existing resources require owner review")
+			}
+		}
+	}
 	if err := c.authorizeSecurity(ctx, m); err != nil {
 		return domain.Application{}, err
 	}

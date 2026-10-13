@@ -8,6 +8,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type OapAgentApplication struct {
+	ApplicationID string             `json:"application_id"`
+	CredentialID  string             `json:"credential_id"`
+	CreationKey   string             `json:"creation_key"`
+	RequestHash   string             `json:"request_hash"`
+	AuditID       pgtype.Text        `json:"audit_id"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
 type OapAgentControl struct {
 	WorkspaceID string             `json:"workspace_id"`
 	Enabled     bool               `json:"enabled"`
@@ -77,6 +86,7 @@ type OapCredential struct {
 	RevokedAt     pgtype.Timestamptz `json:"revoked_at"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	Permissions   []byte             `json:"permissions"`
+	TargetGrant   bool               `json:"target_grant"`
 }
 
 type OapDeployment struct {

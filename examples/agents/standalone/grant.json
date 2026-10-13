@@ -1,0 +1,7 @@
+{
+  "name": "Standalone lifecycle agent",
+  "targetId": "docker-local",
+  "environment": "staging",
+  "maxApplications": 1,
+  "actions": ["deploy", "restart", "configure", "recover"]
+}

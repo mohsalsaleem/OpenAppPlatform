@@ -2,7 +2,9 @@ package store
 
 import (
 	"context"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5"
@@ -84,6 +86,13 @@ func (s *Store) CreateApplication(ctx context.Context, m domain.Manifest) (domai
 		return a, e
 	}
 	defer tx.Rollback(ctx)
+	credential, key, existing, err := authorizeCreation(ctx, tx, m, b)
+	if err != nil {
+		return a, err
+	}
+	if existing != nil {
+		return *existing, nil
+	}
 	if _, e = tx.Exec(ctx, db.InsertApplicationGroup, a.ID, m.Name); e != nil {
 		return a, mapError(e)
 	}
@@ -96,6 +105,12 @@ func (s *Store) CreateApplication(ctx context.Context, m domain.Manifest) (domai
 			if _, e = tx.Exec(ctx, db.InsertObservedBinding, m.TargetID, c.ResourceID, a.ID, c.Name); e != nil {
 				return a, mapError(e)
 			}
+		}
+	}
+	if credential != "" {
+		hash := sha256.Sum256(b)
+		if _, e = tx.Exec(ctx, "INSERT INTO oap_agent_applications(application_id,credential_id,creation_key,request_hash,audit_id) VALUES($1,$2,$3,$4,NULLIF($5,''))", a.ID, credential, key, hex.EncodeToString(hash[:]), domain.AuditIntent(ctx)); e != nil {
+			return a, e
 		}
 	}
 	return a, tx.Commit(ctx)

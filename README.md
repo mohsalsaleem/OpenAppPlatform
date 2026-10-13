@@ -39,8 +39,10 @@ native source lifecycle handoff and artifact reuse are not.
 
 The [JSON CLI](docs/agent-cli.md) exposes current lifecycle APIs, scoped capability
 inspection and durable operation waiting. Build with `go build -o bin/oap ./cmd/oap`;
-`bin/oap help` and `bin/oap schema` work offline. Existing agent scope limits still
-apply; headless bootstrap and app-creation grants are the next M2 slice.
+`bin/oap help` and `bin/oap schema` work offline. The [headless bootstrap](docs/headless-bootstrap.md) slice adds private owner
+setup/login, bounded standalone app-creation grants and external controller rescue.
+Existing app-scoped tokens retain their boundaries; broader workspace access is
+not granted.
 
 ## Run locally
 

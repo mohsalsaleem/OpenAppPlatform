@@ -177,18 +177,30 @@ func (s *Server) ownerAuth(next http.Handler) http.Handler {
 			s.denied(w, r, p, 403, "Owner access is required")
 			return
 		}
-		if p.ApplicationID != "" && !s.applicationScope(r, p) {
+		if (p.ApplicationID != "" || p.TargetGrant()) && !s.applicationScope(r, p) {
 			s.denied(w, r, p, 404, "Resource not found")
 			return
 		}
-		if !s.readRequest(r) && r.URL.Path != "/api/v1/auth/logout" && !p.Operates(p.ApplicationID) {
+		if !s.readRequest(r) && r.URL.Path != "/api/v1/auth/logout" && !p.Operates(p.ApplicationID) && !(p.TargetGrant() && p.Creates(p.Permissions.TargetID, p.Permissions.Environment)) {
 			s.denied(w, r, p, 403, "This credential is read-only")
 			return
 		}
 		action := agentRequestAction(r.Method, r.URL.Path)
-		if !s.readRequest(r) && p.Permissions != nil {
-			app, err := s.Controller.Store.Application(r.Context(), p.ApplicationID)
-			if err != nil || !p.Allows(p.ApplicationID, action, app.Manifest.TargetID, app.Manifest.Environment) {
+		if !s.readRequest(r) && p.Permissions != nil && !(p.TargetGrant() && r.Method == "POST" && r.URL.Path == "/api/v1/applications") {
+			selectedApp := p.ApplicationID
+			if p.TargetGrant() {
+				parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+				if len(parts) >= 4 && parts[2] == "applications" {
+					selectedApp = parts[3]
+				} else if len(parts) >= 4 && parts[2] == "deployments" {
+					d, e := s.Controller.Store.Deployment(r.Context(), parts[3])
+					if e == nil {
+						selectedApp = d.ApplicationID
+					}
+				}
+			}
+			app, err := s.Controller.Store.Application(r.Context(), selectedApp)
+			if err != nil || !p.Allows(selectedApp, action, app.Manifest.TargetID, app.Manifest.Environment) {
 				s.denied(w, r, p, 403, "This action is outside the agent permissions")
 				return
 			}
@@ -222,22 +234,33 @@ func (w *auditResponse) WriteHeader(status int) {
 }
 func (s *Server) applicationScope(r *http.Request, p domain.Principal) bool {
 	path := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if p.TargetGrant() {
+		if r.URL.Path == "/api/v1/applications" {
+			return r.Method == "GET" || r.Method == "POST"
+		}
+		if r.URL.Path == "/api/v1/targets" {
+			return r.Method == "GET"
+		}
+		if len(path) >= 4 && path[2] == "targets" {
+			return r.Method == "GET" && path[3] == p.Permissions.TargetID && (len(path) == 4 || (len(path) == 5 && (path[4] == "resources" || path[4] == "capabilities")))
+		}
+	}
 	if r.URL.Path == "/api/v1/meta" || r.URL.Path == "/api/v1/auth/me" {
 		return r.Method == "GET"
 	}
 	if len(path) >= 4 && path[2] == "applications" {
-		if path[3] != p.ApplicationID {
+		if !p.TargetGrant() && path[3] != p.ApplicationID {
 			return false
 		}
-		app, e := s.Controller.Store.Application(r.Context(), p.ApplicationID)
+		app, e := s.Controller.Store.Application(r.Context(), path[3])
 		return e == nil && p.Reads(app.ID, app.Manifest.TargetID, app.Manifest.Environment)
 	}
 	if len(path) >= 4 && path[2] == "deployments" {
 		d, e := s.Controller.Store.Deployment(r.Context(), path[3])
-		if e != nil || d.ApplicationID != p.ApplicationID || !p.Reads(d.ApplicationID, d.Manifest.TargetID, d.Manifest.Environment) {
+		if e != nil || (!p.TargetGrant() && d.ApplicationID != p.ApplicationID) || !p.Reads(d.ApplicationID, d.Manifest.TargetID, d.Manifest.Environment) {
 			return false
 		}
-		app, e := s.Controller.Store.Application(r.Context(), p.ApplicationID)
+		app, e := s.Controller.Store.Application(r.Context(), d.ApplicationID)
 		return e == nil && p.Reads(app.ID, app.Manifest.TargetID, app.Manifest.Environment)
 	}
 	return false
@@ -362,7 +385,7 @@ func (s *Server) accessRoutes(mux *http.ServeMux) {
 		write(w, 201, map[string]string{"invite": secret, "expiresIn": "48 hours"})
 	})
 	mux.HandleFunc("GET /api/v1/access/credentials", func(w http.ResponseWriter, r *http.Request) {
-		rows, e := s.Controller.Store.Pool.Query(r.Context(), "SELECT id,name,scope,application_id,expires_at,revoked_at IS NOT NULL,permissions FROM oap_credentials WHERE kind='agent' ORDER BY created_at DESC LIMIT 100")
+		rows, e := s.Controller.Store.Pool.Query(r.Context(), "SELECT id,name,scope,COALESCE(application_id,''),expires_at,revoked_at IS NOT NULL,permissions FROM oap_credentials WHERE kind='agent' ORDER BY created_at DESC LIMIT 100")
 		if e != nil {
 			fail(w, e)
 			return
@@ -427,7 +450,12 @@ func (s *Server) accessRoutes(mux *http.ServeMux) {
 			write(w, 422, map[string]string{"message": "Choose a scope, valid actions and a name (1–80 bytes)"})
 			return
 		}
-		write(w, 201, map[string]string{"token": secret})
+		var credentialID string
+		if err := s.Controller.Store.Pool.QueryRow(r.Context(), "SELECT id FROM oap_credentials WHERE token_hash=$1", access.Hash(secret)).Scan(&credentialID); err != nil {
+			fail(w, err)
+			return
+		}
+		write(w, 201, map[string]any{"token": secret, "credentialId": credentialID, "expiresInSeconds": 2592000})
 	})
 	mux.HandleFunc("DELETE /api/v1/access/credentials/{id}", func(w http.ResponseWriter, r *http.Request) {
 		result, e := s.Controller.Store.Pool.Exec(r.Context(), "UPDATE oap_credentials SET revoked_at=now() WHERE id=$1 AND kind='agent'", r.PathValue("id"))
@@ -442,7 +470,7 @@ func (s *Server) accessRoutes(mux *http.ServeMux) {
 		write(w, 200, map[string]bool{"ok": true})
 	})
 	mux.HandleFunc("GET /api/v1/access/audit", func(w http.ResponseWriter, r *http.Request) {
-		rows, e := s.Controller.Store.Pool.Query(r.Context(), "SELECT a.id,COALESCE(u.name,'Anonymous'),COALESCE(a.credential_id,''),a.action,COALESCE(a.status,0),a.created_at,COALESCE(c.name,''),COALESCE(c.kind,''),COALESCE(d.id,''),COALESCE(d.application_id,se.application_id,''),COALESCE(CASE WHEN d.steps->0->'control'->>'mode'='cancel' THEN 'cancelled' WHEN d.steps->0->'control'->>'mode'='abandon' THEN 'abandoned' ELSE d.state END,''),COALESCE(d.operation,''),d.updated_at,COALESCE(se.id,''),COALESCE(se.state,'') FROM oap_audit a LEFT JOIN oap_users u ON u.id=a.user_id LEFT JOIN oap_credentials c ON c.id=a.credential_id LEFT JOIN oap_source_events se ON se.id=a.source_event_id LEFT JOIN oap_deployments d ON d.id=COALESCE(a.deployment_id,se.deployment_id) ORDER BY a.created_at DESC LIMIT 100")
+		rows, e := s.Controller.Store.Pool.Query(r.Context(), "SELECT a.id,COALESCE(u.name,'Anonymous'),COALESCE(a.credential_id,''),a.action,COALESCE(a.status,0),a.created_at,COALESCE(c.name,''),COALESCE(c.kind,''),COALESCE(d.id,''),COALESCE(d.application_id,se.application_id,aa.application_id,''),COALESCE(CASE WHEN d.steps->0->'control'->>'mode'='cancel' THEN 'cancelled' WHEN d.steps->0->'control'->>'mode'='abandon' THEN 'abandoned' ELSE d.state END,''),COALESCE(d.operation,''),d.updated_at,COALESCE(se.id,''),COALESCE(se.state,'') FROM oap_audit a LEFT JOIN oap_agent_applications aa ON aa.audit_id=a.id LEFT JOIN oap_users u ON u.id=a.user_id LEFT JOIN oap_credentials c ON c.id=a.credential_id LEFT JOIN oap_source_events se ON se.id=a.source_event_id LEFT JOIN oap_deployments d ON d.id=COALESCE(a.deployment_id,se.deployment_id) ORDER BY a.created_at DESC LIMIT 100")
 		if e != nil {
 			fail(w, e)
 			return

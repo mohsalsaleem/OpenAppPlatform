@@ -77,3 +77,26 @@ class BackupReportingTest(unittest.TestCase):
                     with self.assertRaises(OSError):
                         installer.backup(tmp, archive)
                     operation.assert_not_called()
+
+class LifecycleSafetyTest(unittest.TestCase):
+    def test_incompatible_candidate_preserves_private_configuration(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / 'install'
+            installer.init(folder, IMAGE, operator_only=True)
+            before = (folder / '.env').read_bytes()
+            with patch.object(installer, 'preflight_image', side_effect=ValueError('incompatible')):
+                with self.assertRaises(ValueError):
+                    installer.lifecycle(folder, 'update', 'sha256:' + 'b' * 64)
+            self.assertEqual((folder / '.env').read_bytes(), before)
+            # Advisory lock is released; a failed command does not leave a stale lock.
+            with patch.object(installer, 'compose', return_value=b'[]'):
+                self.assertFalse(installer.lifecycle(folder, 'check')['healthy'])
+
+    def test_update_requires_immutable_candidate_before_dispatch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / 'install'
+            installer.init(folder, IMAGE, operator_only=True)
+            with patch.object(installer, 'preflight_image') as preflight:
+                with self.assertRaises(ValueError):
+                    installer.lifecycle(folder, 'update', 'oap:latest')
+                preflight.assert_not_called()

@@ -125,6 +125,7 @@ func (s *Server) routes() http.Handler {
 	s.remoteMCPRoutes(mux)
 	if !s.Preview {
 		s.accessRoutes(mux)
+		s.onboardingRoutes(mux)
 		s.backupRoutes(mux)
 	}
 	c := s.Controller
@@ -145,6 +146,15 @@ func (s *Server) routes() http.Handler {
 		if e != nil {
 			fail(w, e)
 			return
+		}
+		if p, ok := domain.Identity(r.Context()); ok && p.TargetGrant() {
+			filtered := []domain.Target{}
+			for _, target := range x {
+				if target.ID == p.Permissions.TargetID && target.Environment == p.Permissions.Environment {
+					filtered = append(filtered, target)
+				}
+			}
+			x = filtered
 		}
 		write(w, 200, x)
 	})
@@ -170,6 +180,15 @@ func (s *Server) routes() http.Handler {
 			fail(w, e)
 			return
 		}
+		if p, ok := domain.Identity(r.Context()); ok && p.TargetGrant() {
+			filtered := []domain.Application{}
+			for _, app := range x {
+				if p.Reads(app.ID, app.Manifest.TargetID, app.Manifest.Environment) {
+					filtered = append(filtered, app)
+				}
+			}
+			x = filtered
+		}
 		write(w, 200, x)
 	})
 	mux.HandleFunc("POST /api/v1/applications", func(w http.ResponseWriter, r *http.Request) {
@@ -182,7 +201,7 @@ func (s *Server) routes() http.Handler {
 			write(w, 422, map[string]string{"code": "invalid_manifest", "message": e.Error()})
 			return
 		}
-		a, e := c.CreateApplication(r.Context(), m)
+		a, e := c.CreateApplication(domain.WithCreationKey(r.Context(), r.Header.Get("Idempotency-Key")), m)
 		if e != nil {
 			if errors.Is(e, domain.ErrConflict) || errors.Is(e, domain.ErrNotFound) {
 				fail(w, e)

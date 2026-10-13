@@ -23,6 +23,10 @@ The runner also performs [headless JSON CLI acceptance](agent-cli.md) against
 standalone Docker and retains `cli-acceptance.json`. It uses explicit isolated
 preview authority; owner/agent scope checks remain in the system and owner suites.
 
+The M2.6 `headless-installation` step uses the shipping standalone Compose package,
+owner-mode auth and a named agent without browser clicks. Its report is
+`headless-acceptance.json`; the existing packaged/browser checks remain regressions.
+
 ## Isolation
 
 Each run creates a unique Compose project containing:

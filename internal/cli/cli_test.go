@@ -191,3 +191,64 @@ func TestCLIWaitPreservesLastObservationOnInterruptedPoll(t *testing.T) {
 		t.Fatal("lost last observation during interruption")
 	}
 }
+
+func TestHeadlessAuthenticationStoresSessionWithoutPrintingIt(t *testing.T) {
+	folder := t.TempDir()
+	os.Chmod(folder, 0700)
+	path := filepath.Join(folder, "owner.json")
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if r.Header.Get("X-OAP-CSRF") != "1" {
+			t.Error("CSRF missing")
+		}
+		http.SetCookie(w, &http.Cookie{Name: "oap-session", Value: "private-owner-session", Path: "/", HttpOnly: true})
+		w.Write([]byte(`{"credentialId":"owner1","kind":"session","role":"owner"}`))
+	}))
+	defer server.Close()
+	result, code := runTest(t, []string{"--url", server.URL, "--out", path, "--file", "-", "login"}, "", `{"email":"owner@example.invalid","password":"private-owner-password"}`)
+	if code != 0 || !result.OK {
+		t.Fatal("headless login failed")
+	}
+	stored, f := readCredential(path, server.URL)
+	if f != nil || stored.Session != "private-owner-session" {
+		t.Fatal("credential not stored")
+	}
+	if _, f = readCredential(path, "https://other.example.invalid"); f == nil {
+		t.Fatal("credential crossed origin")
+	}
+	runTest(t, []string{"--url", server.URL, "--out", path, "--file", "-", "login"}, "", `{}`)
+	if requests != 1 {
+		t.Fatal("existing output did not block issuance")
+	}
+	st, _ := os.Stat(path)
+	if st.Mode().Perm() != 0600 {
+		t.Fatal("credential not private")
+	}
+}
+
+func TestHeadlessGrantNeverEmitsTokenAndBindsOrigin(t *testing.T) {
+	folder := t.TempDir()
+	os.Chmod(folder, 0700)
+	owner := filepath.Join(folder, "owner.json")
+	out := filepath.Join(folder, "agent.json")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/access/onboarding-grants" {
+			t.Error("wrong endpoint")
+		}
+		w.WriteHeader(201)
+		w.Write([]byte(`{"token":"private-agent-token","credentialId":"agent1","expiresInSeconds":86400}`))
+	}))
+	defer server.Close()
+	raw, _ := json.Marshal(credentialFile{SchemaVersion: 1, Origin: server.URL, Session: "owner-private"})
+	os.WriteFile(owner, raw, 0600)
+	var output bytes.Buffer
+	code := Run(context.Background(), []string{"--url", server.URL, "--credential-file", owner, "--out", out, "--file", "-", "grant"}, func(string) string { return "" }, strings.NewReader(`{}`), &output)
+	if code != 0 || strings.Contains(output.String(), "private-agent-token") || strings.Contains(output.String(), "owner-private") {
+		t.Fatal("grant token leaked or issuance failed")
+	}
+	stored, f := readCredential(out, server.URL)
+	if f != nil || stored.Token != "private-agent-token" {
+		t.Fatal("agent file invalid")
+	}
+}
