@@ -1,6 +1,6 @@
 # OpenAppPlatform Product and Architecture Draft
 
-OpenAppPlatform is an application-first Docker control plane that manages complete applications directly on Docker Engine or through deployment operators such as Coolify, Dokploy, Dokku, and Portainer. The intended experience follows DigitalOcean App Platform: users work with applications, components, environments, and releases while retaining their existing Docker infrastructure.
+OpenAppPlatform is an application-first Docker control plane that manages complete applications directly on Docker Engine or through deployment operators such as Coolify, Dokploy, Dokku, and Portainer. The intended experience follows hosted application platforms: users work with applications, components, environments, and releases while retaining their existing Docker infrastructure.
 
 Status: Original architecture draft, 9 October 2026; priority revised 13 October
 2026. Product name: Open App Platform. The technology stack remains the

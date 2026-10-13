@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 548" width="900" height="548" role="img" aria-labelledby="title desc">
   <title id="title">Where OAP fits</title>
-  <desc id="desc">Two axes: what you deploy (individual resources to application as a unit) and who operates it (people and dashboards to agents and machine APIs). Coolify, Dokploy and Portainer sit near resources and dashboards; Compose, Dokku and Kamal in the middle; k3s and MicroK8s are API-driven but resource-oriented; DigitalOcean App Platform is an application unit but hosted; Open App Platform targets the application unit operated by agents, self-hosted.</desc>
+  <desc id="desc">Two axes: what you deploy (individual resources to application as a unit) and who operates it (people and dashboards to agents and machine APIs). Coolify, Dokploy and Portainer sit near resources and dashboards; Compose, Dokku and Kamal in the middle; k3s and MicroK8s are API-driven but resource-oriented; hosted app platforms treat the application as a unit but are not self-hosted; Open App Platform targets the application unit operated by agents, self-hosted.</desc>
   <style>
     .bg { fill: #ffffff; }
     .surface { fill: #f6f8fa; stroke: #d0d7de; }
@@ -107,8 +107,8 @@
   <text class="b" x="298" y="145" text-anchor="start">k3s / MicroK8s</text>
   <text class="s" x="298" y="161" text-anchor="start">full API, heavy, resource model</text>
   <circle class="dot-hosted" cx="724" cy="340" r="7"/>
-  <text class="b" x="710" y="345" text-anchor="end">DigitalOcean App Platform</text>
-  <text class="s" x="710" y="361" text-anchor="end">hosted · the inspiration</text>
+  <text class="b" x="710" y="345" text-anchor="end">Hosted app platforms</text>
+  <text class="s" x="710" y="361" text-anchor="end">managed PaaS, app-centric</text>
   <circle class="dot-oap" cx="753" cy="116" r="9"/>
   <text class="h" x="737" y="121" text-anchor="end">Open App Platform</text>
   <text class="s" x="737" y="137" text-anchor="end">self-hosted · agent-operated</text>

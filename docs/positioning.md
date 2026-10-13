@@ -1,6 +1,6 @@
 # Positioning: an application platform on one server, operated by an agent
 
-> DigitalOcean App Platform, on your own server, built for your agent to operate.
+> A self-hosted application platform for one server, built for your AI agent to operate within guardrails you set.
 
 ![One application on one server, operated by an agent through OAP](images/overview.svg)
 

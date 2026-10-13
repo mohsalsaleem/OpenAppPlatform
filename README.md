@@ -1,6 +1,6 @@
 # Open App Platform
 
-> DigitalOcean App Platform, on your own server, built for your agent to operate.
+> A self-hosted application platform for one server, built for your AI agent to operate within guardrails you set.
 
 Open App Platform (OAP) runs a whole system, such as a frontend, API, worker and
 the database they use, as **one application** on a single server. You describe
@@ -33,9 +33,43 @@ OAP is built on two ideas:
    diffs, plans and applies. Every change is a durable operation with structured
    evidence. The owner decides what the agent may do, and the server enforces it.
 
-![Where OAP fits compared with Coolify, Compose, Dokku, Kamal, k3s and DigitalOcean App Platform](docs/images/landscape.svg)
+![Where OAP fits compared with Coolify, Compose, Dokku, Kamal, k3s and hosted app platforms](docs/images/landscape.svg)
 
 The full comparison is in [positioning](docs/positioning.md).
+
+## Principles
+
+- **The application is the unit.** Its components are released, scaled, rolled back and diagnosed together.
+- **Agents operate; owners decide.** The agent does routine work. The owner sets authority, reviews risky changes and can stop it at any time.
+- **The server enforces authority.** Permissions live in OAP, not in prompts or skills.
+- **Each step means one thing.** Saving, planning, executing and verifying are separate. Saving never deploys.
+- **Durable truth, honest evidence.** Operations survive disconnects and restarts. Health is `healthy`, `issue` or `inconclusive`, never guessed.
+- **Small and boring.** One Go service, PostgreSQL and Docker. No embedded model. Apps keep running when OAP is down.
+
+## Operating model
+
+| | Owner | AI agent | OAP |
+|---|---|---|---|
+| **Does** | Installs OAP, issues grants, approves risky plans, pauses or revokes | Edits specs, plans, deploys, verifies, diagnoses, proposes fixes | Checks every request, runs durable operations, observes health, records audit |
+| **Through** | Owner session (CLI or dashboard) | JSON CLI, MCP, REST | Docker Engine on a local socket |
+
+**What the agent gets:** one portable spec for the whole app; validate, diff and
+hashed plans; operation handles it can wait on after a disconnect; its effective
+capabilities; per-instance health and logs; and a bounded incident view with
+freshness stated. Every command returns structured JSON with stable error codes.
+
+## Guardrails
+
+![Guardrails: identity, scope, freshness, policy and safety checks on every agent request](docs/images/guardrails.svg)
+
+Every agent request passes server-side checks before anything runs: the
+credential is live, the action is inside its target, environment, apps and
+allowed actions, the plan matches the current version, review policy is
+satisfied (agents never approve their own plans), and retries can't run twice.
+The control database, the host shell, granting authority and adopting existing
+resources are never reachable with an agent credential. Logs and other
+app-supplied text are marked untrusted and never treated as instructions.
+Details and limits are in the [operating model](docs/operating-model.md).
 
 ## One spec for the whole application
 
@@ -141,6 +175,7 @@ See [development, testing and deployment](docs/development.md) for details.
 The [documentation index](docs/README.md) lists every guide. Good starting points:
 
 - [Positioning](docs/positioning.md): the problem, the comparison and the reference application
+- [Operating model](docs/operating-model.md): principles, roles, what the agent gets and guardrails
 - [Roadmap](ROADMAP.md): milestones and execution order
 - [Standalone agent runbook](docs/standalone-agent-runbook.md): the full headless journey
 - [Feature reference](docs/feature-reference.md): detailed behavior and limits of current features
