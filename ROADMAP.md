@@ -1,6 +1,6 @@
 # Open App Platform Roadmap
 
-Updated 13 October 2026. This document is the authoritative execution order.
+Updated 14 October 2026. This document is the authoritative execution order.
 It supersedes earlier operator-first priorities and UI delivery queues.
 Historical implementation and acceptance notes are retained in the
 [archived roadmap](ROADMAP-history-through-2026-10-13.md).
@@ -91,11 +91,14 @@ M2.6 passed local gate `20261013-214602-ceb6aceb` at `c2e1eee`.
 M2.7 passed local gate `20261013-222818-1c1a5624` at `187e7d2`, adding the
 portable lifecycle and shared CLI/API/stdio-MCP action plans. M2.8 passed local
 gate `20261013-231136-dca41e73` at `1664ceb`, adding bounded incident evidence and
-a named-agent diagnose/correct/verify flow. Current gaps include the combined
-install-to-fix dogfood/footprint exit and standalone shared ingress/TLS.
+a named-agent diagnose/correct/verify flow. M2.9 passed combined dogfood and the
+exact-tree gate `20261014-000048-91413718` at `76b4061`, including install-to-fix,
+compatible update, crash/rescue and metadata restore. Standalone shared ingress/TLS
+and the full specification-driven scale loop remain missing.
 App-scoped credentials still cannot create applications; creation needs an
 explicit bounded onboarding grant. Read-only MCP deployment summaries remain
-separate from durable executable plans. No whole M2 acceptance is implied.
+separate from durable executable plans. Functional M2 acceptance is complete;
+the measured combined idle CPU goal remains unmet.
 
 ## Delivery sequence
 
@@ -104,8 +107,8 @@ new slice IDs so previous M2.1–M2.4 acceptance records retain their meaning.
 
 | Milestone | Outcome | Status |
 | --- | --- | --- |
-| M2 — Agent-operated standalone core | One agent completes install → deploy → diagnose → correct → verify without dashboard dependence | Active; ordered queue below |
-| M3 — Application unit and standalone delivery | Application router and scale loop, specification-driven topology and pre-deploy jobs, source-to-release, Compose import, image/storage safety, lightweight recovery | Planned after M2 acceptance |
+| M2 — Agent-operated standalone core | One agent completes install → deploy → diagnose → correct → verify without dashboard dependence | Complete at `76b4061` |
+| M3 — Application unit and standalone delivery | Application router and scale loop, specification-driven topology and pre-deploy jobs, source-to-release, Compose import, image/storage safety, lightweight recovery | Active: M3.1 |
 | M4 — Bounded application insight | Indexed logs when needed, release watches, metrics/analytics and notifications | Deferred |
 | M5 — Operator integration return | Capability-aware existing-resource discovery/assembly and operator adapters/views | Parked until standalone gates pass and owner reprioritizes |
 | M6 — Additional servers and runtimes | Explicit multi-server placement, policy metadata, Firecracker/actor experiments | Deferred |
@@ -116,11 +119,13 @@ gate `20261013-210851-28d984b5` at `6b9359c`; see [machine CLI](docs/agent-cli.m
 M2.6 passed gate `20261013-214602-ceb6aceb` at `c2e1eee`; see
 [headless bootstrap](docs/headless-bootstrap.md). M2.7 passed gate `20261013-222818-1c1a5624` at `187e7d2`; see
 [portable lifecycle](docs/portable-lifecycle.md). M2.8 passed gate `20261013-231136-dca41e73` at `1664ceb`; see
-[bounded incident diagnosis](docs/incident-diagnosis.md). The active slice is
-**M2.9**, implemented by the [standalone runbook/skill](docs/standalone-agent-runbook.md)
-and [measured footprint](docs/footprint.md). Its fresh combined dogfood and exact-tree
-full local gate are the M2 exit requirement. Once they pass, the next slice is
-**M3.1 — application router and scale loop**. UI/operator expansion remain
+[bounded incident diagnosis](docs/incident-diagnosis.md). M2.9 is accepted at
+`76b4061`; see the [standalone runbook/skill](docs/standalone-agent-runbook.md)
+and [measured footprint](docs/footprint.md). The active slice is **M3.1 — application
+router and scale loop**, using Caddy. The internal routing foundation and real
+proxy tests are implemented; controller/spec apply, proxy packaging, domain
+ownership, draining and full agent scaling acceptance remain open. See
+[standalone ingress](docs/standalone-ingress.md). UI/operator expansion remains
 parked. The measured combined idle CPU gap stays open for M3.6.
 
 ## Ordered active queue
@@ -154,7 +159,7 @@ application-unit pillar first: replica routing turns several owned containers in
 one scaled application, which is the gap no Compose/Coolify-style tool closes.
 
 1. **Application router and scale loop:** one optional OAP-managed proxy
-   (Caddy preferred: automatic Let's Encrypt and a live admin API) on the
+   (Caddy selected: automatic Let's Encrypt and a live admin API) on the
    application's Docker network. The specification declares an app domain and
    per-component path routes (for example `/` → web, `/api` → api). Only ready
    instances are route members; scale-down removes a member, drains it, then stops

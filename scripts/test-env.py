@@ -105,6 +105,7 @@ def run(keep=False):
     env['OAP_TEST_DATABASE_IMAGE'] = 'openappplatform-test-database:' + project
     env['OAP_TEST_APPLICATION_IMAGE'] = 'openappplatform-test-application:' + project
     env['OAP_TEST_WORKER_IMAGE'] = 'openappplatform-test-worker:' + project
+    env['OAP_TEST_CADDY_IMAGE'] = 'openappplatform-test-caddy:' + project
     env['OAP_TEST_FIXTURE_V2'] = 'openappplatform-test-fixture:' + project + '-v2'
     compose = docker + ['compose', '--env-file', 'tests/env/images.env', '-f', 'tests/env/compose.yaml', '-p', project]
     record = {'status': 'running', 'runId': run_id, 'fingerprint': fingerprint, 'project': project, 'images': versions}
@@ -138,7 +139,8 @@ def run(keep=False):
         shutil.copyfile(ROOT/'tests/env/application-breadth.Dockerfile',extraction/'application.Dockerfile')
         command(docker+['build','--pull=false','--build-arg','ALPINE_IMAGE='+versions['OAP_TEST_ALPINE_IMAGE'],'-f',str(extraction/'application.Dockerfile'),'-t',env['OAP_TEST_APPLICATION_IMAGE'],str(extraction)],env)
         command(docker+['tag',versions['OAP_TEST_POSTGRES_IMAGE'],env['OAP_TEST_DATABASE_IMAGE']],env)
-        fixture_tags += [env['OAP_TEST_APPLICATION_IMAGE'],env['OAP_TEST_DATABASE_IMAGE']]
+        command(docker+['tag',versions['OAP_TEST_CADDY_IMAGE'],env['OAP_TEST_CADDY_IMAGE']],env)
+        fixture_tags += [env['OAP_TEST_APPLICATION_IMAGE'],env['OAP_TEST_DATABASE_IMAGE'],env['OAP_TEST_CADDY_IMAGE']]
         with (run_dir / 'fixtures.tar').open('wb') as archive:
             command(docker + ['save'] + fixture_tags, env, stdout=archive)
         command(compose + ['up', '-d', '--wait', '--wait-timeout', '90', 'postgres', 'docker'], env)
