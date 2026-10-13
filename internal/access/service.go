@@ -190,6 +190,12 @@ func (s Service) principal(ctx context.Context, where, arg string) (domain.Princ
 	if len(raw) > 0 && json.Unmarshal(raw, &p.Permissions) != nil {
 		return domain.Principal{}, ErrDenied
 	}
+	if p.Kind == "agent" {
+		control, err := s.Control(ctx)
+		if err != nil || !control.Enabled {
+			return domain.Principal{}, ErrDenied
+		}
+	}
 	return p, nil
 }
 func (s Service) Rate(ctx context.Context, key string) bool {

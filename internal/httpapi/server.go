@@ -18,6 +18,7 @@ import (
 )
 
 type Server struct {
+	RemoteMCP    bool
 	Preview      bool
 	SetupToken   string
 	SecureCookie bool
@@ -118,6 +119,8 @@ func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	s.endpointRoutes(mux)
 	s.diagnosticRoutes(mux)
+	s.planRoutes(mux)
+	s.remoteMCPRoutes(mux)
 	if !s.Preview {
 		s.accessRoutes(mux)
 		s.backupRoutes(mux)

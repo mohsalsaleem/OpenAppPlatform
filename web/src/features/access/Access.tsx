@@ -1,3 +1,4 @@
+import { AgentControl } from "./AgentControl";
 import { Secrets } from "./Secrets";
 import { Backups } from "./Backups";
 import { FieldSet, FieldLegend } from "@/components/ui/field";
@@ -256,6 +257,7 @@ export function Access() {
       >
         <section className="panel">
           <h2>Agent Tokens</h2>
+          {section==="agents" && <AgentControl/>}
           <p className="muted">
             New tokens are pinned to one application, target and environment for 30 days.
           </p>

@@ -38,9 +38,15 @@ func (c *Controller) recordCredential(ctx context.Context, tx pgx.Tx, id, app st
 	}
 	var current domain.Principal
 	var raw []byte
-	e := tx.QueryRow(ctx, "SELECT u.workspace_id,u.role,c.scope,COALESCE(c.application_id,''),c.permissions FROM oap_credentials c JOIN oap_users u ON u.id=c.user_id AND u.workspace_id=c.workspace_id WHERE c.id=$1 AND u.active AND c.revoked_at IS NULL AND c.expires_at>now() AND c.workspace_id='default'", p.CredentialID).Scan(&current.WorkspaceID, &current.Role, &current.Scope, &current.ApplicationID, &raw)
+	e := tx.QueryRow(ctx, "SELECT u.workspace_id,u.role,c.scope,c.kind,COALESCE(c.application_id,''),c.permissions FROM oap_credentials c JOIN oap_users u ON u.id=c.user_id AND u.workspace_id=c.workspace_id WHERE c.id=$1 AND u.active AND c.revoked_at IS NULL AND c.expires_at>now() AND c.workspace_id='default'", p.CredentialID).Scan(&current.WorkspaceID, &current.Role, &current.Scope, &current.Kind, &current.ApplicationID, &raw)
 	if e != nil || (len(raw) > 0 && json.Unmarshal(raw, &current.Permissions) != nil) {
 		return access.ErrDenied
+	}
+	if current.Kind == "agent" {
+		var enabled bool
+		if err := tx.QueryRow(ctx, "SELECT enabled FROM oap_agent_control WHERE workspace_id='default' FOR SHARE").Scan(&enabled); err != nil || !enabled {
+			return access.ErrDenied
+		}
 	}
 	d, e := c.Store.DeploymentTx(ctx, tx, id)
 	if e != nil {

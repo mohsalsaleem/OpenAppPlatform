@@ -61,7 +61,7 @@ try{
  for(const name of await readdir('/workspace/.local'))if(name.endsWith('.png'))await copyFile('/workspace/.local/'+name,'/report/'+name);
  const input=[{jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2024-11-05',capabilities:{},clientInfo:{name:'local-test',version:'1'}}},{jsonrpc:'2.0',id:2,method:'tools/list'},{jsonrpc:'2.0',id:3,method:'tools/call',params:{name:'list_applications',arguments:{}}}].map(v=>JSON.stringify(v)+'\n').join('');
  const mcp=spawn('/opt/oap/oap-mcp',['-url',env.OAP_BASE_URL],{env,stdio:['pipe','pipe','pipe']});let output='';mcp.stdout.on('data',b=>output+=b);mcp.stdin.end(input);const mcpCode=await new Promise((r,j)=>{mcp.on('error',j);mcp.on('close',r)});const messages=output.trim().split('\n').map(JSON.parse);
- if(mcpCode!==0||messages.length!==3||messages[0].result.protocolVersion!=='2024-11-05'||messages[1].result.tools.length!==6||messages[2].result.isError)throw Error('MCP handshake/read smoke failed');
+ if(mcpCode!==0||messages.length!==3||messages[0].result.protocolVersion!=='2024-11-05'||JSON.stringify(messages[1].result.tools.map(t=>t.name).sort())!==JSON.stringify(['list_applications','get_application','list_deployments','get_deployment','inspect_target','plan_deployment','get_diagnostic_context','inspect_instances'].sort())||messages[2].result.isError)throw Error('MCP handshake/read smoke failed');
  report.steps.push({name:'mcp-smoke',exitCode:0});
  platform.kill('SIGTERM');await new Promise(r=>platform.on('close',r));platform=null;
  await writeFile('/report/platform.log',platformLog);

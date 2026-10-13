@@ -168,7 +168,7 @@ func run() error {
 		defer cancel()
 		c.Jobs.Stop(stop)
 	}()
-	server := platformServer(ctx, addr, (&httpapi.Server{Preview: preview, SetupToken: os.Getenv("OAP_SETUP_TOKEN"), SecureCookie: os.Getenv("OAP_COOKIE_SECURE") != "false", Controller: c, Token: os.Getenv("OAP_API_TOKEN"), WebDir: *web}).Handler())
+	server := platformServer(ctx, addr, (&httpapi.Server{RemoteMCP: os.Getenv("OAP_REMOTE_MCP") == "true", Preview: preview, SetupToken: os.Getenv("OAP_SETUP_TOKEN"), SecureCookie: os.Getenv("OAP_COOKIE_SECURE") != "false", Controller: c, Token: os.Getenv("OAP_API_TOKEN"), WebDir: *web}).Handler())
 	listener, e := net.Listen("tcp", addr)
 	if e != nil {
 		return e

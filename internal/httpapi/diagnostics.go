@@ -72,6 +72,6 @@ func (s *Server) diagnosticRoutes(mux *http.ServeMux) {
 			fail(w, err)
 			return
 		}
-		write(w, 200, map[string]any{"applicationId": app.ID, "definitionVersion": app.Version, "targetId": app.Manifest.TargetID, "comparison": comparison, "events": events, "notificationDelivery": "disabled"})
+		write(w, 200, map[string]any{"applicationId": app.ID, "definitionVersion": app.Version, "targetId": app.Manifest.TargetID, "environment": app.Manifest.Environment, "schemaVersion": 1, "generatedAt": time.Now().UTC(), "evidenceMode": "recorded", "untrustedEvidence": true, "limits": map[string]int{"releases": 2, "events": 20}, "missingEvidence": []string{"live runtime observations", "indexed logs and metrics", "repository patches", "backup safety for rollback"}, "comparison": comparison, "events": events, "notificationDelivery": "disabled"})
 	})
 }

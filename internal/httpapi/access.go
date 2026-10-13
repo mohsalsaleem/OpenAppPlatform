@@ -181,12 +181,12 @@ func (s *Server) ownerAuth(next http.Handler) http.Handler {
 			s.denied(w, r, p, 404, "Resource not found")
 			return
 		}
-		if r.Method != "GET" && r.Method != "HEAD" && r.URL.Path != "/api/v1/auth/logout" && !p.Operates(p.ApplicationID) {
+		if !s.readRequest(r) && r.URL.Path != "/api/v1/auth/logout" && !p.Operates(p.ApplicationID) {
 			s.denied(w, r, p, 403, "This credential is read-only")
 			return
 		}
 		action := agentRequestAction(r.Method, r.URL.Path)
-		if r.Method != "GET" && r.Method != "HEAD" && p.Permissions != nil {
+		if !s.readRequest(r) && p.Permissions != nil {
 			app, err := s.Controller.Store.Application(r.Context(), p.ApplicationID)
 			if err != nil || !p.Allows(p.ApplicationID, action, app.Manifest.TargetID, app.Manifest.Environment) {
 				s.denied(w, r, p, 403, "This action is outside the agent permissions")
@@ -194,7 +194,7 @@ func (s *Server) ownerAuth(next http.Handler) http.Handler {
 			}
 		}
 		ctx := domain.WithAction(domain.WithPrincipal(r.Context(), p), action)
-		if r.Method == "GET" || r.Method == "HEAD" {
+		if s.readRequest(r) {
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
@@ -243,6 +243,35 @@ func (s *Server) applicationScope(r *http.Request, p domain.Principal) bool {
 	return false
 }
 func (s *Server) accessRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/access/agent-control", func(w http.ResponseWriter, r *http.Request) {
+		v, err := s.accessService().Control(r.Context())
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		write(w, 200, v)
+	})
+	mux.HandleFunc("PUT /api/v1/access/agent-control", func(w http.ResponseWriter, r *http.Request) {
+		var v struct {
+			Enabled         bool   `json:"enabled"`
+			ExpectedVersion int64  `json:"expectedVersion"`
+			Reason          string `json:"reason"`
+		}
+		if err := decode(w, r, &v); err != nil {
+			write(w, 400, map[string]string{"message": "Invalid agent control request"})
+			return
+		}
+		result, err := s.accessService().UpdateControl(r.Context(), v.Enabled, v.ExpectedVersion, v.Reason)
+		if err != nil {
+			if errors.Is(err, domain.ErrConflict) {
+				fail(w, err)
+			} else {
+				write(w, 422, map[string]string{"message": err.Error()})
+			}
+			return
+		}
+		write(w, 200, result)
+	})
 	mux.HandleFunc("GET /api/v1/auth/me", func(w http.ResponseWriter, r *http.Request) { p, _ := domain.Identity(r.Context()); write(w, 200, p) })
 	mux.HandleFunc("POST /api/v1/auth/logout", func(w http.ResponseWriter, r *http.Request) {
 		p, _ := domain.Identity(r.Context())
@@ -454,7 +483,7 @@ func agentRequestAction(method, path string) string {
 		}
 		if len(parts) == 5 && method == "POST" {
 			switch parts[4] {
-			case "deployments":
+			case "deployments", "plans":
 				return "deploy"
 			case "restarts":
 				return "restart"
@@ -466,6 +495,9 @@ func agentRequestAction(method, path string) string {
 				return "configure"
 			}
 		}
+	}
+	if parts[2] == "applications" && len(parts) == 7 && parts[4] == "plans" && parts[6] == "execute" && method == "POST" {
+		return "deploy"
 	}
 	if parts[2] == "deployments" && len(parts) == 5 && method == "POST" {
 		switch parts[4] {

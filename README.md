@@ -115,6 +115,7 @@ credentials. It does not mutate an external Coolify installation. Live fixtures 
 - [Owner-mode installation, updates and metadata recovery](docs/installation.md)
 
 - [Roadmap](ROADMAP.md)
+- [M2 scoped agent operation and remote inspection](docs/m2-agent-operation.md)
 - [Recoverable encrypted secrets](docs/encrypted-secret-store.md)
 - [Container security and diagnostic context](docs/m1-security-visibility.md)
 

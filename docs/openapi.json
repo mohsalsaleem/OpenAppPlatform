@@ -4490,6 +4490,46 @@
                       "enum": [
                         "disabled"
                       ]
+                    },
+                    "environment": {
+                      "type": "string"
+                    },
+                    "schemaVersion": {
+                      "type": "integer"
+                    },
+                    "generatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "evidenceMode": {
+                      "type": "string",
+                      "enum": [
+                        "recorded"
+                      ]
+                    },
+                    "untrustedEvidence": {
+                      "type": "boolean"
+                    },
+                    "limits": {
+                      "type": "object",
+                      "properties": {
+                        "releases": {
+                          "type": "integer"
+                        },
+                        "events": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "releases",
+                        "events"
+                      ]
+                    },
+                    "missingEvidence": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   },
                   "required": [
@@ -4498,7 +4538,14 @@
                     "definitionVersion",
                     "comparison",
                     "events",
-                    "notificationDelivery"
+                    "notificationDelivery",
+                    "environment",
+                    "schemaVersion",
+                    "generatedAt",
+                    "evidenceMode",
+                    "untrustedEvidence",
+                    "limits",
+                    "missingEvidence"
                   ],
                   "additionalProperties": false
                 }
@@ -4507,6 +4554,543 @@
           },
           "404": {
             "description": "Application not found or outside scope"
+          }
+        }
+      }
+    },
+    "/api/v1/access/agent-control": {
+      "get": {
+        "summary": "Owner-only persisted agent access state; inference remains disabled",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentControl"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        }
+      },
+      "put": {
+        "summary": "Owner pauses/resumes agent access without cancelling native work",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentControl"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "expectedVersion": {
+                    "type": "integer"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "expectedVersion",
+                  "reason"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/plans": {
+      "get": {
+        "summary": "Latest 20 app-scoped immutable deployment plans",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeploymentPlan"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a 30-minute exact-definition/digest plan; no runtime mutation",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedVersion": {
+                    "type": "integer"
+                  },
+                  "components": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "images": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "expectedVersion",
+                  "components"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/plans/{plan}": {
+      "get": {
+        "summary": "Read the exact plan; approval is separate from execution authority",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "plan",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/plans/{plan}/approve": {
+      "post": {
+        "summary": "Human owner approves exact hash with current definition preconditions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "plan",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploymentPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "planHash": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "planHash"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/plans/{plan}/execute": {
+      "post": {
+        "summary": "Creator executes approved plan atomically and idempotently",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "plan",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/mcp": {
+      "get": {
+        "summary": "Optional MCP transport has no server-initiated SSE stream",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "405": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        }
+      },
+      "post": {
+        "summary": "Opt-in application-scoped read-only MCP JSON response transport",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "202": {
+            "description": "Accepted notification; no response body"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
           }
         }
       }
@@ -6148,6 +6732,99 @@
           "changes"
         ],
         "additionalProperties": false
+      },
+      "DeploymentPlan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "applicationId": {
+            "type": "string"
+          },
+          "credentialId": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "images": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "planHash": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approvedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deploymentId": {
+            "type": "string"
+          },
+          "effect": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "applicationId",
+          "credentialId",
+          "definitionVersion",
+          "targetId",
+          "environment",
+          "components",
+          "images",
+          "planHash",
+          "expiresAt",
+          "effect"
+        ]
+      },
+      "AgentControl": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "inferenceEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "version",
+          "reason",
+          "updatedAt",
+          "inferenceEnabled"
+        ]
       }
     }
   }

@@ -1,3 +1,4 @@
+import { DeploymentPlans } from "./DeploymentPlans";
 import { Diagnostics } from "./Diagnostics";
 import { FieldSet, FieldLegend } from "@/components/ui/field";
 import { Disclosure } from "@/components/Disclosure";
@@ -652,6 +653,7 @@ export function ApplicationDetail() {
           hidden={tab !== "deployments"}
         >
           <Diagnostics id={a.id}/>
+          <DeploymentPlans id={a.id} currentVersion={a.version}/>
           <SourceEvents
             applicationId={a.id}
             version={a.version}

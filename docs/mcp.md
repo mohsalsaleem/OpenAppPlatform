@@ -28,6 +28,8 @@ Never put the platform token in prompts or tool arguments.
 | list_deployments | applicationId | Recent frozen releases and component outcomes |
 | get_deployment | deploymentId | Durable release progress |
 | inspect_target | targetId | Resources inside the configured target |
+| get_diagnostic_context | applicationId | Bounded recorded changes/outcomes, timestamps and missing evidence |
+| inspect_instances | applicationId | Current scoped runtime observations |
 | plan_deployment | applicationId | Definition version and standard-deployment effects; executed is false |
 
 The default server is deliberately read-only. Its plan output is evidence for a
@@ -38,3 +40,9 @@ definition changes before it is queued.
 This is an agent interface, not an embedded generative assistant. Provider
 selection, model budgets, conversational UI, and approved mutation tools remain
 future work. Application data returned by tools is untrusted source material.
+
+## M2 Remote Inspection
+
+An opt-in app-scoped HTTP inspection transport and an optional approved REST
+deployment-plan lane are available. See [M2 operation](m2-agent-operation.md) for
+the exact scopes, owner controls and protocol/client limits. Stdio remains read-only.

@@ -8,6 +8,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type OapAgentControl struct {
+	WorkspaceID string             `json:"workspace_id"`
+	Enabled     bool               `json:"enabled"`
+	Version     int64              `json:"version"`
+	Reason      string             `json:"reason"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
 type OapApplication struct {
 	ID          string             `json:"id"`
 	Name        string             `json:"name"`
@@ -88,6 +96,22 @@ type OapDeployment struct {
 	CredentialID        pgtype.Text        `json:"credential_id"`
 	Source              []byte             `json:"source"`
 	AuthorizationAction string             `json:"authorization_action"`
+}
+
+type OapDeploymentPlan struct {
+	ID                string             `json:"id"`
+	ApplicationID     string             `json:"application_id"`
+	CredentialID      string             `json:"credential_id"`
+	DefinitionVersion int64              `json:"definition_version"`
+	DefinitionHash    string             `json:"definition_hash"`
+	Components        []byte             `json:"components"`
+	Images            []byte             `json:"images"`
+	PlanHash          string             `json:"plan_hash"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	ApprovedBy        pgtype.Text        `json:"approved_by"`
+	ApprovedAt        pgtype.Timestamptz `json:"approved_at"`
+	DeploymentID      pgtype.Text        `json:"deployment_id"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
 }
 
 type OapEndpointVerification struct {

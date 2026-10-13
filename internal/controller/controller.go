@@ -155,6 +155,12 @@ func (c *Controller) EnqueueRestart(ctx context.Context, appID, key string, requ
 	return c.enqueueOperation(ctx, appID, key, nil, version, &request, nil, nil, nil, nil)
 }
 func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64, restart *RestartRequest, scaleDown *ScaleDownRequest, provenance *domain.ReleaseSource, rollback *RollbackRequest, selection []string) (domain.Deployment, error) {
+	if strings.HasPrefix(key, "plan:") {
+		plan, _ := ctx.Value(planKey{}).(string)
+		if plan == "" || key != "plan:"+plan {
+			return domain.Deployment{}, errors.New("plan idempotency namespace is reserved")
+		}
+	}
 	if len(key) < 8 || len(key) > 128 {
 		return domain.Deployment{}, errors.New("Idempotency-Key must contain 8 to 128 characters")
 	}
@@ -217,6 +223,9 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	}
 	if existingErr != nil && !errors.Is(existingErr, pgx.ErrNoRows) {
 		return domain.Deployment{}, existingErr
+	}
+	if e = c.validateDeploymentPlan(ctx, tx, a); e != nil {
+		return domain.Deployment{}, e
 	}
 	if expectedVersion > 0 && a.Version != expectedVersion {
 		return domain.Deployment{}, domain.ErrConflict
@@ -432,6 +441,9 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		}
 	}
 	if e = c.recordCredential(ctx, tx, d.ID, appID); e != nil {
+		return d, e
+	}
+	if e = c.linkDeploymentPlan(ctx, tx, d.ID); e != nil {
 		return d, e
 	}
 	if _, e = c.Jobs.InsertTx(ctx, tx, DeployArgs{d.ID}, &river.InsertOpts{MaxAttempts: 10}); e != nil {

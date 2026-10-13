@@ -39,6 +39,12 @@ environments:
         OAP_SECRET_KEY_FILE: /app/secret-store/key
       recovery: separate-private-original-key-and-encrypted-store
       verified: 2026-10-13
+    remote_mcp:
+      enabled: true
+      runtime_env: OAP_REMOTE_MCP
+      scope: application-scoped-read-only-agent-inspection
+      transport: existing-authenticated-https-origin
+      mutation_lane: scoped-rest-deployment-plans
     auth_mode: owner
     owner_setup: complete
     configuration_storage_uuid: a2q7lc8ehu6twekwj1bcng8m

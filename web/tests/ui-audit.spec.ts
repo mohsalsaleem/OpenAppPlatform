@@ -981,3 +981,36 @@ test("owned Docker security exceptions are explicit and inherited controls stay 
  await expect(policy.getByText("Owner Exception",{exact:true})).toBeVisible();
  await page.screenshot({path:"../.local/ui-container-security.png",fullPage:true});
 });
+
+test("owner pauses agent access with a reason and resumes without exposing secrets",async({page})=>{
+ await fixtures(page);
+ let state={enabled:true,version:1,reason:"",updatedAt:new Date().toISOString(),inferenceEnabled:false};let writes=0;
+ await page.route("**/api/v1/access/agent-control",async route=>{
+  if(route.request().method()==="PUT") {const body=route.request().postDataJSON();expect(body.expectedVersion).toBe(state.version);writes++;state={...state,enabled:body.enabled,reason:body.reason,version:state.version+1};}
+  await route.fulfill({json:state});
+ });
+ await page.goto("/access");await page.getByRole("tab",{name:"Agent Tokens",exact:true}).click();
+ await expect(page.getByText("OAP Inference Off",{exact:true})).toBeVisible();
+ await page.getByRole("button",{name:"Pause or Resume Agents",exact:true}).click();
+ const pause=page.getByRole("button",{name:"Pause Agent Access",exact:true});await expect(pause).toBeDisabled();
+ await page.getByLabel("Reason",{exact:true}).fill("Owner diagnostic maintenance window");await pause.click();
+ await expect(page.getByText("Paused",{exact:true})).toBeVisible();
+ await page.getByRole("button",{name:"Resume Agent Access",exact:true}).click();
+ await expect(page.getByText("Enabled",{exact:true})).toBeVisible();expect(writes).toBe(2);
+ await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:"../.local/ui-m2-agent-control.png",fullPage:true});
+});
+
+test("owner reviews an exact digest plan before approving its unchanged hash",async({page})=>{
+ await fixtures(page);
+ let plan={id:"f".repeat(32),applicationId:app.id,credentialId:"named-agent-id",definitionVersion:3,targetId:target.id,environment:"staging",components:["web"],images:{web:proposed},planHash:"c".repeat(64),expiresAt:new Date(Date.now()+1800000).toISOString(),effect:"Standard lifecycle may cause downtime."};let approvals=0;
+ await page.route("**/api/v1/applications/audit-app/plans",route=>route.fulfill({json:[plan]}));
+ await page.route("**/api/v1/applications/audit-app/plans/*/approve",async route=>{expect(route.request().postDataJSON()).toEqual({planHash:plan.planHash});approvals++;plan={...plan,approvedAt:new Date().toISOString()} as typeof plan;await route.fulfill({json:plan})});
+ await page.goto(`/applications/${app.id}?tab=deployments`);await page.getByRole("button",{name:"Review Plans",exact:true}).click();
+ await page.getByRole("button",{name:/Plan ffffffff/}).click();
+ await expect(page.getByText(`web · ${proposed}`,{exact:true})).toBeVisible();
+ await page.getByRole("button",{name:"Approve This Plan",exact:true}).click();
+ await expect(page.getByText("Approved",{exact:true})).toBeVisible();await expect(page.getByRole("button",{name:"Approve This Plan",exact:true})).toBeDisabled();expect(approvals).toBe(1);
+ await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:"../.local/ui-m2-plan-review.png",fullPage:true});
+});

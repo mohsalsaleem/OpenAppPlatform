@@ -213,7 +213,7 @@ configuration for linked resources remains in the operator; direct configuration
 uses consistent Button, Field, Select and Collapsible patterns. Prevent legacy
 global label/control styles and hand-styled link buttons from returning.
 
-**Current priority:** Review the supported M1 baseline for a v0.1 release candidate. M1.4–M1.6 passed local and scoped staging acceptance on 13 October 2026; see [v0.1 acceptance](docs/v0.1-acceptance.md). M1.1–M1.3 passed local and scoped staging acceptance on 13 October 2026. The supported M0 exit
+**Current priority:** Deliver and verify the ordered M2 agent baseline. The v0.1 candidate passed exact local gate `20261013-182404-1a29268a` and staging at `275f026`. M1.4–M1.6 passed local and scoped staging acceptance on 13 October 2026; see [v0.1 acceptance](docs/v0.1-acceptance.md). M1.1–M1.3 passed local and scoped staging acceptance on 13 October 2026. The supported M0 exit
 review is accepted; P0.1–P0.5 passed their local and scoped staging gates. See
 [the exit review](docs/m0-exit-review.md). P0.4 passed the final local/staging acceptance gate. Standalone Docker uses scoped private pull references and Coolify retains its native server login. P0.1 runtime secret references,
 P0.2 workers and P0.3 existing database links passed local and isolated Coolify
@@ -605,6 +605,26 @@ uncontrolled duplication, revoke an agent credential, and explain every mutation
 in the audit trail. Then pass a real staging update and rollback/recovery drill.
 
 ## M2 Safe remote and agent operation
+
+### Ordered M2 baseline queue (13 October 2026)
+
+Continue breadth-first from the verified v0.1 candidate. Keep deeper integrations
+separate from the single-server agent baseline.
+
+| Order | Deliverable | Gate and stop boundary |
+| --- | --- | --- |
+| M2.1 | Scoped diagnostic API/MCP inspection with missing/freshness evidence | Cross-app/pin/redaction and inert prompt-injection tests; no model calls or indexed log backend |
+| M2.2 | Exact immutable deployment plans, human-owner approval and idempotent execution | Stale/version/hash/expiry/creator checks and traceable operation; no arbitrary/destructive executor |
+| M2.3 | Persistent owner pause and scoped agent revocation | Deny agent reads/new dispatches, preserve owner recovery and disclose in-flight effects; no control DB access |
+| M2.4 | Opt-in authenticated remote inspection and versioned runbook | Named agent inspects and executes one authorized REST plan on staging; existing HTTPS ingress, no mandatory tunnel or identity service |
+
+Current implementation is under local/staging acceptance; see
+[M2 baseline and limits](docs/m2-agent-operation.md). OAuth/ChatGPT-specific client
+acceptance, tunnel provisioning, BYOK internal inference, application database query
+tools and per-app expiring override policies remain open M2 extensions. These are
+not silently completed by the minimal API/inspection path. The full M2 vision
+remains broader than this baseline. Do not advance M3 while baseline gates fail.
+
 
 ### Remote access and tunnels
 
