@@ -4,7 +4,7 @@ Status: **design decision with planned work.** The model below matches what
 exists today (versioned definitions stored in OAP, `export-spec`, per-component
 image overrides on deploy, and the GitHub release hook that maps one repository
 and branch to selected components). The gaps are scheduled in the
-[roadmap](../ROADMAP.md) under M3.2, M3.3 and the deferred table.
+[roadmap](../ROADMAP.md) under M3.2, M3.4 and the deferred table.
 
 ![Service repos release their own component; OAP owns the versioned spec](images/spec-ownership.svg)
 
@@ -108,7 +108,7 @@ OAP-owned model is proven.
 | Spec history, version diff and revert as a plan | M3.2 |
 | Change metadata on each version: author, time, message | M3.2 |
 | `oap spec export --dir` one-way mirror | M3.2 |
-| Component-scoped release grants | M3.3 |
+| Component-scoped release grants | M3.4 |
 | Git-sourced apps | Deferred |
 
 ## Non-goals

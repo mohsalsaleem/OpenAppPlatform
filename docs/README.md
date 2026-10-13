@@ -12,6 +12,7 @@ use this index.
 - [Roadmap](../ROADMAP.md): milestones and execution order
 - [Operating model](operating-model.md): principles, roles, what the agent gets and guardrails
 - [Spec ownership](spec-ownership.md): where the application spec lives and how multi-repo releases work
+- [Environments and verified change](environments.md): previews, declared checks, guarded rollout and optional environment comparison
 - [Standalone agent runbook](standalone-agent-runbook.md): install, grant an agent and run the full lifecycle without the dashboard
 - [Feature reference](feature-reference.md): detailed behavior and limits of current features
 

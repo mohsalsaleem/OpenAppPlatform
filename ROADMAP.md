@@ -108,7 +108,7 @@ new slice IDs so previous M2.1–M2.4 acceptance records retain their meaning.
 | Milestone | Outcome | Status |
 | --- | --- | --- |
 | M2 — Agent-operated standalone core | One agent completes install → deploy → diagnose → correct → verify without dashboard dependence | Complete at `76b4061` |
-| M3 — Application unit and standalone delivery | Application router and scale loop, specification-driven topology and pre-deploy jobs, source-to-release, Compose import, image/storage safety, lightweight recovery | Active: M3.1 |
+| M3 — Application unit and standalone delivery | Application router and scale loop, specification-driven topology and pre-deploy jobs, previews/checks/guarded rollout and environment comparison, source-to-release, Compose import, image/storage safety, lightweight recovery | Active: M3.1 |
 | M4 — Bounded application insight | Indexed logs when needed, release watches, metrics/analytics and notifications | Deferred |
 | M5 — Operator integration return | Capability-aware existing-resource discovery/assembly and operator adapters/views | Parked until standalone gates pass and owner reprioritizes |
 | M6 — Additional servers and runtimes | Explicit multi-server placement, policy metadata, Firecracker/actor experiments | Deferred |
@@ -126,7 +126,7 @@ router and scale loop**, using Caddy. The internal routing foundation and real
 proxy tests are implemented; controller/spec apply, proxy packaging, domain
 ownership, draining and full agent scaling acceptance remain open. See
 [standalone ingress](docs/standalone-ingress.md). UI/operator expansion remains
-parked. The measured combined idle CPU gap stays open for M3.6.
+parked. The measured combined idle CPU gap stays open for M3.7.
 
 ## Ordered active queue
 
@@ -184,7 +184,34 @@ one scaled application, which is the gap no Compose/Coolify-style tool closes.
    repositories. Acceptance: an agent reverts a topology change through a plan,
    the history shows who changed what, and the export round-trips through
    validate/diff without exposing secret values.
-3. **Source-to-release:** explicit GitHub release ownership, signed/deduplicated
+3. **Verified change flow and environments:** make "evidence before exposure"
+   the default without forcing a traditional dev → staging → production chain.
+   (a) **Preview environments:** a temporary environment built from production's
+   current release plus one change (image and/or spec), on its own route
+   (for example `pr-42.<domain>`), with non-production secret bindings, seeded or
+   empty data by default, a concurrent-preview cap and automatic expiry/cleanup.
+   Never attach a live production database. (b) **Declared checks:** the spec
+   declares deterministic application checks (HTTP requests with expected status
+   and body fragments, worker job probes) that OAP runs and records as evidence;
+   an agent's claim is not evidence. (c) **Guarded rollout:** using the M3.1
+   router, a release updates one instance first, runs checks against it, then the
+   rest; a failed check rolls back automatically to the previous release. Schema
+   changes must be backward compatible while old and new instances overlap.
+   (d) **Promotion of verified releases:** production may require that the exact
+   image digests passed checks in a preview (owner policy, off by default); a fast
+   lane for urgent fixes skips the preview only with a recorded reason and exact
+   owner approval. (e) **Optional long-lived environments and comparison:** named
+   environments (for example staging) remain supported, never required. A read-only
+   comparison of any two environments' current releases classifies differences
+   as declared per-environment overrides, changes one side has that the other
+   lacks, or undeclared drift, with values masked. Feature flags, not divergent
+   environments, are the recommended way to hold unreleased work. Acceptance: an
+   agent opens a preview for an API change, declared checks pass, the release rolls
+   out one instance first and completes; an injected failing check rolls back
+   automatically; the preview expires and its containers are removed; comparing
+   two named environments reports expected, ahead and drift entries without secret
+   values. See [environments and verified change](docs/environments.md).
+4. **Source-to-release:** explicit GitHub release ownership, signed/deduplicated
    events, frozen commits and immutable artifacts. Start with a documented external
    build lane; evaluate Railpack/Nixpacks alternatives later. Source detection
    must not silently take over an existing trigger or add a mandatory builder.
@@ -192,21 +219,21 @@ one scaled application, which is the gap no Compose/Coolify-style tool closes.
    release only its own component's image, never edit the specification.
    Acceptance: three repositories release three components of one application
    independently; a credential for one is denied on the others.
-4. **Compose import:** convert a `docker-compose.yml` into a proposed specification
+5. **Compose import:** convert a `docker-compose.yml` into a proposed specification
    with explicit decisions and unsupported fields, per the
    [Compose import proposal](docs/compose-import.md). Import never deploys,
    adopts running containers or reads secret values.
-5. **Image and storage safety:** runtime artifact inventory, retained known-good
+6. **Image and storage safety:** runtime artifact inventory, retained known-good
    releases, bounded cache/retention, reviewed pruning and named-volume backup
    procedures. Protect active/stopped workloads and recovery artifacts. App-data
    restore is separately authorized and verified; metadata restore is not data restore.
-6. **One-person operability:** offline-compatible rescue, secret/key recovery,
+7. **One-person operability:** offline-compatible rescue, secret/key recovery,
    backup checks, bounded metadata growth, retries/timeouts and measured resource
    regression checks. Add optional external secret providers only for a verified need.
 
 Exit: the reference application (web, API, worker, linked PostgreSQL) runs on one
 small server behind one HTTPS domain; an agent scales it through the
-specification, ships one source change as a verified release, and recovers from
+specification, ships one source change through a preview and guarded rollout as a verified release, and recovers from
 an injected regression, with documented recovery and measured operating cost.
 Optional ingress and build services have separate resource accounting. This is
 not a multi-server gate.
@@ -226,7 +253,7 @@ unmeasured goals, not guarantees. Publish repeatable commands and measurements
 in M2.9; revise goals explicitly if evidence requires it. The
 [reference measurement](docs/footprint.md) meets idle memory comparisons but misses
 the combined one-core idle CPU goal (about 1.86% versus 1%). Keep the 1% goal
-unchanged and retain the gap for M3.6 one-person operability. Bound polling, log reads,
+unchanged and retain the gap for M3.7 one-person operability. Bound polling, log reads,
 retries, concurrency and retained metadata. OAP failure must not stop existing
 containers or routes. Do not install monitoring infrastructure just to benchmark.
 
@@ -251,7 +278,7 @@ containers or routes. Do not install monitoring infrastructure just to benchmark
 | Security | Existing Docker limits/ownership/no-new-privileges preserved; no privileged/bind/host-network generalization. Build isolation and image provenance/scanning introduced only by later explicit gates |
 | Multi-server, taints and annotations | M6: explicit placement, capacity/health, generation fencing and enforced policy; no implied cross-host networking or replicated local volumes |
 | Firecracker, celld, Cloudflare Durable Objects | M6 research after Docker operability; independent runtime/artifact/state contracts, real recovery/isolation examples; optional, never core dependencies |
-| Rolling and blue-green | Optional later policy after stable endpoints/verification; controlled by owner, not enforced |
+| Blue-green and broader rollout policies | Guarded one-instance-first rollout is M3.3. Blue-green, weighted traffic splitting and other policies stay optional later work controlled by the owner, not enforced |
 
 ## Completion discipline
 

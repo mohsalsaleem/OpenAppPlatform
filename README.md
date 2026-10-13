@@ -135,7 +135,8 @@ fixed host port.
 | Operations | Health and bounded logs, incident evidence, [headless install and rescue](docs/headless-bootstrap.md), metadata backup, [measured footprint](docs/footprint.md) |
 
 **Next:** the router and scale loop, adding and removing components plus
-pre-deploy jobs through the spec, building from source, and
+pre-deploy jobs through the spec, [previews, declared checks and guarded
+rollout](docs/environments.md), building from source, and
 [Docker Compose import](docs/compose-import.md).
 
 ## Architecture
