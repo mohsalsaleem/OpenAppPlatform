@@ -32,7 +32,13 @@ type RegistryAuth struct {
 	ServerAddress string `json:"serveraddress"`
 }
 
+type ContainerSecurity struct {
+	AllowPrivilegeEscalation bool   `json:"allowPrivilegeEscalation"`
+	ExceptionReason          string `json:"exceptionReason,omitempty"`
+}
 type Component struct {
+	Security *ContainerSecurity `json:"security,omitempty"`
+
 	RegistryCredentialRef string            `json:"registryCredentialRef,omitempty"`
 	RegistryAuth          *RegistryAuth     `json:"-"`
 	Volumes               []VolumeMount     `json:"volumes,omitempty"`
@@ -154,6 +160,14 @@ func (m *Manifest) Validate() error {
 		}
 		if c.HostPort != 0 && c.Instances != 1 {
 			return errors.New("hostPort requires one instance; shared port routing is not implemented")
+		}
+		if c.Security != nil {
+			if c.ResourceID != "" || c.Management == "observe" || c.Kind == "database" {
+				return errors.New("linked resource security remains managed by its operator")
+			}
+			if c.Security.AllowPrivilegeEscalation && (len(c.Security.ExceptionReason) < 12 || len(c.Security.ExceptionReason) > 240 || strings.ContainsAny(c.Security.ExceptionReason, "\n\r\x00")) {
+				return errors.New("security exceptions require a reason of 12 to 240 bytes without line breaks")
+			}
 		}
 		if c.Kind != "worker" && ((c.Port < 1 && !(c.Management == "observe" && c.Port == 0)) || c.Port > 65535) {
 			return errors.New("port must be between 1 and 65535")

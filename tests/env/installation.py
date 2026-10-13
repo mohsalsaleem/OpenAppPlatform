@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import shutil
 import socket
 import subprocess
 import time
@@ -129,6 +130,18 @@ def run():
             raise RuntimeError('Installation did not retain non-root/read-only runtime')
         browser('bootstrap')
         app = json.loads((folder / 'application.json').read_text())
+        secret_dir = folder / 'secret-store'
+        secret_dir.mkdir(mode=0o700)
+        secret_dir.chmod(0o700)
+        native(['run','--rm','--network','none','--user','0','--mount','type=bind,src='+str(secret_dir)+',dst=/secrets','--entrypoint','/bin/chown',runtime,'10001:10001','/secrets'])
+        secret_cli=['run','--rm','-i','--network','none','--mount','type=bind,src='+str(secret_dir)+',dst=/secrets','-e','OAP_SECRET_STORE_FILE=/secrets/store.json','-e','OAP_SECRET_KEY_FILE=/secrets/key','--entrypoint','/app/oap-admin',runtime]
+        native(secret_cli+['secret-store-init'])
+        secret_record={'reference':'stored-proof-v1','targetId':'docker-local','applicationId':app['id'],'component':'worker','variable':'PROOF_TOKEN','value':'installation-private-stored-token'}
+        native(secret_cli+['secret-put'],json.dumps(secret_record).encode())
+        if b'installation-private-stored-token' in (secret_dir/'store.json').read_bytes():
+            raise RuntimeError('Stored secret was not encrypted')
+        shutil.copyfile('/workspace/deploy/compose.secrets.yaml',folder/'compose.secrets.yaml')
+        set_env('COMPOSE_FILE',values()['COMPOSE_FILE']+':compose.secrets.yaml')
         network = 'oap-docker-local-' + app['id'][:12]
         # Native owner prepares reachability; database linking itself never joins networks.
         native(['network', 'create', '--label', 'io.openappplatform.target=docker-local',

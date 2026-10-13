@@ -1,3 +1,4 @@
+import { Diagnostics } from "./Diagnostics";
 import { FieldSet, FieldLegend } from "@/components/ui/field";
 import { Disclosure } from "@/components/Disclosure";
 import { DatabaseLinkDialog } from "./DatabaseLinkDialog";
@@ -650,6 +651,7 @@ export function ApplicationDetail() {
           forceMount
           hidden={tab !== "deployments"}
         >
+          <Diagnostics id={a.id}/>
           <SourceEvents
             applicationId={a.id}
             version={a.version}

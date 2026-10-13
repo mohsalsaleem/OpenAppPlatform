@@ -106,6 +106,16 @@ type OapInvitation struct {
 	AcceptedAt  pgtype.Timestamptz `json:"accepted_at"`
 }
 
+type OapNotificationOutbox struct {
+	ID            string             `json:"id"`
+	DeploymentID  string             `json:"deployment_id"`
+	ApplicationID string             `json:"application_id"`
+	State         string             `json:"state"`
+	Operation     string             `json:"operation"`
+	CommitSha     string             `json:"commit_sha"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
 type OapReleaseClaim struct {
 	ReleaseID string `json:"release_id"`
 	Component string `json:"component"`

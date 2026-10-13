@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"regexp"
 	"sort"
@@ -142,4 +143,52 @@ func (i *Inputs) Redact(text string) string {
 		text = strings.ReplaceAll(text, value, "[REDACTED]")
 	}
 	return text
+}
+
+// StoredInput is an in-memory value from a trusted encrypted provider. It is
+// deliberately not a serialized/public configuration representation.
+type StoredInput struct {
+	Binding Binding
+	Value   string
+}
+
+func AddStored(existing *Inputs, values []StoredInput) (*Inputs, error) {
+	if len(values) > 128 {
+		return nil, errors.New("encrypted input grants exceed limit")
+	}
+	bindings := make([]Binding, 0, len(values))
+	lookup := map[string]string{}
+	for n, v := range values {
+		b := v.Binding
+		b.ValueEnv = fmt.Sprintf("OAP_SECRET_STORED_%d", n)
+		bindings = append(bindings, b)
+		lookup[b.ValueEnv] = v.Value
+	}
+	raw, _ := json.Marshal(bindings)
+	parsed, err := Parse(raw, func(name string) string { return lookup[name] })
+	if err != nil {
+		return nil, err
+	}
+	for _, entry := range parsed.entries {
+		if entry.value == "" {
+			return nil, errors.New("stored secret value is missing")
+		}
+	}
+	out := &Inputs{}
+	if existing != nil {
+		out.entries = append(out.entries, existing.entries...)
+		out.registries = append(out.registries, existing.registries...)
+	}
+	for _, v := range parsed.entries {
+		for _, old := range out.entries {
+			a, b := v.binding, old.binding
+			a.ValueEnv = ""
+			b.ValueEnv = ""
+			if a == b {
+				return nil, errors.New("runtime input grant is duplicated across providers")
+			}
+		}
+		out.entries = append(out.entries, v)
+	}
+	return out, nil
 }

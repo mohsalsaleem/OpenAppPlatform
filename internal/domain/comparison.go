@@ -111,6 +111,13 @@ func CompareReleases(from, to Deployment) ReleaseComparison {
 		add(name, "included in operation", fmt.Sprint(oldSelection[name]), fmt.Sprint(newSelection[name]))
 		add(name, "requested image", a.Image, b.Image)
 		add(name, "registry credential reference", a.RegistryCredentialRef, b.RegistryCredentialRef)
+		security := func(c Component) string {
+			if c.Security != nil && c.Security.AllowPrivilegeEscalation {
+				return "owner exception"
+			}
+			return "no new privileges"
+		}
+		add(name, "container security", security(a), security(b))
 		add(name, "kind", a.Kind, b.Kind)
 		management := func(c Component) string {
 			if c.Management == "observe" {

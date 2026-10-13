@@ -254,3 +254,46 @@ func TestNativeHealthCheckChangesRuntimeRevisionAndUsesExecArguments(t *testing.
 		t.Fatal("probe did not use fixed loopback/exec arguments", probe)
 	}
 }
+
+func TestOwnedDockerSecurityDefaultAndExplicitException(t *testing.T) {
+	for _, allow := range []bool{false, true} {
+		app := strings.Repeat("a", 32)
+		var host map[string]any
+		client := fakeClient(t, func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.Method == "GET" && strings.Contains(r.URL.Path, "/containers/"):
+				w.WriteHeader(404)
+			case r.Method == "GET" && strings.Contains(r.URL.Path, "/images/"):
+				json.NewEncoder(w).Encode(map[string]any{"Id": "sha256:cached"})
+			case r.Method == "GET" && strings.Contains(r.URL.Path, "/networks/"):
+				json.NewEncoder(w).Encode(map[string]any{"Labels": map[string]string{prefix + "target": "fixture", prefix + "application": app}})
+			case r.Method == "POST" && strings.Contains(r.URL.Path, "/containers/create"):
+				var body map[string]any
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					t.Fatal(err)
+				}
+				host = body["HostConfig"].(map[string]any)
+				json.NewEncoder(w).Encode(map[string]any{"Id": "created"})
+			default:
+				t.Fatalf("unexpected provider mutation %s %s", r.Method, r.URL.Path)
+			}
+		})
+		component := domain.Component{Name: "web", Image: "fixture:cached", Port: 8080}
+		if allow {
+			component.Security = &domain.ContainerSecurity{AllowPrivilegeEscalation: true, ExceptionReason: "Reviewed fixture setuid helper"}
+		}
+		if _, err := client.Ensure(context.Background(), operator.Spec{Name: "web", Ownership: "OpenAppPlatform:" + app + ":web", Component: component}); err != nil {
+			t.Fatal(err)
+		}
+		if host["Privileged"] != false {
+			t.Fatal("privileged container allowed")
+		}
+		options := host["SecurityOpt"].([]any)
+		if !allow && (len(options) != 1 || options[0] != "no-new-privileges:true") {
+			t.Fatal("default security not applied")
+		}
+		if allow && len(options) != 0 {
+			t.Fatal("reviewed exception ignored")
+		}
+	}
+}

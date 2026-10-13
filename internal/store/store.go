@@ -201,12 +201,15 @@ func (s *Store) Deployments(ctx context.Context, appID string) ([]domain.Deploym
 	return out, rows.Err()
 }
 func (s *Store) SaveDeployment(ctx context.Context, d domain.Deployment) error {
-	raw, err := json.Marshal(d.Steps)
+	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	_, err = db.New(s.Pool).UpdateDeployment(ctx, db.UpdateDeploymentParams{ID: d.ID, State: deploymentStorageState(d), Steps: raw})
-	return err
+	defer tx.Rollback(ctx)
+	if err = s.SaveDeploymentTx(ctx, tx, &d); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *Store) ApplicationTx(ctx context.Context, tx pgx.Tx, id string) (domain.Application, error) {
@@ -248,6 +251,7 @@ func (s *Store) SaveDeploymentTx(ctx context.Context, tx pgx.Tx, d *domain.Deplo
 	at, err := db.New(tx).UpdateDeploymentReturningTimestamp(ctx, db.UpdateDeploymentReturningTimestampParams{ID: d.ID, State: deploymentStorageState(*d), Steps: raw})
 	if err == nil {
 		d.UpdatedAt = at.Time
+		err = recordNotification(ctx, tx, *d)
 	}
 	return err
 }

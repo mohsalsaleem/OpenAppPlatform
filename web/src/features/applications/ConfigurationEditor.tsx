@@ -1,3 +1,4 @@
+import { ContainerSecurity } from "./ContainerSecurity";
 import { RegistryCredentials } from "./RegistryCredentials";
 import { HostPortFields, invalidHostPort } from "./HostPortFields";
 import { FieldSet, FieldLegend } from "@/components/ui/field";
@@ -12,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { HealthCheckFields, invalidHealthCheck } from "./HealthCheckFields";
 import { ConfigurationDiff } from "./ConfigurationDiff";
-import { useCanOperate } from "../../access";
+import { useCanOperate, useIsOwner } from "../../access";
 import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Save, RotateCcw } from "lucide-react";
@@ -32,6 +33,7 @@ export function ConfigurationEditor({
   application: Application;
 }) {
   const canOperate = useCanOperate();
+ const isOwner=useIsOwner();
   const client = useQueryClient();
   const [base, setBase] = useState(app);
   const [draft, setDraft] = useState<Manifest>(() =>
@@ -127,7 +129,8 @@ export function ConfigurationEditor({
       | Component["readiness"]
       | string[]
       | Component["volumes"]
-      | Component["limits"],
+      | Component["limits"]
+ | Component["security"],
   ) {
     setSaved(false);
     setDraft({
@@ -321,6 +324,7 @@ export function ConfigurationEditor({
                     onPortChange={(port) => change(i, "hostPort", port)}
                   />
                 </div>
+                <ContainerSecurity component={c} supported={!!capabilities.data?.containerSecurity} owner={isOwner} onChange={value=>change(i,"security",value)}/>
                 <StorageAndLimits
                   component={c}
                   saved={base.manifest.components.find(

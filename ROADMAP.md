@@ -213,7 +213,7 @@ configuration for linked resources remains in the operator; direct configuration
 uses consistent Button, Field, Select and Collapsible patterns. Prevent legacy
 global label/control styles and hand-styled link buttons from returning.
 
-**Current priority:** M1.3 Metadata Backup Visibility. M1.1 and the M1.2 baseline passed local and scoped staging acceptance on 13 October 2026. The supported M0 exit
+**Current priority:** Complete the remaining M1 baseline (M1.4–M1.6), then review the M1 exit gate for v0.1. M1.1–M1.3 passed local and scoped staging acceptance on 13 October 2026. The supported M0 exit
 review is accepted; P0.1–P0.5 passed their local and scoped staging gates. See
 [the exit review](docs/m0-exit-review.md). P0.4 passed the final local/staging acceptance gate. Standalone Docker uses scoped private pull references and Coolify retains its native server login. P0.1 runtime secret references,
 P0.2 workers and P0.3 existing database links passed local and isolated Coolify
@@ -515,7 +515,7 @@ into a separate platform before covering this queue.
 
 M1.1 now includes transactional operation/source audit correlation plus explicit agent action allowlists and target/environment pins. Legacy identity/release IDs and permissions remain intact. Its acceptance checks cover narrow issuance, wrong action/pin denial, queued expiry/revocation/permission holds, GitHub build authority and exact-operation audit controls. Local migration/API/browser and scoped Coolify staging acceptance passed. The temporary restart-only acceptance credential was revoked; legacy credentials and existing database configuration/data were preserved.
 
-M1.2 now records bounded target observations, classifies unknown/connected/unreachable/failed/stale evidence, and links held operations to existing recovery controls. Local outage/restart/browser and scoped staging acceptance passed; rechecking does not redispatch work. Continue with M1.3: owner-visible, bounded, read-only host backup reports; coverage and external configuration/key dependencies; isolated restore and failure evidence; manual retention guidance. Complete local packaged/API/browser and scoped staging acceptance before advancing to M1.4. Review the M1 exit gate after these slices; do not pull M2–M6
+M1.2 now records bounded target observations, classifies unknown/connected/unreachable/failed/stale evidence, and links held operations to existing recovery controls. Local outage/restart/browser and scoped staging acceptance passed; rechecking does not redispatch work. M1.3 owner-only bounded host reports, private staging archive/isolated restore, checksum failure and workload preservation passed local/staging acceptance. Continue with M1.4–M1.6: optional encrypted host-file values with exact grants and recoverable keys; capability-aware owned-Docker no-new-privileges and human-owner exceptions while inheriting operator settings; bounded release/change diagnostics and a local durable notification outbox. Verify local and scoped staging acceptance before declaring this baseline delivered. Scanning/signing, external vaults, notification delivery and AI diagnosis remain beyond this minimal slice. Review the M1 exit gate after these slices; do not pull M2–M6
 work forward. General routing and advanced rollout strategies stay parked under
 the accepted breadth-first correction.
 

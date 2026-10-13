@@ -7,6 +7,8 @@ import (
 )
 
 func (s *Server) backupRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/access/secret-store", func(w http.ResponseWriter, r *http.Request) { write(w, 200, s.Controller.SecretStoreStatus) })
+
 	mux.HandleFunc("GET /api/v1/access/backups", func(w http.ResponseWriter, r *http.Request) {
 		overview, err := backupreports.Read(os.Getenv("OAP_BACKUP_REPORTS_DIR"))
 		if err != nil {

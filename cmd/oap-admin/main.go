@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/access"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/secretstore"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 	"io"
 	"os"
@@ -19,6 +20,26 @@ func main() {
 	}
 }
 func run() error {
+	if len(os.Args) == 2 && (os.Args[1] == "secret-store-init" || os.Args[1] == "secret-put") {
+		path, key := os.Getenv("OAP_SECRET_STORE_FILE"), os.Getenv("OAP_SECRET_KEY_FILE")
+		if os.Args[1] == "secret-store-init" {
+			if err := secretstore.Init(path, key); err != nil {
+				return err
+			}
+			fmt.Println("Encrypted store initialized. Save the private key separately before using it.")
+			return nil
+		}
+		record, err := secretstore.ReadRecord(os.Stdin)
+		if err != nil {
+			return err
+		}
+		if err = secretstore.Put(path, key, record); err != nil {
+			return err
+		}
+		fmt.Println("Scoped secret stored. Restart the controller to load the new snapshot.")
+		return nil
+	}
+
 	if len(os.Args) == 2 && os.Args[1] == "check-schema" {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
@@ -34,7 +55,7 @@ func run() error {
 		return nil
 	}
 	if len(os.Args) != 2 || os.Args[1] != "reset-owner-password" {
-		return fmt.Errorf("usage: oap-admin check-schema | reset-owner-password < password-file")
+		return fmt.Errorf("usage: oap-admin check-schema | reset-owner-password | secret-store-init | secret-put (sensitive input uses stdin)")
 	}
 	raw, e := io.ReadAll(io.LimitReader(os.Stdin, 258))
 	if e != nil {

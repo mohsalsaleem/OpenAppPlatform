@@ -16,6 +16,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/routing"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/runtimeinputs"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/secretstore"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/source"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 	"github.com/riverqueue/river"
@@ -30,16 +31,17 @@ type DeployArgs struct {
 func (DeployArgs) Kind() string { return "oap_deploy" }
 
 type Controller struct {
-	RuntimeInputs   *runtimeinputs.Inputs
-	EndpointProbe   func(context.Context, routing.Binding) routing.Verification
-	RouteBindings   []routing.Binding
-	SourceHooks     map[string]source.Hook
-	SourceBuilder   source.Builder
-	RequireIdentity bool
-	Store           *store.Store
-	Factory         operator.Factory
-	Jobs            *river.Client[pgx.Tx]
-	PollInterval    time.Duration
+	RuntimeInputs     *runtimeinputs.Inputs
+	SecretStoreStatus secretstore.Status
+	EndpointProbe     func(context.Context, routing.Binding) routing.Verification
+	RouteBindings     []routing.Binding
+	SourceHooks       map[string]source.Hook
+	SourceBuilder     source.Builder
+	RequireIdentity   bool
+	Store             *store.Store
+	Factory           operator.Factory
+	Jobs              *river.Client[pgx.Tx]
+	PollInterval      time.Duration
 }
 type Worker struct {
 	river.WorkerDefaults[DeployArgs]
@@ -47,7 +49,7 @@ type Worker struct {
 }
 
 func New(ctx context.Context, s *store.Store, f operator.Factory) (*Controller, error) {
-	c := &Controller{Store: s, Factory: f, PollInterval: 2 * time.Second}
+	c := &Controller{Store: s, Factory: f, PollInterval: 2 * time.Second, SecretStoreStatus: secretstore.Status{State: "disabled", Grants: []secretstore.Grant{}}}
 	driver := riverpgxv5.New(s.Pool)
 	migrator, e := rivermigrate.New(driver, nil)
 	if e != nil {
@@ -73,6 +75,9 @@ func (c *Controller) Adapter(ctx context.Context, id string) (operator.Adapter, 
 	return c.Factory(t)
 }
 func (c *Controller) CreateApplication(ctx context.Context, m domain.Manifest) (domain.Application, error) {
+	if err := c.authorizeSecurity(ctx, m); err != nil {
+		return domain.Application{}, err
+	}
 	if c.RequireIdentity {
 		for _, comp := range m.Components {
 			if comp.Kind == "database" {

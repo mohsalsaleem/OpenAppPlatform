@@ -945,7 +945,7 @@ test("metadata backup results keep coverage, failures and pending attempts disti
  await page.route("**/api/v1/access/backups",route=>route.fulfill({json:{configured:true,invalidReports:0,truncated:false,reports:[report,{...report,id:"c".repeat(32),action:"restore-check",status:"failed",sha256:"",sizeBytes:0,errorCode:"checksum-mismatch"},{...report,id:"d".repeat(32),status:"running",sha256:"",sizeBytes:0}]}}));
  await page.goto("/access");await page.getByRole("tab",{name:"Backups",exact:true}).click();
  await expect(page.getByText("Application Data Excluded",{exact:true})).toBeVisible();
- await expect(page.getByText("Configuration & Keys Saved Separately",{exact:true})).toBeVisible();
+ await expect(page.getByText("Configuration & Keys: Separate Backup Required",{exact:true})).toBeVisible();
  await expect(page.getByText("Archive checksum or format did not match.",{exact:true})).toBeVisible();
  await expect(page.getByText("Result Pending",{exact:true})).toBeVisible();
  await expect(page.getByRole("button",{name:"Refresh Reports",exact:true})).toBeVisible();
@@ -954,4 +954,30 @@ test("metadata backup results keep coverage, failures and pending attempts disti
  await expect(page.getByText(/Retention: keep at least two verified archives/)).toBeVisible();
  await page.setViewportSize({width:390,height:844});
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test("encrypted store status exposes grant metadata and recovery without values",async({page})=>{
+ await fixtures(page);
+ await page.route("**/api/v1/access/secret-store",route=>route.fulfill({json:{enabled:true,state:"ready",loadedAt:"2026-10-13T12:00:00Z",grants:[{reference:"token-v1",targetId:"audit-target",applicationId:app.id,component:"web",variable:"TOKEN"}]}}));
+ await page.goto("/access");await page.getByRole("tab",{name:"Secrets",exact:true}).click();
+ await expect(page.getByText("Ready · 1 scoped grants loaded at startup.",{exact:true})).toBeVisible();
+ await expect(page.getByText("token-v1",{exact:true})).toBeVisible();
+ await page.getByRole("button",{name:"Key Backup & Recovery",exact:true}).click();
+ await expect(page.getByText(/Save the encrypted store and its original 32-byte key separately/)).toBeVisible();
+ await page.setViewportSize({width:390,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.screenshot({path:"../.local/ui-encrypted-store.png",fullPage:true});
+});
+
+test("owned Docker security exceptions are explicit and inherited controls stay native",async({page})=>{
+ await fixtures(page);
+ await page.route("**/api/v1/targets/audit-target/capabilities",route=>route.fulfill({json:{standard:true,containerSecurity:true,environment:true,namedVolumes:true,resourceLimits:true}}));
+ await page.goto(`/applications/${app.id}`);await page.getByRole("tab",{name:"Settings",exact:true}).click();
+ const policy=page.locator('[data-slot="collapsible"]').filter({has:page.getByRole("button",{name:"Container Security",exact:true})}).first();
+ await policy.getByRole("button",{name:"Container Security",exact:true}).click();
+ await expect(policy.getByText("No New Privileges",{exact:true})).toBeVisible();
+ await policy.getByLabel("Allow Privilege Escalation",{exact:true}).check();
+ await expect(policy.getByLabel("Exception Reason",{exact:true})).toBeVisible();
+ await policy.getByLabel("Exception Reason",{exact:true}).fill("Reviewed test fixture setuid requirement");
+ await expect(policy.getByText("Owner Exception",{exact:true})).toBeVisible();
+ await page.screenshot({path:"../.local/ui-container-security.png",fullPage:true});
 });

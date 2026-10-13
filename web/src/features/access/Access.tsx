@@ -1,3 +1,4 @@
+import { Secrets } from "./Secrets";
 import { Backups } from "./Backups";
 import { FieldSet, FieldLegend } from "@/components/ui/field";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -133,12 +134,13 @@ export function Access() {
       <TabsList
         variant="line"
         aria-label="Workspace Access"
-        className="w-full justify-start border-b rounded-none mb-4"
+        className="w-full max-w-full overflow-x-auto justify-start border-b rounded-none mb-4"
       >
         <TabsTrigger value="members">Members</TabsTrigger>
         <TabsTrigger value="agents">Agent Tokens</TabsTrigger>
         <TabsTrigger value="audit">Audit Log</TabsTrigger>
  <TabsTrigger value="backups">Backups</TabsTrigger>
+ <TabsTrigger value="secrets">Secrets</TabsTrigger>
       </TabsList>
       <ErrorBox
         error={
@@ -356,7 +358,8 @@ export function Access() {
           ))}
         </section>
       </TabsContent>
-      <TabsContent value="backups">{section==="backups" && <Backups/>}</TabsContent>
+      <TabsContent value="secrets">{section==="secrets" && <Secrets/>}</TabsContent>
+ <TabsContent value="backups">{section==="backups" && <Backups/>}</TabsContent>
       <TabsContent
         value="audit"
         forceMount

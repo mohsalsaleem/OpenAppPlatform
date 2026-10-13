@@ -19,7 +19,7 @@ export function Backups(){
  const query=useQuery({queryKey:["backup-reports"],queryFn:()=>api.GET("/api/v1/access/backups").then(unwrap),refetchInterval:30000});
  return <section className="panel">
   <div className="section-heading"><h2>Metadata Backups</h2><Button variant="outline" disabled={query.isFetching} onClick={()=>query.refetch()}>Refresh Reports</Button></div>
-  <div className="flex flex-wrap gap-2 mb-3"><Badge variant="outline">Metadata Only</Badge><Badge variant="outline">Application Data Excluded</Badge><Badge variant="outline">Configuration &amp; Keys Saved Separately</Badge></div>
+  <div className="flex flex-wrap gap-2 mb-3"><Badge variant="outline">Metadata Only</Badge><Badge variant="outline">Application Data Excluded</Badge><Badge variant="outline">Configuration &amp; Keys: Separate Backup Required</Badge></div>
   <p className="small muted">Host-reported results. Archives stay on the host; these records do not confirm that a file is still available.</p>
   <ErrorBox error={query.error}/>
   {query.isPending ? <Loading/> : !query.data?.configured ? <p className="muted">Report feed is not configured. Use the installation’s read-only backup report mount.</p> : query.data.reports.length===0 && <p className="muted">No backup reports yet.</p>}

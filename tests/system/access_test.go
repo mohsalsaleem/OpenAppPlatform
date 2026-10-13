@@ -241,6 +241,18 @@ func TestOwnerSessionsRolesScopeAuditAndRevokedJobs(t *testing.T) {
 	if code != 403 {
 		t.Fatal("agent accessed host backup reports", code)
 	}
+	code, raw, _ = call("GET", "/api/v1/access/secret-store", nil, owner, "", "")
+	if code != 200 || !bytes.Contains(raw, []byte(`"state":"disabled"`)) {
+		t.Fatal("owner secret metadata missing")
+	}
+	code, _, _ = call("GET", "/api/v1/access/secret-store", nil, nil, "Bearer "+read, "")
+	if code != 403 {
+		t.Fatal("agent accessed global secret store metadata")
+	}
+	code, raw, _ = call("GET", "/api/v1/applications/"+app.ID+"/diagnostics", nil, nil, "Bearer "+read, "")
+	if code != 200 || !bytes.Contains(raw, []byte(`"notificationDelivery":"disabled"`)) {
+		t.Fatal("scoped diagnostics unavailable")
+	}
 	// Session mutation requires the custom CSRF header even with a valid cookie.
 	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/auth/logout", nil)
 	req.AddCookie(owner)

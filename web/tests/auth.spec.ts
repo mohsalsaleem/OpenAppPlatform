@@ -261,6 +261,11 @@ test("owner setup, sessions, invitations, read-only membership, and scoped agent
   await auditRow.getByRole("link", { name: "View Operation" }).click();
   await expect(page.getByRole("tab", { name: "Activity", exact: true })).toHaveAttribute("data-state", "active");
   await expect(page.locator(`#operation-${operation.id}`)).toBeInViewport();
+  const diagnosticsResponse=await page.request.get(`/api/v1/applications/${auditApp.id}/diagnostics`);
+  expect(diagnosticsResponse.status()).toBe(200);const diagnostic=await diagnosticsResponse.json();
+  expect(diagnostic.notificationDelivery).toBe("disabled");expect(diagnostic.events.some((event:any)=>event.deploymentId===operation.id && event.state==="succeeded")).toBe(true);
+  await page.getByRole("button",{name:"Inspect Context",exact:true}).click();
+  await expect(page.getByText("Values & Logs Excluded",{exact:true})).toBeVisible();
   await page.getByRole("link", { name: "Workspace Settings" }).click();
   await page.getByRole("tab", { name: "Agent Tokens", exact: true }).click();
   await expect(

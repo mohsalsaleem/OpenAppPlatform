@@ -2117,6 +2117,122 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/access/secret-store": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Owner-only encrypted provider startup status and grant metadata; never returns keys or values */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Immutable startup snapshot */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            enabled: boolean;
+                            /** @enum {string} */
+                            state: "disabled" | "unavailable" | "ready";
+                            /** Format: date-time */
+                            loadedAt?: string;
+                            grants: {
+                                reference: string;
+                                targetId: string;
+                                applicationId: string;
+                                component: string;
+                                variable: string;
+                            }[];
+                        };
+                    };
+                };
+                /** @description Owner browser session required */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/applications/{id}/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bounded scoped release/change context and local notification events; no logs, values or model calls */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Deterministic diagnostic context */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            applicationId: string;
+                            targetId: string;
+                            definitionVersion: number;
+                            comparison: components["schemas"]["ReleaseComparison"] | null;
+                            events: {
+                                id: string;
+                                deploymentId: string;
+                                state: string;
+                                operation: string;
+                                commit: string;
+                                createdAt: string;
+                            }[];
+                            /** @enum {string} */
+                            notificationDelivery: "disabled";
+                        };
+                    };
+                };
+                /** @description Application not found or outside scope */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2177,6 +2293,10 @@ export interface components {
             limits?: components["schemas"]["ResourceLimits"];
             /** @description Scoped private-image credential reference. Direct Docker only; operator login stays native. */
             registryCredentialRef?: string;
+            security?: {
+                allowPrivilegeEscalation: boolean;
+                exceptionReason?: string;
+            };
         };
         Manifest: {
             name: string;
@@ -2314,6 +2434,7 @@ export interface components {
             namedVolumes: boolean;
             resourceLimits: boolean;
             registryCredentials?: boolean;
+            containerSecurity: boolean;
         };
         Restart: {
             component: string;
@@ -2419,6 +2540,10 @@ export interface components {
             limits?: components["schemas"]["ResourceLimits"];
             /** @description Scoped private-image credential reference. Direct Docker only; operator login stays native. */
             registryCredentialRef?: string;
+            security?: {
+                allowPrivilegeEscalation: boolean;
+                exceptionReason?: string;
+            };
         };
         ManifestInput: {
             name: string;
@@ -2533,6 +2658,38 @@ export interface components {
             sha256: string;
             sizeBytes: number;
             errorCode: string;
+        };
+        ReleaseComparison: {
+            from: {
+                id: string;
+                definitionVersion: number;
+                state: string;
+                operation: string;
+                commit?: string;
+                artifacts: {
+                    component: string;
+                    image: string;
+                    immutable: boolean;
+                }[];
+            };
+            to: {
+                id: string;
+                definitionVersion: number;
+                state: string;
+                operation: string;
+                commit?: string;
+                artifacts: {
+                    component: string;
+                    image: string;
+                    immutable: boolean;
+                }[];
+            };
+            changes: {
+                component: string;
+                field: string;
+                before: string;
+                after: string;
+            }[];
         };
     };
     responses: never;

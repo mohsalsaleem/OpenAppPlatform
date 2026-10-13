@@ -134,7 +134,10 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	}
 	port := strconv.Itoa(s.Component.Port) + "/tcp"
 	labels := map[string]string{prefix + "target": c.target.ID, prefix + "environment": c.target.Environment, prefix + "reference": s.Name, prefix + "owner": s.Ownership, prefix + "revision": rev, prefix + "artifact": s.Component.Image, prefix + "port": strconv.Itoa(s.Component.Port)}
-	host := map[string]any{"NetworkMode": network, "RestartPolicy": map[string]string{"Name": "unless-stopped"}, "Memory": int64(128 << 20), "NanoCpus": int64(250000000)}
+	host := map[string]any{"Privileged": false, "SecurityOpt": []string{"no-new-privileges:true"}, "NetworkMode": network, "RestartPolicy": map[string]string{"Name": "unless-stopped"}, "Memory": int64(128 << 20), "NanoCpus": int64(250000000)}
+	if s.Component.Security != nil && s.Component.Security.AllowPrivilegeEscalation {
+		host["SecurityOpt"] = []string{}
+	}
 	if s.Component.Limits != nil {
 		host["Memory"] = int64(s.Component.Limits.MemoryMiB) << 20
 		host["NanoCpus"] = int64(s.Component.Limits.CPUMillis) * 1000000

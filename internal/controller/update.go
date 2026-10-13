@@ -35,6 +35,9 @@ func (c *Controller) UpdateApplication(ctx context.Context, id string, m domain.
 }
 
 func (c *Controller) updateApplicationTx(ctx context.Context, tx pgx.Tx, id string, m domain.Manifest, version int64) (domain.Application, error) {
+	if err := c.authorizeSecurity(ctx, m); err != nil {
+		return domain.Application{}, err
+	}
 	var e error
 	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", id); e != nil {
 		return domain.Application{}, e

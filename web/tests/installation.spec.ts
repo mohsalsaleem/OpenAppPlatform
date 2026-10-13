@@ -198,6 +198,12 @@ test("fresh packaged installation supports the complete owner application journe
     await expect(page.getByText("Archive checksum or format did not match.",{exact:true})).toBeVisible();
     await page.screenshot({path:process.env.OAP_INSTALL_REPORT+"/install-backup-reports.png",fullPage:true});
   }
+  if (phase !== "bootstrap") {
+    const encrypted=await page.request.get("/api/v1/access/secret-store");
+    expect(encrypted.status()).toBe(200);const metadata=await encrypted.json();
+    expect(metadata.state).toBe("ready");expect(metadata.grants.some((g:any)=>g.reference==="stored-proof-v1")).toBe(true);
+    expect(JSON.stringify(metadata)).not.toContain("installation-private-stored-token");
+  }
   const definition = await page.request.get(`/api/v1/applications/${app.id}`);
   expect(JSON.stringify(await definition.json())).not.toContain(
     "postgres://fixture_reader:",

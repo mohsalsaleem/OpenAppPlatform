@@ -9,6 +9,7 @@ import (
 )
 
 type Capabilities struct {
+	ContainerSecurity   bool `json:"containerSecurity"`
 	RegistryCredentials bool `json:"registryCredentials"`
 	NamedVolumes        bool `json:"namedVolumes"`
 	ResourceLimits      bool `json:"resourceLimits"`
@@ -67,6 +68,9 @@ type Restarter interface {
 
 func ValidateRuntime(m domain.Manifest, caps Capabilities) error {
 	for _, c := range m.Components {
+		if c.Security != nil && !caps.ContainerSecurity {
+			return errors.New("container security remains managed in the operator for this target")
+		}
 		if c.RegistryCredentialRef != "" && !caps.RegistryCredentials {
 			return fmt.Errorf("target registry login remains owned by the operator for %s", c.Name)
 		}

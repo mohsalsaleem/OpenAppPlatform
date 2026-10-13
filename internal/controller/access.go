@@ -88,3 +88,18 @@ func releaseAuthorizationAction(d domain.Deployment) string {
 	}
 	return d.Operation
 }
+
+func (c *Controller) authorizeSecurity(ctx context.Context, m domain.Manifest) error {
+	if !c.RequireIdentity {
+		return nil
+	}
+	for _, component := range m.Components {
+		if component.Security != nil && component.Security.AllowPrivilegeEscalation {
+			p, ok := domain.Identity(ctx)
+			if !ok || p.Role != "owner" || p.Kind != "session" {
+				return errors.New("human owner review is required for a container security exception")
+			}
+		}
+	}
+	return nil
+}

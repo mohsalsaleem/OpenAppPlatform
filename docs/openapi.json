@@ -4334,6 +4334,182 @@
           }
         }
       }
+    },
+    "/api/v1/access/secret-store": {
+      "get": {
+        "summary": "Owner-only encrypted provider startup status and grant metadata; never returns keys or values",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Immutable startup snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "disabled",
+                        "unavailable",
+                        "ready"
+                      ]
+                    },
+                    "loadedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "grants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "reference": {
+                            "type": "string"
+                          },
+                          "targetId": {
+                            "type": "string"
+                          },
+                          "applicationId": {
+                            "type": "string"
+                          },
+                          "component": {
+                            "type": "string"
+                          },
+                          "variable": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "reference",
+                          "targetId",
+                          "applicationId",
+                          "component",
+                          "variable"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "state",
+                    "grants"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner browser session required"
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/diagnostics": {
+      "get": {
+        "summary": "Bounded scoped release/change context and local notification events; no logs, values or model calls",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deterministic diagnostic context",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "applicationId": {
+                      "type": "string"
+                    },
+                    "targetId": {
+                      "type": "string"
+                    },
+                    "definitionVersion": {
+                      "type": "integer"
+                    },
+                    "comparison": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/ReleaseComparison"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "events": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "deploymentId": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "operation": {
+                            "type": "string"
+                          },
+                          "commit": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "deploymentId",
+                          "state",
+                          "operation",
+                          "commit",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "notificationDelivery": {
+                      "type": "string",
+                      "enum": [
+                        "disabled"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "applicationId",
+                    "targetId",
+                    "definitionVersion",
+                    "comparison",
+                    "events",
+                    "notificationDelivery"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Application not found or outside scope"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4493,6 +4669,22 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]{0,47}$",
             "description": "Scoped private-image credential reference. Direct Docker only; operator login stays native."
+          },
+          "security": {
+            "type": "object",
+            "properties": {
+              "allowPrivilegeEscalation": {
+                "type": "boolean"
+              },
+              "exceptionReason": {
+                "type": "string",
+                "maxLength": 240
+              }
+            },
+            "required": [
+              "allowPrivilegeEscalation"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -4978,6 +5170,9 @@
           },
           "registryCredentials": {
             "type": "boolean"
+          },
+          "containerSecurity": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -4997,7 +5192,8 @@
           "workers",
           "databaseLinks",
           "namedVolumes",
-          "resourceLimits"
+          "resourceLimits",
+          "containerSecurity"
         ],
         "additionalProperties": false
       },
@@ -5322,6 +5518,22 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]{0,47}$",
             "description": "Scoped private-image credential reference. Direct Docker only; operator login stays native."
+          },
+          "security": {
+            "type": "object",
+            "properties": {
+              "allowPrivilegeEscalation": {
+                "type": "boolean"
+              },
+              "exceptionReason": {
+                "type": "string",
+                "maxLength": 240
+              }
+            },
+            "required": [
+              "allowPrivilegeEscalation"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -5794,6 +6006,146 @@
           "sha256",
           "sizeBytes",
           "errorCode"
+        ],
+        "additionalProperties": false
+      },
+      "ReleaseComparison": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "definitionVersion": {
+                "type": "number"
+              },
+              "state": {
+                "type": "string"
+              },
+              "operation": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              },
+              "artifacts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "component": {
+                      "type": "string"
+                    },
+                    "image": {
+                      "type": "string"
+                    },
+                    "immutable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "component",
+                    "image",
+                    "immutable"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id",
+              "definitionVersion",
+              "state",
+              "operation",
+              "artifacts"
+            ],
+            "additionalProperties": false
+          },
+          "to": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "definitionVersion": {
+                "type": "number"
+              },
+              "state": {
+                "type": "string"
+              },
+              "operation": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              },
+              "artifacts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "component": {
+                      "type": "string"
+                    },
+                    "image": {
+                      "type": "string"
+                    },
+                    "immutable": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "component",
+                    "image",
+                    "immutable"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id",
+              "definitionVersion",
+              "state",
+              "operation",
+              "artifacts"
+            ],
+            "additionalProperties": false
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "component": {
+                  "type": "string"
+                },
+                "field": {
+                  "type": "string"
+                },
+                "before": {
+                  "type": "string"
+                },
+                "after": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "component",
+                "field",
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "changes"
         ],
         "additionalProperties": false
       }

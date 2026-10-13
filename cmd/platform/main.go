@@ -21,6 +21,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operators"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/routing"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/runtimeinputs"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/secretstore"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/source"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 )
@@ -116,6 +117,17 @@ func run() error {
 		c.RuntimeInputs, e = runtimeinputs.AddRegistries(c.RuntimeInputs, []byte(raw), os.Getenv)
 		if e != nil {
 			return e
+		}
+	}
+	stored, status := secretstore.Snapshot(os.Getenv("OAP_SECRET_STORE_FILE"), os.Getenv("OAP_SECRET_KEY_FILE"))
+	c.SecretStoreStatus = status
+	if status.Enabled && preview {
+		return errors.New("encrypted secret store requires owner mode")
+	}
+	if status.State == "ready" {
+		c.RuntimeInputs, e = secretstore.Inputs(c.RuntimeInputs, stored)
+		if e != nil {
+			return errors.New("runtime input grants conflict across providers")
 		}
 	}
 	if *sourceFile != "" {
