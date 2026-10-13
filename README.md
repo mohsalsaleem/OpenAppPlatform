@@ -9,6 +9,11 @@ triggers, domains, volumes and secrets. A custom builder is optional.
 
 ## Current milestone
 
+The supported single-server baseline is being reviewed for **v0.1**. See the
+[release acceptance checklist and limits](docs/v0.1-acceptance.md) and
+[release candidate notes](docs/releases/v0.1.md). This is a preview release
+candidate, not a production-readiness or zero-downtime guarantee.
+
 Implemented: Go API and controller, PostgreSQL persistence, River deployment
 jobs, a React dashboard, target-scoped Coolify and direct Docker adapters, versioned configuration editing,
 and a read-only MCP interface. Standard releases
@@ -110,6 +115,8 @@ credentials. It does not mutate an external Coolify installation. Live fixtures 
 - [Owner-mode installation, updates and metadata recovery](docs/installation.md)
 
 - [Roadmap](ROADMAP.md)
+- [Recoverable encrypted secrets](docs/encrypted-secret-store.md)
+- [Container security and diagnostic context](docs/m1-security-visibility.md)
 
 - [Product and architecture](docs/product-and-architecture.md)
 - [System design](docs/architecture/system-design.md)

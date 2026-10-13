@@ -1,5 +1,9 @@
 # Supported M0 Exit Review
 
+Historical M0 checkpoint: the owner-grade gaps and next work below describe that
+checkpoint. M1.1–M1.6 minimal baseline has since passed; current release scope
+and remaining gaps are in [v0.1 acceptance](v0.1-acceptance.md).
+
 Reviewed 13 October 2026 against the breadth-first priority correction in
 [the roadmap](../ROADMAP.md). The supported single-server core is accepted.
 This is not acceptance of every original routing feature or production readiness.

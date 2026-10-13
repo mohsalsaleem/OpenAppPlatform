@@ -28,6 +28,17 @@ environments:
       runtime_env: OAP_BACKUP_REPORTS_DIR
       coverage: metadata-only
       execution: trusted-host-helper
+    secret_store:
+      enabled: true
+      optional: true
+      host_path: /home/saleem/.config/openappplatform/staging/secret-store
+      mount_path: /app/secret-store
+      read_only: true
+      runtime_env:
+        OAP_SECRET_STORE_FILE: /app/secret-store/store.json
+        OAP_SECRET_KEY_FILE: /app/secret-store/key
+      recovery: separate-private-original-key-and-encrypted-store
+      verified: 2026-10-13
     auth_mode: owner
     owner_setup: complete
     configuration_storage_uuid: a2q7lc8ehu6twekwj1bcng8m
