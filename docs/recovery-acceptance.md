@@ -1,5 +1,10 @@
 # M0 batch 4 supported recovery acceptance
 
+Historical batch review. The [13 October M0 exit review](m0-exit-review.md) and
+roadmap priority correction govern current execution; general batch 5 expansion
+remains deferred. The packaged P0.5 drill now also verifies a full HTTP/River
+process crash and controlled metadata restore, with its stated limits.
+
 Batch 4's supported stateless managed-image release workflow is accepted. This
 does not enable OAP-managed stateful provisioning, automatic data restoration,
 native source mutation or owner-grade production recovery. Batch 5 follows the

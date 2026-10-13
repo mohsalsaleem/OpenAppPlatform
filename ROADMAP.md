@@ -5,7 +5,7 @@ operate, manually or through authenticated agents. Its core must stay useful
 without AI, external cloud services, or a collection of infrastructure services.
 
 This roadmap captures priorities from 9 October 2026 and accepted updates through
-11 October 2026. Phases are
+13 October 2026. Phases are
 sequenced by dependency and acceptance criteria, not delivery dates. Listed
 integrations are candidates; they are not installed or enabled by this document.
 
@@ -155,10 +155,12 @@ configuration for linked resources remains in the operator; direct configuration
 uses consistent Button, Field, Select and Collapsible patterns. Prevent legacy
 global label/control styles and hand-styled link buttons from returning.
 
-**Current priority:** P0.5 repeatable installation. P0.4 passed the final local/staging acceptance gate. Standalone Docker uses scoped private pull references and Coolify retains its native server login. P0.1 runtime secret references,
+**Current priority:** M1.1 Auth/Scopes and Mutation Audit. The supported M0 exit
+review is accepted; P0.1–P0.5 passed their local and scoped staging gates. See
+[the exit review](docs/m0-exit-review.md). P0.4 passed the final local/staging acceptance gate. Standalone Docker uses scoped private pull references and Coolify retains its native server login. P0.1 runtime secret references,
 P0.2 workers and P0.3 existing database links passed local and isolated Coolify
-staging acceptance. The first four-component breadth milestone is delivered. Finish everyday configuration
-and repeatable installation next. The priority correction below is the authoritative execution order.
+staging acceptance. The first four-component breadth milestone and repeatable installation are delivered.
+Continue with the ordered M1 breadth queue below. The priority correction below is the authoritative execution order.
 Batch 5 has an accepted, limited Coolify routing pilot; its remaining capabilities
 are deferred and the batch is not complete. Batch 4 is accepted for supported
 stateless managed-image workflows; see the [acceptance review](docs/recovery-acceptance.md).
@@ -245,15 +247,17 @@ failure prevents the stated journey or violates an existing security/authority
 boundary. Complete the local gate and an authorized staging walkthrough before
 claiming delivery; record unsupported capabilities without quietly widening scope.
 
-**P0.5 implementation:** owner-mode Compose packaging, immutable image references,
+**P0.5 acceptance:** owner-mode Compose packaging, immutable image references,
 container-visible Docker socket group configuration and operator-only setup are
 implemented. Containerized local owner HTTP required a small prerequisite: an
 explicit loopback-publication declaration derived from the Compose bind IP.
 Public insecure-cookie bindings and container-wide preview remain rejected. Quiesced metadata archives restore only into new offline databases;
 read-only image preflight and startup reject incompatible migration ledgers.
-Acceptance is the fresh packaged owner/four-component journey, process recovery,
-compatible image replacement/rollback and isolated metadata restore, followed by
-the existing staging journey. This does not automate stale-backup reconciliation
+The fresh packaged owner/four-component journey, process recovery, compatible
+image replacement/rollback and isolated metadata restore passed full local gate
+`20261013-003113-a84adfa3`. Staging `73e288c` passed read-only schema preflight,
+healthy update, owner access, scoped worker restart, health/logs and unchanged
+application database configuration/data. This does not automate stale-backup reconciliation
 or application-data restore. See [installation](docs/installation.md).
 
 **Parked until this queue is delivered:** general domain creation, connection
@@ -405,6 +409,27 @@ contracts are verified. Tunnels, enterprise identity services, a new scheduler,
 and external analytics/model services are not dependencies of the M0 stack.
 
 ## M1 Owner grade operation
+
+### Ordered M1 breadth queue (13 October 2026)
+
+The [supported M0 exit review](docs/m0-exit-review.md) is accepted. This queue is
+the next authoritative execution order; keep the existing one-person stack and
+native operator ownership. Each slice produces a reviewable UI/API result, a
+reproducible local gate and authorized staging evidence. Do not deepen one slice
+into a separate platform before covering this queue.
+
+| Priority | Deliverable | Acceptance gate | Stop boundary |
+| --- | --- | --- | --- |
+| M1.1 — Auth/Scopes and Mutation Audit | Extend the existing owner/agent foundation with explicit action, target and environment boundaries; correlate audit intent with durable operation ID and observed outcome. Preserve existing identity/release IDs and keep values redacted. | Owner walkthrough issues a restricted credential; wrong action/target/environment is denied, revocation/expiry holds queued work before dispatch, and the resulting operation is traceable in audit. Local migration/API/browser and scoped staging checks pass. | No identity service, enterprise tenancy, OIDC/MFA rollout or remote-agent approval framework. |
+| M1.2 — Recovery and Target State | Expose a small consistent classification of unreachable/stale/unknown/failed state and safe recovery actions. Reuse the journal, generation checks and uncertain-dispatch holds already delivered. | Target outage and controller restart show useful state, bounded retries/deadlines and an owner recovery path without duplicate dispatch or SQL edits. | No automatic reconciliation of arbitrary old backups, new scheduler or multi-server consensus. |
+| M1.3 — Metadata Backup Visibility | Record owner-visible metadata backup/restore receipts and failures, key/config dependencies and basic retention guidance. Reuse the quiesced external helper. | A verified archive/isolated restore and an injected failure are distinguishable in UI/API; metadata versus application-data coverage is explicit. | No automatic workload backup/restore, paid backup service, host storage deletion or broad retention engine. |
+| M1.4 — Recoverable Secret Store | Add the minimum encrypted local provider alongside current environment references, with owner-supplied/generated key and separate recovery/export instructions. | Values stay out of definitions/audit/logs; exact grants, missing key/value, restart and isolated restore are tested before live use. | No external vault provisioning, provider collection or automatic key/credential rotation. |
+| M1.5 — Container and Image Baseline | Capability-aware policies for owned workloads and explicit auditable exceptions; show resolved artifact/architecture/provenance and protect active/rollback/retained images. | A supported workload runs under policy, an unsafe/incompatible request is rejected before mutation, and native/inherited configuration is preserved. | No scanning platform, arbitrary image pruning or alternate runtime. |
+| M1.6 — Basic Visibility and Dogfooding | Controller/target/release/backup visibility, deterministic release/change context and notification event outbox. AI remains optional and no notification is sent without a configured destination. | An isolated failure is explainable from scoped context; a staging update/recovery drill has a usable external path and traceable outcomes. | No indexed logging/analytics stack, model inference, tunnels or notification-provider expansion. |
+
+Start with M1.1. Review the M1 exit gate after these slices; do not pull M2–M6
+work forward. General routing and advanced rollout strategies stay parked under
+the accepted breadth-first correction.
 
 ### Authentication and agent identity
 

@@ -106,6 +106,7 @@ credentials. It does not mutate an external Coolify installation. Live fixtures 
 
 ## Documentation
 
+- [Supported M0 exit review and remaining limits](docs/m0-exit-review.md)
 - [Owner-mode installation, updates and metadata recovery](docs/installation.md)
 
 - [Roadmap](ROADMAP.md)
