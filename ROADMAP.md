@@ -14,6 +14,16 @@ diagnose, correct and verify through documented machine interfaces. The owner
 sets authority and intervenes when required; routine permitted operations should
 not depend on dashboard clicks.
 
+The product is **an application platform on one server, operated by an agent**
+(see [positioning](docs/positioning.md)). Two pillars define it: the
+**application as a unit** (one specification for every component, with app-wide
+deploy, scale, release, rollback and health) and **agents as the operator**
+(edit spec → validate/diff → plan → apply → verify, under bounded server-enforced
+authority). The defining capability is the scale loop: raise a web component's
+`instances` in the specification, apply, and every healthy copy serves traffic
+behind one stable HTTPS address. Compose files are an import format; OAP must
+stay far smaller than Kubernetes and never re-implement it.
+
 AI interface means deterministic APIs, structured CLI commands, MCP tools and
 versioned skills that external agents can use. It does not require an embedded
 model, chatbot, agent runtime or OAP inference subscription. Core operation remains
@@ -91,7 +101,7 @@ new slice IDs so previous M2.1–M2.4 acceptance records retain their meaning.
 | Milestone | Outcome | Status |
 | --- | --- | --- |
 | M2 — Agent-operated standalone core | One agent completes install → deploy → diagnose → correct → verify without dashboard dependence | Active; ordered queue below |
-| M3 — Standalone delivery and operability | Source-to-release, optional public ingress/TLS, image/storage safety, lightweight recovery | Planned after M2 acceptance |
+| M3 — Application unit and standalone delivery | Application router and scale loop, specification-driven topology and pre-deploy jobs, source-to-release, Compose import, image/storage safety, lightweight recovery | Planned after M2 acceptance |
 | M4 — Bounded application insight | Indexed logs when needed, release watches, metrics/analytics and notifications | Deferred |
 | M5 — Operator integration return | Capability-aware existing-resource discovery/assembly and operator adapters/views | Parked until standalone gates pass and owner reprioritizes |
 | M6 — Additional servers and runtimes | Explicit multi-server placement, policy metadata, Firecracker/actor experiments | Deferred |
@@ -106,8 +116,8 @@ M2.6 passed gate `20261013-214602-ceb6aceb` at `c2e1eee`; see
 **M2.9**, implemented by the [standalone runbook/skill](docs/standalone-agent-runbook.md)
 and [measured footprint](docs/footprint.md). Its fresh combined dogfood and exact-tree
 full local gate are the M2 exit requirement. Once they pass, the next slice is
-**M3.1 — source-to-release via an explicit external build lane**. UI/operator
-expansion remain parked. The measured combined idle CPU gap stays open for M3.4.
+**M3.1 — application router and scale loop**. UI/operator expansion remain
+parked. The measured combined idle CPU gap stays open for M3.6.
 
 ## Ordered active queue
 
@@ -133,30 +143,54 @@ required. Corrections do not imply authority to change repository code or data:
 those permissions remain explicit and source edits/tests stay with the external
 agent's development tools.
 
-## M3 Standalone delivery and operability
+## M3 Application unit and standalone delivery
 
-Schedule these only after M2 acceptance, one slice at a time:
+Schedule these only after M2 acceptance, one slice at a time. The order puts the
+application-unit pillar first: replica routing turns several owned containers into
+one scaled application, which is the gap no Compose/Coolify-style tool closes.
 
-1. **Source-to-release:** explicit GitHub release ownership, signed/deduplicated
+1. **Application router and scale loop:** one optional OAP-managed proxy
+   (Caddy preferred: automatic Let's Encrypt and a live admin API) on the
+   application's Docker network. The specification declares an app domain and
+   per-component path routes (for example `/` → web, `/api` → api). Only ready
+   instances are route members; scale-down removes a member, drains it, then stops
+   it. Scale-up and scale-down both run through specification apply, not only the
+   dashboard. Routes are persisted on disk and keep serving while OAP is down.
+   Workers scale without routes; writable-volume components stay at one instance.
+   Fixed host ports remain for single-instance compatibility. Account for the
+   proxy as a separate service in footprint measurements. Acceptance: an agent
+   applies the reference application, scales the API 1 → 3 with requests reaching
+   every instance, scales 3 → 1 with no failed requests, and restarts OAP while
+   traffic continues. No blue-green or zero-downtime claim beyond the tested cases.
+2. **Specification-driven topology and pre-deploy jobs:** add and remove components
+   through the specification save/plan path, with explicit review for removal and
+   retained volumes. Add a run-to-completion job kind (for example migrations) that
+   a release runs before rolling out dependent components; failure stops the
+   release with evidence. Application rollback reuses the existing
+   [image rollback](docs/image-rollback.md) across all owned components; schema
+   and data are never rolled back implicitly.
+3. **Source-to-release:** explicit GitHub release ownership, signed/deduplicated
    events, frozen commits and immutable artifacts. Start with a documented external
    build lane; evaluate Railpack/Nixpacks alternatives later. Source detection
    must not silently take over an existing trigger or add a mandatory builder.
-2. **Stable endpoints:** optional standalone ingress with replica membership,
-   health/readiness evidence, explicit domain ownership and automatic Let's Encrypt
-   certificates. Allow enable/disable; account for its extra service and preserve
-   routes while OAP is down. Operator-owned ingress/TLS stays native when operators
-   return. No forced blue-green or claim that a bridge is a load balancer.
-3. **Image and storage safety:** runtime artifact inventory, retained known-good
+4. **Compose import:** convert a `docker-compose.yml` into a proposed specification
+   with explicit decisions and unsupported fields, per the
+   [Compose import proposal](docs/compose-import.md). Import never deploys,
+   adopts running containers or reads secret values.
+5. **Image and storage safety:** runtime artifact inventory, retained known-good
    releases, bounded cache/retention, reviewed pruning and named-volume backup
    procedures. Protect active/stopped workloads and recovery artifacts. App-data
    restore is separately authorized and verified; metadata restore is not data restore.
-4. **One-person operability:** offline-compatible rescue, secret/key recovery,
+6. **One-person operability:** offline-compatible rescue, secret/key recovery,
    backup checks, bounded metadata growth, retries/timeouts and measured resource
    regression checks. Add optional external secret providers only for a verified need.
 
-Exit: one source change becomes a verified standalone release with a stable
-endpoint, documented recovery and measured operating cost. Optional ingress and
-build services have separate resource accounting. This is not a multi-server gate.
+Exit: the reference application (web, API, worker, linked PostgreSQL) runs on one
+small server behind one HTTPS domain; an agent scales it through the
+specification, ships one source change as a verified release, and recovers from
+an injected regression, with documented recovery and measured operating cost.
+Optional ingress and build services have separate resource accounting. This is
+not a multi-server gate.
 
 ## Lightweight requirement
 
@@ -173,7 +207,7 @@ unmeasured goals, not guarantees. Publish repeatable commands and measurements
 in M2.9; revise goals explicitly if evidence requires it. The
 [reference measurement](docs/footprint.md) meets idle memory comparisons but misses
 the combined one-core idle CPU goal (about 1.86% versus 1%). Keep the 1% goal
-unchanged and retain the gap for M3 one-person operability. Bound polling, log reads,
+unchanged and retain the gap for M3.6 one-person operability. Bound polling, log reads,
 retries, concurrency and retained metadata. OAP failure must not stop existing
 containers or routes. Do not install monitoring infrastructure just to benchmark.
 

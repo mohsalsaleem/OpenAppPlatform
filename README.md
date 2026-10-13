@@ -1,5 +1,15 @@
 # Open App Platform
 
+> DigitalOcean App Platform, on your own server, built for your agent to operate.
+
+Define a whole system (frontend, API, worker and the database it uses) as **one
+application** in one specification. Deploy, scale, roll back and diagnose it as a
+unit on a single server, and let an external AI agent run that lifecycle through
+bounded, audited interfaces instead of a dashboard or a root shell. Raising a
+component's `instances` and applying is the scale loop the platform is built
+around. See [positioning](docs/positioning.md) for how this compares with Docker
+Compose, Coolify, Kamal and k3s.
+
 A lightweight, self-hosted application control plane for one owner and an external
 AI agent. **Standalone Docker and agent-facing interfaces are the current focus.**
 Agents should manage the complete application lifecycle through deterministic
