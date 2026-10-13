@@ -2,338 +2,150 @@
 
 > DigitalOcean App Platform, on your own server, built for your agent to operate.
 
-Define a whole system (frontend, API, worker and the database it uses) as **one
-application** in one specification. Deploy, scale, roll back and diagnose it as a
-unit on a single server, and let an external AI agent run that lifecycle through
-bounded, audited interfaces instead of a dashboard or a root shell. Raising a
-component's `instances` and applying is the scale loop the platform is built
-around. See [positioning](docs/positioning.md) for how this compares with Docker
-Compose, Coolify, Kamal and k3s.
+Open App Platform (OAP) runs a whole system, such as a frontend, API, worker and
+the database they use, as **one application** on a single server. You describe
+it in one specification. OAP deploys, scales, rolls back and diagnoses it as a
+unit, and your AI agent operates it through a JSON CLI, MCP and a REST API with
+limited, audited permissions instead of a dashboard or a root shell.
 
-A lightweight, self-hosted application control plane for one owner and an external
-AI agent. **Standalone Docker and agent-facing interfaces are the current focus.**
-Agents should manage the complete application lifecycle through deterministic
-APIs, a structured CLI, MCP and skills; embedded inference is optional.
+![One application on one server, operated by an agent through OAP](docs/images/overview.svg)
 
-The [roadmap](ROADMAP.md) defines the new ordered headless delivery milestones.
-UI expansion and operator-specific work are parked. Existing dashboard and Coolify
-capabilities remain supported with their current limits; native builds, triggers,
-configuration and data retain their ownership. The complete agent-led journey is
-planned, not yet delivered.
+> **Status:** preview. The single-server baseline is a
+> [v0.1 release candidate](docs/v0.1-acceptance.md), and the agent-operated
+> standalone core (M2) is in its final acceptance. It is not yet a production or
+> zero-downtime guarantee. See the [roadmap](ROADMAP.md).
 
-## Current milestone
+## Why
 
-The supported single-server baseline is being reviewed for **v0.1**. See the
-[release acceptance checklist and limits](docs/v0.1-acceptance.md) and
-[release candidate notes](docs/releases/v0.1.md). This is a preview release
-candidate, not a production-readiness or zero-downtime guarantee.
+Self-hosting tools like Coolify, Dokploy and Portainer manage individual
+resources well, but a set of services rarely behaves as one application you can
+scale and roll back together, and their interfaces are built for people clicking
+through a dashboard. Docker Compose is too generic and stops working once the
+command exits. Kubernetes solves everything at a cost a single small server
+shouldn't pay.
 
-Implemented: Go API and controller, PostgreSQL persistence, River deployment
-jobs, a React dashboard, target-scoped Coolify and direct Docker adapters, versioned configuration editing,
-and a read-only MCP interface. Standard releases
-support web and worker components and multiple instances, explicit Docker-image resource
-adoption, frozen artifacts, idempotency, progress, live instance inspection,
-per-instance bounded logs, explicit observation recovery, per-instance restart,
-and Docker runtime variables, application DNS connections, and explicit instance retirement.
+OAP is built on two ideas:
 
-Verified locally with PostgreSQL and Chromium, and through a real deployment on
-an isolated staging project in the owner's existing Coolify.
+1. **The application is the unit.** One spec lists every component, its kind,
+   instance count, connections, secret references and volumes. Releases, health
+   and rollback apply to the whole application.
+2. **Agents are the operator.** The spec is a file your agent edits, validates,
+   diffs, plans and applies. Every change is a durable operation with structured
+   evidence. The owner decides what the agent may do, and the server enforces it.
 
-Bare Docker uses a local Unix socket and supports cached-image deployments without
-a registry connection. Dokploy, Dokku, Portainer, scheduled jobs, embedded AI
-diagnosis, rolling deployments, and blue-green remain planned. Native Coolify source tracking
-and an optional signed immutable-image build lane are implemented and staged;
-native source lifecycle handoff and artifact reuse are not.
+![Where OAP fits compared with Coolify, Compose, Dokku, Kamal, k3s and DigitalOcean App Platform](docs/images/landscape.svg)
 
-## Agent interface
+The full comparison is in [positioning](docs/positioning.md).
 
-The [JSON CLI](docs/agent-cli.md) exposes current lifecycle APIs, scoped capability
-inspection and durable operation waiting. Build with `go build -o bin/oap ./cmd/oap`;
-`bin/oap help` and `bin/oap schema` work offline. The [headless bootstrap](docs/headless-bootstrap.md) slice adds private owner
-setup/login, bounded standalone app-creation grants and external controller rescue.
-Existing app-scoped tokens retain their boundaries; broader workspace access is
-not granted.
+## One spec for the whole application
 
-## Run locally
+```json
+{
+  "apiVersion": "oap.dev/v1alpha1",
+  "kind": "Application",
+  "spec": {
+    "name": "shop",
+    "environment": "production",
+    "targetId": "docker-local",
+    "components": [
+      {"name": "web", "kind": "web", "image": "ghcr.io/me/web@sha256:…", "port": 3000,
+       "instances": 3, "services": {"API_URL": "api"}, "dependsOn": ["api"]},
+      {"name": "api", "kind": "web", "image": "ghcr.io/me/api@sha256:…", "port": 8080,
+       "instances": 2, "secretRefs": {"DATABASE_URL": "shop-database-url"}},
+      {"name": "worker", "kind": "worker", "image": "ghcr.io/me/api@sha256:…",
+       "instances": 1, "secretRefs": {"DATABASE_URL": "shop-database-url"}}
+    ]
+  }
+}
+```
 
-Requires Go 1.26, Node 22, Docker Engine or Docker Desktop, and Python 3 for the
-local helper scripts. These scripts work with environment variables directly in
-CI; .env.local is a convenience for local credentials.
+Components reach each other by name on a private network for the app. Secrets
+can be referenced by name instead of written into the spec. Images are pinned to
+immutable digests, so every release is reproducible. See the
+[portable lifecycle guide](docs/portable-lifecycle.md) and
+[examples](examples/README.md).
+
+## How an agent operates it
+
+![Agent lifecycle: edit spec, validate, plan, review, execute, wait, verify, then diagnose and correct](docs/images/lifecycle.svg)
+
+Saving a spec never deploys. Each deployment is a stored, hashed plan that runs
+as a durable operation, so a disconnected agent can reconnect and check the
+result. HTTP `202` means accepted, not succeeded. Verification checks runtime
+health separately from the app's actual behavior. When something breaks, the
+agent reads a bounded [incident view](docs/incident-diagnosis.md) and plans a
+fix within its grant.
+
+## The scale loop
+
+![Change instances from 1 to 3 and apply; new copies join the router when ready; scale-down drains first](docs/images/scale-loop.svg)
+
+Raising `instances` and applying already creates, observes and retires
+individual instances. The **router** that spreads traffic across healthy copies
+on one HTTPS domain, and drains copies on scale-down, is the next milestone
+(M3.1). Until then, standalone Docker publishes a component through a single
+fixed host port.
+
+## What works today
+
+| Area | Available now |
+|---|---|
+| Runtime | Standalone Docker over a local socket (primary); Coolify adapter retained |
+| Applications | Web and worker components, multiple instances, app-local DNS, named volumes, CPU and memory limits, readiness checks |
+| Releases | Frozen releases, idempotent admission, dispatch-once recovery, image rollback, scale-down with retained instances |
+| Agent interface | [JSON CLI](docs/agent-cli.md), stdio MCP with optional operate tools, read-only remote MCP, OpenAPI REST, [skill](skills/open-app-platform/SKILL.md) |
+| Trust | Owner account, named agents with limited grants, exact owner review for risky plans, pause and revoke, audit trail |
+| Operations | Health and bounded logs, incident evidence, [headless install and rescue](docs/headless-bootstrap.md), metadata backup, [measured footprint](docs/footprint.md) |
+
+**Next:** the router and scale loop, adding and removing components plus
+pre-deploy jobs through the spec, building from source, and
+[Docker Compose import](docs/compose-import.md).
+
+## Architecture
+
+![OAP architecture: clients, one Go process, PostgreSQL, Docker Engine](docs/images/architecture.svg)
+
+One Go service and PostgreSQL, which holds both the state and the durable job
+queue. There is no separate queue, registry, identity service or required model
+runtime. Workloads keep running when OAP is down. See the
+[system design](docs/architecture/system-design.md).
+
+## Get started
+
+**Operate with an agent:** follow the
+[standalone agent runbook](docs/standalone-agent-runbook.md). It covers
+installation, owner setup, granting an agent, and the full lifecycle. Build the
+CLI with:
+
+```sh
+go build -o bin/oap ./cmd/oap
+bin/oap help    # works offline
+bin/oap schema  # complete request and response contracts
+```
+
+**Develop OAP:** requires Go 1.26, Node 22, Docker and Python 3.
 
 ```sh
 cp .env.example .env.local
-mkdir -p .local
-cp examples/targets.json .local/targets.json
-# Edit local credentials and non-production target IDs.
+mkdir -p .local && cp examples/targets.json .local/targets.json
 docker compose up -d --wait
-npm --prefix web ci
-npm --prefix web run build
-make dev
+npm --prefix web ci && npm --prefix web run build
+make dev        # http://127.0.0.1:8787
+make test-local # required pre-push gate
 ```
 
-Open http://127.0.0.1:8787 and create the owner account using the private
-OAP_SETUP_TOKEN from your local configuration. Use a random setup secret of at
-least 24 characters. Subsequent visits use email/password sign-in with an HttpOnly
-session cookie. Local HTTP uses OAP_COOKIE_SECURE=false; hosted installations
-retain secure cookies and HTTPS. See [owner access](docs/owner-access.md).
-
-The local PostgreSQL port is 55438 and its data uses a named Docker volume.
-Development credentials in compose.yaml are intentionally local-only. Do not
-reuse them for production. The controller does not need a Docker socket when
-using Coolify; direct Docker targets use a configured local socket, and it operates through the scoped API target.
-
-## Examples
-
-For an operator-free setup, follow [standalone Docker](docs/bare-docker.md),
-including the persistent-volume example.
-
-See [examples](examples/README.md) for a single-component app, a two-component
-app, target configuration, and adoption. Creating a definition does not deploy.
-Standard deployment can restart workloads and cause downtime. Instances are
-tracked together; routing and balancing are not provided in this milestone.
-
-```sh
-python3 scripts/run-local.py python3 scripts/example.py examples/hello-web/application.json
-```
-
-[GitHub Actions release example](examples/github-actions.yml) builds an image,
-then queues its digest through the release API. The operator must be able to
-pull that image. Existing independent deployment triggers must be disabled for
-controller-owned releases. A 202 response is not deployment success.
-
-## Tests
-
-GitHub CI is disabled for now. The required pre-push check is `make test-local`,
-which starts fresh PostgreSQL, a separate Docker daemon, and the browser runner.
-See [reproducible local testing](docs/local-testing.md). Install its Git hook with
-`make install-test-hook`.
-
-```sh
-make test                   # unit tests and PostgreSQL system tests, with -race
-make test-system            # focused core system tests
-npm --prefix web run build  # TypeScript and production UI build
-python3 scripts/run-local.py npm --prefix web run test:e2e
-```
-
-The default browser suite uses the isolated standalone Docker target; Coolify
-credentials are not required. `make test-local` supplies the server, daemon and
-browser. External Coolify tests are opt-in.
-
-The opt-in live suite requires COOLIFY_URL, COOLIFY_TOKEN, COOLIFY_PROJECT_ID,
-COOLIFY_SERVER_ID, COOLIFY_ENVIRONMENT=staging, COOLIFY_TEST_IMAGE as an immutable
-digest, and optionally COOLIFY_TEST_PORT and COOLIFY_TEST_RESOURCE_ID for reusing
-a retained Docker-image fixture:
-
-```sh
-make test-live
-```
-
-Without TEST_DATABASE_URL, database system tests explicitly skip. Without
-OAP_LIVE_COOLIFY=1, the real operator test explicitly skips. The isolated local harness supplies PostgreSQL and Docker without developer
-credentials. It does not mutate an external Coolify installation. Live fixtures are retained, not deleted.
+See [development, testing and deployment](docs/development.md) for details.
 
 ## Documentation
 
-- [Supported M0 exit review and remaining limits](docs/m0-exit-review.md)
-- [Owner-mode installation, updates and metadata recovery](docs/installation.md)
+The [documentation index](docs/README.md) lists every guide. Good starting points:
 
-- [Roadmap](ROADMAP.md)
-- [M2 scoped agent operation and remote inspection](docs/m2-agent-operation.md)
-- [Recoverable encrypted secrets](docs/encrypted-secret-store.md)
-- [Container security and diagnostic context](docs/m1-security-visibility.md)
-
-- [Product and architecture](docs/product-and-architecture.md)
-- [System design](docs/architecture/system-design.md)
-- [Low level design](docs/architecture/low-level-design.md)
-- [Native HTTP health checks](docs/native-health-checks.md)
-- [Release cancellation and abandonment](docs/release-controls.md)
-- [OpenAPI contract](docs/openapi.json)
-- [Bare Docker targets](docs/bare-docker.md)
-- [Runtime secret references](docs/runtime-secret-references.md)
-- [Private registry access](docs/private-registry-access.md)
-- [Long-running workers](docs/workers.md)
-- [Read-only MCP tools](docs/mcp.md)
-- [Verification report](docs/verification.md)
-- [Reproducible local test environment](docs/local-testing.md)
-- [Editable design Page](https://chatgpt.com/space/page_48ca8aa82f6881918cae167d00860fe9)
-
-## Deployment
-
-The Dockerfile builds the UI and Go binary into a non-root image. Supply a
-PostgreSQL database, first-run setup secret, and a mounted target config;
-operator credentials are needed only for operator targets.
-pass -targets /path/to/targets.json. The controller can run through Coolify or on
-Docker directly. The direct Docker adapter manages explicitly owned application containers through
-a local Unix socket; no separate scheduler is required.
-
-.coolify/deploy.yaml records product staging and retained integration fixtures.
-The platform is available at https://oap-staging.mohsal.dev in owner mode, with
-server-built image provenance and a verified manual database backup/restore.
-See [server deployment and recovery](docs/server-build-deploy.md) for setup and
-operational limits. Production release requirements remain separate.
+- [Positioning](docs/positioning.md): the problem, the comparison and the reference application
+- [Roadmap](ROADMAP.md): milestones and execution order
+- [Standalone agent runbook](docs/standalone-agent-runbook.md): the full headless journey
+- [Feature reference](docs/feature-reference.md): detailed behavior and limits of current features
 
 ## License
 
 Open App Platform is open source under the [MIT License](LICENSE).
 Third-party notices are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
-## Configuration and release preconditions
-
-The configuration editor updates future releases without restarting components.
-Updates require the current definition version. Existing releases retain their
-snapshots, and a deployment can require expectedVersion to reject a stale plan.
-Topology changes, scale-down, target migration, and adopted runtime mutation are
-not silently performed through this editor.
-
-SQL migrations now have immutable checksums and version records. Existing preview
-schemas are adopted by the idempotent first migration, then upgraded additively.
-
-## Inspect and recover
-
-The application overview polls current instance health independently of release
-history. Select an instance to read its latest 100 log lines, including when a
-newer release failed before reaching that instance. The API exposes
-`GET /api/v1/applications/{id}/instances` and
-`GET /api/v1/applications/{id}/logs/{component}?ordinal=2`.
-
-An attention-state release exposes recovery controls in its release history.
-Recheck the recorded provider deployment; if the dispatch response was lost,
-inspect the operator and supply the exact deployment ID for that instance.
-Docker validates the active container ID; Coolify validates deployment-to-resource
-association within its latest 100 resource deployments. Selecting the correct historical deployment remains the owner's
-responsibility. Recovery never issues another uncertain dispatch. Preparation
-can be retried only when it failed before dispatch. Remaining instances resume
-through durable jobs once all attention states are resolved.
-
-`POST /api/v1/deployments/{id}/recover` accepts `component`, `ordinal`, and the
-release's current `expectedUpdatedAt`, plus either an optional
-`remoteDeploymentId` or `retryPreparation: true` where supported. Stale recovery
-requests conflict. Recovery does not roll back data or cancel provider work.
-If no provider operation can be identified after uncertain dispatch, the release
-remains blocked; automatic provider-history reconciliation is still planned.
-
-Target capabilities are exposed at `GET /api/v1/targets/{id}/capabilities` and
-checked when configurations and operations are admitted. Native restart is
-supported by Docker and Coolify; managed `env` configuration is supported by Docker and controller-owned Coolify
-resources. Docker supports application DNS; Coolify connections require explicit
-`serviceEndpoints` for referenced components. Unsupported fields are rejected rather than
-silently ignored. See the [connected Docker example](examples/README.md#connected-docker-components).
-
-## Scale down and retained instances
-
-Managed Docker components with multiple instances have a **Scale down** action in
-the overview. Review the highest ordinals to retire and the remaining count.
-OAP stops only those instances, confirms their container identities, and then
-commits the new count as a new application definition version. Remaining instances
-keep their current configuration. Traffic draining is not implemented.
-
-Retired instances and logs remain visible. Their bindings stay reserved, preventing
-accidental adoption by another application. To scale up again, increase the count
-in Configuration and deploy; unchanged retained containers can be reused. Restart
-cannot reactivate a retired binding. Unexpectedly running retired instances are
-reported as drift rather than hidden or automatically stopped.
-
-`POST /api/v1/applications/{id}/scale-down` accepts `component`, `instances`, and
-`expectedVersion` with an `Idempotency-Key`. Desired counts remain unchanged until
-all stops succeed. A partial or uncertain retirement blocks competing operations
-and definition edits. Recovery rechecks the exact stopped container without
-another stop; if every stop completed but final persistence failed, use
-`retryFinalization: true` with the current `expectedUpdatedAt` on the recovery API.
-The operation's `definitionVersion` identifies the admission version, while its
-manifest records the intended lower count. Coolify retirement remains unsupported.
-
-## Coolify runtime variables and connections
-
-OAP records provider variable IDs and value hashes before updating owned Coolify
-runtime configuration. Existing operator variables are not taken over, even when
-their values match. Shared, hidden, preview, renamed, or externally changed
-variables are protected. Only previously recorded OAP production-runtime variables
-can be removed. Coolify may create preview copies; those remain operator-managed.
-Adopted resource configuration is unchanged.
-
-`services` maps a variable to a component. On Coolify, also supply
-`serviceEndpoints`, for example `{"api":"https://api.example.com"}`. OAP injects
-that explicit URL; it does not infer private DNS, modify networks, or create a
-route. URLs must not contain credentials, queries, or fragments. Endpoints remain
-under operator/owner management. Docker may use either its application DNS or
-an explicit endpoint.
-
-Preparation verifies applied values and preserves unrelated variables. Known
-variable IDs and recorded intents allow safe update/removal retries. An ambiguous
-creation without a captured provider ID remains blocked for operator review;
-inspect and resolve the unverified key through Coolify before retrying preparation.
-The ownership ledger is part of OAP metadata and must be included in backups.
-
-## Group existing services
-
-Deployment targets → Group services → Select → Review creates an observe-only
-application. Health and logs are available immediately; registration does not
-restart or deploy anything. Existing Coolify image services can receive lifecycle
-management through a separate reviewed handoff. Source-backed Coolify apps and
-explicitly scoped external Docker containers remain observe-only.
-
-See [discovery and assembly](docs/discovery-and-assembly.md) for API semantics,
-Docker observation scope, compatibility, and verification. Examples that combine
-new managed components with existing resources require handoff of supported
-observed components before application-wide deployment.
-
-## Owner setup and access
-
-The platform now defaults to owner mode. Configure a private `OAP_SETUP_TOKEN`
-(at least 24 characters) before first launch, then create the owner account in the
-UI. Public signup is disabled; members join with owner-issued invitation codes.
-Workspace access provides roles, application-scoped agent tokens, revocation and
-audit. Existing resources remain in the installation's single workspace.
-
-See [owner access](docs/owner-access.md) for local HTTP configuration, session and
-role behavior, agent scopes, legacy preview compatibility and password recovery.
-`OAP_API_TOKEN` no longer grants platform access in owner mode.
-
-## GitHub source activity
-
-Use existing Coolify GitHub Apps for native source deployment. OAP can observe
-signed push notifications and correlate exact commits with resource-scoped provider
-history while keeping management observe-only. An optional trusted image-builder
-command supports durable build requests and selected-component digest releases.
-See [GitHub releases](docs/github-releases.md) and [examples](examples/github-sources).
-The optional hosted image-builder lane passed a real GitHub push and redelivery.
-Native source handoff/artifact reuse remains unsupported; CI stays disabled.
-See the [operator-first audit and roadmap corrections](docs/operator-first-audit.md).
-
-## Application environments
-
-Logical applications group existing staging/production environment records while
-preserving resource IDs, native workflows, release histories and credential scopes.
-Owners explicitly link or separate environments through the dashboard. Existing
-flat application URLs/APIs stay compatible. Target configuration remains server-side.
-See [application environments](docs/application-environments.md).
-
-## Local test cache housekeeping
-
-The test build caches Go compilation independently of root documentation and UI
-changes. Test build stages carry `io.openappplatform.test-cache=true`, so obsolete
-dangling test layers can be reclaimed on the local Docker endpoint with:
-
-```sh
-docker image prune --filter label=io.openappplatform.test-cache=true
-```
-
-This targets unused untagged test images; it does not prune application volumes.
-Keep the latest test runner tag and recorded screenshots/results for reproducibility.
-Failed build containers can retain cache layers and should be inspected before
-removal. Do not use volume pruning as a general disk-cleanup command.
-
-The [target setup and definition review](docs/target-setup-and-definition-review.md)
-flow generates first-connection recipes, verifies configured scopes read-only,
-connects additional existing environments through trusted operators, reuses naming
-layouts and previews masked configuration changes. Native workflows remain intact.
-
-The four-component example now groups frontend, API, worker and an existing
-PostgreSQL dependency with explicit ownership. See [existing database links](docs/existing-database-links.md)
-and [the reproducible example](examples/application-breadth/README.md).
-
-The current standalone agent lifecycle work is documented in [Portable application lifecycle](docs/portable-lifecycle.md), with versioned specifications and shared CLI/API/MCP action plans. See [ROADMAP](ROADMAP.md) for acceptance status and execution order.
-
-Agent diagnosis uses the [bounded incident view](docs/incident-diagnosis.md), keeping runtime health, release outcome, freshness and external application verification distinct.
-
-The [versioned standalone agent runbook](docs/standalone-agent-runbook.md) and [operation skill](skills/open-app-platform/SKILL.md) cover the combined headless journey. [Footprint measurements](docs/footprint.md) separate OAP/PostgreSQL from workloads and retain the measured idle CPU gap.

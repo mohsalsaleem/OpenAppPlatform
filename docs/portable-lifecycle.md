@@ -21,6 +21,8 @@ its provisioning, configuration changes, migration or deletion.
 
 ## Headless workflow
 
+![Agent lifecycle: edit spec, validate, plan, review, execute, wait, verify, then diagnose and correct](images/lifecycle.svg)
+
 Authenticate using the [bootstrap guide](headless-bootstrap.md). Flags precede the
 command. Every CLI command writes one JSON envelope; input uses `--file file.json`
 or `--file -`. Do not put credentials in arguments.

@@ -2,6 +2,8 @@
 
 > DigitalOcean App Platform, on your own server, built for your agent to operate.
 
+![One application on one server, operated by an agent through OAP](images/overview.svg)
+
 This document records why OAP exists, what it is compared with, and which
 capabilities define it. The [roadmap](../ROADMAP.md) decides execution order.
 
@@ -37,11 +39,15 @@ of these:
 The pillars reinforce each other: a declarative application specification is the
 interface agents handle best. The defining loop is:
 
+![Agent lifecycle loop](images/lifecycle.svg)
+
 ```text
 edit spec → oap validate/diff → oap plan → (owner review if required) → oap apply → oap verify
 ```
 
 ### Defining capability: the scale loop
+
+![The scale loop](images/scale-loop.svg)
 
 Changing `"instances": 1` to `"instances": 3` on a web component and applying
 must result in three healthy copies serving traffic behind one stable,
@@ -55,6 +61,8 @@ component through a fixed host port, which is limited to one instance. Replica
 routing is the missing layer and is the first M3 slice.
 
 ## Comparison
+
+![Where OAP fits](images/landscape.svg)
 
 | | Docker Compose | Docker Swarm | Kamal | k3s / MicroK8s | **OAP (target)** |
 |---|---|---|---|---|---|

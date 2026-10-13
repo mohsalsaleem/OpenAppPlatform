@@ -8,6 +8,8 @@ remains bounded by the documented acceptance limits. The
 agent-facing contracts first; UI and operator expansion are parked. This document
 describes the existing architecture, not completion of the headless agent journey.
 
+![OAP architecture: clients, one Go process, PostgreSQL, Docker Engine](../images/architecture.svg)
+
 ## Boundaries
 
 | Package | Responsibility |

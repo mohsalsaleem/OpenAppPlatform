@@ -5,6 +5,8 @@ OAP remains one Go service, dedicated PostgreSQL and Docker Engine. The owner se
 trust and policy; the agent uses deterministic REST/JSON CLI/scoped MCP. No model
 runtime or dashboard is required. UI and operator expansion remain parked.
 
+![One application on one server, operated by an agent through OAP](images/overview.svg)
+
 ## Establish the installation and authority
 
 Use [headless bootstrap](headless-bootstrap.md) for the detailed command contracts.
