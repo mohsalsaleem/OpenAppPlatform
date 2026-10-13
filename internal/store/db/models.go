@@ -152,6 +152,27 @@ type OapEndpointVerification struct {
 	Report        []byte `json:"report"`
 }
 
+type OapIngressAuthority struct {
+	TargetID      string `json:"target_id"`
+	ApplicationID string `json:"application_id"`
+	AuthorityHash string `json:"authority_hash"`
+	ConfigHash    string `json:"config_hash"`
+}
+
+type OapIngressPublication struct {
+	DeploymentID    string             `json:"deployment_id"`
+	ApplicationID   string             `json:"application_id"`
+	TargetID        string             `json:"target_id"`
+	AuthorityHash   string             `json:"authority_hash"`
+	ExpectedHash    string             `json:"expected_hash"`
+	ExpectedEtag    string             `json:"expected_etag"`
+	CandidateHash   string             `json:"candidate_hash"`
+	CandidateConfig []byte             `json:"candidate_config"`
+	Phase           string             `json:"phase"`
+	DispatchedAt    pgtype.Timestamptz `json:"dispatched_at"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
 type OapInvitation struct {
 	ID          string             `json:"id"`
 	WorkspaceID string             `json:"workspace_id"`

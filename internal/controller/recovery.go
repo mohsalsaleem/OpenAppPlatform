@@ -100,7 +100,19 @@ func (c *Controller) Recover(ctx context.Context, id string, request Recovery) (
 				return d, err
 			}
 		}
-		if request.RetryPreparation {
+		if step.Action == "ingress" {
+			if err = c.recoverIngress(ctx, d, request); err != nil {
+				return d, err
+			}
+			if request.RetryPreparation {
+				step.Phase = "pending"
+			} else {
+				step.Phase = "succeeded"
+				step.Observed = "configuration verified"
+			}
+			step.Error = ""
+			step.RecoveryPhase = ""
+		} else if request.RetryPreparation {
 			if (step.RecoveryPhase != "pending" && step.RecoveryPhase != "prepared") || step.RemoteDeploymentID != "" || request.RemoteDeploymentID != "" {
 				return d, errors.New("only a recorded pre-dispatch phase can be retried")
 			}

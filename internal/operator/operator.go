@@ -9,6 +9,7 @@ import (
 )
 
 type Capabilities struct {
+	ApplicationIngress  bool `json:"applicationIngress"`
 	ContainerSecurity   bool `json:"containerSecurity"`
 	RegistryCredentials bool `json:"registryCredentials"`
 	NamedVolumes        bool `json:"namedVolumes"`
@@ -67,6 +68,9 @@ type Restarter interface {
 }
 
 func ValidateRuntime(m domain.Manifest, caps Capabilities) error {
+	if m.Ingress != nil && !caps.ApplicationIngress {
+		return errors.New("application ingress is not enabled for this target")
+	}
 	for _, c := range m.Components {
 		if c.Security != nil && !caps.ContainerSecurity {
 			return errors.New("container security remains managed in the operator for this target")
@@ -145,3 +149,15 @@ type HealthCheckVerifier interface {
 
 // ErrUnreachable distinguishes transport failure from an operator rejection.
 var ErrUnreachable = errors.New("operator is unreachable")
+
+// ValidateTargetManifest includes provider-specific owner policy without making
+// admission dependent on side effects or native network attachment.
+func ValidateTargetManifest(m domain.Manifest, adapter Adapter) error {
+	if err := ValidateRuntime(m, adapter.Capabilities()); err != nil {
+		return err
+	}
+	if validator, ok := adapter.(interface{ ValidateManifest(domain.Manifest) error }); ok {
+		return validator.ValidateManifest(m)
+	}
+	return nil
+}

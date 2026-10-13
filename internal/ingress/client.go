@@ -111,3 +111,12 @@ func (c *Client) Apply(ctx context.Context, expected Snapshot, candidate Candida
 	receipt.ObservedHash = observed.Hash
 	return receipt, nil
 }
+
+// RestoreCandidate is only for private controller dispatch journals. It checks
+// the frozen content commitment; callers must never accept this from agents.
+func RestoreCandidate(raw []byte, hash string) (Candidate, error) {
+	if hash == "" || len(raw) > responseLimit || Hash(raw) != hash {
+		return Candidate{}, ErrRejected
+	}
+	return Candidate{raw: append([]byte(nil), raw...), hash: hash}, nil
+}

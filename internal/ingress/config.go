@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,16 +20,8 @@ import (
 
 // Definition is the proposed application ingress contract, separate until the
 // controller can enforce domain ownership and durably reconcile publications.
-type Definition struct {
-	Domain string  `json:"domain"`
-	HTTPS  bool    `json:"https"`
-	Routes []Route `json:"routes"`
-}
-type Route struct {
-	Path        string `json:"path"`
-	Component   string `json:"component"`
-	StripPrefix bool   `json:"stripPrefix,omitempty"`
-}
+type Definition = domain.IngressDefinition
+type Route = domain.IngressRoute
 
 // Member must come from exact owned runtime bindings, never agent-supplied URLs.
 // The future controller remains responsible for binding identity/authority.
@@ -55,39 +46,6 @@ type Candidate struct {
 
 func (c Candidate) JSON() []byte { return append([]byte(nil), c.raw...) }
 func (c Candidate) Hash() string { return c.hash }
-
-var hostname = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
-var routePath = regexp.MustCompile(`^/(?:[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*)?$`)
-
-func (d Definition) Validate(m domain.Manifest) error {
-	if len(d.Domain) > 253 || !strings.Contains(d.Domain, ".") || net.ParseIP(d.Domain) != nil {
-		return errors.New("ingress requires one lowercase DNS hostname")
-	}
-	for _, part := range strings.Split(d.Domain, ".") {
-		if !hostname.MatchString(part) {
-			return errors.New("ingress requires one lowercase DNS hostname")
-		}
-	}
-	if len(d.Routes) < 1 || len(d.Routes) > 16 {
-		return errors.New("ingress requires between 1 and 16 routes")
-	}
-	components := map[string]domain.Component{}
-	for _, c := range m.Components {
-		components[c.Name] = c
-	}
-	paths := map[string]bool{}
-	for _, r := range d.Routes {
-		if len(r.Path) > 256 || !routePath.MatchString(r.Path) || paths[r.Path] || (r.Path == "/" && r.StripPrefix) {
-			return errors.New("route paths must be unique literal segment prefixes; root cannot be stripped")
-		}
-		paths[r.Path] = true
-		c, ok := components[r.Component]
-		if !ok || c.Kind != "web" || c.Management != "" || c.ResourceID != "" || c.HostPort != 0 || c.Port < 1 || c.Port > 65535 {
-			return errors.New("routes require owned web components with a private port")
-		}
-	}
-	return nil
-}
 
 // Compile produces one complete dedicated-proxy configuration. Input order does
 // not affect its hash. /api matches /api and /api/*, never /apiculture. The most
@@ -178,7 +136,7 @@ func Compile(appID string, m domain.Manifest, d Definition, members []Member, o 
 		port = o.HTTPSPort
 	}
 	server := map[string]any{"listen": []string{":" + strconv.Itoa(port)}, "routes": native}
-	apps := map[string]any{"http": map[string]any{"http_port": o.HTTPPort, "https_port": o.HTTPSPort, "servers": map[string]any{"oap": server}}}
+	apps := map[string]any{"http": map[string]any{"grace_period": int64(30 * time.Second), "http_port": o.HTTPPort, "https_port": o.HTTPSPort, "servers": map[string]any{"oap": server}}}
 	if !d.HTTPS {
 		server["automatic_https"] = map[string]any{"disable": true}
 	} else {

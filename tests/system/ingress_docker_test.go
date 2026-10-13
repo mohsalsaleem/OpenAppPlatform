@@ -316,8 +316,87 @@ func TestCaddyStandaloneRoutingPublicationAndResume(t *testing.T) {
 	if err != nil || status != 200 {
 		t.Fatal("HTTPS resume failed", status, err)
 	}
+
+	// A single proxy can host independently configured applications. Updating one
+	// does not require forcing the other into the same HTTPS mode.
+	otherID := id + "-other"
+	otherContainer := create(otherID, map[string]any{"Image": image, "Env": []string{"OAP_TEST_MESSAGE=other-app"}, "HostConfig": map[string]any{"NetworkMode": network}})
+	created = append(created, otherContainer)
+	var otherState struct {
+		NetworkSettings struct {
+			Networks map[string]struct {
+				IPAddress string `json:"IPAddress"`
+			} `json:"Networks"`
+		} `json:"NetworkSettings"`
+	}
+	json.Unmarshal(api("GET", "/containers/"+otherContainer+"/json", nil), &otherState)
+	otherIP := otherState.NetworkSettings.Networks[network].IPAddress
+	if otherIP == "" {
+		t.Fatal("other app address unavailable")
+	}
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); {
+		res, e := public.Get("http://" + net.JoinHostPort(otherIP, "8080") + "/health/custom")
+		if e == nil {
+			res.Body.Close()
+			if res.StatusCode == 200 {
+				break
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	otherManifest := domain.Manifest{TargetID: m.TargetID, Components: []domain.Component{{Name: "other-web", Kind: "web", Port: 8080, Instances: 1}}, Ingress: &domain.IngressDefinition{Domain: "other.example.test", HTTPS: true, Routes: []domain.IngressRoute{{Path: "/", Component: "other-web"}}}}
+	otherMembers := []ingress.Member{{ApplicationID: otherID, TargetID: m.TargetID, Component: "other-web", Ordinal: 1, Address: net.JoinHostPort(otherIP, "8080"), Ready: true, ObservedAt: time.Now()}}
+	d.HTTPS = false
+	m.Ingress = &d
+	for i := range members {
+		members[i].ObservedAt = time.Now()
+	}
+	shared, e := ingress.CompileServer([]ingress.ApplicationRoutes{{ApplicationID: id, Manifest: m, Members: members}, {ApplicationID: otherID, Manifest: otherManifest, Members: otherMembers}}, options, time.Now())
+	if e != nil {
+		t.Fatal(e)
+	}
+	snapshot, e = client.Read(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = client.Apply(ctx, snapshot, shared); e != nil {
+		t.Fatal(e)
+	}
+	status, body, err = request(public, "http", httpPort, "/api", d.Domain)
+	if err != nil || status != 200 || !strings.Contains(string(body), "api-1") {
+		t.Fatal("HTTP app lost after adding HTTPS sibling", status, err)
+	}
+	otherTLS := &http.Client{Timeout: 5 * time.Second, Transport: &http.Transport{TLSClientConfig: &tls.Config{RootCAs: roots, ServerName: otherManifest.Ingress.Domain, MinVersion: tls.VersionTLS12}}}
+	defer otherTLS.CloseIdleConnections()
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); {
+		status, body, err = request(otherTLS, "https", tlsPort, "/", otherManifest.Ingress.Domain)
+		if err == nil && status == 200 {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if err != nil || status != 200 || !strings.Contains(string(body), "other-app") {
+		t.Fatal("shared HTTPS app unavailable", status, err)
+	}
+	api("POST", "/containers/"+proxy+"/restart?t=3", nil)
+	client.Close()
+	for deadline := time.Now().Add(10 * time.Second); time.Now().Before(deadline); {
+		status, body, err = request(public, "http", httpPort, "/api", d.Domain)
+		if err == nil && status == 200 {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if err != nil || status != 200 {
+		t.Fatal("shared HTTP resume", status, err)
+	}
+	status, body, err = request(otherTLS, "https", tlsPort, "/", otherManifest.Ingress.Domain)
+	if err != nil || status != 200 || !strings.Contains(string(body), "other-app") {
+		t.Fatal("shared HTTPS resume", status, err)
+	}
+
 	if dir := os.Getenv("OAP_TEST_REPORT_DIR"); dir != "" {
-		receipt := map[string]any{"status": "passed", "scope": "Caddy foundation; no controller apply/scale-down acceptance", "httpReplicaCount": 3, "pathPrecedence": true, "prefixStripping": true, "unknownHostRejected": true, "conditionalPublication": true, "replayWithoutMutation": true, "replicaMembershipRemoval": true, "restartResume": true, "verifiedInternalCAHTTPS": true, "publicACMEIssued": false}
+		receipt := map[string]any{"status": "passed", "scope": "Caddy foundation; no controller apply/scale-down acceptance", "httpReplicaCount": 3, "pathPrecedence": true, "prefixStripping": true, "unknownHostRejected": true, "conditionalPublication": true, "replayWithoutMutation": true, "replicaMembershipRemoval": true, "restartResume": true, "verifiedInternalCAHTTPS": true, "publicACMEIssued": false, "sharedApplicationCount": 2, "independentHTTPSModes": true}
 		raw, _ := json.MarshalIndent(receipt, "", "  ")
 		if err := os.WriteFile(filepath.Join(dir, "ingress-foundation.json"), append(raw, '\n'), 0600); err != nil {
 			t.Fatal(err)

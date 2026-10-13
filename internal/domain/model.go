@@ -63,10 +63,11 @@ type Component struct {
 	ResourceID            string            `json:"resourceId,omitempty"`
 }
 type Manifest struct {
-	Name        string      `json:"name"`
-	Environment string      `json:"environment"`
-	TargetID    string      `json:"targetId"`
-	Components  []Component `json:"components"`
+	Ingress     *IngressDefinition `json:"ingress,omitempty"`
+	Name        string             `json:"name"`
+	Environment string             `json:"environment"`
+	TargetID    string             `json:"targetId"`
+	Components  []Component        `json:"components"`
 }
 
 func (m *Manifest) Validate() error {
@@ -183,6 +184,11 @@ func (m *Manifest) Validate() error {
 	}
 	for _, c := range m.Components {
 		if err := validateRuntime(c, components); err != nil {
+			return err
+		}
+	}
+	if m.Ingress != nil {
+		if err := m.Ingress.Validate(*m); err != nil {
 			return err
 		}
 	}
@@ -306,6 +312,9 @@ func InitialSteps(m Manifest) []Step {
 		for n := 1; n <= c.Instances; n++ {
 			steps = append(steps, Step{Component: c.Name, Ordinal: n, Phase: "pending", ResourceID: c.ResourceID})
 		}
+	}
+	if m.Ingress != nil {
+		steps = append(steps, Step{Component: "@ingress", Ordinal: 1, Action: "ingress", Phase: "pending"})
 	}
 	return steps
 }

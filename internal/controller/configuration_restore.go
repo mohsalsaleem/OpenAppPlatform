@@ -112,7 +112,7 @@ func (c *Controller) configurationRestorePlan(ctx context.Context, tx pgx.Tx, ap
 	if err != nil {
 		return plan, desired, err
 	}
-	if err = operator.ValidateRuntime(desired, adapter.Capabilities()); err != nil {
+	if err = operator.ValidateTargetManifest(desired, adapter); err != nil {
 		return plan, desired, rollbackInvalid("snapshot configuration is unsupported by this target")
 	}
 	plan.Changes = domain.CompareReleases(domain.Deployment{Manifest: app.Manifest}, domain.Deployment{Manifest: desired}).Changes

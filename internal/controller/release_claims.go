@@ -45,6 +45,9 @@ func releaseClaims(release domain.Deployment) (map[string]string, error) {
 	}
 	claims := map[string]string{}
 	for _, step := range release.Steps {
+		if step.Action == "ingress" {
+			continue
+		}
 		if _, ok := components[step.Component]; !ok {
 			return nil, errors.New("unknown release component")
 		}
@@ -78,7 +81,20 @@ func releaseClaims(release domain.Deployment) (map[string]string, error) {
 		}
 		return nil
 	}
+	if release.Manifest.Ingress != nil {
+		for _, route := range release.Manifest.Ingress.Routes {
+			if claims[route.Component] != "write" {
+				claims[route.Component] = "read"
+			}
+			if err := visit(route.Component); err != nil {
+				return nil, err
+			}
+		}
+	}
 	for _, step := range release.Steps {
+		if step.Action == "ingress" {
+			continue
+		}
 		if err := visit(step.Component); err != nil {
 			return nil, err
 		}

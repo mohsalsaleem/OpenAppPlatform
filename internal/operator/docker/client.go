@@ -26,9 +26,10 @@ const prefix = "io.openappplatform."
 const apiVersion = "v1.45"
 
 type Settings struct {
-	ObserveContainers []string `json:"observeContainers,omitempty"`
-	PullPolicy        string   `json:"pullPolicy"`
-	HostBindIP        string   `json:"hostBindIP"`
+	Ingress           *IngressSettings `json:"ingress,omitempty"`
+	ObserveContainers []string         `json:"observeContainers,omitempty"`
+	PullPolicy        string           `json:"pullPolicy"`
+	HostBindIP        string           `json:"hostBindIP"`
 }
 type Client struct {
 	target   domain.Target
@@ -57,6 +58,9 @@ func New(t domain.Target) (*Client, error) {
 			return nil, errors.New("invalid Docker target settings")
 		}
 	}
+	if err := validateIngressSettings(settings.Ingress); err != nil {
+		return nil, err
+	}
 	if len(settings.ObserveContainers) > 64 {
 		return nil, errors.New("observeContainers supports at most 64 explicit container IDs")
 	}
@@ -77,7 +81,7 @@ func New(t domain.Target) (*Client, error) {
 	return &Client{target: t, settings: settings, base: "http://docker", http: &http.Client{Transport: transport, Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) Capabilities() operator.Capabilities {
-	return operator.Capabilities{ContainerSecurity: true, RegistryCredentials: true, NamedVolumes: true, ResourceLimits: true, DatabaseLinks: true, Workers: true, HTTPHealthChecks: true, ImageRollback: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ApplicationDNS: true, ServiceEndpoints: true}
+	return operator.Capabilities{ApplicationIngress: c.settings.Ingress != nil, ContainerSecurity: true, RegistryCredentials: true, NamedVolumes: true, ResourceLimits: true, DatabaseLinks: true, Workers: true, HTTPHealthChecks: true, ImageRollback: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ApplicationDNS: true, ServiceEndpoints: true}
 }
 func (c *Client) request(ctx context.Context, method, path string, input, output any) error {
 	var body io.Reader
@@ -127,8 +131,10 @@ type container struct {
 	Image      string            `json:"Image"`
 	Mounts     []json.RawMessage `json:"Mounts"`
 	HostConfig struct {
-		Memory       int64 `json:"Memory"`
-		NanoCPUs     int64 `json:"NanoCpus"`
+		Privileged   bool   `json:"Privileged"`
+		NetworkMode  string `json:"NetworkMode"`
+		Memory       int64  `json:"Memory"`
+		NanoCPUs     int64  `json:"NanoCpus"`
 		PortBindings map[string][]struct {
 			HostPort string `json:"HostPort"`
 			HostIP   string `json:"HostIp"`
@@ -149,6 +155,9 @@ type container struct {
 		} `json:"Health"`
 	} `json:"State"`
 	NetworkSettings struct {
+		Networks map[string]struct {
+			IPAddress string `json:"IPAddress"`
+		} `json:"Networks"`
 		Ports map[string][]struct {
 			HostIP   string `json:"HostIp"`
 			HostPort string `json:"HostPort"`

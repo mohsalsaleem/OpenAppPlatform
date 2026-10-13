@@ -3953,6 +3953,7 @@ export interface components {
             environment: string;
             targetId: string;
             components: components["schemas"]["Component"][];
+            ingress?: components["schemas"]["IngressDefinition"];
         };
         Application: {
             groupId: string;
@@ -3993,7 +3994,7 @@ export interface components {
              * @description Absent for ordinary deployment steps.
              * @enum {string}
              */
-            action?: "restart" | "retire";
+            action?: "restart" | "retire" | "ingress";
             recoveryPhase?: string;
             resourceId?: string;
             remoteDeploymentId?: string;
@@ -4085,6 +4086,8 @@ export interface components {
             resourceLimits: boolean;
             registryCredentials?: boolean;
             containerSecurity: boolean;
+            /** @description Target has explicit host-owner standalone Caddy authority. Domain, peer identity and actual native readiness are verified during admission/execution. */
+            applicationIngress: boolean;
         };
         Restart: {
             component: string;
@@ -4200,6 +4203,7 @@ export interface components {
             environment: string;
             targetId: string;
             components: components["schemas"]["ComponentInput"][];
+            ingress?: components["schemas"]["IngressDefinition"];
         };
         RouteMember: {
             ordinal: number;
@@ -4403,7 +4407,7 @@ export interface components {
         };
         ActionRequest: {
             /** @enum {string} */
-            action: "create" | "configure" | "deploy" | "restart" | "recover";
+            action: "create" | "configure" | "deploy" | "restart" | "recover" | "scale-down";
             applicationId?: string;
             expectedVersion?: number;
             specification?: components["schemas"]["ApplicationSpecification"];
@@ -4541,6 +4545,32 @@ export interface components {
             verification: components["schemas"]["VerificationCriterion"][];
             applicationBehaviorVerified: boolean;
             missingEvidence: string[];
+        };
+        IngressRoute: {
+            /** @description Literal segment prefix; longest matching path wins. */
+            path: string;
+            /** @description Owned web component with a private port. */
+            component: string;
+            /** @default false */
+            stripPrefix: boolean;
+        };
+        /** @description Application ingress requires an explicitly owner-configured standalone Caddy peer. Automatic provisioning and public ACME acceptance remain deferred. */
+        IngressDefinition: {
+            domain: string;
+            https: boolean;
+            routes: components["schemas"]["IngressRoute"][];
+        };
+        /** @description Host-owner configuration for one dedicated existing Caddy peer/domain. Not application-controlled. */
+        DockerIngressAuthority: {
+            containerId: string;
+            bootstrapHash: string;
+            adminSocket: string;
+            proxySocket: string;
+            domain: string;
+            httpPort: number;
+            httpsPort: number;
+            /** @default false */
+            internalCa: boolean;
         };
     };
     responses: never;

@@ -17,7 +17,7 @@ func (c *Controller) runtimeComponent(m domain.Manifest, app, name string) (doma
 func (c *Controller) inputPins(d domain.Deployment) (map[string]string, error) {
 	pins := map[string]string{}
 	for _, step := range d.Steps {
-		if step.Action == "retire" {
+		if step.Action == "retire" || step.Action == "ingress" {
 			continue
 		}
 		runtime, err := c.runtimeComponent(d.Manifest, d.ApplicationID, step.Component)

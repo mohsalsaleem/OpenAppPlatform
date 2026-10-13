@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -86,6 +87,9 @@ func CompareReleases(from, to Deployment) ReleaseComparison {
 			result.Changes = append(result.Changes, ReleaseChange{Component: name, Field: field, Before: a, After: b})
 		}
 	}
+	oldIngress, _ := json.Marshal(from.Manifest.Ingress)
+	newIngress, _ := json.Marshal(to.Manifest.Ingress)
+	add("", "application ingress", string(oldIngress), string(newIngress))
 	dependencies := func(c Component) string {
 		names := append([]string(nil), c.DependsOn...)
 		sort.Strings(names)

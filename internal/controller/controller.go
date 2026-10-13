@@ -119,7 +119,7 @@ func (c *Controller) CreateApplication(ctx context.Context, m domain.Manifest) (
 	if e != nil {
 		return domain.Application{}, e
 	}
-	if e = operator.ValidateRuntime(m, a.Capabilities()); e != nil {
+	if e = operator.ValidateTargetManifest(m, a); e != nil {
 		return domain.Application{}, e
 	}
 	for _, comp := range m.Components {
@@ -349,6 +349,9 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		if len(selected) == 0 {
 			return d, errors.New("source release requires at least one selected image")
 		}
+		if d.Manifest.Ingress != nil {
+			selected = append(selected, domain.Step{Component: "@ingress", Ordinal: 1, Action: "ingress", Phase: "pending"})
+		}
 		d.Steps = selected
 		if rollback != nil {
 			d.Source = rollbackSource.Source
@@ -373,7 +376,7 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		return d, e
 	}
 	if restart == nil && scaleDown == nil {
-		if e = operator.ValidateRuntime(a.Manifest, adapter.Capabilities()); e != nil {
+		if e = operator.ValidateTargetManifest(a.Manifest, adapter); e != nil {
 			return d, e
 		}
 	} else if scaleDown != nil {
@@ -410,6 +413,17 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		}
 		if !found {
 			return d, errors.New("unknown component")
+		}
+		routedRetirement := false
+		if d.Manifest.Ingress != nil {
+			for _, route := range d.Manifest.Ingress.Routes {
+				if route.Component == scaleDown.Component {
+					routedRetirement = true
+				}
+			}
+		}
+		if routedRetirement {
+			d.Steps = append([]domain.Step{{Component: "@ingress", Ordinal: 1, Action: "ingress", Phase: "pending"}}, d.Steps...)
 		}
 		d.Operation = "scale-down"
 	} else {
@@ -542,10 +556,46 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 		d.State = state
 		return c.Store.SaveDeployment(ctx, d)
 	}
+	drained, drainErr := c.ingressDrain(ctx, d)
+	if drainErr != nil {
+		for i := range d.Steps {
+			if d.Steps[i].Action == "ingress" {
+				return fail(&d.Steps[i], "attention", drainErr)
+			}
+		}
+		return drainErr
+	}
+	if !drained {
+		return river.JobSnooze(c.PollInterval)
+	}
 	for i := range d.Steps {
 		step := &d.Steps[i]
 		if step.Phase == "succeeded" || step.Phase == "failed" || step.Phase == "attention" {
 			continue
+		}
+		if step.Action == "ingress" {
+			if d.Operation != "scale-down" {
+				for _, prior := range d.Steps[:i] {
+					if prior.Phase != "succeeded" {
+						return fail(step, "failed", errors.New("workload release failed; previous ingress preserved"))
+					}
+				}
+			}
+			if d.Manifest.Ingress == nil || step.Component != "@ingress" || step.Ordinal != 1 {
+				return fail(step, "attention", errors.New("invalid persisted ingress step"))
+			}
+			ready, err := c.publishIngress(ctx, d)
+			if err != nil {
+				return fail(step, "attention", err)
+			}
+			if ready {
+				step.Phase = "succeeded"
+				step.Observed = "configuration verified"
+			}
+			if err = c.Store.SaveDeployment(ctx, d); err != nil {
+				return err
+			}
+			return river.JobSnooze(c.PollInterval)
 		}
 		if (step.Action == "retire" && d.Operation != "scale-down") || (step.Action != "" && step.Action != "restart" && step.Action != "retire") {
 			return fail(step, "attention", errors.New("unknown operation action"))

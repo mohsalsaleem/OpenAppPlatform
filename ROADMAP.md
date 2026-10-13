@@ -122,10 +122,12 @@ M2.6 passed gate `20261013-214602-ceb6aceb` at `c2e1eee`; see
 [bounded incident diagnosis](docs/incident-diagnosis.md). M2.9 is accepted at
 `76b4061`; see the [standalone runbook/skill](docs/standalone-agent-runbook.md)
 and [measured footprint](docs/footprint.md). The active slice is **M3.1 — application
-router and scale loop**, using Caddy. The internal routing foundation and real
-proxy tests are implemented; controller/spec apply, proxy packaging, domain
-ownership, draining and full agent scaling acceptance remain open. See
-[standalone ingress](docs/standalone-ingress.md). UI/operator expansion remains
+router and scale loop**, using Caddy. Owner-configured standalone peers now support
+spec-declared routes, durable release publication and named-agent 1 → 3 → 1
+scaling with traffic verification and observation-only lost-response recovery.
+Default targets remain fail-closed. Automatic proxy packaging, multi-application
+lifecycle aggregation, route/domain handoffs, integrated HTTPS and proxy footprint
+acceptance remain open. See [standalone ingress](docs/standalone-ingress.md). UI/operator expansion remains
 parked. The measured combined idle CPU gap stays open for M3.7.
 
 ## Ordered active queue
@@ -165,6 +167,10 @@ one scaled application, which is the gap no Compose/Coolify-style tool closes.
    instances are route members; scale-down removes a member, drains it, then stops
    it. Scale-up and scale-down both run through specification apply, not only the
    dashboard. Routes are persisted on disk and keep serving while OAP is down.
+   Public Let's Encrypt issuance/renewal acceptance is deferred until the owner
+   provides a publicly reachable server and controlled domain. Continue local
+   routing, apply, scaling and internal-CA HTTPS acceptance without that dependency;
+   do not claim public certificate support verified from local-CA tests.
    Workers scale without routes; writable-volume components stay at one instance.
    Fixed host ports remain for single-instance compatibility. Account for the
    proxy as a separate service in footprint measurements. Acceptance: an agent

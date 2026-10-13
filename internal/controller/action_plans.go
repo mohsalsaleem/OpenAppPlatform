@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"time"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/access"
@@ -60,7 +61,7 @@ func (c *Controller) ValidateSpecification(ctx context.Context, spec domain.Appl
 	if err != nil {
 		return err
 	}
-	return operator.ValidateRuntime(spec.Spec, adapter.Capabilities())
+	return operator.ValidateTargetManifest(spec.Spec, adapter)
 }
 func (c *Controller) prepareAction(ctx context.Context, request *ActionRequest) (domain.Application, domain.Target, error) {
 	p, ok := domain.Identity(ctx)
@@ -86,7 +87,7 @@ func (c *Controller) prepareAction(ctx context.Context, request *ActionRequest) 
 				}
 			}
 		}
-	case "configure", "deploy", "restart", "recover":
+	case "configure", "deploy", "restart", "recover", "scale-down":
 		var err error
 		app, err = c.Store.Application(ctx, request.ApplicationID)
 		if err != nil {
@@ -102,7 +103,7 @@ func (c *Controller) prepareAction(ctx context.Context, request *ActionRequest) 
 	if !allowed {
 		return app, domain.Target{}, access.ErrDenied
 	}
-	if request.Action != "create" && request.Action != "configure" && request.Specification != nil {
+	if request.Action != "create" && request.Action != "configure" && request.Action != "scale-down" && request.Specification != nil {
 		return app, domain.Target{}, errors.New("specification is only valid for create/configure")
 	}
 	if request.Action != "deploy" && (len(request.Components) > 0 || len(request.Images) > 0) {
@@ -132,7 +133,7 @@ func (c *Controller) prepareAction(ctx context.Context, request *ActionRequest) 
 				return app, target, access.ErrDenied
 			}
 		}
-		err = operator.ValidateRuntime(app.Manifest, adapter.Capabilities())
+		err = operator.ValidateTargetManifest(app.Manifest, adapter)
 	case "configure":
 		if request.Specification == nil {
 			return app, target, errors.New("configure requires a specification")
@@ -146,6 +147,19 @@ func (c *Controller) prepareAction(ctx context.Context, request *ActionRequest) 
 		}
 		_, err = c.updateApplicationTx(ctx, tx, app.ID, request.Specification.Spec, request.ExpectedVersion)
 		tx.Rollback(ctx)
+	case "scale-down":
+		if request.Specification == nil {
+			return app, target, errors.New("scale-down requires the desired specification")
+		}
+		if err = request.Specification.Validate(); err != nil {
+			return app, target, err
+		}
+		if _, err = desiredScaleDown(app.Manifest, request.Specification.Spec); err != nil {
+			return app, target, err
+		}
+		if !adapter.Capabilities().Retirement {
+			return app, target, errors.New("target does not support retirement")
+		}
 	case "deploy":
 		if len(request.Components) == 0 {
 			for _, comp := range app.Manifest.Components {
@@ -244,7 +258,7 @@ func (c *Controller) actionInputs(ctx context.Context, app domain.Application, r
 			pins[name] = runtimeinputs.Fingerprint(resolved, id)
 		}
 	}
-	if req.Action == "restart" {
+	if req.Action == "restart" || req.Action == "scale-down" {
 		bindings, err := c.Store.Bindings(ctx, app.ID)
 		if err != nil {
 			return "", err
@@ -268,6 +282,9 @@ func (c *Controller) CreateActionPlan(ctx context.Context, req ActionRequest) (s
 	effect := "Save metadata only; no deployment or runtime mutation."
 	if req.Action == "deploy" || req.Action == "restart" {
 		effect = "Standard runtime lifecycle; interruption/downtime is possible. No application data restore."
+	}
+	if req.Action == "scale-down" {
+		effect = "Withdraw routing, wait bounded drain, stop exact excess instances, then save desired count. Volumes are retained; exact owner review is enforced when requested."
 	}
 	if req.Action == "recover" {
 		effect = "Existing constrained recovery; no arbitrary redispatch, SQL or data restore."
@@ -376,6 +393,12 @@ func (c *Controller) ExecuteActionPlan(ctx context.Context, id string) (store.Ac
 		_, err = c.UpdateApplication(ctx, req.ApplicationID, req.Specification.Spec, req.ExpectedVersion)
 	case "deploy":
 		_, err = c.EnqueueSelected(ctx, req.ApplicationID, "action-plan:"+id, req.Images, req.ExpectedVersion, req.Components)
+	case "scale-down":
+		down, e := desiredScaleDown(app.Manifest, req.Specification.Spec)
+		if e != nil {
+			return plan, e
+		}
+		_, err = c.EnqueueScaleDown(ctx, req.ApplicationID, "action-plan:"+id, down, req.ExpectedVersion)
 	case "restart":
 		_, err = c.EnqueueRestart(ctx, req.ApplicationID, "action-plan:"+id, RestartRequest{Component: req.Component, Ordinal: req.Ordinal}, req.ExpectedVersion)
 	case "recover":
@@ -387,4 +410,32 @@ func (c *Controller) ExecuteActionPlan(ctx context.Context, id string) (store.Ac
 		return plan, err
 	}
 	return c.ActionPlan(ctx, id)
+}
+
+// The first spec-driven retirement changes exactly one replica count. Other
+// topology/runtime edits stay separate and do not get applied by retirement.
+func desiredScaleDown(current, proposed domain.Manifest) (ScaleDownRequest, error) {
+	var result ScaleDownRequest
+	if len(current.Components) != len(proposed.Components) {
+		return result, errors.New("scale-down cannot add or remove components")
+	}
+	clone := proposed
+	clone.Components = append([]domain.Component(nil), proposed.Components...)
+	for i, comp := range current.Components {
+		other := clone.Components[i]
+		if comp.Name != other.Name {
+			return result, errors.New("scale-down preserves component order and identity")
+		}
+		if other.Instances < comp.Instances {
+			if result.Component != "" || other.Instances < 1 || comp.Management != "" || comp.ResourceID != "" || comp.Kind == "database" {
+				return result, errors.New("scale-down changes one owned component count")
+			}
+			result = ScaleDownRequest{Component: comp.Name, Instances: other.Instances}
+			clone.Components[i].Instances = comp.Instances
+		}
+	}
+	if result.Component == "" || !reflect.DeepEqual(current, clone) {
+		return result, errors.New("scale-down only lowers one instance count; save other changes separately")
+	}
+	return result, nil
 }
