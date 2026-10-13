@@ -93,7 +93,10 @@ Details and limits are in the [operating model](docs/operating-model.md).
 }
 ```
 
-Components reach each other by name on a private network for the app. Secrets
+The spec lives in OAP, which keeps every version, so the application doesn't
+need a repository of its own. Each service repository releases only its own
+component's image ([spec ownership](docs/spec-ownership.md)). Components reach
+each other by name on a private network for the app. Secrets
 can be referenced by name instead of written into the spec. Images are pinned to
 immutable digests, so every release is reproducible. See the
 [portable lifecycle guide](docs/portable-lifecycle.md) and

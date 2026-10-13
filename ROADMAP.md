@@ -42,6 +42,10 @@ hosting while standalone workload acceptance runs on isolated Docker.
 
 ## Product and engineering rules
 
+- OAP owns each application specification and its version history; service
+  repositories release only their own component's immutable image. No repository
+  or Git host is a required or second writable source of the specification. See
+  [spec ownership](docs/spec-ownership.md).
 - Keep one Go service, PostgreSQL/River and Docker Engine as the default stack.
   No required model runtime, per-workload agent, separate queue, registry,
   identity service or monitoring cluster.
@@ -168,11 +172,21 @@ one scaled application, which is the gap no Compose/Coolify-style tool closes.
    a release runs before rolling out dependent components; failure stops the
    release with evidence. Application rollback reuses the existing
    [image rollback](docs/image-rollback.md) across all owned components; schema
-   and data are never rolled back implicitly.
+   and data are never rolled back implicitly. Make OAP's stored definition
+   versions usable as the specification's history: record author (owner or named
+   agent), time and message on each version; add history, version diff (masked)
+   and revert-as-a-new-plan; and add a one-way `spec export --dir` mirror for
+   repositories. Acceptance: an agent reverts a topology change through a plan,
+   the history shows who changed what, and the export round-trips through
+   validate/diff without exposing secret values.
 3. **Source-to-release:** explicit GitHub release ownership, signed/deduplicated
    events, frozen commits and immutable artifacts. Start with a documented external
    build lane; evaluate Railpack/Nixpacks alternatives later. Source detection
    must not silently take over an existing trigger or add a mandatory builder.
+   Add component-scoped release grants so a service repository's CI or agent can
+   release only its own component's image, never edit the specification.
+   Acceptance: three repositories release three components of one application
+   independently; a credential for one is denied on the others.
 4. **Compose import:** convert a `docker-compose.yml` into a proposed specification
    with explicit decisions and unsupported fields, per the
    [Compose import proposal](docs/compose-import.md). Import never deploys,
@@ -218,6 +232,7 @@ containers or routes. Do not install monitoring infrastructure just to benchmark
 | UI and generated UI | Parked. Revisit after M2/M3 headless workflows; render shared status/topology/evidence/approval models, keep authority server-side. Existing functional/security fixes remain allowed |
 | Coolify, Dokploy, Dokku, Portainer | M5 after owner reprioritization: preserve native configuration, resource discovery/grouping, capability contracts and operator-specific acceptance; no adapter expansion now |
 | AI-assisted discovery and application assembly | M5: deterministic proposals first, explicit ownership/handoff; no implicit adoption |
+| Git-sourced application specifications | After M3: an app may declare one repository/path as its specification source. New commits become proposals that OAP validates, plans and reviews; the spec is read-only in OAP while Git-sourced. Exactly one authority per app; no bidirectional sync |
 | Remote transport, Tailscale, OAuth, ChatGPT apps/plugins | Optional follow-up after M2 headless acceptance. Existing authenticated transport remains supported; never expose Docker/control DB or make a tunnel mandatory |
 | Embedded inference and BYOK models | Optional after deterministic diagnosis is useful; disable AI without losing APIs; model/context sharing and budgets explicitly opt-in |
 | Skills | Minimal versioned standalone operation skill/runbook in M2.9; client-specific packaging later |

@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 994 392" width="994" height="392" role="img" aria-labelledby="title desc">
+  <title id="title">Spec ownership</title>
+  <desc id="desc">Service repositories build images and release only their own component to OAP. OAP owns the versioned application spec with history, diff and revert. Releases freeze a spec version plus component images and run on Docker Engine. An optional one-way Git mirror exports the spec.</desc>
+  <style>
+    .bg { fill: #ffffff; }
+    .surface { fill: #f6f8fa; stroke: #d0d7de; }
+    .card { fill: #ffffff; stroke: #d0d7de; }
+    .oap { fill: #ddf4ff; stroke: #0969da; }
+    .agent { fill: #fbefff; stroke: #8250df; }
+    .owner { fill: #fff8c5; stroke: #9a6700; }
+    .app { fill: none; stroke: #0969da; stroke-width: 2; }
+    .inst { fill: #dafbe1; stroke: #1a7f37; }
+    .db { fill: #ffffff; stroke: #59636e; }
+    .planned { fill: #fff8c5; stroke: #9a6700; stroke-dasharray: 6 4; }
+    .line { stroke: #59636e; stroke-width: 1.6; fill: none; }
+    .line-accent { stroke: #0969da; stroke-width: 1.8; fill: none; }
+    .arrow { fill: #59636e; }
+    .arrow-accent { fill: #0969da; }
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #1f2328; }
+    .h { font-size: 15px; font-weight: 600; }
+    .b { font-size: 13px; }
+    .s { font-size: 12px; fill: #59636e; }
+    .label { font-size: 12px; font-weight: 600; fill: #0969da; }
+    .warn { font-size: 12px; font-weight: 600; fill: #9a6700; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0d1117; }
+      .surface { fill: #161b22; stroke: #30363d; }
+      .card { fill: #0d1117; stroke: #30363d; }
+      .oap { fill: #0c2d6b; stroke: #4493f8; }
+      .agent { fill: #2d1f4d; stroke: #ab7df8; }
+      .owner { fill: #3b2e0a; stroke: #d29922; }
+      .app { stroke: #4493f8; }
+      .inst { fill: #0f2d1a; stroke: #3fb950; }
+      .db { fill: #0d1117; stroke: #9198a1; }
+      .planned { fill: #3b2e0a; stroke: #d29922; }
+      .line { stroke: #9198a1; }
+      .line-accent { stroke: #4493f8; }
+      .arrow { fill: #9198a1; }
+      .arrow-accent { fill: #4493f8; }
+      text { fill: #e6edf3; }
+      .s { fill: #9198a1; }
+      .label { fill: #4493f8; }
+      .warn { fill: #d29922; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-accent" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+
+  <style>
+    .parked { fill: none; stroke: #8c959f; stroke-dasharray: 5 4; }
+    .step { fill: #ffffff; stroke: #d0d7de; }
+    .num { font-size: 12px; font-weight: 700; fill: #ffffff; }
+    .numdot { fill: #0969da; }
+    .axis { stroke: #8c959f; stroke-width: 1.2; }
+    .grid { stroke: #d0d7de; stroke-width: 1; stroke-dasharray: 3 4; }
+    .dot { fill: #59636e; }
+    .dot-hosted { fill: #ffffff; stroke: #59636e; stroke-width: 2; }
+    .dot-oap { fill: #0969da; }
+    .drain { fill: #fff1e5; stroke: #bc4c00; stroke-dasharray: 5 3; }
+    .bad { font-size: 12px; font-weight: 600; fill: #bc4c00; }
+    @media (prefers-color-scheme: dark) {
+      .parked { stroke: #6e7681; }
+      .step { fill: #0d1117; stroke: #30363d; }
+      .num { fill: #0d1117; }
+      .numdot { fill: #4493f8; }
+      .axis { stroke: #6e7681; }
+      .grid { stroke: #30363d; }
+      .dot { fill: #9198a1; }
+      .dot-hosted { fill: #0d1117; stroke: #9198a1; }
+      .dot-oap { fill: #4493f8; }
+      .drain { fill: #3d1d0a; stroke: #f0883e; }
+      .bad { fill: #f0883e; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-accent" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="994" height="392" rx="12"/>
+  <text class="h" x="14" y="32">Who owns what</text>
+  <text class="s" x="14" y="52">Service repos release images for their own component. OAP owns the application spec and its version history.</text>
+  <rect class="agent" x="14" y="82" width="190" height="72" rx="8"/>
+  <text class="h" x="28" y="106">web repo</text>
+  <text class="s" x="28" y="126">builds web</text>
+  <text class="s" x="28" y="144">CI or a coding agent</text>
+  <path class="line-accent" d="M204,118 L380,118" marker-end="url(#aa)"/>
+  <rect class="agent" x="14" y="174" width="190" height="72" rx="8"/>
+  <text class="h" x="28" y="198">api repo</text>
+  <text class="s" x="28" y="218">builds api</text>
+  <text class="s" x="28" y="236">CI or a coding agent</text>
+  <path class="line-accent" d="M204,210 L380,210" marker-end="url(#aa)"/>
+  <rect class="agent" x="14" y="266" width="190" height="72" rx="8"/>
+  <text class="h" x="28" y="290">worker repo</text>
+  <text class="s" x="28" y="310">builds worker</text>
+  <text class="s" x="28" y="328">CI or a coding agent</text>
+  <path class="line-accent" d="M204,302 L380,302" marker-end="url(#aa)"/>
+  <text class="label" x="216" y="108">component release</text><text class="mono" x="216" y="140">--image sha256:…</text>
+  <text class="s" x="216" y="334">own component only</text>
+  <rect class="oap" x="384" y="74" width="330" height="270" rx="12"/>
+  <text class="h" x="402" y="102">Open App Platform</text><text class="s" x="548" y="102">source of truth</text>
+  <rect class="card" x="402" y="116" width="294" height="124" rx="8"/>
+  <text class="h" x="416" y="140">Application spec: shop</text>
+  <text class="mono" x="416" y="158">v14</text><text class="b" x="450" y="158">scale api to 3</text><text class="s" x="640" y="158">agent</text>
+  <text class="mono" x="416" y="176">v13</text><text class="b" x="450" y="176">add worker</text><text class="s" x="640" y="176">agent</text>
+  <text class="mono" x="416" y="194">v12</text><text class="b" x="450" y="194">route /api</text><text class="s" x="640" y="194">owner</text>
+  <text class="s" x="416" y="226">history · diff · revert as a new plan</text>
+  <rect class="card" x="402" y="252" width="294" height="76" rx="8"/>
+  <text class="h" x="416" y="276">Releases</text>
+  <text class="b" x="416" y="296">Frozen spec version + component images</text>
+  <text class="s" x="416" y="314">web@a1f… api@9c2… worker@9c2…</text>
+  <path class="line-accent" d="M714,206 L780,206" marker-end="url(#aa)"/>
+  <rect class="surface" x="784" y="166" width="196" height="80" rx="8"/>
+  <text class="h" x="798" y="190">Docker Engine</text>
+  <text class="s" x="798" y="210">the running application</text>
+  <rect class="agent" x="784" y="74" width="196" height="76" rx="8"/>
+  <text class="h" x="798" y="98">Agent or owner</text>
+  <text class="s" x="798" y="118">pull spec, edit, diff,</text>
+  <text class="s" x="798" y="136">plan, apply</text>
+  <path class="line" d="M784,112 L716,140" marker-end="url(#a)"/>
+  <rect class="parked" x="784" y="262" width="196" height="82" rx="8"/>
+  <text class="h" x="798" y="286">Git mirror (optional)</text>
+  <text class="s" x="798" y="306">oap spec export --dir</text>
+  <text class="s" x="798" y="324">one-way, read-only copy</text>
+  <path class="line" d="M714,300 L782,300" marker-end="url(#a)" style="stroke-dasharray:5 4"/>
+  <text class="s" x="14" y="372">Later, an app may instead declare a Git source: new commits become proposals that OAP plans and reviews. Each app has exactly one authority.</text>
+</svg>

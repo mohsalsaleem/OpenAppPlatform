@@ -11,6 +11,7 @@ use this index.
 - [Positioning](positioning.md): the problem, the comparison with Compose, Kamal and k3s, and the reference application
 - [Roadmap](../ROADMAP.md): milestones and execution order
 - [Operating model](operating-model.md): principles, roles, what the agent gets and guardrails
+- [Spec ownership](spec-ownership.md): where the application spec lives and how multi-repo releases work
 - [Standalone agent runbook](standalone-agent-runbook.md): install, grant an agent and run the full lifecycle without the dashboard
 - [Feature reference](feature-reference.md): detailed behavior and limits of current features
 

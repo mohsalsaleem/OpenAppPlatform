@@ -44,6 +44,15 @@ The agent also keeps its normal development tools. Changing source code,
 running tests and building images happen outside OAP, in the agent's own
 environment; OAP takes the resulting immutable image.
 
+## Where the application spec lives
+
+OAP owns each application's spec and keeps every version. Service repositories
+don't hold the whole application: each repository's CI or agent builds an image
+and releases only its own component. Changing the application itself (adding a
+component, scaling, routes) goes through pull, edit, diff, plan and apply in OAP.
+See [spec ownership](spec-ownership.md) for the reasoning and planned history,
+revert and Git mirror commands.
+
 ## What the agent gets
 
 **Interfaces**
