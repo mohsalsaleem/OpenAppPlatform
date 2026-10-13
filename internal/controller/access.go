@@ -36,5 +36,24 @@ func (c *Controller) recordCredential(ctx context.Context, tx pgx.Tx, id, app st
 		return access.ErrDenied
 	}
 	_, e = tx.Exec(ctx, "UPDATE oap_deployments SET credential_id=$2 WHERE id=$1", id, p.CredentialID)
-	return e
+	if e != nil {
+		return e
+	}
+	return linkAuditOperation(ctx, tx, id)
+}
+
+// Commit the correlation with the operation: a crash after commit cannot orphan it.
+func linkAuditOperation(ctx context.Context, tx pgx.Tx, id string) error {
+	audit := domain.AuditIntent(ctx)
+	if audit == "" {
+		return nil
+	} // Internal/preview callers have no HTTP intent.
+	result, err := tx.Exec(ctx, "UPDATE oap_audit SET deployment_id=$2 WHERE id=$1 AND workspace_id='default' AND (deployment_id IS NULL OR deployment_id=$2)", audit, id)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return errors.New("durable audit intent is missing or conflicts with the operation")
+	}
+	return nil
 }

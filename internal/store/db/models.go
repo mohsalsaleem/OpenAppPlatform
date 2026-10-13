@@ -28,14 +28,16 @@ type OapApplicationGroup struct {
 }
 
 type OapAudit struct {
-	ID           string             `json:"id"`
-	WorkspaceID  string             `json:"workspace_id"`
-	UserID       pgtype.Text        `json:"user_id"`
-	CredentialID pgtype.Text        `json:"credential_id"`
-	Action       string             `json:"action"`
-	Status       pgtype.Int4        `json:"status"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	CompletedAt  pgtype.Timestamptz `json:"completed_at"`
+	ID            string             `json:"id"`
+	WorkspaceID   string             `json:"workspace_id"`
+	UserID        pgtype.Text        `json:"user_id"`
+	CredentialID  pgtype.Text        `json:"credential_id"`
+	Action        string             `json:"action"`
+	Status        pgtype.Int4        `json:"status"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	CompletedAt   pgtype.Timestamptz `json:"completed_at"`
+	DeploymentID  pgtype.Text        `json:"deployment_id"`
+	SourceEventID pgtype.Text        `json:"source_event_id"`
 }
 
 type OapAuthAttempt struct {

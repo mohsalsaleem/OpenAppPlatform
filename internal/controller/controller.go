@@ -201,7 +201,14 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		if oldHash != requestHash {
 			return domain.Deployment{}, domain.ErrConflict
 		}
-		return c.Store.DeploymentTx(ctx, tx, existingID)
+		existing, err := c.Store.DeploymentTx(ctx, tx, existingID)
+		if err != nil {
+			return existing, err
+		}
+		if err = linkAuditOperation(ctx, tx, existingID); err != nil {
+			return existing, err
+		}
+		return existing, tx.Commit(ctx)
 	}
 	if existingErr != nil && !errors.Is(existingErr, pgx.ErrNoRows) {
 		return domain.Deployment{}, existingErr
@@ -274,7 +281,14 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		if restart != nil || scaleDown != nil || oldHash != hash {
 			return domain.Deployment{}, domain.ErrConflict
 		}
-		return c.Store.DeploymentTx(ctx, tx, existingID)
+		existing, err := c.Store.DeploymentTx(ctx, tx, existingID)
+		if err != nil {
+			return existing, err
+		}
+		if err = linkAuditOperation(ctx, tx, existingID); err != nil {
+			return existing, err
+		}
+		return existing, tx.Commit(ctx)
 	}
 
 	d := domain.Deployment{Operation: "deploy", ID: domain.NewID(), ApplicationID: appID, Manifest: a.Manifest, DefinitionVersion: a.Version, State: "queued", Steps: domain.InitialSteps(a.Manifest)}

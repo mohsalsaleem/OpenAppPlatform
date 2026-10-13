@@ -141,7 +141,7 @@ func (c *Controller) ReceiveSource(ctx context.Context, h source.Hook, delivery 
 	if _, e = c.Jobs.InsertTx(ctx, tx, SourceArgs{id}, &river.InsertOpts{MaxAttempts: 3}); e != nil {
 		return SourceEvent{}, e
 	}
-	if _, e = tx.Exec(ctx, "INSERT INTO oap_audit(id,user_id,credential_id,action,status,completed_at) VALUES($1,$2,$3,$4,202,now())", domain.NewID(), p.UserID, p.CredentialID, "github.push "+h.Repository+"@"+push.After); e != nil {
+	if _, e = tx.Exec(ctx, "INSERT INTO oap_audit(id,user_id,credential_id,action,status,completed_at,source_event_id) VALUES($1,$2,$3,$4,202,now(),$5)", domain.NewID(), p.UserID, p.CredentialID, "github.push "+h.Repository+"@"+push.After, id); e != nil {
 		return SourceEvent{}, e
 	}
 	if e = tx.Commit(ctx); e != nil {

@@ -240,6 +240,28 @@ test("owner setup, sessions, invitations, read-only membership, and scoped agent
   await expect(
     page.getByText("Read-only member", { exact: true }),
   ).toBeVisible();
+  // A real local image release exposes observed outcome, not only HTTP acceptance.
+  const auditAppResponse = await page.request.post("/api/v1/applications", {
+    headers,
+    data: { name: "audit-browser", environment: "staging", targetId: "test-docker",
+      components: [{ name: "web", image: process.env.OAP_TEST_DOCKER_IMAGE!, port: 8080, instances: 1, strategy: "standard" }] },
+  });
+  expect(auditAppResponse.status()).toBe(201);
+  const auditApp = await auditAppResponse.json();
+  const deploymentResponse = await page.request.post(`/api/v1/applications/${auditApp.id}/deployments`, {
+    headers: { ...headers, "Idempotency-Key": "audit-browser-release" }, data: {},
+  });
+  expect(deploymentResponse.status()).toBe(202);
+  const operation = await deploymentResponse.json();
+  await page.getByRole("tab", { name: "Audit Log", exact: true }).click();
+  const auditRow = page.locator(".step").filter({ has: page.getByRole("link", { name: "View Operation" }) });
+  await expect(auditRow).toHaveCount(1);
+  await expect(auditRow.getByText("Completed", { exact: true })).toBeVisible({ timeout: 60000 });
+  await page.screenshot({ path: "../.local/ui-audit-operation.png", fullPage: true });
+  await auditRow.getByRole("link", { name: "View Operation" }).click();
+  await expect(page.getByRole("tab", { name: "Activity", exact: true })).toHaveAttribute("data-state", "active");
+  await expect(page.locator(`#operation-${operation.id}`)).toBeInViewport();
+  await page.getByRole("link", { name: "Workspace Settings" }).click();
   await page.getByRole("tab", { name: "Agent Tokens", exact: true }).click();
   await expect(
     page.getByText("Read-only agent", { exact: true }),

@@ -427,6 +427,8 @@ into a separate platform before covering this queue.
 | M1.5 — Container and Image Baseline | Capability-aware policies for owned workloads and explicit auditable exceptions; show resolved artifact/architecture/provenance and protect active/rollback/retained images. | A supported workload runs under policy, an unsafe/incompatible request is rejected before mutation, and native/inherited configuration is preserved. | No scanning platform, arbitrary image pruning or alternate runtime. |
 | M1.6 — Basic Visibility and Dogfooding | Controller/target/release/backup visibility, deterministic release/change context and notification event outbox. AI remains optional and no notification is sent without a configured destination. | An isolated failure is explainable from scoped context; a staging update/recovery drill has a usable external path and traceable outcomes. | No indexed logging/analytics stack, model inference, tunnels or notification-provider expansion. |
 
+M1.1 implementation is in progress: the first slice adds transactional request-to-operation correlation, live recorded outcomes and an Audit Log operation control, including GitHub source events and duplicate requests. Action/target/environment restrictions remain pending; this does not complete M1.1 or advance the priority to M1.2.
+
 Start with M1.1. Review the M1 exit gate after these slices; do not pull M2–M6
 work forward. General routing and advanced rollout strategies stay parked under
 the accepted breadth-first correction.

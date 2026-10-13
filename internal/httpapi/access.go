@@ -196,7 +196,7 @@ func (s *Server) ownerAuth(next http.Handler) http.Handler {
 			return
 		}
 		recorder := &auditResponse{ResponseWriter: w, status: 200}
-		next.ServeHTTP(recorder, r.WithContext(ctx))
+		next.ServeHTTP(recorder, r.WithContext(domain.WithAuditIntent(ctx, audit)))
 		finish, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = s.accessService().CompleteAudit(finish, audit, recorder.status)
@@ -375,7 +375,7 @@ func (s *Server) accessRoutes(mux *http.ServeMux) {
 		write(w, 200, map[string]bool{"ok": true})
 	})
 	mux.HandleFunc("GET /api/v1/access/audit", func(w http.ResponseWriter, r *http.Request) {
-		rows, e := s.Controller.Store.Pool.Query(r.Context(), "SELECT a.id,COALESCE(u.name,'Anonymous'),COALESCE(a.credential_id,''),a.action,COALESCE(a.status,0),a.created_at,COALESCE(c.name,''),COALESCE(c.kind,'') FROM oap_audit a LEFT JOIN oap_users u ON u.id=a.user_id LEFT JOIN oap_credentials c ON c.id=a.credential_id ORDER BY a.created_at DESC LIMIT 100")
+		rows, e := s.Controller.Store.Pool.Query(r.Context(), "SELECT a.id,COALESCE(u.name,'Anonymous'),COALESCE(a.credential_id,''),a.action,COALESCE(a.status,0),a.created_at,COALESCE(c.name,''),COALESCE(c.kind,''),COALESCE(d.id,''),COALESCE(d.application_id,se.application_id,''),COALESCE(CASE WHEN d.steps->0->'control'->>'mode'='cancel' THEN 'cancelled' WHEN d.steps->0->'control'->>'mode'='abandon' THEN 'abandoned' ELSE d.state END,''),COALESCE(d.operation,''),d.updated_at,COALESCE(se.id,''),COALESCE(se.state,'') FROM oap_audit a LEFT JOIN oap_users u ON u.id=a.user_id LEFT JOIN oap_credentials c ON c.id=a.credential_id LEFT JOIN oap_source_events se ON se.id=a.source_event_id LEFT JOIN oap_deployments d ON d.id=COALESCE(a.deployment_id,se.deployment_id) ORDER BY a.created_at DESC LIMIT 100")
 		if e != nil {
 			fail(w, e)
 			return
@@ -383,14 +383,15 @@ func (s *Server) accessRoutes(mux *http.ServeMux) {
 		defer rows.Close()
 		out := []map[string]any{}
 		for rows.Next() {
-			var id, name, credential, action, credentialName, kind string
+			var id, name, credential, action, credentialName, kind, operationID, applicationID, operationState, operation, sourceID, sourceState string
+			var updatedAt *time.Time
 			var status int
 			var at time.Time
-			if e = rows.Scan(&id, &name, &credential, &action, &status, &at, &credentialName, &kind); e != nil {
+			if e = rows.Scan(&id, &name, &credential, &action, &status, &at, &credentialName, &kind, &operationID, &applicationID, &operationState, &operation, &updatedAt, &sourceID, &sourceState); e != nil {
 				fail(w, e)
 				return
 			}
-			out = append(out, map[string]any{"id": id, "subject": name, "credentialId": credential, "credentialName": credentialName, "kind": kind, "action": action, "status": status, "createdAt": at})
+			out = append(out, map[string]any{"id": id, "subject": name, "credentialId": credential, "credentialName": credentialName, "kind": kind, "action": action, "status": status, "createdAt": at, "operationId": operationID, "applicationId": applicationID, "operationState": operationState, "operation": operation, "operationUpdatedAt": updatedAt, "sourceEventId": sourceID, "sourceState": sourceState})
 		}
 		if e = rows.Err(); e != nil {
 			fail(w, e)

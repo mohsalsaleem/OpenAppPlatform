@@ -150,6 +150,12 @@ func TestOwnerSessionsRolesScopeAuditAndRevokedJobs(t *testing.T) {
 	}
 	var d domain.Deployment
 	json.Unmarshal(raw, &d)
+	// Duplicate HTTP requests retain separate intents linked to the same durable operation.
+	code, raw, _ = call("POST", "/api/v1/applications/"+app.ID+"/deployments", nil, nil, "Bearer "+operate, "")
+	var repeated domain.Deployment
+	if code != 202 || json.Unmarshal(raw, &repeated) != nil || repeated.ID != d.ID {
+		t.Fatal("duplicate operation changed")
+	}
 	principal, e := (access.Service{Pool: c.Store.Pool}).Principal(context.Background(), operate)
 	if e != nil {
 		t.Fatal(e)
@@ -180,6 +186,52 @@ func TestOwnerSessionsRolesScopeAuditAndRevokedJobs(t *testing.T) {
 	code, raw, _ = call("GET", "/api/v1/access/audit", nil, owner, "", "")
 	if code != 200 || !bytes.Contains(raw, []byte("POST /api/v1/applications")) || bytes.Contains(raw, []byte(operate)) || bytes.Contains(raw, []byte(account["password"])) {
 		t.Fatal("audit missing or secret leaked")
+	}
+	var events []struct {
+		OperationID    string `json:"operationId"`
+		ApplicationID  string `json:"applicationId"`
+		OperationState string `json:"operationState"`
+		Status         int    `json:"status"`
+	}
+	if json.Unmarshal(raw, &events) != nil {
+		t.Fatal("invalid audit response")
+	}
+	linked := 0
+	for _, event := range events {
+		if event.OperationID == d.ID {
+			linked++
+			if event.ApplicationID != app.ID || event.OperationState != "attention" || event.Status != 202 {
+				t.Fatal("audit lost request or observed outcome")
+			}
+		}
+	}
+	if linked != 2 {
+		t.Fatalf("expected two intents for one operation, got %d", linked)
+	}
+	// A missing durable intent must roll back a new operation and its queue entry.
+	ctx := domain.WithAuditIntent(domain.WithPrincipal(context.Background(), principal), "missing-intent")
+	// Use the still-active owner identity rather than the revoked agent.
+	ownerPrincipal, err := (access.Service{Pool: c.Store.Pool}).Principal(context.Background(), owner.Value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx = domain.WithPrincipal(ctx, ownerPrincipal)
+	auditManifest := manifest()
+	auditManifest.Name = "audit-rollback-fixture"
+	auditApp, err := c.CreateApplication(ctx, auditManifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	before, err := c.Store.Deployments(ctx, auditApp.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = c.Enqueue(ctx, auditApp.ID, "missing-audit-operation"); err == nil {
+		t.Fatal("operation committed without audit intent")
+	}
+	after, err := c.Store.Deployments(ctx, auditApp.ID)
+	if err != nil || len(after) != len(before) {
+		t.Fatal("missing audit left an operation")
 	}
 	// Session mutation requires the custom CSRF header even with a valid cookie.
 	req, _ := http.NewRequest("POST", srv.URL+"/api/v1/auth/logout", nil)

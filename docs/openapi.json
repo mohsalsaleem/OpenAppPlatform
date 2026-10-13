@@ -2222,7 +2222,7 @@
     },
     "/api/v1/access/audit": {
       "get": {
-        "summary": "Latest 100 audit intents/results, excluding request bodies",
+        "summary": "Latest 100 audit intents and HTTP outcomes, with durable operation/source correlation; excludes request bodies",
         "responses": {
           "200": {
             "description": "Successful operation",
@@ -2253,6 +2253,34 @@
                       },
                       "createdAt": {
                         "type": "string"
+                      },
+                      "credentialId": {
+                        "type": "string"
+                      },
+                      "operationId": {
+                        "type": "string"
+                      },
+                      "applicationId": {
+                        "type": "string"
+                      },
+                      "operationState": {
+                        "type": "string"
+                      },
+                      "operation": {
+                        "type": "string"
+                      },
+                      "sourceEventId": {
+                        "type": "string"
+                      },
+                      "sourceState": {
+                        "type": "string"
+                      },
+                      "operationUpdatedAt": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "format": "date-time"
                       }
                     },
                     "required": [
@@ -2262,7 +2290,15 @@
                       "subject",
                       "action",
                       "status",
-                      "createdAt"
+                      "createdAt",
+                      "credentialId",
+                      "operationId",
+                      "applicationId",
+                      "operationState",
+                      "operation",
+                      "sourceEventId",
+                      "sourceState",
+                      "operationUpdatedAt"
                     ],
                     "additionalProperties": false
                   }

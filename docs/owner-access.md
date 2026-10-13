@@ -24,6 +24,11 @@ Membership and token status are loaded on every request. Releases record the ini
 
 Mutations record an audit intent before executing; failure to write the intent blocks the action. Status is recorded after handling. If completion logging is interrupted, the durable intent remains pending. Permission denials from known credentials are recorded. Audit excludes bodies, passwords, tokens and operator secrets; owners can inspect the latest 100 entries. This is a baseline, not an external tamper-proof audit system.
 
+New lifecycle requests link their intent to the durable operation in the same database transaction. Duplicate idempotent requests retain separate request intents that refer to the same operation. Restart, deploy, rollback, retirement and recovery/control requests expose `operationId`, `applicationId`, `operationState`, `operation`, and `operationUpdatedAt` in the owner audit API. The HTTP status remains the request outcome; the operation status is its latest recorded observation, not a fresh provider health check. Cancelling or closing tracking has its existing distinct status. An interrupted HTTP completion can leave a pending request with a linked committed operation.
+
+GitHub push audits link to their durable source event (`sourceEventId`, `sourceState`), then follow its resulting release when one exists. The Audit Log uses the observed status and opens the exact operation in application Activity. It never adds source payloads, configuration values, control reasons or provider errors to the audit response. Existing historical intents keep their IDs and are left unlinked; the migration does not guess associations from paths. Internal/preview calls without a durable HTTP intent retain their existing behavior.
+
+
 ## Recovery and preview compatibility
 
 If the owner loses their password, run the installed `oap-admin reset-owner-password` command with the new password on stdin and the installation's `DATABASE_URL`. The binary is included in the application container. Keep the password out of command arguments and shell history. This host-side action updates the password, revokes owner credentials, and records recovery. It requires database access; no unauthenticated password-reset endpoint exists.

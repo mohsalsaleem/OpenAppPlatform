@@ -91,7 +91,10 @@ func (c *Controller) StopRelease(ctx context.Context, id string, request StopRel
 	requestHash := hex.EncodeToString(sum[:])
 	if release.Control != nil {
 		if release.Control.RequestHash == requestHash {
-			return release, nil
+			if err = linkAuditOperation(ctx, tx, id); err != nil {
+				return release, err
+			}
+			return release, tx.Commit(ctx)
 		}
 		return release, domain.ErrConflict
 	}
@@ -180,7 +183,10 @@ func (c *Controller) ReconcileAbandoned(ctx context.Context, id string, request 
 		return release, domain.ErrConflict
 	}
 	if release.Control.ResolvedAt != nil {
-		return release, nil
+		if err = linkAuditOperation(ctx, tx, id); err != nil {
+			return release, err
+		}
+		return release, tx.Commit(ctx)
 	}
 	if !release.UpdatedAt.Equal(request.ExpectedUpdatedAt) {
 		return release, domain.ErrConflict

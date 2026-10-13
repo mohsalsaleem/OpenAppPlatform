@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Link } from "react-router-dom";
+import { Status } from "../../components/Status";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { unwrap, api } from "../../api";
@@ -59,6 +61,7 @@ export function Access() {
   });
   const audit = useQuery({
     queryKey: ["audit"],
+    enabled: section === "audit",
     queryFn: () => api.GET("/api/v1/access/audit").then(unwrap),
     refetchInterval: 10000,
   });
@@ -328,8 +331,7 @@ export function Access() {
         <section className="panel">
           <h2>Audit Log</h2>
           <p className="muted">
-            Latest 100 actions and request outcomes. Open application Activity
-            for deployment progress.
+            Latest 100 actions, request outcomes and operation progress.
           </p>
           {audit.data?.map((event) => (
             <div className="step" key={event.id}>
@@ -340,6 +342,9 @@ export function Access() {
                   <p className="small">
                     Event {event.id} · Actor {event.subject} · HTTP{" "}
                     {event.status || "pending"}
+                    {event.operationId && <> · Operation {event.operationId}</>}
+                    {event.sourceEventId && <> · Source Event {event.sourceEventId}</>}
+                    {event.operationUpdatedAt && <> · Observed {new Date(event.operationUpdatedAt).toLocaleString()}</>}
                   </p>
                 </Disclosure>
                 <p className="small muted">
@@ -349,7 +354,9 @@ export function Access() {
                   · {new Date(event.createdAt).toLocaleString()}
                 </p>
               </div>
-              <span className="environment">
+              {event.operationState || event.sourceState ? (
+                <Status value={event.operationState || event.sourceState} />
+              ) : <span className="environment">
                 {!event.status
                   ? "Pending"
                   : event.status === 202
@@ -359,7 +366,12 @@ export function Access() {
                       : event.status < 400
                         ? "Succeeded"
                         : "Rejected"}
-              </span>
+              </span>}
+              {event.operationId && event.applicationId && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link to={`/applications/${event.applicationId}?tab=deployments#operation-${event.operationId}`}>View Operation</Link>
+                </Button>
+              )}
             </div>
           ))}
         </section>

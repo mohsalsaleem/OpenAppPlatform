@@ -24,7 +24,7 @@ import { EnvironmentNavigation } from "./EnvironmentNavigation";
 import { SourceEvents } from "./SourceEvents";
 import { useCanOperate, useIsOwner } from "../../access";
 import { useState, useEffect, useRef } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -54,7 +54,11 @@ export function ApplicationDetail() {
   const client = useQueryClient();
   const live = useApplicationEvents(id);
   const [handoff, setHandoff] = useState("");
+  const location = useLocation();
   const [tab, setTab] = useState("overview");
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("tab") === "deployments") setTab("deployments");
+  }, [location.search, location.key]);
   const [scaleReview, setScaleReview] = useState<{
     component: string;
     instances: number;
@@ -85,6 +89,15 @@ export function ApplicationDetail() {
         .then(unwrap),
     refetchInterval: live ? false : 2000,
   });
+  const scrolledOperation = useRef("");
+  useEffect(() => {
+    if (tab !== "deployments" || !location.hash.startsWith("#operation-") || scrolledOperation.current === location.key) return;
+    const element = document.getElementById(location.hash.slice(1));
+    if (element) {
+      element.scrollIntoView({ block: "start" });
+      scrolledOperation.current = location.key;
+    }
+  }, [tab, releases.data, location.hash, location.key]);
   const targets = useQuery({
     queryKey: ["targets"],
     queryFn: () => api.GET("/api/v1/targets").then(unwrap),
@@ -657,7 +670,7 @@ export function ApplicationDetail() {
               <p className="muted">No deployments yet.</p>
             )}
             {releases.data?.map((d) => (
-              <article className="release" key={d.id}>
+              <article className="release scroll-mt-4" id={`operation-${d.id}`} key={d.id}>
                 <div className="section-heading">
                   <div>
                     <strong>

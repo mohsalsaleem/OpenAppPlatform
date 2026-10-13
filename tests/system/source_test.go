@@ -133,6 +133,11 @@ func TestSignedGitHubDeliveryBuildOnceSelectedReplicasAndRecovery(t *testing.T) 
 	if e != nil || event.State != "released" || builder.calls != 1 {
 		t.Fatalf("build/release %+v %v calls=%d", event, e, builder.calls)
 	}
+	var auditCount int
+	var auditRelease string
+	if err := c.Store.Pool.QueryRow(ctx, "SELECT count(*),COALESCE(min(se.deployment_id),'') FROM oap_audit a JOIN oap_source_events se ON se.id=a.source_event_id WHERE se.id=$1", event.ID).Scan(&auditCount, &auditRelease); err != nil || auditCount != 1 || auditRelease != event.DeploymentID {
+		t.Fatal("source audit lost durable event/release correlation", err)
+	}
 	release, e := c.Store.Deployment(ctx, event.DeploymentID)
 	if e != nil || len(release.Steps) != 2 || release.Source == nil || release.Source.Commit != push.After {
 		t.Fatal("selected component provenance lost")

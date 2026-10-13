@@ -1091,7 +1091,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Latest 100 audit intents/results, excluding request bodies */
+        /** Latest 100 audit intents and HTTP outcomes, with durable operation/source correlation; excludes request bodies */
         get: {
             parameters: {
                 query?: never;
@@ -1115,6 +1115,15 @@ export interface paths {
                             action: string;
                             status: number;
                             createdAt: string;
+                            credentialId: string;
+                            operationId: string;
+                            applicationId: string;
+                            operationState: string;
+                            operation: string;
+                            sourceEventId: string;
+                            sourceState: string;
+                            /** Format: date-time */
+                            operationUpdatedAt: string | null;
                         }[];
                     };
                 };
