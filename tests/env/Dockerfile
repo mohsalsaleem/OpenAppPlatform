@@ -11,6 +11,7 @@ RUN go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.30.0
 # Compile only Go-package inputs. Root docs and UI edits must not regenerate
 # the large Go race/compiler cache layer on every verification run.
 COPY sqlc.yaml ./
+COPY docs/ docs/
 COPY cmd/ cmd/
 COPY internal/ internal/
 COPY tests/ tests/
@@ -23,6 +24,7 @@ RUN /go/bin/sqlc diff && go vet ./... && mkdir -p /opt/oap/tests && \
     done < /opt/oap/packages.txt
 RUN CGO_ENABLED=0 go build -trimpath -o /opt/oap/platform ./cmd/platform && \
     CGO_ENABLED=0 go build -trimpath -o /opt/oap/oap-mcp ./cmd/oap-mcp && \
+    CGO_ENABLED=0 go build -trimpath -o /opt/oap/oap ./cmd/oap && \
     CGO_ENABLED=0 go build -trimpath -ldflags '-X main.version=v1 -X main.port=8080' -o /opt/oap/fixture-v1 ./tests/env/fixture && \
     CGO_ENABLED=0 go build -trimpath -ldflags '-X main.version=v2 -X main.port=8025' -o /opt/oap/fixture-v2 ./tests/env/fixture && \
     CGO_ENABLED=0 go build -trimpath -o /opt/oap/worker-fixture ./examples/worker && \

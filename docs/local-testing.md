@@ -19,6 +19,10 @@ internal network without registry pulls or external service access. This is
 reproducible local verification, not a guarantee of bit-identical build artifacts
 or a fully offline first installation.
 
+The runner also performs [headless JSON CLI acceptance](agent-cli.md) against
+standalone Docker and retains `cli-acceptance.json`. It uses explicit isolated
+preview authority; owner/agent scope checks remain in the system and owner suites.
+
 ## Isolation
 
 Each run creates a unique Compose project containing:

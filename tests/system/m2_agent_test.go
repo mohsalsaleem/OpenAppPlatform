@@ -80,6 +80,24 @@ func TestM2ScopedRemoteDiagnosticsPlansPauseAndRecovery(t *testing.T) {
 		return response.StatusCode, data
 	}
 	root := "/api/v1/applications/" + app.ID
+	for _, credential := range []string{read, actor} {
+		status, projection := call("GET", root+"/capabilities", credential, nil)
+		var capabilities struct {
+			Actions map[string]map[string]struct {
+				Allowed bool `json:"allowed"`
+			} `json:"actions"`
+		}
+		if status != 200 || json.Unmarshal(projection, &capabilities) != nil {
+			t.Fatal("scoped capabilities unavailable")
+		}
+		if capabilities.Actions["web"]["deploy"].Allowed != (credential == actor) {
+			t.Fatal("capabilities ignored action grant")
+		}
+		status, _ = call("GET", "/api/v1/applications/"+other.ID+"/capabilities", credential, nil)
+		if status != 404 {
+			t.Fatal("capabilities escaped app scope")
+		}
+	}
 	rpc := func(name, id string) map[string]any {
 		return map[string]any{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": map[string]any{"name": name, "arguments": map[string]string{"applicationId": id}}}
 	}

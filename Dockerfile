@@ -12,14 +12,16 @@ FROM ${GO_IMAGE} AS backend
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
+COPY docs/ docs/
 COPY cmd/ cmd/
 COPY internal/ internal/
-RUN CGO_ENABLED=0 go build -trimpath -o /platform ./cmd/platform && CGO_ENABLED=0 go build -trimpath -o /oap-mcp ./cmd/oap-mcp && CGO_ENABLED=0 go build -trimpath -o /oap-admin ./cmd/oap-admin && CGO_ENABLED=0 go build -trimpath -o /oap-build-client ./cmd/oap-build-client
+RUN CGO_ENABLED=0 go build -trimpath -o /oap ./cmd/oap && CGO_ENABLED=0 go build -trimpath -o /platform ./cmd/platform && CGO_ENABLED=0 go build -trimpath -o /oap-mcp ./cmd/oap-mcp && CGO_ENABLED=0 go build -trimpath -o /oap-admin ./cmd/oap-admin && CGO_ENABLED=0 go build -trimpath -o /oap-build-client ./cmd/oap-build-client
 
 FROM ${RUNTIME_IMAGE} AS runtime
 RUN apk add --no-cache ca-certificates && adduser -D -u 10001 platform
 WORKDIR /app
 COPY --from=backend /platform /app/platform
+COPY --from=backend /oap /app/oap
 COPY --from=backend /oap-mcp /app/oap-mcp
 COPY --from=backend /oap-admin /app/oap-admin
 COPY --from=backend /oap-build-client /app/oap-build-client

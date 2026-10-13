@@ -3,6 +3,7 @@
 dev:
 	python3 scripts/run-local.py go run ./cmd/platform -targets .local/targets.json
 build:
+	go build -o bin/oap ./cmd/oap
 	npm --prefix web run build
 	python3 scripts/run-local.py go build -o bin/platform ./cmd/platform
 	python3 scripts/run-local.py go build -o bin/oap-mcp ./cmd/oap-mcp

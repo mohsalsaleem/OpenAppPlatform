@@ -1,11 +1,15 @@
 # Open App Platform
 
-An application-first control plane for self-hosted runtimes and deployment operators. Group web services and long-running workers
-into applications, track releases, and keep your existing deployment operator.
-The product experience is inspired by DigitalOcean App Platform. The primary
-operator-backed journey is connect/configure your existing operator, discover
-running resources and group them into applications. Preserve native builds, GitHub
-triggers, domains, volumes and secrets. A custom builder is optional.
+A lightweight, self-hosted application control plane for one owner and an external
+AI agent. **Standalone Docker and agent-facing interfaces are the current focus.**
+Agents should manage the complete application lifecycle through deterministic
+APIs, a structured CLI, MCP and skills; embedded inference is optional.
+
+The [roadmap](ROADMAP.md) defines the new ordered headless delivery milestones.
+UI expansion and operator-specific work are parked. Existing dashboard and Coolify
+capabilities remain supported with their current limits; native builds, triggers,
+configuration and data retain their ownership. The complete agent-led journey is
+planned, not yet delivered.
 
 ## Current milestone
 
@@ -30,6 +34,13 @@ a registry connection. Dokploy, Dokku, Portainer, scheduled jobs, embedded AI
 diagnosis, rolling deployments, and blue-green remain planned. Native Coolify source tracking
 and an optional signed immutable-image build lane are implemented and staged;
 native source lifecycle handoff and artifact reuse are not.
+
+## Agent interface
+
+The [JSON CLI](docs/agent-cli.md) exposes current lifecycle APIs, scoped capability
+inspection and durable operation waiting. Build with `go build -o bin/oap ./cmd/oap`;
+`bin/oap help` and `bin/oap schema` work offline. Existing agent scope limits still
+apply; headless bootstrap and app-creation grants are the next M2 slice.
 
 ## Run locally
 

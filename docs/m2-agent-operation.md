@@ -1,5 +1,9 @@
 # M2 Scoped Agent Operation
 
+This records the shipped M2.1–M2.4 baseline. The revised
+[roadmap](../ROADMAP.md) continues with standalone, headless M2.5–M2.9; the browser
+issuance/review steps below describe current behavior and are not the target DX.
+
 This baseline reuses the single Go service, existing owner/agent credentials,
 PostgreSQL journal and operator adapters. It adds no model, tunnel service,
 identity service or direct database access. Native builds, triggers, configuration

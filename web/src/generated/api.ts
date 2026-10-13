@@ -3022,6 +3022,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/applications/{id}/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inspect scoped application action eligibility
+         * @description Scope-checked eligibility for deploy/restart/configure, not admission or a complete lifecycle permission catalog. Missing current runtime/input/conflict evidence is explicit.
+         */
+        get: operations["get_application_capabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3029,6 +3049,9 @@ export interface components {
         Error: {
             code: string;
             message: string;
+            /** @description A transient failure may be retried only after outcome inspection and with the same mutation key. */
+            retryable?: boolean;
+            nextActions?: string[];
         };
         Component: {
             healthCheck?: components["schemas"]["HealthCheck"];
@@ -5508,6 +5531,95 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_application_capabilities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful operation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        schemaVersion: 1;
+                        /** Format: date-time */
+                        generatedAt?: string;
+                        applicationId: string;
+                        definitionVersion: number;
+                        targetId: string;
+                        environment: string;
+                        runtime: components["schemas"]["Capabilities"];
+                        actions: {
+                            [key: string]: {
+                                [key: string]: {
+                                    allowed: boolean;
+                                    reason: string;
+                                };
+                            };
+                        };
+                        /** @constant */
+                        admissionRequired: true;
+                        coverage: string[];
+                        missingEvidence: string[];
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Validation rejected */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };

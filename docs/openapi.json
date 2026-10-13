@@ -5094,6 +5094,159 @@
           }
         }
       }
+    },
+    "/api/v1/applications/{id}/capabilities": {
+      "get": {
+        "summary": "Inspect scoped application action eligibility",
+        "operationId": "get_application_capabilities",
+        "responses": {
+          "200": {
+            "description": "Successful operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "schemaVersion",
+                    "applicationId",
+                    "definitionVersion",
+                    "targetId",
+                    "environment",
+                    "runtime",
+                    "actions",
+                    "admissionRequired",
+                    "coverage",
+                    "missingEvidence"
+                  ],
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "integer",
+                      "const": 1
+                    },
+                    "generatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "applicationId": {
+                      "type": "string"
+                    },
+                    "definitionVersion": {
+                      "type": "integer"
+                    },
+                    "targetId": {
+                      "type": "string"
+                    },
+                    "environment": {
+                      "type": "string"
+                    },
+                    "runtime": {
+                      "$ref": "#/components/schemas/Capabilities"
+                    },
+                    "actions": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "required": [
+                            "allowed",
+                            "reason"
+                          ],
+                          "properties": {
+                            "allowed": {
+                              "type": "boolean"
+                            },
+                            "reason": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "admissionRequired": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "coverage": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "missingEvidence": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Scope-checked eligibility for deploy/restart/configure, not admission or a complete lifecycle permission catalog. Missing current runtime/input/conflict evidence is explicit."
+      }
     }
   },
   "components": {
@@ -5124,6 +5277,16 @@
           },
           "message": {
             "type": "string"
+          },
+          "retryable": {
+            "type": "boolean",
+            "description": "A transient failure may be retried only after outcome inspection and with the same mutation key."
+          },
+          "nextActions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [

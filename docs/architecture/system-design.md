@@ -3,7 +3,10 @@
 Open App Platform is a single-workspace application control plane over existing
 operators and bare Docker. The supported runtime adapters are Coolify and Docker.
 It is verified locally and in isolated staging; owner-grade production hardening
-remains in M1. The [roadmap](../../ROADMAP.md) defines the delivery order.
+remains bounded by the documented acceptance limits. The
+[roadmap](../../ROADMAP.md) defines the delivery order: standalone Docker and
+agent-facing contracts first; UI and operator expansion are parked. This document
+describes the existing architecture, not completion of the headless agent journey.
 
 ## Boundaries
 

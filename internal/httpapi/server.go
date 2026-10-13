@@ -80,6 +80,7 @@ func (s *Server) auth(next http.Handler) http.Handler {
 	})
 }
 func write(w http.ResponseWriter, status int, data any) {
+	data = machineError(status, data)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
@@ -117,6 +118,7 @@ func decode(w http.ResponseWriter, r *http.Request, dst any) error {
 }
 func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/applications/{id}/capabilities", s.applicationCapabilities)
 	s.endpointRoutes(mux)
 	s.diagnosticRoutes(mux)
 	s.planRoutes(mux)

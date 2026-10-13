@@ -2,21 +2,24 @@
 
 OpenAppPlatform is an application-first Docker control plane that manages complete applications directly on Docker Engine or through deployment operators such as Coolify, Dokploy, Dokku, and Portainer. The intended experience follows DigitalOcean App Platform: users work with applications, components, environments, and releases while retaining their existing Docker infrastructure.
 
-Status: Draft design, 9 October 2026. Product name: OpenAppPlatform. Bare Docker and Coolify are first-class initial targets. This records the agreed direction and proposed implementation; no infrastructure changes are authorized by this document.
+Status: Original architecture draft, 9 October 2026; priority revised 13 October
+2026. Product name: Open App Platform. The technology stack remains the
+implementation contract; proposed features are not claims of current support.
 
-The [roadmap delivery queue](../ROADMAP.md#m0-core-workflow-delivery-queue)
-is the current execution order and separates implemented behavior from future
-contracts. Finish Coolify runtime configuration/connections, then prioritize guided
-assembly, GitHub release ownership, environment organization, readiness/recovery,
-and stable routing. Minimal owner auth and scoped agents are implemented; full M1 hardening and
-AI assistance follow the usable core. The technology stack below is the implementation contract. Any future change
-requires an explicit recorded decision rather than silently making it optional.
-Later capabilities remain scheduled by the roadmap, not implied by this draft.
-
+The [current roadmap](../ROADMAP.md) is the authoritative execution order:
+standalone Docker first, external agents as primary operators, and UI/operator
+expansion parked. Earlier operator-first ordering is superseded. The next slice
+is M2.5 machine contracts and CLI, followed by headless bootstrap, the portable
+application lifecycle, bounded diagnosis and full standalone acceptance.
 
 ## Product direction
 
-The primary journey is connect an existing deployment operator, discover running resources, review mappings and group them into logical applications. Native builds, GitHub integrations, domains, volumes and secrets keep working. Users can also create new components or use bare Docker. Optional infrastructure fills verified operator gaps. See the [operator-first implementation audit](operator-first-audit.md).
+The primary journey is an owner establishing trust and an external agent installing
+OAP, defining and deploying applications on standalone Docker, diagnosing issues,
+correcting them and verifying behavior through machine interfaces. The UI remains
+an optional human surface. Existing operator-backed resources preserve native
+builds, triggers, configuration and data; their adapter expansion and views return
+later. See the [historical operator audit](operator-first-audit.md).
 
 The platform groups frontend, API, workers, scheduled jobs, and linked dependencies under one application. It provides shared configuration, a coherent release view, combined health and logs, and application-level API, CLI, and MCP operations.
 

@@ -56,6 +56,7 @@ try{
  platform=spawn('/opt/oap/platform',['-targets','/workspace/.local/observed-targets.json','-web','/workspace/web/dist'],{env,stdio:['ignore','pipe','pipe']});
  let platformLog='';platform.stdout.on('data',b=>platformLog+=b);platform.stderr.on('data',b=>platformLog+=b);
  await waitReady();
+ await run('cli-standalone','python3',['tests/env/cli.py'],'/workspace',240000);
  try { await run('browser','node',['node_modules/@playwright/test/cli.js','test','tests/workspace.spec.ts','tests/ui-audit.spec.ts'],'/workspace/web'); }
  catch(error) { const {cp}=await import('node:fs/promises');await cp('/workspace/web/test-results','/report/browser-failure',{recursive:true}).catch(()=>{});throw error; }
  for(const name of await readdir('/workspace/.local'))if(name.endsWith('.png'))await copyFile('/workspace/.local/'+name,'/report/'+name);
