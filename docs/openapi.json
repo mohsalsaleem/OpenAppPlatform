@@ -4220,6 +4220,72 @@
           }
         }
       }
+    },
+    "/api/v1/targets/{id}/connection-state": {
+      "get": {
+        "summary": "Read the latest recorded connection and held operations without contacting the operator",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Connection observation (including failed or unreachable)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetConnectionState"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Target not found"
+          },
+          "403": {
+            "description": "Mutation authorization required for a check"
+          }
+        }
+      }
+    },
+    "/api/v1/targets/{id}/connection-checks": {
+      "post": {
+        "summary": "Run a bounded read-only operator discovery and record the observation; never retry deployment work",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Connection observation (including failed or unreachable)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TargetConnectionState"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Target not found"
+          },
+          "403": {
+            "description": "Mutation authorization required for a check"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5554,6 +5620,71 @@
             "maximum": 64000
           }
         }
+      },
+      "TargetConnectionState": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "unknown",
+              "connected",
+              "unreachable",
+              "failed",
+              "stale"
+            ]
+          },
+          "observedState": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "checkedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "resourceCount": {
+            "type": "integer"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/Capabilities"
+          },
+          "nativeSourceObservation": {
+            "type": "boolean"
+          },
+          "heldOperations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "applicationId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "applicationId"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "state",
+          "observedState",
+          "message",
+          "nativeSourceObservation",
+          "heldOperations"
+        ],
+        "additionalProperties": false
       }
     }
   }

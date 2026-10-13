@@ -78,6 +78,7 @@ async function fixtures(page: Page, preview = false) {
         : { name: "Audit Owner", role: "owner", kind: "session" },
       "/meta": {},
       "/targets": [target],
+ "/targets/audit-target/connection-state": {state:"unknown",observedState:"unknown",message:"Connection has not been checked for this configuration.",nativeSourceObservation:false,heldOperations:[]},
       "/application-groups": [
         {
           id: "audit-group",
@@ -907,4 +908,33 @@ test("automatic membership requires owner opt-in and can be disabled", async ({
       "Native route drift detected. No automatic changes were made.",
     ),
   ).toBeVisible();
+});
+
+test("target outage evidence survives navigation and rechecks never retry operations", async ({ page }) => {
+  await fixtures(page);
+  let checks=0;
+  let state: {resourceCount:number;state:string;observedState:string;message:string;nativeSourceObservation:boolean;heldOperations:{id:string;applicationId:string}[];expiresAt?:string}={resourceCount:0,state:"unknown",observedState:"unknown",message:"Connection has not been checked for this configuration.",nativeSourceObservation:false,heldOperations:[] as {id:string;applicationId:string}[]};
+  await page.route("**/api/v1/targets/audit-target/connection-state",route=>route.fulfill({json:state}));
+  await page.route("**/api/v1/targets/audit-target/connection-checks",route=>{
+    checks++;
+    state=checks===1 ? {resourceCount:0,state:"unreachable",observedState:"unreachable",message:"The operator could not be reached within the connection deadline.",nativeSourceObservation:false,heldOperations:[{id:"held-operation",applicationId:app.id}]} : {resourceCount:0,state:"connected",observedState:"connected",message:"Connection verified.",nativeSourceObservation:false,heldOperations:[{id:"held-operation",applicationId:app.id}]};
+    return route.fulfill({json:state});
+  });
+  await page.goto("/targets");
+  await expect(page.getByText("Unknown",{exact:true})).toBeVisible();
+  await page.getByRole("button",{name:"Verify Connection",exact:true}).click();
+  await expect(page.getByText("Unreachable",{exact:true})).toBeVisible();
+  await expect(page.getByRole("link",{name:"Review Operation",exact:true})).toHaveAttribute("href",`/applications/${app.id}?tab=deployments#operation-held-operation`);
+  await page.reload();
+  await expect(page.getByText("Unreachable",{exact:true})).toBeVisible();
+  expect(checks).toBe(1);
+  await page.screenshot({path:"../.local/ui-target-outage.png",fullPage:true});
+  await page.getByRole("button",{name:"Verify Connection",exact:true}).click();
+  await expect(page.getByText("Connected",{exact:true})).toBeVisible();
+  await expect(page.getByRole("link",{name:"Review Operation",exact:true})).toBeVisible();
+  expect(checks).toBe(2);
+  state={...state,state:"connected",expiresAt:"2000-01-01T00:00:00Z",message:"Connection verified."};
+  await page.reload();
+  await expect(page.getByText("Stale",{exact:true})).toBeVisible();
+  expect(checks).toBe(2);
 });

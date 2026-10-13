@@ -5,7 +5,7 @@ import { TargetSetup } from "./TargetSetup";
 import { useCanOperate } from "../../access";
 import { Link } from "react-router-dom";
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Server } from "lucide-react";
 import { unwrap, api, type Target } from "../../api";
 import { Status } from "../../components/Status";
@@ -47,13 +47,20 @@ export function Targets() {
 function TargetCard({ target: t }: { target: Target }) {
   const canOperate = useCanOperate();
   const [discover, setDiscover] = useState(false);
+ const client=useQueryClient();
+ const connection=useQuery({queryKey:["target-connection",t.id],queryFn:()=>api.GET("/api/v1/targets/{id}/connection-state",{params:{path:{id:t.id!}}}).then(unwrap),refetchInterval:30000});
+ const evidence=connection.data;
+ const expired=Boolean(evidence?.expiresAt && Date.now()>=Date.parse(evidence.expiresAt));
+ const connectionState=expired ? "stale" : evidence?.state ?? "unknown";
+ const capabilities=connectionState==="connected" ? evidence?.capabilities : undefined;
   const check = useMutation({
     mutationFn: () =>
       api
-        .GET("/api/v1/targets/{id}/connection", {
+        .POST("/api/v1/targets/{id}/connection-checks", {
           params: { path: { id: t.id! } },
         })
         .then(unwrap),
+    onSuccess:value=>client.setQueryData(["target-connection",t.id],value),
   });
 
   const q = useQuery({
@@ -80,7 +87,7 @@ function TargetCard({ target: t }: { target: Target }) {
             variant="outline"
 
             onClick={() => check.mutate()}
-            disabled={check.isPending}
+            disabled={check.isPending || !canOperate}
           >
             {check.isPending ? "Checking…" : "Verify Connection"}
           </Button>
@@ -101,15 +108,19 @@ function TargetCard({ target: t }: { target: Target }) {
           </Button>
         </div>
       </div>
-      <ErrorBox error={check.error || q.error} />
-      {check.data && (
-        <p role="status" className="saved-message">
-          Connection verified · {check.data.resourceCount} resources in the
-          configured scope. Existing builds and deployment triggers are
-          preserved.
-        </p>
-      )}
-      {check.data && (
+      <ErrorBox error={check.error || connection.error || q.error} />
+      <div className="flex items-center gap-2 mt-3" role="status">
+        <Status value={connectionState}/>
+        <span className="small muted">{connectionState==="connected" ? `Connection verified · ${evidence?.resourceCount} resources in the configured scope.` : expired ? "The previous connection observation has expired. Recheck before relying on it." : evidence?.message ?? "No recorded connection check."}</span>
+      </div>
+      {evidence?.checkedAt && <p className="small muted mt-2">Checked {new Date(evidence.checkedAt).toLocaleString()} · observation expires after 2 minutes.</p>}
+      {evidence?.heldOperations.map(operation=>(
+        <div className="step" key={operation.id}>
+          <span className="small">Held Operation · {operation.id.slice(0,8)}</span>
+          <Button variant="outline" size="sm" asChild><Link to={`/applications/${operation.applicationId}?tab=deployments#operation-${operation.id}`}>Review Operation</Link></Button>
+        </div>
+      ))}
+      {capabilities && (
         <Disclosure
           className="workflow-ownership"
           title={<>Adapter Capabilities</>}
@@ -121,35 +132,35 @@ function TargetCard({ target: t }: { target: Target }) {
           <dl>
             {(
               [
-                ["Standard image releases", check.data.capabilities.standard],
+                ["Standard image releases", capabilities.standard],
                 [
                   "Image rollback safety checks",
-                  check.data.capabilities.imageRollback,
+                  capabilities.imageRollback,
                 ],
-                ["Instance restart", check.data.capabilities.restart],
-                ["Retire owned instances", check.data.capabilities.retirement],
+                ["Instance restart", capabilities.restart],
+                ["Retire owned instances", capabilities.retirement],
                 [
                   "Managed environment variables",
-                  check.data.capabilities.environment,
+                  capabilities.environment,
                 ],
                 [
                   "Application service DNS",
-                  check.data.capabilities.applicationDns,
+                  capabilities.applicationDns,
                 ],
                 [
                   "Explicit service endpoints",
-                  check.data.capabilities.serviceEndpoints,
+                  capabilities.serviceEndpoints,
                 ],
                 [
                   "Image management handoff",
-                  check.data.capabilities.managementHandoff,
+                  capabilities.managementHandoff,
                 ],
                 [
                   "Native source deployment observation",
-                  check.data.nativeSourceObservation,
+                  evidence?.nativeSourceObservation,
                 ],
-                ["Rolling deployment", check.data.capabilities.rolling],
-                ["Blue-green deployment", check.data.capabilities.blueGreen],
+                ["Rolling deployment", capabilities.rolling],
+                ["Blue-green deployment", capabilities.blueGreen],
               ] as const
             ).map(([name, supported]) => (
               <div key={name}>

@@ -58,7 +58,7 @@ func (c *Client) request(ctx context.Context, method, path string, input, output
 	r.Header.Set("Accept", "application/json")
 	res, e := c.http.Do(r)
 	if e != nil {
-		return errors.New("Coolify connection failed or timed out")
+		return fmt.Errorf("Coolify connection failed or timed out: %w", operator.ErrUnreachable)
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {

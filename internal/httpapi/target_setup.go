@@ -11,6 +11,26 @@ import (
 )
 
 func (s *Server) setupRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/v1/targets/{id}/connection-state", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cancel()
+		state, err := s.Controller.TargetConnection(ctx, r.PathValue("id"))
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		write(w, 200, state)
+	})
+	mux.HandleFunc("POST /api/v1/targets/{id}/connection-checks", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		state, err := s.Controller.CheckTarget(ctx, r.PathValue("id"))
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		write(w, 200, state)
+	})
 	mux.HandleFunc("POST /api/v1/targets/scopes", func(w http.ResponseWriter, r *http.Request) {
 		if !s.Preview {
 			p, ok := domain.Identity(r.Context())

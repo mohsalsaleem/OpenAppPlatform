@@ -2,6 +2,9 @@ import { Badge } from "@/components/ui/badge";
 export function statusLabel(value: string) {
   const labels: Record<string, string> = {
     succeeded: "Completed",
+ connected: "Connected",
+ unreachable: "Unreachable",
+ stale: "Stale",
     failed: "Failed",
     attention: "Needs Review",
     queued: "Queued",
@@ -33,9 +36,9 @@ export function statusLabel(value: string) {
   );
 }
 export function Status({ value }: { value: string }) {
-  const good = value === "succeeded" || value === "running:healthy";
+  const good = value === "succeeded" || value === "connected" || value === "running:healthy";
   const bad =
-    ["failed", "attention", "retired:running", "missing"].includes(value) ||
+    ["failed", "attention", "retired:running", "missing", "unreachable", "stale"].includes(value) ||
     value.includes("unhealthy") ||
     value.startsWith("exited");
   return (

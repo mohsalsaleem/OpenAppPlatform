@@ -186,6 +186,13 @@ type OapTarget struct {
 	WorkspaceID string `json:"workspace_id"`
 }
 
+type OapTargetObservation struct {
+	TargetID   string             `json:"target_id"`
+	TargetHash string             `json:"target_hash"`
+	CheckedAt  pgtype.Timestamptz `json:"checked_at"`
+	Summary    []byte             `json:"summary"`
+}
+
 type OapUser struct {
 	ID           string             `json:"id"`
 	WorkspaceID  string             `json:"workspace_id"`

@@ -155,7 +155,7 @@ configuration for linked resources remains in the operator; direct configuration
 uses consistent Button, Field, Select and Collapsible patterns. Prevent legacy
 global label/control styles and hand-styled link buttons from returning.
 
-**Current priority:** Finish M1.1 acceptance, then M1.2 Recovery and Target State. The supported M0 exit
+**Current priority:** M1.2 Recovery and Target State. M1.1 passed local and scoped staging acceptance on 13 October 2026. The supported M0 exit
 review is accepted; P0.1–P0.5 passed their local and scoped staging gates. See
 [the exit review](docs/m0-exit-review.md). P0.4 passed the final local/staging acceptance gate. Standalone Docker uses scoped private pull references and Coolify retains its native server login. P0.1 runtime secret references,
 P0.2 workers and P0.3 existing database links passed local and isolated Coolify
@@ -427,9 +427,9 @@ into a separate platform before covering this queue.
 | M1.5 — Container and Image Baseline | Capability-aware policies for owned workloads and explicit auditable exceptions; show resolved artifact/architecture/provenance and protect active/rollback/retained images. | A supported workload runs under policy, an unsafe/incompatible request is rejected before mutation, and native/inherited configuration is preserved. | No scanning platform, arbitrary image pruning or alternate runtime. |
 | M1.6 — Basic Visibility and Dogfooding | Controller/target/release/backup visibility, deterministic release/change context and notification event outbox. AI remains optional and no notification is sent without a configured destination. | An isolated failure is explainable from scoped context; a staging update/recovery drill has a usable external path and traceable outcomes. | No indexed logging/analytics stack, model inference, tunnels or notification-provider expansion. |
 
-M1.1 now includes transactional operation/source audit correlation plus explicit agent action allowlists and target/environment pins. Legacy identity/release IDs and permissions remain intact. Its acceptance checks cover narrow issuance, wrong action/pin denial, queued expiry/revocation/permission holds, GitHub build authority and exact-operation audit controls. Complete local and scoped staging acceptance before advancing to M1.2 Recovery and Target State.
+M1.1 now includes transactional operation/source audit correlation plus explicit agent action allowlists and target/environment pins. Legacy identity/release IDs and permissions remain intact. Its acceptance checks cover narrow issuance, wrong action/pin denial, queued expiry/revocation/permission holds, GitHub build authority and exact-operation audit controls. Local migration/API/browser and scoped Coolify staging acceptance passed. The temporary restart-only acceptance credential was revoked; legacy credentials and existing database configuration/data were preserved.
 
-Start with M1.1. Review the M1 exit gate after these slices; do not pull M2–M6
+Continue with M1.2. Its first slice records bounded target connection observations, classifies unknown/connected/unreachable/failed/stale evidence, and links held operations to their existing recovery controls. Rechecking discovery never resumes or redispatches lifecycle work. Verify local outage/restart/browser and scoped staging acceptance before moving to M1.3. Review the M1 exit gate after these slices; do not pull M2–M6
 work forward. General routing and advanced rollout strategies stay parked under
 the accepted breadth-first correction.
 

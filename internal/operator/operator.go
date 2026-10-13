@@ -2,6 +2,7 @@ package operator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 	"time"
@@ -137,3 +138,6 @@ type RollbackSafetyChecker interface {
 type HealthCheckVerifier interface {
 	CheckHealthCheck(context.Context, string, domain.Component, bool) error
 }
+
+// ErrUnreachable distinguishes transport failure from an operator rejection.
+var ErrUnreachable = errors.New("operator is unreachable")

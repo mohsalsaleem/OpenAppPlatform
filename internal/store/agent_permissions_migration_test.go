@@ -6,6 +6,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 	"io/fs"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -39,7 +40,8 @@ func TestAgentPermissionMigrationPreservesLegacyCredentialAndAudit(t *testing.T)
 	old := fstest.MapFS{}
 	files, _ := fs.Glob(migrations, "migrations/*.sql")
 	for _, file := range files {
-		if strings.HasPrefix(file, "migrations/017_") {
+		version, _ := strconv.Atoi(strings.SplitN(strings.TrimPrefix(file, "migrations/"), "_", 2)[0])
+		if version >= 17 {
 			continue
 		}
 		raw, _ := fs.ReadFile(migrations, file)

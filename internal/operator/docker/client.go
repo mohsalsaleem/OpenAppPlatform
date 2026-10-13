@@ -95,7 +95,7 @@ func (c *Client) request(ctx context.Context, method, path string, input, output
 	req.Header.Set("Content-Type", "application/json")
 	res, e := c.http.Do(req)
 	if e != nil {
-		return errors.New("Docker Engine is unavailable or timed out")
+		return fmt.Errorf("Docker Engine is unavailable or timed out: %w", operator.ErrUnreachable)
 	}
 	defer res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
