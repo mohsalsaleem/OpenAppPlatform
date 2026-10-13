@@ -8,6 +8,28 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type OapActionPlan struct {
+	ID                string             `json:"id"`
+	Action            string             `json:"action"`
+	CredentialID      string             `json:"credential_id"`
+	ApplicationID     pgtype.Text        `json:"application_id"`
+	TargetID          string             `json:"target_id"`
+	Environment       string             `json:"environment"`
+	DefinitionVersion int64              `json:"definition_version"`
+	DefinitionHash    string             `json:"definition_hash"`
+	TargetHash        string             `json:"target_hash"`
+	InputFingerprint  string             `json:"input_fingerprint"`
+	Payload           []byte             `json:"payload"`
+	PublicSummary     []byte             `json:"public_summary"`
+	PlanHash          string             `json:"plan_hash"`
+	RequiresReview    bool               `json:"requires_review"`
+	ApprovedBy        pgtype.Text        `json:"approved_by"`
+	ApprovedAt        pgtype.Timestamptz `json:"approved_at"`
+	Result            []byte             `json:"result"`
+	ExpiresAt         pgtype.Timestamptz `json:"expires_at"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
 type OapAgentApplication struct {
 	ApplicationID string             `json:"application_id"`
 	CredentialID  string             `json:"credential_id"`

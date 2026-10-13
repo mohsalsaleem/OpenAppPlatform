@@ -71,12 +71,14 @@ acceptance. See [M2 baseline and limits](docs/m2-agent-operation.md) and
 [v0.1 acceptance](docs/v0.1-acceptance.md). These receipts are historical evidence,
 not acceptance of the new standalone headless milestones.
 
-Current gaps: agent onboarding and app creation authority; a complete public CLI;
-shared capability/error/wait contracts; MCP mutation parity; headless owner review;
-unified current incident evidence; standalone shared ingress/TLS; and complete
-bootstrap/update/rescue tooling. Existing app-scoped credentials cannot by
-themselves create a new app. Existing MCP deployment summaries are not durable
-reviewed plans. No milestone below is marked complete merely because pieces exist.
+M2.5 and M2.6 add the JSON CLI, shared bounded waits/errors, headless owner
+setup, bounded named-agent creation grants and packaged install/update/rescue.
+M2.6 passed local gate `20261013-214602-ceb6aceb` at `c2e1eee`.
+Current gaps include portable lifecycle/MCP parity acceptance, unified incident
+evidence, standalone shared ingress/TLS and the complete install-to-fix dogfood.
+App-scoped credentials still cannot create applications; creation needs an
+explicit bounded onboarding grant. Read-only MCP deployment summaries remain
+separate from durable executable plans. No whole M2 acceptance is implied.
 
 ## Delivery sequence
 
@@ -92,13 +94,12 @@ new slice IDs so previous M2.1–M2.4 acceptance records retain their meaning.
 | M6 — Additional servers and runtimes | Explicit multi-server placement, policy metadata, Firecracker/actor experiments | Deferred |
 
 Only the ordered active queue authorizes the next implementation slice. Deferred
-items are preserved requirements, not parallel work or prerequisites. The next
-slice is **M2.5**, implemented by the [machine CLI slice](docs/agent-cli.md).
-Its reproducible acceptance runs in the full local gate and retains a
-`cli-acceptance.json` receipt. M2.5 passed gate `20261013-210851-28d984b5` at `6b9359c`.
-**M2.6** is implemented by [headless bootstrap](docs/headless-bootstrap.md);
-its fresh named-agent Compose journey retains `headless-acceptance.json`. Once
-that full gate passes, **M2.7 is next**. This is not acceptance of M2.7–M2.9.
+items are preserved requirements, not parallel work or prerequisites. M2.5 passed
+gate `20261013-210851-28d984b5` at `6b9359c`; see [machine CLI](docs/agent-cli.md).
+M2.6 passed gate `20261013-214602-ceb6aceb` at `c2e1eee`; see
+[headless bootstrap](docs/headless-bootstrap.md). The active slice is **M2.7**;
+see [portable lifecycle](docs/portable-lifecycle.md). Its full local standalone
+acceptance is required before M2.8 begins. M2.8–M2.9 remain unaccepted.
 
 ## Ordered active queue
 

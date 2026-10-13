@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/cli"
 	"io"
 	"net/http"
 	"net/url"
@@ -22,6 +23,7 @@ type Server struct {
 	HTTP            *http.Client
 	AllowedTools    []string
 	ProtocolVersion string
+	Operate         bool
 }
 type request struct {
 	JSONRPC string          `json:"jsonrpc"`
@@ -101,6 +103,14 @@ func (s *Server) read(ctx context.Context, path string) (json.RawMessage, error)
 func (s *Server) call(ctx context.Context, name string, raw json.RawMessage) (any, error) {
 	if s.AllowedTools != nil && !slices.Contains(s.AllowedTools, name) {
 		return nil, errors.New("tool is not enabled on this transport")
+	}
+	for _, t := range lifecycleTools() {
+		if t.Name == name {
+			if !s.Operate {
+				return nil, errors.New("lifecycle tools require explicit stdio operation mode")
+			}
+			return s.lifecycleCall(ctx, name, raw)
+		}
 	}
 	var args struct {
 		ApplicationID string `json:"applicationId"`
@@ -242,6 +252,9 @@ func (s *Server) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 			result = map[string]any{}
 		case "tools/list":
 			available := tools()
+			if s.Operate {
+				available = append(available, lifecycleTools()...)
+			}
 			if s.AllowedTools != nil {
 				filtered := []tool{}
 				for _, t := range available {
@@ -264,12 +277,19 @@ func (s *Server) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 			data, e := s.call(ctx, params.Name, params.Arguments)
 			if e != nil {
 				result = map[string]any{"isError": true, "content": []map[string]string{{"type": "text", "text": e.Error()}}}
+				var f *cli.Failure
+				if errors.As(e, &f) {
+					result.(map[string]any)["structuredContent"] = map[string]any{"schemaVersion": 1, "ok": false, "error": f}
+				}
 			} else {
 				b, e := json.Marshal(data)
 				if e != nil {
 					return e
 				}
 				result = map[string]any{"content": []map[string]string{{"type": "text", "text": string(b)}}}
+				if s.Operate {
+					result.(map[string]any)["structuredContent"] = map[string]any{"schemaVersion": 1, "ok": true, "data": data}
+				}
 			}
 		default:
 			code, message = -32601, "Method not found"

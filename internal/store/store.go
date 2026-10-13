@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store/db"
+	"strings"
 )
 
 //go:embed migrations/*.sql
@@ -75,6 +76,10 @@ func (s *Store) Targets(ctx context.Context) ([]domain.Target, error) {
 	return out, nil
 }
 func (s *Store) CreateApplication(ctx context.Context, m domain.Manifest) (domain.Application, error) {
+	if key := domain.CreationKey(ctx); strings.HasPrefix(key, "action-plan:") && (ActiveActionPlan(ctx) == "" || key != "action-plan:"+ActiveActionPlan(ctx)) {
+		return domain.Application{}, domain.ErrConflict
+	}
+
 	a := domain.Application{ID: domain.NewID(), Manifest: m}
 	a.GroupID = a.ID
 	b, e := json.Marshal(m)
@@ -86,6 +91,13 @@ func (s *Store) CreateApplication(ctx context.Context, m domain.Manifest) (domai
 		return a, e
 	}
 	defer tx.Rollback(ctx)
+	replay, err := s.BeginActionPlan(ctx, tx)
+	if err != nil {
+		return a, err
+	}
+	if replay != nil {
+		return s.ApplicationTx(ctx, tx, replay.ApplicationID)
+	}
 	credential, key, existing, err := authorizeCreation(ctx, tx, m, b)
 	if err != nil {
 		return a, err
@@ -112,6 +124,9 @@ func (s *Store) CreateApplication(ctx context.Context, m domain.Manifest) (domai
 		if _, e = tx.Exec(ctx, "INSERT INTO oap_agent_applications(application_id,credential_id,creation_key,request_hash,audit_id) VALUES($1,$2,$3,$4,NULLIF($5,''))", a.ID, credential, key, hex.EncodeToString(hash[:]), domain.AuditIntent(ctx)); e != nil {
 			return a, e
 		}
+	}
+	if err = s.FinishActionPlan(ctx, tx, ActionResult{ApplicationID: a.ID, DefinitionVersion: a.Version, State: "created"}); err != nil {
+		return a, err
 	}
 	return a, tx.Commit(ctx)
 }

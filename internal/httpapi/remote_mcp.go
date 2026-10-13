@@ -15,6 +15,15 @@ import (
 )
 
 func (s *Server) readRequest(r *http.Request) bool {
+	if r.Method == "POST" {
+		if r.URL.Path == "/api/v1/specifications/validate" {
+			return true
+		}
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		if len(parts) == 6 && parts[2] == "applications" && parts[4] == "specification" && parts[5] == "diff" {
+			return true
+		}
+	}
 	if r.Method == "GET" || r.Method == "HEAD" {
 		return true
 	}

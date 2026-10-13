@@ -1,0 +1,86 @@
+{
+  "apiVersion": "oap.dev/v1alpha1",
+  "kind": "Application",
+  "spec": {
+    "name": "connected-application",
+    "environment": "staging",
+    "targetId": "local-docker",
+    "components": [
+      {
+        "name": "frontend",
+        "kind": "web",
+        "image": "REPLACE_WITH_IMMUTABLE_EXAMPLE_IMAGE",
+        "port": 8080,
+        "instances": 1,
+        "strategy": "standard",
+        "env": {
+          "MODE": "frontend"
+        },
+        "services": {
+          "UPSTREAM_URL": "api"
+        },
+        "dependsOn": [
+          "api"
+        ],
+        "readiness": {
+          "requireHealthy": true,
+          "timeoutSeconds": 120
+        },
+        "hostPort": 8080
+      },
+      {
+        "name": "api",
+        "kind": "web",
+        "image": "REPLACE_WITH_IMMUTABLE_EXAMPLE_IMAGE",
+        "port": 8080,
+        "instances": 1,
+        "strategy": "standard",
+        "env": {
+          "MODE": "api"
+        },
+        "secretRefs": {
+          "DATABASE_URL": "database-v1"
+        },
+        "dependsOn": [
+          "database"
+        ],
+        "readiness": {
+          "requireHealthy": true,
+          "timeoutSeconds": 120
+        }
+      },
+      {
+        "name": "worker",
+        "kind": "worker",
+        "image": "REPLACE_WITH_IMMUTABLE_EXAMPLE_IMAGE",
+        "port": 0,
+        "instances": 1,
+        "strategy": "standard",
+        "env": {
+          "MODE": "worker"
+        },
+        "secretRefs": {
+          "DATABASE_URL": "database-v1"
+        },
+        "dependsOn": [
+          "database"
+        ],
+        "readiness": {
+          "requireHealthy": true,
+          "timeoutSeconds": 120
+        }
+      },
+      {
+        "name": "database",
+        "kind": "database",
+        "management": "observe",
+        "resourceId": "REPLACE_WITH_EXISTING_SCOPED_RESOURCE_ID",
+        "image": "REPLACE_WITH_OBSERVED_IMAGE",
+        "port": 0,
+        "instances": 1,
+        "strategy": "standard",
+        "databaseEndpoint": "postgresql://database:5432/application"
+      }
+    ]
+  }
+}

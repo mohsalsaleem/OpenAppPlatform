@@ -252,3 +252,26 @@ func TestHeadlessGrantNeverEmitsTokenAndBindsOrigin(t *testing.T) {
 		t.Fatal("agent file invalid")
 	}
 }
+
+func TestPortableCommandsUseSharedFixedRoutes(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/api/v1/action-plans/plan-1/execute" {
+			t.Error("unexpected action route", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(202)
+		w.Write([]byte(`{"id":"plan-1","result":{"applicationId":"app-1","definitionVersion":2,"operationId":"release-1","state":"admitted"}}`))
+	}))
+	defer server.Close()
+	var out bytes.Buffer
+	code := Run(context.Background(), []string{"--url", server.URL, "--plan", "plan-1", "--file", "-", "execute-action"}, func(key string) string {
+		if key == "OAP_API_TOKEN" {
+			return "private-agent-token"
+		}
+		return ""
+	}, strings.NewReader(`{}`), &out)
+	var result Result
+	if json.Unmarshal(out.Bytes(), &result) != nil || code != 0 || result.OperationID != "release-1" {
+		t.Fatal("missing operation handle", code)
+	}
+}

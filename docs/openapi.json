@@ -5363,6 +5363,469 @@
         "operationId": "post_onboarding_grant",
         "description": "One Docker target/environment, 24-hour expiry, explicit lifecycle actions on newly created applications only, maximum 1\u201310 apps."
       }
+    },
+    "/api/v1/specifications/validate": {
+      "post": {
+        "summary": "Validate structure and runtime capabilities without execution",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "applicationId": {
+                    "type": "string"
+                  },
+                  "specification": {
+                    "$ref": "#/components/schemas/ApplicationSpecification"
+                  }
+                },
+                "required": [
+                  "specification"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/specification": {
+      "get": {
+        "summary": "Export specification with literal environment values omitted",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationSpecification"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{id}/specification/diff": {
+      "post": {
+        "summary": "Compare current version and proposed specification with masked values",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expectedVersion": {
+                    "type": "integer"
+                  },
+                  "specification": {
+                    "$ref": "#/components/schemas/ApplicationSpecification"
+                  }
+                },
+                "required": [
+                  "expectedVersion",
+                  "specification"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/action-plans": {
+      "post": {
+        "summary": "Create a bounded action plan without execution",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/action-plans/{plan}": {
+      "get": {
+        "summary": "Inspect action plan and committed receipt",
+        "parameters": [
+          {
+            "name": "plan",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        }
+      }
+    },
+    "/api/v1/action-plans/{plan}/input": {
+      "get": {
+        "summary": "Owner-only review of supplied literal inputs; stored secret values are never resolved",
+        "parameters": [
+          {
+            "name": "plan",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        }
+      }
+    },
+    "/api/v1/action-plans/{plan}/approve": {
+      "post": {
+        "summary": "Owner approves the exact unexpired plan hash",
+        "parameters": [
+          {
+            "name": "plan",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "planHash": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "planHash"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/action-plans/{plan}/execute": {
+      "post": {
+        "summary": "Creator executes stored action; 202 means operation admission",
+        "parameters": [
+          {
+            "name": "plan",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionPlan"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "401": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "403": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "404": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "409": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "422": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "429": {
+            "description": "Invalid, denied, stale or bounded request"
+          },
+          "202": {
+            "description": "Result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionPlan"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7207,6 +7670,216 @@
             "$ref": "#/components/schemas/AgentPermissions"
           }
         }
+      },
+      "ApplicationSpecification": {
+        "type": "object",
+        "properties": {
+          "apiVersion": {
+            "type": "string",
+            "enum": [
+              "oap.dev/v1alpha1"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "Application"
+            ]
+          },
+          "spec": {
+            "$ref": "#/components/schemas/Manifest"
+          },
+          "redactedFields": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind",
+          "spec"
+        ],
+        "additionalProperties": false
+      },
+      "ActionRequest": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "configure",
+              "deploy",
+              "restart",
+              "recover"
+            ]
+          },
+          "applicationId": {
+            "type": "string"
+          },
+          "expectedVersion": {
+            "type": "integer"
+          },
+          "specification": {
+            "$ref": "#/components/schemas/ApplicationSpecification"
+          },
+          "components": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "images": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "component": {
+            "type": "string"
+          },
+          "ordinal": {
+            "type": "integer"
+          },
+          "deploymentId": {
+            "type": "string"
+          },
+          "recovery": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "retryFinalization": {
+                "type": "boolean"
+              },
+              "retryPreparation": {
+                "type": "boolean"
+              },
+              "component": {
+                "type": "string"
+              },
+              "ordinal": {
+                "type": "integer"
+              },
+              "remoteDeploymentId": {
+                "type": "string"
+              },
+              "expectedUpdatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "component",
+              "ordinal",
+              "expectedUpdatedAt"
+            ]
+          },
+          "requireReview": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "ActionResult": {
+        "type": "object",
+        "properties": {
+          "applicationId": {
+            "type": "string"
+          },
+          "definitionVersion": {
+            "type": "integer"
+          },
+          "operationId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "created",
+              "saved",
+              "admitted"
+            ]
+          }
+        },
+        "required": [
+          "applicationId",
+          "definitionVersion",
+          "state"
+        ],
+        "additionalProperties": false
+      },
+      "ActionPlan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "credentialId": {
+            "type": "string"
+          },
+          "applicationId": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "planHash": {
+            "type": "string"
+          },
+          "expectedVersion": {
+            "type": "integer"
+          },
+          "requiresReview": {
+            "type": "boolean"
+          },
+          "approvedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ActionResult"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "summary": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "credentialId",
+          "targetId",
+          "environment",
+          "planHash",
+          "expectedVersion",
+          "requiresReview",
+          "expiresAt",
+          "createdAt",
+          "summary"
+        ],
+        "additionalProperties": false
       }
     }
   }

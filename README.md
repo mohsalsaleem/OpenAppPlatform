@@ -321,3 +321,5 @@ layouts and previews masked configuration changes. Native workflows remain intac
 The four-component example now groups frontend, API, worker and an existing
 PostgreSQL dependency with explicit ownership. See [existing database links](docs/existing-database-links.md)
 and [the reproducible example](examples/application-breadth/README.md).
+
+The current standalone agent lifecycle work is documented in [Portable application lifecycle](docs/portable-lifecycle.md), with versioned specifications and shared CLI/API/MCP action plans. See [ROADMAP](ROADMAP.md) for acceptance status and execution order.

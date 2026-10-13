@@ -242,7 +242,7 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 		return finish(json.RawMessage(docs.OpenAPI), nil, 0)
 	}
 	if command == "help" {
-		return finish(map[string]any{"commands": []string{"help", "schema", "meta", "targets", "capabilities", "apps", "create", "get", "update", "instances", "diagnostics", "deploy", "operation", "wait", "verify", "setup", "login", "grant", "app-grant", "revoke", "agent-control", "set-agent-control", "plan", "get-plan", "approve", "execute-plan", "target-capabilities", "resources", "whoami"}, "flagsBeforeCommand": true, "contextFlags": []string{"url", "app", "target", "environment", "operation"}, "input": "--file path.json or --file -; deploy requires --key and expectedVersion > 0; agent create requires --key", "auth": "OAP_API_TOKEN or --session-file; no credentials in flags/output", "wait": "--timeout 1s..30m; observes without cancelling", "verification": "current instance health only, not end-to-end application behavior", "exitCodes": map[string]int{"success": 0, "input": 2, "denied": 3, "rejected": 4, "unavailable": 5, "operationStopped": 6, "timeout": 7}}, nil, 0)
+		return finish(map[string]any{"commands": []string{"help", "schema", "meta", "targets", "capabilities", "apps", "create", "get", "update", "instances", "diagnostics", "deploy", "operation", "wait", "verify", "setup", "login", "grant", "app-grant", "revoke", "agent-control", "set-agent-control", "plan", "get-plan", "approve", "execute-plan", "target-capabilities", "resources", "whoami", "validate-spec", "diff-spec", "export-spec", "action-plan", "get-action-plan", "review-action-input", "approve-action", "execute-action"}, "flagsBeforeCommand": true, "contextFlags": []string{"url", "app", "target", "environment", "operation"}, "input": "--file path.json or --file -; deploy requires --key and expectedVersion > 0; agent create requires --key", "auth": "OAP_API_TOKEN or --session-file; no credentials in flags/output", "wait": "--timeout 1s..30m; observes without cancelling", "verification": "current instance health only, not end-to-end application behavior", "exitCodes": map[string]int{"success": 0, "input": 2, "denied": 3, "rejected": 4, "unavailable": 5, "operationStopped": 6, "timeout": 7}}, nil, 0)
 	}
 	c := Client{URL: *endpoint, Token: getenv("OAP_API_TOKEN")}
 	if *session != "" {
@@ -416,6 +416,35 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 			method = "POST"
 			path += "/execute"
 		}
+	case "validate-spec":
+		method, path = "POST", "/api/v1/specifications/validate"
+	case "action-plan":
+		method, path = "POST", "/api/v1/action-plans"
+	case "get-action-plan", "review-action-input", "approve-action", "execute-action":
+		if !idPattern.MatchString(*plan) {
+			return emitFailure(nil, failure("invalid_plan", "Provide --plan ID", false, "check_context"))
+		}
+		path = "/api/v1/action-plans/" + *plan
+		if command == "review-action-input" {
+			path += "/input"
+		}
+		if command == "approve-action" {
+			method = "POST"
+			path += "/approve"
+		}
+		if command == "execute-action" {
+			method = "POST"
+			path += "/execute"
+		}
+	case "export-spec", "diff-spec":
+		if !idPattern.MatchString(*app) {
+			return emitFailure(nil, failure("invalid_application", "Provide --app ID", false, "check_context"))
+		}
+		path = "/api/v1/applications/" + *app + "/specification"
+		if command == "diff-spec" {
+			method = "POST"
+			path += "/diff"
+		}
 	case "apps":
 		path = "/api/v1/applications"
 	case "create":
@@ -466,6 +495,27 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 		var manifest domain.Manifest
 		if command == "create" {
 			_ = json.Unmarshal(body, &manifest)
+		} else if command == "action-plan" || command == "validate-spec" {
+			var input struct {
+				ApplicationID string                           `json:"applicationId"`
+				Specification *domain.ApplicationSpecification `json:"specification"`
+			}
+			if json.Unmarshal(body, &input) != nil {
+				return emitFailure(nil, failure("invalid_input", "Invalid specification/action input", false, "inspect_schema"))
+			}
+			if input.Specification != nil {
+				manifest = input.Specification.Spec
+			} else if input.ApplicationID != "" && idPattern.MatchString(input.ApplicationID) {
+				raw, f := c.Call(ctx, "GET", "/api/v1/applications/"+input.ApplicationID, nil, "")
+				if f != nil {
+					return emitFailure(nil, f)
+				}
+				var current domain.Application
+				_ = json.Unmarshal(raw, &current)
+				manifest = current.Manifest
+			} else {
+				return emitFailure(nil, failure("context_required", "Context assertions require specification or applicationId", false, "check_context"))
+			}
 		} else if *app != "" {
 			raw, f := c.Call(ctx, "GET", "/api/v1/applications/"+*app, nil, "")
 			if f != nil {
@@ -503,6 +553,17 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 			return emitFailure(nil, failure("invalid_response", "Release admission response lacks an operation ID; inspect before retry", false, "inspect_operation"))
 		}
 		result.OperationID = v.ID
+	}
+	if command == "execute-action" {
+		var receipt struct {
+			Result *struct {
+				OperationID string `json:"operationId"`
+			} `json:"result"`
+		}
+		if json.Unmarshal(raw, &receipt) != nil || receipt.Result == nil {
+			return emitFailure(nil, failure("invalid_response", "Action response lacks a committed receipt; inspect the plan before retry", false, "inspect_plan"))
+		}
+		result.OperationID = receipt.Result.OperationID
 	}
 	if command == "verify" {
 		var instances []struct {

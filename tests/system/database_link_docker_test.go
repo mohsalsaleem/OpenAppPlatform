@@ -7,13 +7,19 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/access"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/cli"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/controller"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/httpapi"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/mcp"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/operator/docker"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/runtimeinputs"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 	"github.com/riverqueue/river"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strconv"
 	"strings"
@@ -154,7 +160,102 @@ func TestNativeDockerFourComponentApplicationWithExistingDatabase(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	d, err := c.EnqueueVersion(ctx, app.ID, "breadth-initial-release", nil, app.Version)
+	// Existing database linking remains an owner operation. The external agent
+	// receives only this app's permitted lifecycle actions after explicit linking.
+	c.RequireIdentity = true
+	svc := access.Service{Pool: c.Store.Pool}
+	owner, err := svc.Register(ctx, "portable-native@example.invalid", "Owner", "portable-native-owner-password", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := svc.IssueRestricted(ctx, owner, "Portable lifecycle agent", "operate", app.ID, time.Hour, domain.AgentPermissions{Actions: []string{"configure", "deploy", "restart", "recover"}, TargetID: target.ID, Environment: "staging"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	actor, err := svc.Principal(ctx, token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	agentCtx := domain.WithPrincipal(ctx, actor)
+	api := httptest.NewServer((&httpapi.Server{Controller: c}).Handler())
+	defer api.Close()
+	invoke := func(command string, flags []string, body any) cli.Result {
+		t.Helper()
+		var in, out bytes.Buffer
+		if body != nil {
+			json.NewEncoder(&in).Encode(body)
+		}
+		args := append([]string{"--url", api.URL}, flags...)
+		if body != nil {
+			args = append(args, "--file", "-")
+		}
+		args = append(args, command)
+		code := cli.Run(ctx, args, func(key string) string {
+			if key == "OAP_API_TOKEN" {
+				return token
+			}
+			return ""
+		}, &in, &out)
+		var result cli.Result
+		if json.Unmarshal(out.Bytes(), &result) != nil || code != 0 {
+			t.Fatalf("portable CLI %s failed: %d", command, code)
+		}
+		return result
+	}
+	planned := func(request controller.ActionRequest) store.ActionPlan {
+		t.Helper()
+		created := invoke("action-plan", nil, request)
+		raw, _ := json.Marshal(created.Data)
+		var plan store.ActionPlan
+		if json.Unmarshal(raw, &plan) != nil || plan.ID == "" {
+			t.Fatal("invalid plan")
+		}
+		// MCP and CLI submit the identical durable plan to the same REST/controller.
+		rpc, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": map[string]any{"name": "execute_action_plan", "arguments": map[string]string{"planId": plan.ID}}})
+		var out bytes.Buffer
+		server := mcp.Server{URL: api.URL, Token: token, Operate: true}
+		if err := server.Serve(ctx, bytes.NewReader(append(rpc, '\n')), &out); err != nil {
+			t.Fatal(err)
+		}
+		var reply struct {
+			Result struct {
+				IsError bool `json:"isError"`
+				Content []struct {
+					Text string `json:"text"`
+				} `json:"content"`
+			} `json:"result"`
+		}
+		if json.Unmarshal(out.Bytes(), &reply) != nil || reply.Result.IsError || len(reply.Result.Content) != 1 {
+			t.Fatal("MCP action failed")
+		}
+		var executed store.ActionPlan
+		if json.Unmarshal([]byte(reply.Result.Content[0].Text), &executed) != nil || executed.Result == nil {
+			t.Fatal("MCP receipt missing")
+		}
+		replay := invoke("execute-action", []string{"--plan", plan.ID}, map[string]any{})
+		raw, _ = json.Marshal(replay.Data)
+		var repeated store.ActionPlan
+		json.Unmarshal(raw, &repeated)
+		if repeated.Result == nil || *repeated.Result != *executed.Result {
+			t.Fatal("CLI/MCP receipt divergence")
+		}
+		return executed
+	}
+	spec := domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: app.Manifest}
+	invoke("validate-spec", nil, map[string]any{"applicationId": app.ID, "specification": spec})
+	invoke("diff-spec", []string{"--app", app.ID}, map[string]any{"expectedVersion": app.Version, "specification": spec})
+	saved := planned(controller.ActionRequest{Action: "configure", ApplicationID: app.ID, ExpectedVersion: app.Version, Specification: &spec})
+	if saved.Result.OperationID != "" {
+		t.Fatal("save deployed")
+	}
+	app, err = c.Store.Application(ctx, app.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	immutable := call("GET", "/images/"+image+"/json", nil)["Id"].(string)
+	images := map[string]string{"frontend": immutable, "api": immutable, "worker": immutable}
+	release := planned(controller.ActionRequest{Action: "deploy", ApplicationID: app.ID, ExpectedVersion: app.Version, Images: images})
+	d, err := c.Store.Deployment(ctx, release.Result.OperationID)
 	if err != nil || len(d.Steps) != 3 {
 		t.Fatal("database entered release", err)
 	}
@@ -229,8 +330,8 @@ func TestNativeDockerFourComponentApplicationWithExistingDatabase(t *testing.T) 
 	if code != 200 || !strings.Contains(logResult.Logs, "ready to accept connections") {
 		t.Fatal("database logs unavailable")
 	}
-	saved, _ := json.Marshal(app)
-	if bytes.Contains(saved, []byte(dsn)) || bytes.Contains(saved, []byte(readerPassword)) {
+	savedDefinition, _ := json.Marshal(app)
+	if bytes.Contains(savedDefinition, []byte(dsn)) || bytes.Contains(savedDefinition, []byte(readerPassword)) {
 		t.Fatal("SQL credentials saved in definition")
 	}
 	if fingerprint() != before {
@@ -248,6 +349,29 @@ func TestNativeDockerFourComponentApplicationWithExistingDatabase(t *testing.T) 
 		t.Fatal("application credential can write owner data")
 	}
 	reader.Close(ctx)
+	// Restart one managed worker through the same plan path; preserve its peers.
+	apiBootBefore := fetch(apiResource.URL + "/identity")["boot"]
+	restartPlan := planned(controller.ActionRequest{Action: "restart", ApplicationID: app.ID, ExpectedVersion: app.Version, Component: "worker", Ordinal: 1})
+	for i := 0; i < 40; i++ {
+		var snooze *river.JobSnoozeError
+		if e := c.Advance(ctx, restartPlan.Result.OperationID); e != nil && !errors.As(e, &snooze) {
+			t.Fatal(e)
+		}
+		observed, e := c.Store.Deployment(ctx, restartPlan.Result.OperationID)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if observed.State == "succeeded" {
+			break
+		}
+		if domain.Terminal(observed.State) || i == 39 {
+			t.Fatal("worker restart failed", observed.State)
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	if fetch(apiResource.URL + "/identity")["boot"] != apiBootBefore {
+		t.Fatal("worker restart changed API")
+	}
 	boot := fetch(apiResource.URL + "/identity")["boot"]
 	call("POST", "/containers/"+dbID+"/stop?t=3", nil)
 	failedResponse, failedErr := http.Get(apiResource.URL)
@@ -263,7 +387,8 @@ func TestNativeDockerFourComponentApplicationWithExistingDatabase(t *testing.T) 
 	if instances[3].Status == "running:healthy" {
 		t.Fatal("database failure hidden")
 	}
-	held, err := c.EnqueueSelected(ctx, app.ID, "database-failure-hold", nil, app.Version, []string{"api"})
+	heldPlan := planned(controller.ActionRequest{Action: "deploy", ApplicationID: app.ID, ExpectedVersion: app.Version, Components: []string{"api"}, Images: map[string]string{"api": immutable}})
+	held, err := c.Store.Deployment(ctx, heldPlan.Result.OperationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +404,8 @@ func TestNativeDockerFourComponentApplicationWithExistingDatabase(t *testing.T) 
 	}
 	call("POST", "/containers/"+dbID+"/start", nil)
 	waitDB()
-	held, err = c.Recover(ctx, held.ID, controller.Recovery{Component: "api", Ordinal: 1, RetryPreparation: true, ExpectedUpdatedAt: held.UpdatedAt})
+	recovered := planned(controller.ActionRequest{Action: "recover", ApplicationID: app.ID, ExpectedVersion: app.Version, DeploymentID: held.ID, Recovery: &controller.Recovery{Component: "api", Ordinal: 1, RetryPreparation: true, ExpectedUpdatedAt: held.UpdatedAt}})
+	held, err = c.Store.Deployment(agentCtx, recovered.Result.OperationID)
 	if err != nil {
 		t.Fatal(err)
 	}

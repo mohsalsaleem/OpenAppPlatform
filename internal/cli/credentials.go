@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -127,4 +128,17 @@ func ownerAuthenticate(ctx context.Context, endpoint, command, setup string, bod
 	credential.CredentialID = principal.CredentialID
 	credential.Origin = base
 	return credential, json.RawMessage(raw), nil
+}
+
+// AgentCredential applies the CLI's private-file and origin checks to stdio MCP.
+// Owner sessions cannot be used as execution-facing agent credentials.
+func AgentCredential(path, endpoint string) (string, error) {
+	credential, f := readCredential(path, endpoint)
+	if f != nil {
+		return "", fmt.Errorf("%s", f.Message)
+	}
+	if credential.Token == "" || credential.Session != "" {
+		return "", fmt.Errorf("MCP requires an agent credential")
+	}
+	return credential.Token, nil
 }

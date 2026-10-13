@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 	"github.com/riverqueue/river"
 )
 
@@ -45,6 +46,13 @@ func (c *Controller) Recover(ctx context.Context, id string, request Recovery) (
 	}
 	if !locked {
 		return initial, domain.ErrConflict
+	}
+	replay, planErr := c.Store.BeginActionPlan(ctx, tx)
+	if planErr != nil {
+		return initial, planErr
+	}
+	if replay != nil {
+		return c.Store.DeploymentTx(ctx, tx, replay.OperationID)
 	}
 	d, err := c.Store.DeploymentTx(ctx, tx, id)
 	if err != nil {
@@ -173,6 +181,9 @@ func (c *Controller) Recover(ctx context.Context, id string, request Recovery) (
 		if _, err = c.Jobs.InsertTx(ctx, tx, DeployArgs{d.ID}, &river.InsertOpts{MaxAttempts: 10}); err != nil {
 			return d, err
 		}
+	}
+	if err = c.Store.FinishActionPlan(ctx, tx, store.ActionResult{ApplicationID: d.ApplicationID, DefinitionVersion: d.DefinitionVersion, OperationID: d.ID, State: "admitted"}); err != nil {
+		return d, err
 	}
 	return d, tx.Commit(ctx)
 }

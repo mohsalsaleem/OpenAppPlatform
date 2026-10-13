@@ -9,6 +9,7 @@ import (
 	"slices"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store/db"
 )
 
@@ -27,9 +28,24 @@ func (c *Controller) UpdateApplication(ctx context.Context, id string, m domain.
 	}
 	defer tx.Rollback(ctx)
 
+	if store.ActiveActionPlan(ctx) != "" {
+		if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", id); e != nil {
+			return domain.Application{}, e
+		}
+		replay, err := c.Store.BeginActionPlan(ctx, tx)
+		if err != nil {
+			return domain.Application{}, err
+		}
+		if replay != nil {
+			return c.Store.ApplicationTx(ctx, tx, replay.ApplicationID)
+		}
+	}
 	updated, e := c.updateApplicationTx(ctx, tx, id, m, version)
 	if e != nil {
 		return domain.Application{}, e
+	}
+	if e = c.Store.FinishActionPlan(ctx, tx, store.ActionResult{ApplicationID: updated.ID, DefinitionVersion: updated.Version, State: "saved"}); e != nil {
+		return updated, e
 	}
 	return updated, tx.Commit(ctx)
 }

@@ -186,7 +186,7 @@ func (s *Server) ownerAuth(next http.Handler) http.Handler {
 			return
 		}
 		action := agentRequestAction(r.Method, r.URL.Path)
-		if !s.readRequest(r) && p.Permissions != nil && !(p.TargetGrant() && r.Method == "POST" && r.URL.Path == "/api/v1/applications") {
+		if !s.readRequest(r) && p.Permissions != nil && !s.actionPlanRequest(r) && !(p.TargetGrant() && r.Method == "POST" && r.URL.Path == "/api/v1/applications") {
 			selectedApp := p.ApplicationID
 			if p.TargetGrant() {
 				parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
@@ -234,6 +234,12 @@ func (w *auditResponse) WriteHeader(status int) {
 }
 func (s *Server) applicationScope(r *http.Request, p domain.Principal) bool {
 	path := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if r.URL.Path == "/api/v1/specifications/validate" {
+		return r.Method == "POST"
+	}
+	if s.actionPlanRequest(r) {
+		return true
+	} // Controller checks body/plan scope before data or mutation.
 	if p.TargetGrant() {
 		if r.URL.Path == "/api/v1/applications" {
 			return r.Method == "GET" || r.Method == "POST"
@@ -536,4 +542,9 @@ func agentRequestAction(method, path string) string {
 		}
 	}
 	return ""
+}
+
+func (s *Server) actionPlanRequest(r *http.Request) bool {
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	return len(parts) >= 3 && parts[0] == "api" && parts[1] == "v1" && parts[2] == "action-plans" && ((len(parts) == 3 && r.Method == "POST") || (len(parts) == 4 && r.Method == "GET") || (len(parts) == 5 && ((parts[4] == "input" && r.Method == "GET") || ((parts[4] == "approve" || parts[4] == "execute") && r.Method == "POST"))))
 }

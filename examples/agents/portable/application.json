@@ -1,0 +1,14 @@
+{
+  "apiVersion": "oap.dev/v1alpha1",
+  "kind": "Application",
+  "spec": {
+    "name": "portable-demo",
+    "environment": "staging",
+    "targetId": "docker-local",
+    "components": [
+      {"name": "frontend", "kind": "web", "image": "example/frontend@sha256:REPLACE_WITH_DIGEST", "port": 8080, "instances": 1, "services": {"API_URL": "api"}, "dependsOn": ["api"]},
+      {"name": "api", "kind": "web", "image": "example/api@sha256:REPLACE_WITH_DIGEST", "port": 8080, "instances": 1, "secretRefs": {"DATABASE_URL": "database-v1"}},
+      {"name": "worker", "kind": "worker", "image": "example/worker@sha256:REPLACE_WITH_DIGEST", "instances": 1, "secretRefs": {"DATABASE_URL": "database-v1"}}
+    ]
+  }
+}

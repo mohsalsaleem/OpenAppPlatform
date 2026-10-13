@@ -166,6 +166,9 @@ func (c *Controller) EnqueueRestart(ctx context.Context, appID, key string, requ
 	return c.enqueueOperation(ctx, appID, key, nil, version, &request, nil, nil, nil, nil)
 }
 func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64, restart *RestartRequest, scaleDown *ScaleDownRequest, provenance *domain.ReleaseSource, rollback *RollbackRequest, selection []string) (domain.Deployment, error) {
+	if strings.HasPrefix(key, "action-plan:") && (store.ActiveActionPlan(ctx) == "" || key != "action-plan:"+store.ActiveActionPlan(ctx)) {
+		return domain.Deployment{}, errors.New("action-plan idempotency namespace is reserved")
+	}
 	if strings.HasPrefix(key, "plan:") {
 		plan, _ := ctx.Value(planKey{}).(string)
 		if plan == "" || key != "plan:"+plan {
@@ -183,6 +186,13 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	// Serialize enqueue and give duplicate deliveries the original deployment.
 	if _, e = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", appID); e != nil {
 		return domain.Deployment{}, e
+	}
+	replay, err := c.Store.BeginActionPlan(ctx, tx)
+	if err != nil {
+		return domain.Deployment{}, err
+	}
+	if replay != nil {
+		return c.Store.DeploymentTx(ctx, tx, replay.OperationID)
 	}
 	a, e := c.Store.ApplicationTx(ctx, tx, appID)
 	if e != nil {
@@ -283,7 +293,15 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 				if comp.ResourceID != "" && comp.Image != image {
 					return domain.Deployment{}, errors.New("adopted resource image changes are not supported")
 				}
-				if !strings.Contains(image, "@sha256:") && !(rollback != nil && dockerContentID.MatchString(image)) {
+				cachedPlanImage := false
+				if store.ActiveActionPlan(ctx) != "" && dockerContentID.MatchString(image) {
+					target, err := c.Store.TargetTx(ctx, tx, a.Manifest.TargetID)
+					if err != nil {
+						return domain.Deployment{}, err
+					}
+					cachedPlanImage = target.Operator == "docker"
+				}
+				if !strings.Contains(image, "@sha256:") && !(rollback != nil && dockerContentID.MatchString(image)) && !cachedPlanImage {
 					return domain.Deployment{}, errors.New("release image overrides must use an immutable sha256 digest")
 				}
 				comp.Image = image
@@ -458,6 +476,9 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		return d, e
 	}
 	if _, e = c.Jobs.InsertTx(ctx, tx, DeployArgs{d.ID}, &river.InsertOpts{MaxAttempts: 10}); e != nil {
+		return d, e
+	}
+	if e = c.Store.FinishActionPlan(ctx, tx, store.ActionResult{ApplicationID: d.ApplicationID, DefinitionVersion: d.DefinitionVersion, OperationID: d.ID, State: "admitted"}); e != nil {
 		return d, e
 	}
 	return d, tx.Commit(ctx)

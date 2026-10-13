@@ -122,6 +122,7 @@ func (s *Server) routes() http.Handler {
 	s.endpointRoutes(mux)
 	s.diagnosticRoutes(mux)
 	s.planRoutes(mux)
+	s.specificationRoutes(mux)
 	s.remoteMCPRoutes(mux)
 	if !s.Preview {
 		s.accessRoutes(mux)
