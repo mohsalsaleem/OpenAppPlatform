@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 1,
+  "status": "measured",
+  "profile": {
+    "applications": 10,
+    "components": 50,
+    "instances": 50,
+    "observationIntervalSeconds": 10,
+    "idleSeconds": 60
+  },
+  "host": {
+    "NCPU": 12,
+    "MemTotal": 8216776704,
+    "Architecture": "aarch64",
+    "OperatingSystem": "Alpine Linux v3.23 (containerized)",
+    "ServerVersion": "29.2.1"
+  },
+  "platformImageBytes": 69677008,
+  "latency": {
+    "startupSeconds": 8.252620502986247,
+    "compatibleUpdateSeconds": 5.983198418980464,
+    "externalRescueSeconds": 5.8659552950121
+  },
+  "phases": [
+    {
+      "name": "idle",
+      "elapsedSeconds": 60.144,
+      "sampleIntervalSeconds": 5,
+      "samples": 13,
+      "services": {
+        "platform": {
+          "rssPeakBytes": 21639168,
+          "rssMeanBytes": 21632551.384615384,
+          "workingSetPeakBytes": 10792960,
+          "cpuMeanOneCorePercent": 0.7176026190091392,
+          "cpuIntervals": 12,
+          "missingSamples": 0
+        },
+        "postgres": {
+          "rssPeakBytes": 215773184,
+          "rssMeanBytes": 215135468.30769232,
+          "workingSetPeakBytes": 106659840,
+          "cpuMeanOneCorePercent": 1.1432305424897125,
+          "cpuIntervals": 12,
+          "missingSamples": 0
+        }
+      },
+      "metadataBefore": {
+        "databaseBytes": 10278579,
+        "connections": 7,
+        "applications": 10,
+        "operations": 12,
+        "plans": 6
+      },
+      "metadataAfter": {
+        "databaseBytes": 10294963,
+        "connections": 7,
+        "applications": 10,
+        "operations": 12,
+        "plans": 6
+      },
+      "runtimeRequests": {
+        "GET:images": 0,
+        "GET:containers": 0,
+        "GET:networks": 0,
+        "POST:networks": 0,
+        "POST:containers": 0,
+        "DELETE:containers": 0
+      },
+      "runtimeRequestsPerSecond": 0.0
+    },
+    {
+      "name": "agent_observation",
+      "elapsedSeconds": 30.161,
+      "sampleIntervalSeconds": 5,
+      "samples": 7,
+      "services": {
+        "platform": {
+          "rssPeakBytes": 21655552,
+          "rssMeanBytes": 21649700.57142857,
+          "workingSetPeakBytes": 10768384,
+          "cpuMeanOneCorePercent": 0.7730138995575166,
+          "cpuIntervals": 6,
+          "missingSamples": 0
+        },
+        "postgres": {
+          "rssPeakBytes": 216334336,
+          "rssMeanBytes": 216044690.2857143,
+          "workingSetPeakBytes": 107008000,
+          "cpuMeanOneCorePercent": 1.201380092483461,
+          "cpuIntervals": 6,
+          "missingSamples": 0
+        }
+      },
+      "metadataBefore": {
+        "databaseBytes": 10294963,
+        "connections": 7,
+        "applications": 10,
+        "operations": 12,
+        "plans": 6
+      },
+      "metadataAfter": {
+        "databaseBytes": 10294963,
+        "connections": 7,
+        "applications": 10,
+        "operations": 12,
+        "plans": 6
+      },
+      "runtimeRequests": {
+        "GET:images": 0,
+        "GET:containers": 15,
+        "GET:networks": 0,
+        "POST:networks": 0,
+        "POST:containers": 0,
+        "DELETE:containers": 0
+      },
+      "runtimeRequestsPerSecond": 0.4973
+    },
+    {
+      "name": "deployment_burst",
+      "elapsedSeconds": 30.163,
+      "sampleIntervalSeconds": 5,
+      "samples": 7,
+      "services": {
+        "platform": {
+          "rssPeakBytes": 22634496,
+          "rssMeanBytes": 22228406.85714286,
+          "workingSetPeakBytes": 11755520,
+          "cpuMeanOneCorePercent": 3.297562563056102,
+          "cpuIntervals": 6,
+          "missingSamples": 0
+        },
+        "postgres": {
+          "rssPeakBytes": 221241344,
+          "rssMeanBytes": 218993225.14285713,
+          "workingSetPeakBytes": 108089344,
+          "cpuMeanOneCorePercent": 4.608139219499339,
+          "cpuIntervals": 6,
+          "missingSamples": 0
+        }
+      },
+      "metadataBefore": {
+        "databaseBytes": 10294963,
+        "connections": 7,
+        "applications": 10,
+        "operations": 12,
+        "plans": 6
+      },
+      "metadataAfter": {
+        "databaseBytes": 10327731,
+        "connections": 7,
+        "applications": 10,
+        "operations": 22,
+        "plans": 6
+      },
+      "runtimeRequests": {
+        "GET:images": 70,
+        "GET:containers": 260,
+        "GET:networks": 0,
+        "POST:networks": 0,
+        "POST:containers": 0,
+        "DELETE:containers": 0
+      },
+      "runtimeRequestsPerSecond": 10.9404
+    },
+    {
+      "name": "target_outage",
+      "elapsedSeconds": 30.203,
+      "sampleIntervalSeconds": 5,
+      "samples": 7,
+      "services": {
+        "platform": {
+          "rssPeakBytes": 22839296,
+          "rssMeanBytes": 22701787.42857143,
+          "workingSetPeakBytes": 11886592,
+          "cpuMeanOneCorePercent": 0.8146089987706581,
+          "cpuIntervals": 6,
+          "missingSamples": 0
+        },
+        "postgres": {
+          "rssPeakBytes": 222617600,
+          "rssMeanBytes": 221811858.2857143,
+          "workingSetPeakBytes": 108650496,
+          "cpuMeanOneCorePercent": 1.2752219766750308,
+          "cpuIntervals": 6,
+          "missingSamples": 0
+        }
+      },
+      "metadataBefore": {
+        "databaseBytes": 10335923,
+        "connections": 7,
+        "applications": 10,
+        "operations": 22,
+        "plans": 6
+      },
+      "metadataAfter": {
+        "databaseBytes": 10335923,
+        "connections": 7,
+        "applications": 10,
+        "operations": 22,
+        "plans": 6
+      },
+      "runtimeRequests": {
+        "GET:images": 0,
+        "GET:containers": 15,
+        "GET:networks": 0,
+        "POST:networks": 0,
+        "POST:containers": 0,
+        "DELETE:containers": 0
+      },
+      "runtimeRequestsPerSecond": 0.4966
+    },
+    {
+      "name": "controller_recovery",
+      "elapsedSeconds": 30.166,
+      "sampleIntervalSeconds": 5,
+      "samples": 7,
+      "services": {
+        "platform": {
+          "rssPeakBytes": 18956288,
+          "rssMeanBytes": 18503387.42857143,
+          "workingSetPeakBytes": 8187904,
+          "cpuMeanOneCorePercent": 0.8079270644667167,
+          "cpuIntervals": 6,
+          "missingSamples": 0
+        },
+        "postgres": {
+          "rssPeakBytes": 128634880,
+          "rssMeanBytes": 128127561.14285715,
+          "workingSetPeakBytes": 89600000,
+          "cpuMeanOneCorePercent": 1.2501200524855591,
+          "cpuIntervals": 6,
+          "missingSamples": 0
+        }
+      },
+      "metadataBefore": {
+        "databaseBytes": 10368691,
+        "connections": 4,
+        "applications": 10,
+        "operations": 22,
+        "plans": 6
+      },
+      "metadataAfter": {
+        "databaseBytes": 10368691,
+        "connections": 4,
+        "applications": 10,
+        "operations": 22,
+        "plans": 6
+      },
+      "runtimeRequests": {
+        "GET:images": 0,
+        "GET:containers": 15,
+        "GET:networks": 0,
+        "POST:networks": 0,
+        "POST:containers": 0,
+        "DELETE:containers": 0
+      },
+      "runtimeRequestsPerSecond": 0.4973
+    }
+  ],
+  "goals": {
+    "serviceIdleRssUnder256MiB": true,
+    "combinedIdleSummedRssUnder512MiB": true,
+    "combinedIdleCpuUnderOneCorePercent": false
+  },
+  "definitions": {
+    "platformRss": "VmRSS of /proc/1/status",
+    "postgresRss": "sum of postgres process VmRSS; shared pages may be counted repeatedly",
+    "workingSet": "Docker memory usage minus inactive file cache",
+    "cpu": "Docker CPU counter delta / system delta * online CPUs * 100; one-core percentage",
+    "runtimeRequests": "Only platform adapter requests through the test proxy; sampler/host commands bypass it"
+  },
+  "limits": [
+    "Short isolated Docker Desktop/Linux profile, not production capacity or sustained-memory proof",
+    "Workloads, Engine, browser/test runner and builds excluded from OAP+PostgreSQL accounting",
+    "Proxy instrumentation adds overhead; no monitoring service is part of the product",
+    "Label-only update tests image replacement/schema compatibility, not a historical release migration",
+    "Metadata restore is not application-data restore"
+  ],
+  "measurementSource": {
+    "runtimeCommit": "1664ceb",
+    "harness": "M2.9 candidate",
+    "focusRun": "oap-m29-focus-1e034627a1"
+  }
+}

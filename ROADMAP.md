@@ -75,9 +75,10 @@ M2.5 and M2.6 add the JSON CLI, shared bounded waits/errors, headless owner
 setup, bounded named-agent creation grants and packaged install/update/rescue.
 M2.6 passed local gate `20261013-214602-ceb6aceb` at `c2e1eee`.
 M2.7 passed local gate `20261013-222818-1c1a5624` at `187e7d2`, adding the
-portable lifecycle and shared CLI/API/stdio-MCP action plans. Current gaps include
-unified incident acceptance, standalone shared ingress/TLS and the complete
-install-to-fix dogfood.
+portable lifecycle and shared CLI/API/stdio-MCP action plans. M2.8 passed local
+gate `20261013-231136-dca41e73` at `1664ceb`, adding bounded incident evidence and
+a named-agent diagnose/correct/verify flow. Current gaps include the combined
+install-to-fix dogfood/footprint exit and standalone shared ingress/TLS.
 App-scoped credentials still cannot create applications; creation needs an
 explicit bounded onboarding grant. Read-only MCP deployment summaries remain
 separate from durable executable plans. No whole M2 acceptance is implied.
@@ -100,10 +101,13 @@ items are preserved requirements, not parallel work or prerequisites. M2.5 passe
 gate `20261013-210851-28d984b5` at `6b9359c`; see [machine CLI](docs/agent-cli.md).
 M2.6 passed gate `20261013-214602-ceb6aceb` at `c2e1eee`; see
 [headless bootstrap](docs/headless-bootstrap.md). M2.7 passed gate `20261013-222818-1c1a5624` at `187e7d2`; see
-[portable lifecycle](docs/portable-lifecycle.md). The active slice is **M2.8**;
-see [bounded incident diagnosis](docs/incident-diagnosis.md). Its full local
-standalone acceptance is required before **M2.9**, the combined headless dogfood
-and measured footprint. M2.9 remains unaccepted.
+[portable lifecycle](docs/portable-lifecycle.md). M2.8 passed gate `20261013-231136-dca41e73` at `1664ceb`; see
+[bounded incident diagnosis](docs/incident-diagnosis.md). The active slice is
+**M2.9**, implemented by the [standalone runbook/skill](docs/standalone-agent-runbook.md)
+and [measured footprint](docs/footprint.md). Its fresh combined dogfood and exact-tree
+full local gate are the M2 exit requirement. Once they pass, the next slice is
+**M3.1 — source-to-release via an explicit external build lane**. UI/operator
+expansion remain parked. The measured combined idle CPU gap stays open for M3.4.
 
 ## Ordered active queue
 
@@ -166,7 +170,10 @@ startup/recovery latency. No browser is required for the baseline measurement.
 Provisional goals remain <=256 MiB service RSS, <=512 MiB service plus dedicated
 PostgreSQL RSS at idle, and <=1% of one CPU core average idle usage. These are
 unmeasured goals, not guarantees. Publish repeatable commands and measurements
-in M2.9; revise goals explicitly if evidence requires it. Bound polling, log reads,
+in M2.9; revise goals explicitly if evidence requires it. The
+[reference measurement](docs/footprint.md) meets idle memory comparisons but misses
+the combined one-core idle CPU goal (about 1.86% versus 1%). Keep the 1% goal
+unchanged and retain the gap for M3 one-person operability. Bound polling, log reads,
 retries, concurrency and retained metadata. OAP failure must not stop existing
 containers or routes. Do not install monitoring infrastructure just to benchmark.
 

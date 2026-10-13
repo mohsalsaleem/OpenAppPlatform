@@ -39,6 +39,7 @@ try{
   report.steps.at(-1).package=packages[index];report.steps.at(-1).skipped=skipped;await persist();
   if(skipped.some(name=>!report.expectedSkips.includes(name)))throw Error(`Unexpected test skip: ${skipped.join(', ')}`);
  }
+ await run('dogfood','python3',['tests/env/dogfood.py'],'/workspace',600000);
  await run('headless-installation','python3',['tests/env/headless.py'],'/workspace',360000);
  await run('installation','python3',['tests/env/installation.py'],'/workspace',360000);
  async function dockerRequest(path,body) {
