@@ -1,7 +1,7 @@
 # Environments and verified change
 
 Status: **planned.** Roadmap slices M3.3a (declared checks and guarded rollout,
-v0.2), M3.3b (previews and promotion, v0.3) and M3.3c (environment comparison,
+v0.2), M3.3b (previews and promotion, v0.4) and M3.3c (environment comparison,
 v0.4). Builds on the M3.1 router and M3.2
 specification-driven topology. Today OAP supports separate environment records
 grouped under one logical application ([application environments](application-environments.md))

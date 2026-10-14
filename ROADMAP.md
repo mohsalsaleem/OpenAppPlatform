@@ -22,8 +22,16 @@ execution path** (see [positioning](docs/positioning.md) and the
 - **Evidence before exposure.** Changes earn recorded evidence before users
   depend on them. Environments are a tool for that, not a required chain
   (see [environments and verified change](docs/environments.md)).
-- **Small and boring.** One Go service, PostgreSQL/River, Docker Engine and an
-  optional Caddy proxy. Far smaller than Kubernetes; never a re-implementation of it.
+- **Zero to live.** An agent given a VPS, an application and optionally a domain
+  should install OAP, build, create data services, deploy and serve it in one
+  session, then keep operating it (see [zero to live](docs/zero-to-live.md)).
+  Agents trigger releases; Git stores code.
+- **Capabilities, not access.** OAP holds the keys (Docker, secrets, control
+  database, proxy, builder); agents get narrow, audited, policy-checked operations.
+  Host access exists only during bootstrap and is handed back.
+- **Small and boring.** One Go service, PostgreSQL/River, Docker Engine, and an
+  optional Caddy proxy and isolated builder. Far smaller than Kubernetes; never a
+  re-implementation of it.
 
 AI interface means deterministic APIs, a structured CLI, MCP tools and versioned
 skills. No embedded model, chatbot or inference subscription is required; core
@@ -51,6 +59,13 @@ installer secrets, private endpoints or improvised host changes.
   becomes the source of deployment truth.
 - One owner and named agents with bounded grants and an audit trail. No enterprise
   tenancy or agent fleet.
+- Two phases of trust: an agent may hold host access only during an owner-present
+  bootstrap; installation ends by removing it, and operating agents hold only OAP
+  credentials. Prompts and skills are guidance, never guardrails.
+- Secrets never reach agents. Agents reference secrets by name; OAP generates
+  data-service credentials; human-held secrets arrive through owner-filled requests.
+- Builds are untrusted code: they run only in the isolated builder, never with the
+  Docker socket or host mounts.
 - Authorization is enforced by the server, never by prompts or skills. Routine
   reversible actions may run under explicit owner policy; risky actions need exact
   review. Agents cannot self-approve or write OAP's control database.
@@ -118,28 +133,35 @@ and everything below.
 | Slice | Scope | Acceptance |
 |---|---|---|
 | **M3.3a Declared checks and guarded rollout** | Spec-declared HTTP and worker checks run by OAP and recorded against the exact release; one-instance-first rollout through the router; automatic rollback on a failed check; a bounded post-release health window | A release rolls out one instance first and completes; an injected failing check rolls back automatically; evidence is recorded and visible to the agent |
-| **M3.6a Retention and pruning** | Automatic, bounded retention of job containers and unused images; protect active, stopped-but-bound and rollback-target artifacts; reviewed pruning plans | Disk use stays bounded across 50 releases; rollback targets survive pruning |
+| **M3.6a Retention and pruning** | Automatic, bounded retention of job containers and unused images; protect active, stopped-but-bound and rollback-target artifacts; reviewed pruning plans. Foundation for Z4 | Disk use stays bounded across 50 releases; rollback targets survive pruning |
 | **M3.2d Spec history** | Author (owner or named agent), time and message per version; history, masked version diff, revert as a new plan; one-way `spec export --dir` | An agent reverts a topology change through a plan; history shows who changed what; export round-trips through validate/diff without secret values |
-| **M4.1 Owner notifications** | Durable, deduplicated owner notifications for automatic rollback, operations needing attention, and paused or denied agents; off until configured | Each event type is delivered once to a configured channel; delivery failure never blocks operations |
+| **M4.1 Owner notifications** | Durable, deduplicated owner notifications for automatic rollback, operations needing attention, and paused or denied agents; off until configured. Also delivers Z3/Z5 secret requests and approval requests | Each event type is delivered once to a configured channel; delivery failure never blocks operations |
 
-### v0.3 — Real-world workflow
+### v0.3 — Zero to live
+
+The agent-run server journey and its guardrails; design in
+[zero to live](docs/zero-to-live.md). M3.4's external build lane is replaced by
+on-server builds (Z2); its component-scoped release grants remain.
 
 | Slice | Scope | Acceptance |
 |---|---|---|
-| **M3.4 Source-to-release and component grants** | Component-scoped release grants; explicit GitHub release ownership; documented external build lane; no silent takeover of existing triggers | Three repositories release three components of one app independently; each credential is denied on the others |
+| **Z1 Bootstrap and handoff** | Agent-guided install on a fresh VPS (OAP, PostgreSQL, Caddy, builder); owner setup; agent grant; installer removes the temporary host key and reports it; break-glass re-entry is an explicit, time-limited owner action. Read-only **server facts** API (disk, memory, CPU, images, build cache, reclaimable space, per-app usage; other apps only as totals). Fallback hostname via `sslip.io` when no domain is given | An agent goes from a fresh VPS to a live HTTPS app with no domain supplied; after handoff its old host key no longer works; server facts never name another grant's apps |
+| **Z2 On-server builds** | Optional isolated builder (rootless BuildKit, no Docker socket or host mounts, CPU/memory/time limits, cache budget); input is a Git commit or an uploaded source bundle; output is a local image with commit provenance; component-scoped release grants (from M3.4); agent-triggered releases, Git webhooks optional | An agent builds and releases three components from one commit; a hostile Dockerfile cannot reach the host or Docker socket; a component credential cannot build or release another component |
+| **Z3 Owned data services** | Postgres, Redis and MySQL as owned single-instance components with retained volumes; OAP-generated credentials bound as secrets; dependants wired by reference; documented backup and restore procedure | An app with Postgres and Redis deploys with credentials never appearing in any agent-visible output; data survives app releases and rollback |
+| **Z4 Quotas and disk management** | Per-app quotas (CPU, memory, disk, instances, build minutes) and app count per grant; disk-aware clean-up of images, build cache and old job containers under thresholds, extending M3.6a | One app cannot exceed its quota; under disk pressure clean-up frees space without touching running, bound or rollback-target artifacts |
+| **Z5 Policy and safety rails** | Owner-editable risk tiers (routine, sensitive, destructive); secret requests filled by the owner through a separate link; circuit breakers and mutation rate limits; blast radius in every plan; Docker socket proxy limiting OAP's own Docker API use | A sensitive change waits for owner approval; repeated failed deploys auto-pause the agent; a secret request never exposes the value to the agent; OAP's Docker access is limited to its allowlist |
+| **Z6 Agent discoverability** | Operation skill and MCP server published where agents look for tools; agent-oriented docs (`llms.txt`); an agent quickstart from *VPS + repository + optional domain* to a live app | A fresh agent with only the quickstart completes the Z1–Z3 journey (measured as a Q3 scenario) |
+| **M3.5 Compose import** | Proposed spec from `docker-compose.yml` with explicit decisions and unsupported fields ([proposal](docs/compose-import.md)); moved here because agents use it to understand existing apps | The example imports, validates and deploys after decisions are resolved, with no secret values in output |
 | **M3.8 Remote agent access** | Authenticated HTTPS API and MCP for agents outside the server (cloud agents, CI), served through the installed Caddy; never exposes Docker or the control database; no mandatory tunnel | A remote agent completes the release journey over HTTPS with the same grants and denials as a local one |
-| **M3.3b Previews and promotion** | Temporary environments from production's release plus one change, own route, test secrets, seeded data, cap and expiry; optional rule that production only receives digests that passed in a preview; urgent-fix fast lane with reason and owner approval | A preview runs checks and is cleaned up on expiry; promotion of an unverified digest is refused when the rule is on |
 
-### v0.4 — Adoption and operability
+### v0.4 — Verified change and operability
 
 | Slice | Scope | Acceptance |
 |---|---|---|
-| **M3.5 Compose import** | Proposed spec from `docker-compose.yml` with explicit decisions and unsupported fields ([proposal](docs/compose-import.md)) | The example imports, validates and deploys after decisions are resolved, with no secret values in output |
+| **M3.3b Previews and promotion** | Temporary environments from production's release plus one change, own route, test secrets, seeded data, cap and expiry; optional rule that production only receives digests that passed in a preview; urgent-fix fast lane with reason and owner approval | A preview runs checks and is cleaned up on expiry; promotion of an unverified digest is refused when the rule is on |
 | **M3.3c Environment comparison** | Optional long-lived environments with per-environment overrides; masked comparison sorted into declared, ahead and drift | Comparing two environments reports all three groups without secret values |
-| **M3.6b Storage safety** | Runtime artifact inventory, retained known-good releases, named-volume backup procedures; app-data restore separately authorized | A volume backup and restore drill on the reference app |
+| **M3.6b Storage safety** | Runtime artifact inventory, retained known-good releases, automated named-volume and data-service backups; app-data restore separately authorized | A backup and restore drill on the reference app, including its database |
 | **M3.7 One-person operability** | Offline rescue, secret/key recovery, backup checks, bounded metadata growth, idle CPU work toward the 1% goal | Measured footprint regression checks in the gate |
-
-Move M3.5 earlier if outside users are a near-term goal; it is the easiest on-ramp.
 
 ## QA track
 
@@ -153,7 +175,7 @@ behavior, renewal).
 |---|---|---|
 | **Q1 Integrity checker** (with v0.2) | Read-only, test-only checker comparing OAP's records with Docker, Caddy, audit and interface outputs; invariants for records vs reality, routes vs health, no double dispatch, audited mutations, canary-secret leaks, scope isolation, data survival, no early success and exact plans; fault scenarios through CLI, REST and MCP | The existing gate scenarios run the checker after every step; each invariant has a scenario that deliberately breaks it and is caught |
 | **Q2 Agent-facing environment** (with v0.2) | `qa-env up/reset/down` with `local`, `small` and `vps` profiles returning one JSON context; cached images and a post-install snapshot | `up` under 5 minutes from nothing, `reset` under 1 minute, identical results across repeated runs |
-| **Q3 Agent evaluations** (with v0.3) | Scenario library, client transcript plus server audit trace joined by a request trace ID, outcome/process/honest-claims grading mapped to the operating-model principles, results per OAP version and per agent | Every scenario in the library runs unattended for at least one agent, with a report citing evidence for each grade |
+| **Q3 Agent evaluations** (with v0.3; Z6 is measured by it) | Scenario library, client transcript plus server audit trace joined by a request trace ID, outcome/process/honest-claims grading mapped to the operating-model principles, results per OAP version and per agent | Every scenario in the library runs unattended for at least one agent, with a report citing evidence for each grade |
 
 ## Later milestones
 
@@ -166,8 +188,8 @@ behavior, renewal).
 
 ## Lightweight requirement
 
-Measure the OAP service, its dedicated PostgreSQL and the optional Caddy proxy
-separately from workloads and builds. Reference profile: one declared server,
+Measure the OAP service, its dedicated PostgreSQL, the optional Caddy proxy and
+the optional builder separately from workloads and builds. Reference profile: one declared server,
 10 applications / 50 components. Exercise idle, agent observation, deployment
 burst, target outage and controller recovery. Goals: ≤256 MiB service RSS,
 ≤512 MiB service plus PostgreSQL at idle, ≤1% of one core average idle CPU. The
@@ -188,7 +210,7 @@ existing containers or routes. Do not add monitoring infrastructure to benchmark
 | Destructive actions | Data deletion, destructive migrations, rotations and pruning need separate exact authority and recovery checks |
 | Indexed logs, metrics, analytics, telemetry | M4; opt-in, bounded retention, local diagnosis always available |
 | AI-assisted discovery and assembly | M5; deterministic proposals first, no implicit adoption |
-| Security | Docker limits, ownership and no-new-privileges preserved; no privileged/bind/host-network generalization; build isolation and image provenance only by later explicit gates |
+| Security | Docker limits, ownership and no-new-privileges preserved; no privileged/bind/host-network generalization. Build isolation and commit provenance arrive with Z2; image signing and vulnerability scanning stay later explicit gates |
 | Multi-server, Firecracker, other runtimes | M6 research; optional, never core dependencies |
 
 ## Completion discipline

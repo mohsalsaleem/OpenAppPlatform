@@ -16,6 +16,7 @@ use this index.
 - [Standalone agent runbook](standalone-agent-runbook.md): install, grant an agent and run the full lifecycle without the dashboard
 - [Feature reference](feature-reference.md): detailed behavior and limits of current features
 - [QA strategy](qa-strategy.md): local-first system integrity tests and agent evaluations
+- [Zero to live](zero-to-live.md): agent-run servers from a fresh VPS, and the guardrail model
 
 ## Agent interface
 

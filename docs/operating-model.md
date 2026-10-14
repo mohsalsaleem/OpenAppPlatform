@@ -114,6 +114,14 @@ Additional protections:
 - **Audit and control.** Every mutation is recorded with its credential. The
   owner can pause or revoke an agent at any time; new work is denied immediately.
 
+## Toward agent-run servers
+
+The planned [zero to live](zero-to-live.md) work extends these guardrails for
+agents that install and run whole servers: two phases of trust (host access only
+during an owner-present bootstrap, then handed back), quotas, risk-tiered
+policy, secret requests the owner fills, circuit breakers, isolated on-server
+builds and a read-only server facts API.
+
 ## Limits
 
 Guardrails cover the OAP API. They do not cover:
