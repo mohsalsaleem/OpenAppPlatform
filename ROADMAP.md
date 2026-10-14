@@ -89,11 +89,11 @@ release. Do these in order.
 | # | Task | Done when |
 |---|---|---|
 | 1 | **Record existing evidence** | Gate ID for `3ac90b1` added to [test evidence](docs/v0.1-test-evidence.md) |
-| 2 | **One continuous release journey** (`tests/env/release_journey.py`, added to the gate) | One named agent, one reference app (web, api, worker, migration job, linked PostgreSQL fixture), CLI only: create → deploy with migration → routed through Caddy → scale api 1 → 3 with traffic on every instance → inject a failing release → `incident` identifies it → correct via plan → app-wide image rollback (migration not re-run, volume data kept) → `verify` plus HTTP behavior checks → scale 3 → 1 with no failed requests. Writes `release-journey.json` |
+| 2 | **One continuous release journey** on a real VPS ([runbook and fixtures](tests/vps/release-journey/README.md)), run by the VPS testing agent | One named agent, one reference app (web, api, notes with a volume, worker, migration job; linked PostgreSQL stays covered by the local gate), CLI only: create → deploy with migration → routed through Caddy → scale api 1 → 3 with traffic on every instance → inject a failing release → `incident` identifies it → correct via plan → app-wide image rollback (migration not re-run, volume data kept) → `verify` plus HTTP behavior checks → scale 3 → 1 with no failed requests. Writes `release-journey.json` |
 | 3 | **Disk safety for small servers** | Documented, tested manual procedure to remove old pre-deploy job containers and unused images without touching active, stopped-but-bound or rollback-target artifacts; listed in known limits |
 | 4 | **Public docs match reality** | README "What works today", "Next" and scale-loop text; `overview.svg` and `scale-loop.svg` no longer say "planned M3.1"; [v0.1 release notes](docs/releases/v0.1.md) list included features and known limits; [standalone ingress](docs/standalone-ingress.md) and the roadmap agree on multi-app aggregation status |
 | 5 | **Release candidate gate** | Fresh exact-tree `make test-local` passes on the final tree, including step 2; gate ID recorded |
-| 6 | **Public install on the release tree** | Repeat the [public acceptance](docs/standalone-public-acceptance.md) on a fresh VPS at the release commit (Let's Encrypt issue, routed app reachable) |
+| 6 | **Public install on the release tree** | The step 2 journey run at the release commit with `--ingress-tls letsencrypt` covers this; otherwise repeat the [public acceptance](docs/standalone-public-acceptance.md) |
 | 7 | **Cut v0.1** | Tag, pinned OAP and Caddy image digests, upgrade from an M2.9-era install tested, release notes published |
 
 **Known limits to publish with v0.1:** standard deploys can cause downtime;

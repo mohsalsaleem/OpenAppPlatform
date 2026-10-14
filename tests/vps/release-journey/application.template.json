@@ -1,0 +1,77 @@
+{
+  "apiVersion": "oap.dev/v1alpha1",
+  "kind": "Application",
+  "spec": {
+    "name": "release-journey",
+    "environment": "production",
+    "targetId": "docker-local",
+    "components": [
+      {
+        "name": "migrate",
+        "kind": "job",
+        "image": "__JOB_IMAGE__",
+        "port": 0,
+        "instances": 1,
+        "strategy": "standard",
+        "env": {"JOB_EXIT_CODE": "0"},
+        "readiness": {"timeoutSeconds": 60}
+      },
+      {
+        "name": "api",
+        "kind": "web",
+        "image": "__API_V1_IMAGE__",
+        "port": 8080,
+        "instances": 1,
+        "strategy": "standard",
+        "dependsOn": ["migrate"],
+        "healthCheck": {"mode": "image"},
+        "readiness": {"requireHealthy": true, "timeoutSeconds": 120},
+        "limits": {"memoryMiB": 64, "cpuMillis": 200}
+      },
+      {
+        "name": "web",
+        "kind": "web",
+        "image": "__WEB_IMAGE__",
+        "port": 8080,
+        "instances": 1,
+        "strategy": "standard",
+        "services": {"UPSTREAM_URL": "api"},
+        "dependsOn": ["api"],
+        "healthCheck": {"mode": "image"},
+        "readiness": {"requireHealthy": true, "timeoutSeconds": 120},
+        "limits": {"memoryMiB": 64, "cpuMillis": 200}
+      },
+      {
+        "name": "notes",
+        "kind": "web",
+        "image": "__NOTES_IMAGE__",
+        "port": 8080,
+        "instances": 1,
+        "strategy": "standard",
+        "volumes": [{"name": "data", "mountPath": "/data"}],
+        "healthCheck": {"mode": "image"},
+        "readiness": {"requireHealthy": true, "timeoutSeconds": 120},
+        "limits": {"memoryMiB": 64, "cpuMillis": 200}
+      },
+      {
+        "name": "worker",
+        "kind": "worker",
+        "image": "__WORKER_IMAGE__",
+        "port": 0,
+        "instances": 1,
+        "strategy": "standard",
+        "readiness": {"requireHealthy": true, "timeoutSeconds": 120},
+        "limits": {"memoryMiB": 64, "cpuMillis": 200}
+      }
+    ],
+    "ingress": {
+      "domain": "__DOMAIN__",
+      "https": true,
+      "routes": [
+        {"path": "/", "component": "web"},
+        {"path": "/api", "component": "api", "stripPrefix": true},
+        {"path": "/notes", "component": "notes", "stripPrefix": true}
+      ]
+    }
+  }
+}
