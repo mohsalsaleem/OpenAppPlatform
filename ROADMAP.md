@@ -84,7 +84,11 @@ What the tests already prove, and where, is mapped in
 v0.1 is **a multi-component application on one server, operated end to end by an
 owner-authorized agent through the CLI**. Feature work for v0.1 is done; what
 remains is proving it as one journey, documenting it accurately and cutting the
-release. Do these in order.
+release. Do these in order. The real VPS journey must target **1 GB RAM**;
+constrain the test and move candidate builds off-host rather than requiring a
+larger runtime server. See [VPS journey feedback](docs/vps-journey-feedback.md)
+for the blocked attempt and acceptance requirements. This constraint is not yet
+validated.
 
 | # | Task | Done when |
 |---|---|---|

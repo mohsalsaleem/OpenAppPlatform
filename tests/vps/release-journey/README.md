@@ -40,6 +40,13 @@ human can do them, or the testing agent acting as owner in those steps only.
 
 ## What you need
 
+**Pending test revision:** the owner requires this journey to run on a **1 GB
+VPS**. The procedure below still assumes the original 2 GB host and on-host
+builds; it has not proven the 1 GB target. Constrain fixture overhead and add a
+reproducible off-host build lane before repeating it on a 1 GB server. See
+[VPS journey feedback](../../../docs/vps-journey-feedback.md) for observations
+and acceptance requirements.
+
 - A fresh Linux VPS (2 vCPU / 2 GB RAM or more) with Docker Engine (API ≥ 1.45),
   Compose v2, Python ≥ 3.8, Go (to build the CLI and MCP server), Git and `curl`.
   Public TCP 80/443 open.
