@@ -1,78 +1,69 @@
-# v0.1 release journey on a real VPS
+# v0.1 release journey on a real VPS: CLI, REST and MCP
 
-**Purpose:** prove the v0.1 promise as **one continuous journey** on a fresh
-server: a multi-component application, operated end to end by an
-owner-authorized agent through the `oap` CLI. This is roadmap v0.1 closeout
-tasks 2 and 6. The result is one receipt, `release-journey.json`.
+**Purpose:** prove that an agent can manage an application end to end, reliably,
+through **each** of OAP's agent interfaces. The same journey runs three times on
+one server, once per interface:
 
-**Who runs it:** a testing agent on a disposable VPS, plus a human owner for the
-trust steps (or the testing agent acting as owner **only** in the clearly marked
-owner steps, using the owner credential file, never in agent steps).
+| Run | Interface | Agent identity | Hostname |
+|---|---|---|---|
+| `cli` | `oap` JSON CLI | Journey agent (CLI) | `cli.$BASE` |
+| `rest` | REST API (`curl`) | Journey agent (REST) | `rest.$BASE` |
+| `mcp` | stdio MCP (`oap-mcp -operate`) | Journey agent (MCP) | `mcp.$BASE` |
+
+Each run uses its own named agent, its own application and its own hostname.
+Afterwards, cross-interface checks confirm the three apps coexist behind the
+shared proxy and that no agent can touch another's app. This covers roadmap v0.1
+closeout tasks 2 and 6. The results are one receipt per run plus a parity report.
+
+**Who runs it:** a testing agent on a disposable VPS. Owner steps (marked
+**Owner**) use the owner credential and must never be mixed into agent steps. A
+human can do them, or the testing agent acting as owner in those steps only.
 
 ## Ground rules
 
-1. **One management interface.** Every OAP operation uses the `oap` CLI. Docker,
-   `curl` and `probe.py` are used only to build images and to observe
-   application traffic, never to change OAP state.
-2. **Identities stay separate.** Owner steps use `owner.json`. Agent steps use
-   `agent.json` (onboarding) or `agent-app.json` (app-scoped). Never pass
-   credentials in arguments or logs.
-3. **No workarounds.** Never edit the control database, call private endpoints,
-   hand-edit Caddy, or restart containers with Docker to make a step pass.
-4. **Stop on surprises.** If a step's result differs from **Expect**, stop,
-   capture evidence (command output, `operation`, `incident`, `instances`), and
-   record the step as failed in the receipt. Do not retry with a new plan after an
-   uncertain result; re-run `execute-action` with the **same** plan ID instead.
-5. **Retain everything:** plan IDs, plan hashes, operation IDs and every probe
-   summary, in the order they happened.
+1. **One interface per run.** Every agent step in a run uses only that run's
+   interface. `docker`, `curl` against the app's public URL, and `probe.py` are
+   used only to build images and observe application traffic. Owner steps always
+   use the CLI.
+2. **Identities stay separate.** Never pass credentials in arguments, prompts or
+   logs. Credential files are mode 0600 inside a 0700 directory.
+3. **No workarounds.** Never edit the control database, call undocumented
+   endpoints, hand-edit Caddy, or restart containers to make a step pass. A
+   missing capability in one interface is a **finding**, not a reason to switch
+   interfaces mid-run.
+4. **Stop on surprises.** If a result differs from **Expect**, stop that run,
+   capture evidence (operation, incident, instances), and record a finding. After
+   an uncertain result, re-execute the **same** plan or reuse the **same**
+   idempotency key; never create a new plan to "try again".
+5. **Retain everything** in `$OUT/<run>/`: request bodies, responses, plan IDs and
+   hashes, operation IDs and probe summaries, numbered in order.
 
 ## What you need
 
-- A fresh Linux VPS (2 vCPU / 2 GB RAM is enough) with Docker Engine (API ≥ 1.45),
-  Compose v2, Python ≥ 3.8 and Git. Public TCP 80/443 open.
-- A DNS name pointing at the VPS, e.g. `journey.example.com` (A record only).
-  Without DNS, use `--ingress-tls internal`, a `.test` name in `/etc/hosts`, and
+- A fresh Linux VPS (2 vCPU / 2 GB RAM or more) with Docker Engine (API ≥ 1.45),
+  Compose v2, Python ≥ 3.8, Go (to build the CLI and MCP server), Git and `curl`.
+  Public TCP 80/443 open.
+- Three DNS A records pointing at the VPS: `cli.$BASE`, `rest.$BASE`, `mcp.$BASE`.
+  Without DNS, use `--ingress-tls internal`, `.test` names in `/etc/hosts` and
   `--cafile` on the probe; record that public ACME was **not** tested.
 - The OAP repository at the **release candidate commit**. Record `git rev-parse HEAD`.
 
-## Variables
+## Phase A: build and install (once, host administration)
 
 ```sh
-export REPO=$PWD                         # repository root at the RC commit
-export J=$REPO/tests/vps/release-journey
-export DIR=/opt/oap-journey              # installation directory (new, empty)
-export DOMAIN=journey.example.com        # your DNS name
-export URL=http://127.0.0.1:8878         # OAP API, loopback only
-export OUT=/opt/oap-journey-evidence     # evidence directory
-mkdir -p "$OUT"
-oapo() { ./bin/oap --url "$URL" --credential-file "$DIR/owner.json" "$@"; }      # owner
-oapa() { ./bin/oap --url "$URL" --credential-file "$DIR/agent.json" "$@"; }      # agent (onboarding)
-oapx() { ./bin/oap --url "$URL" --credential-file "$DIR/agent-app.json" "$@"; }  # agent (app-scoped)
-```
+export REPO=$PWD J=$PWD/tests/vps/release-journey
+export DIR=/opt/oap-journey OUT=/opt/oap-journey-evidence
+export BASE=journey.example.com URL=http://127.0.0.1:8878
+mkdir -p "$OUT" && install -d -m 700 "$DIR/creds"
 
-Every `oap` command prints one JSON envelope. Plan IDs are at `.data.id`, plan
-hashes at `.data.planHash`, execution results at `.data.result` (with
-`applicationId`, `definitionVersion` and `operationId` where relevant). Save
-each envelope to `$OUT/NN-step.json`.
-
-## Phase A: build and install (host administration)
-
-**A1. Build OAP and the CLI.**
-
-```sh
-cd "$REPO"
 docker build --label org.opencontainers.image.revision="$(git rev-parse HEAD)" -t openappplatform:rc .
-go build -o bin/oap ./cmd/oap      # or extract the shipping oap binary from the image
+go build -o bin/oap ./cmd/oap && go build -o bin/oap-mcp ./cmd/oap-mcp
 OAP_IMAGE=$(docker image inspect --format '{{.Id}}' openappplatform:rc)
-```
 
-**A2. Build the application images** and record their content IDs.
-
-```sh
-docker build -t oap-journey-api:base   examples/hello-api
-docker build -t oap-journey-notes:v1   examples/persistent-web
-docker build -t oap-journey-worker:v1  examples/worker
-docker build -t oap-journey-job:v1     -f $J/job.Dockerfile $J
+docker build -t oap-journey-api:base  examples/hello-api
+docker build -t oap-journey-notes:v1  examples/persistent-web
+docker build -t oap-journey-worker:v1 examples/worker
+docker build -t oap-journey-job:v1 -f $J/job.Dockerfile $J
 for v in web-v1 v1 v2; do
   docker build -t oap-journey-api:$v -f $J/api-variant.Dockerfile \
     --build-arg BASE=oap-journey-api:base --build-arg VERSION=$v $J
@@ -82,278 +73,284 @@ id() { docker image inspect --format '{{.Id}}' "$1"; }
 export JOB=$(id oap-journey-job:v1) WEB=$(id oap-journey-api:web-v1) API1=$(id oap-journey-api:v1) \
        API2=$(id oap-journey-api:v2) APIBAD=$(id oap-journey-api:broken) \
        NOTES=$(id oap-journey-notes:v1) WORKER=$(id oap-journey-worker:v1)
-```
 
-**A3. Install with packaged Caddy and public HTTPS.**
-
-```sh
 python3 scripts/install.py init --json --directory "$DIR" --image "$OAP_IMAGE" \
-  --environment production --ingress-domain "$DOMAIN" --ingress-tls letsencrypt --ingress-bind 0.0.0.0
+  --environment production --ingress-tls letsencrypt --ingress-bind 0.0.0.0 \
+  --ingress-domain "cli.$BASE" --ingress-domain "rest.$BASE" --ingress-domain "mcp.$BASE"
 python3 scripts/install.py start --json --directory "$DIR"
-python3 scripts/install.py check --json --directory "$DIR" | tee "$OUT/A3-check.json"
+python3 scripts/install.py check --json --directory "$DIR" | tee "$OUT/A-check.json"
 ```
 
 **Expect:** `check` reports healthy OAP, PostgreSQL and Caddy. The OAP API answers
-only on loopback. Port 443 has no certificate yet (none is requested until an app
-with HTTPS routes is deployed).
+only on loopback. No certificate is requested until an app with HTTPS routes deploys.
 
-## Phase B: owner establishes trust (owner only)
+## Phase B: owner trust (once, **Owner**)
 
-**B1. Owner setup.** Write `private-owner.json` with `{"email","name","password"}`
-(mode 0600, outside the repository).
+Write `private-owner.json` with `{"email","name","password"}` (mode 0600, outside
+the repository), then:
 
 ```sh
 python3 scripts/install.py owner-setup --json --directory "$DIR" \
-  --cli-bin ./bin/oap --out "$DIR/owner.json" < private-owner.json
+  --cli-bin ./bin/oap --out "$DIR/creds/owner.json" < private-owner.json
+oapo() { ./bin/oap --url "$URL" --credential-file "$DIR/creds/owner.json" "$@"; }
+for RUN in cli rest mcp; do
+  printf '{"name":"Journey agent (%s)","targetId":"docker-local","environment":"production","maxApplications":1,"actions":["configure","deploy","recover","rollback"]}\n' "$RUN" > grant-$RUN.json
+  oapo --out "$DIR/creds/onboard-$RUN.json" --file grant-$RUN.json grant | tee "$OUT/B-grant-$RUN.json"
+done
 ```
 
-**B2. Onboarding grant for the agent.**
+**Expect:** three agent credential files. The owner credential is never given to
+an agent step.
+
+## Interface reference
+
+Request bodies are **identical across interfaces**: the CLI's `--file` body, the
+REST request body and the MCP tool arguments carry the same JSON. Responses carry
+the same data (CLI `.data`, REST response body, MCP `structuredContent.data`):
+plan ID at `id`, plan hash at `planHash`, execution result at `result` with
+`applicationId`, `definitionVersion` and `operationId`. An operation ID is also the
+release ID used by rollback.
+
+| Action | CLI (`oap … <command>`) | REST | MCP tool |
+|---|---|---|---|
+| Validate spec | `--file B validate-spec` | `POST /api/v1/specifications/validate` | `validate_specification` |
+| Diff spec | `--app A --file B diff-spec` | `POST /api/v1/applications/A/specification/diff` | `diff_specification` |
+| Export spec | `--app A export-spec` | `GET /api/v1/applications/A/specification` | `export_specification` |
+| Capabilities | `--app A capabilities` | `GET /api/v1/applications/A/capabilities` | `inspect_capabilities` |
+| Create a plan | `--file B action-plan` | `POST /api/v1/action-plans` | `create_action_plan` with `{"request": B}` |
+| Read a plan | `--plan P get-action-plan` | `GET /api/v1/action-plans/P` | `get_action_plan` |
+| Execute a plan | `--plan P --file empty.json execute-action` | `POST /api/v1/action-plans/P/execute` with `{}` | `execute_action_plan` |
+| Wait | `--operation O --timeout 10m wait` | Poll `GET /api/v1/deployments/O` until `state` is terminal | `wait_operation` (`timeoutSeconds` ≤ 1800) |
+| Instance health | `--app A verify` | `GET /api/v1/applications/A/instances` | `inspect_instances` |
+| Incident | `--app A --component C --ordinal N incident` | `GET /api/v1/applications/A/incident?component=C&ordinal=N` | `get_incident_context` |
+| Rollback plan | `--app A --file B rollback-plan` | `GET /api/v1/applications/A/rollback-plan?releaseId=R&expectedVersion=V` | `plan_rollback` |
+| Rollback | `--app A --key K --file B rollback` | `POST /api/v1/applications/A/rollbacks` with `Idempotency-Key: K` | `execute_rollback` (with `idempotencyKey`) |
+| Approve a plan (**Owner**) | `--plan P --file approve.json approve-action` | — (owner uses CLI) | — (owner uses CLI) |
+
+Terminal operation states: `succeeded`, `failed`, `attention`, `cancelled`, `abandoned`.
+
+### Running an agent step through each interface
 
 ```sh
-cat > grant.json <<'EOF'
-{"name": "Release journey agent", "targetId": "docker-local", "environment": "production",
- "maxApplications": 1, "actions": ["configure", "deploy", "recover", "rollback"]}
-EOF
-oapo --out "$DIR/agent.json" --file grant.json grant | tee "$OUT/B2-grant.json"
+# CLI
+oapx() { ./bin/oap --url "$URL" --credential-file "$CRED" "$@"; }
+oapx --file body.json action-plan
+
+# REST: build the auth header file once per credential (never put the token in arguments)
+python3 -c 'import json,sys;print("Authorization: Bearer "+json.load(open(sys.argv[1]))["token"])' "$CRED" > "$DIR/creds/$RUN.hdr"
+chmod 600 "$DIR/creds/$RUN.hdr"
+rest() { curl -sS -H @"$DIR/creds/$RUN.hdr" -H 'Content-Type: application/json' "$@"; }
+rest -X POST "$URL/api/v1/action-plans" --data @body.json
+
+# MCP: preferably configure oap-mcp as an MCP server in your own agent client:
+#   command: ./bin/oap-mcp   args: -url $URL -operate -credential-file $CRED
+# or use the helper, which performs the same stdio handshake:
+mcpx() { python3 -I $J/mcp_call.py --bin ./bin/oap-mcp --url "$URL" --credential-file "$CRED" "$@"; }
+mcpx list                                             # expect 19 tools incl. lifecycle tools
+echo '{"request": '"$(cat body.json)"'}' | mcpx call create_action_plan --args -
 ```
 
-**Expect:** `agent.json` is created with mode 0600. The owner credential is never
-given to agent steps.
+Notes per interface:
+- **REST:** HTTP `202` means admitted, not succeeded. Record status codes. Waiting
+  is client-side polling (every 1–2 s). If a bearer-authenticated mutation is
+  refused for origin or CSRF reasons, record a finding.
+- **MCP:** there is no `verify` tool; use `inspect_instances`. Owner approval is
+  deliberately not an MCP tool. Note any other step the tools can't express as a
+  finding with the closest available tool.
 
-## Phase C: agent creates and deploys the application (agent)
+## The journey (repeat for `RUN=cli`, then `rest`, then `mcp`)
 
-**C1. Fill the spec.**
+```sh
+export RUN=cli  DOMAIN=$RUN.$BASE  CRED=$DIR/creds/onboard-$RUN.json
+mkdir -p "$OUT/$RUN"
+echo '{}' > empty.json
+```
+
+Each step names the action from the reference table and the JSON body to send.
+`V` is always the current definition version (from the last `configure` or
+`create` result, or from reading the application).
+
+### C: create and first deploy
+
+**C1. Fill and validate the spec.**
 
 ```sh
 sed -e "s|__JOB_IMAGE__|$JOB|" -e "s|__API_V1_IMAGE__|$API1|" -e "s|__WEB_IMAGE__|$WEB|" \
     -e "s|__NOTES_IMAGE__|$NOTES|" -e "s|__WORKER_IMAGE__|$WORKER|" -e "s|__DOMAIN__|$DOMAIN|" \
-    $J/application.template.json > spec.json
-python3 -c 'import json;s=json.load(open("spec.json"));print(json.dumps({"specification":s}))' > validate.json
-oapa --file validate.json validate-spec | tee "$OUT/C1-validate.json"
+    -e "s|\"release-journey\"|\"release-journey-$RUN\"|" $J/application.template.json > spec-$RUN.json
 ```
 
-**Expect:** `ok: true`.
+*Validate spec* with `{"specification": <spec>}`. **Expect:** valid.
 
-**C2. Create (save only).**
+**C2. Create (save only).** *Create a plan* with `{"action":"create","specification":<spec>}`,
+then *execute* it. Record `APP` and `V` from the result.
+**Expect:** no containers started (*instance health* shows none running).
+
+**C3. Owner: app-scoped credential.** Scale-down is granted per application, so:
 
 ```sh
-python3 -c 'import json;s=json.load(open("spec.json"));print(json.dumps({"action":"create","specification":s}))' > create.json
-oapa --file create.json action-plan | tee "$OUT/C2-plan.json"          # keep .data.id
-echo '{}' > empty.json
-oapa --plan "$CREATE_PLAN" --file empty.json execute-action | tee "$OUT/C2-create.json"
-export APP=<.data.result.applicationId>  V=<.data.result.definitionVersion>
+printf '{"name":"Journey app agent (%s)","scope":"operate","applicationId":"%s","actions":["configure","deploy","scale-down","recover","rollback"]}\n' "$RUN" "$APP" > app-grant-$RUN.json
+oapo --out "$DIR/creds/app-$RUN.json" --file app-grant-$RUN.json app-grant
+export CRED=$DIR/creds/app-$RUN.json      # REST: rebuild the header file for this credential
 ```
 
-**Expect:** application saved, **no containers started** (`oapa --app $APP instances`
-shows none running).
-
-**C3. Owner issues an app-scoped credential** (owner step; needed because
-scale-down is granted per application).
-
-```sh
-cat > app-grant.json <<EOF
-{"name": "Release journey app agent", "scope": "operate", "applicationId": "$APP",
- "actions": ["configure", "deploy", "scale-down", "recover", "rollback"]}
-EOF
-oapo --out "$DIR/agent-app.json" --file app-grant.json app-grant | tee "$OUT/C3-app-grant.json"
-```
-
-From here on, agent steps use `oapx`.
-
-**C4. First deploy (runs the migration job).**
-
-```sh
-echo "{\"action\":\"deploy\",\"applicationId\":\"$APP\",\"expectedVersion\":$V}" > deploy.json
-oapx --file deploy.json action-plan | tee "$OUT/C4-plan.json"
-oapx --plan "$DEPLOY1_PLAN" --file empty.json execute-action | tee "$OUT/C4-exec.json"
-oapx --operation "$OP" --timeout 10m wait | tee "$OUT/C4-wait.json"
-oapx --app "$APP" verify | tee "$OUT/C4-verify.json"
-oapx --plan "$DEPLOY1_PLAN" --file empty.json execute-action > "$OUT/C4-replay.json"
-```
+**C4. First deploy.** *Create a plan* with `{"action":"deploy","applicationId":APP,"expectedVersion":V}`,
+*execute*, *wait*, *instance health*. Then *execute* the same plan again.
 
 **Expect:**
 - The operation succeeds, and its first step is `migrate` with `exitCode: 0`.
-- `verify` reports every instance healthy.
-- Replaying the same plan returns the **same** `operationId`.
-- `https://$DOMAIN/` answers from `web`, `https://$DOMAIN/api` from `api` (version
-  `v1`), and `https://$DOMAIN/notes` returns `{"boots":1}`. The certificate is
-  publicly trusted (no `--cafile` needed).
+- All instances are healthy.
+- Re-executing returns the **same** `operationId`; no second release is created.
+- `https://$DOMAIN/` answers from `web`, `/api` returns version `v1`, `/notes`
+  returns `{"boots":1}`, with a publicly trusted certificate.
 
 ```sh
-curl -sS https://$DOMAIN/api | tee "$OUT/C4-api.json"
-curl -sS https://$DOMAIN/notes | tee "$OUT/C4-notes.json"
-curl -sS -o /dev/null -w '%{http_code}\n' -H 'Host: unknown.invalid' https://$DOMAIN/ -k   # expect 404 or TLS refusal
+curl -sS https://$DOMAIN/api   | tee "$OUT/$RUN/C4-api.json"
+curl -sS https://$DOMAIN/notes | tee "$OUT/$RUN/C4-notes.json"
 ```
 
-## Phase D: scale up with live traffic (agent)
+### D: scale up under traffic
 
-**D1.** Change `api.instances` from 1 to 3 in `spec.json` (nothing else), then
-configure and deploy. Run the probe in parallel for the whole step.
+**D1.** In the spec, change only `api.instances` from 1 to 3. *Create a plan*
+`{"action":"configure","applicationId":APP,"expectedVersion":V,"specification":<spec>}`
+and *execute*; then *create a plan* `deploy` at the new `V`, *execute*, *wait*.
+Run the probe for the whole step:
 
 ```sh
-python3 -I $J/probe.py --url https://$DOMAIN/api --duration 240 --out "$OUT/D1-probe.json" &
-# configure: {"action":"configure","applicationId":APP,"expectedVersion":V,"specification":<spec>}
-oapx --file configure.json action-plan    # → execute-action → note new definitionVersion
-oapx --file deploy.json action-plan        # deploy at the new version → execute-action → wait → verify
+python3 -I $J/probe.py --url https://$DOMAIN/api --duration 240 --out "$OUT/$RUN/D1-probe.json" &
+# … configure, deploy, wait …
 wait
-python3 -I $J/probe.py --url https://$DOMAIN/api --duration 20 --expect-instances 3 --out "$OUT/D1-after.json"
+python3 -I $J/probe.py --url https://$DOMAIN/api --duration 20 --expect-instances 3 --out "$OUT/$RUN/D1-after.json"
 ```
+
+**Expect:** success. The migration runs again (new release, new job). `D1-after`
+shows 3 distinct instances, all `v1`. Record D1's operation ID as `D1_RELEASE`.
+Rollout failures are an observation (standard deploys may interrupt traffic).
+
+### E: injected failures, diagnosis, correction
+
+**E1. Failing migration.** Set `migrate.env.JOB_EXIT_CODE` to `"7"`, then configure
+and deploy. **Expect:** the operation ends `failed`, `migrate` has `exitCode: 7`,
+no `api` step was dispatched, and `/api` still serves `v1` from 3 instances.
+*Incident* for component `migrate`: **Expect** `state: issue`, the job failure
+identified, and `applicationBehaviorVerified: false`. Then restore `JOB_EXIT_CODE`
+to `"0"` and configure (save only).
+
+**E2. Broken API release.** With the probe running, *create a plan*
+`{"action":"deploy","applicationId":APP,"expectedVersion":V,"components":["api"],"images":{"api":"<APIBAD>"}}`,
+*execute*, *wait*. Then *incident* for `api`, ordinal 1.
+**Expect:** readiness never passes and the operation does not succeed. The
+incident reports `issue` for `api`, with the image change in its comparison.
+Record `/api` availability as an observation. If the operation lands in
+`attention` instead of `failed`, stop and capture it as a finding.
+
+**E3. Correct.** The same deploy request with `"api":"<API2>"`, then *execute*,
+*wait*, *instance health*. **Expect:** success, and the probe with
+`--expect-instances 3` shows `v2` on all 3.
+
+### F: app-wide rollback to D1
+
+*Rollback plan* with `releaseId = D1_RELEASE`, `expectedVersion = V`. Then
+*rollback* with `{"releaseId":D1_RELEASE,"expectedVersion":V,"planHash":<hash>,"acknowledgeDataCompatibility":true}`
+and idempotency key `journey-$RUN-rollback-1`; *wait*; send the identical
+rollback again; *instance health*.
 
 **Expect:**
-- The deploy succeeds. The migration runs again (a new release runs a new job).
-- `D1-after.json` shows **3 distinct instances**, all version `v1`.
-- Failures during the rollout are recorded but don't fail the step (standard
-  deploys may interrupt traffic; this is a known limit).
+- The plan lists every owned web/worker instance and **skips `migrate`**.
+- Success, and the repeated request returns the same operation.
+- `/api` serves `v1` from 3 instances.
+- No `migrate` step in the rollback operation.
+- `/notes` `boots` is greater than in C4 (the volume survived).
 
-## Phase E: injected failure, diagnosis and correction (agent)
+### H: scale down under traffic
 
-**E1. Failing migration blocks rollout.** Set `migrate.env.JOB_EXIT_CODE` to `"7"`,
-then configure and deploy.
+Change only `api.instances` back to 1. *Create a plan*
+`{"action":"scale-down","applicationId":APP,"expectedVersion":V,"specification":<spec>}`,
+*execute*, *wait*, with the probe running for 120 s.
+**Expect:** success after the 31-second drain grace, **0 probe failures**, and
+one `api` instance remains.
 
-**Expect:** the operation ends `failed`, the `migrate` step has `exitCode: 7`, and
-no `api` step was dispatched. `/api` still answers `v1` from 3 instances.
-
-```sh
-oapx --app "$APP" --component migrate incident | tee "$OUT/E1-incident.json"
-```
-
-**Expect:** `state` is `issue`, the job failure is identified, and
-`applicationBehaviorVerified` is `false`.
-
-Restore `JOB_EXIT_CODE` to `"0"` and configure (save) so the definition matches
-the last good release again.
-
-**E2. Broken API release.** Deploy with an image override, with the probe running:
-
-```sh
-python3 -I $J/probe.py --url https://$DOMAIN/api --duration 180 --out "$OUT/E2-probe.json" &
-echo "{\"action\":\"deploy\",\"applicationId\":\"$APP\",\"expectedVersion\":$V,\"components\":[\"api\"],\"images\":{\"api\":\"$APIBAD\"}}" > deploy-bad.json
-oapx --file deploy-bad.json action-plan   # → execute-action → wait (expect non-zero exit)
-oapx --app "$APP" --component api --ordinal 1 incident | tee "$OUT/E2-incident.json"
-wait
-```
-
-**Expect:** readiness never passes and the operation does not succeed. `incident`
-reports `issue` for `api` and shows the image change in its comparison. Record
-whether `/api` stayed available (`E2-probe.json`); standard deploys may cause
-downtime here, so record it as a known limit rather than a failure. If the
-operation lands in **attention** instead of `failed`, stop and capture
-`operation` and `incident`: that's a finding.
-
-**E3. Correct with a good release.** Deploy `api` with `$API2`, the same way as E2,
-then `wait` and `verify`.
-
-**Expect:** success. `probe.py --expect-instances 3` shows version `v2` from all
-3 instances.
-
-## Phase F: app-wide rollback (agent)
-
-Roll back to the **D1 scale-up release** (v1 images, api at 3 instances). Its
-release ID is in the D1 deploy result.
-
-```sh
-echo "{\"releaseId\":\"$D1_RELEASE\",\"expectedVersion\":$V}" > rb-read.json
-oapx --app "$APP" --file rb-read.json rollback-plan | tee "$OUT/F1-plan.json"
-echo "{\"releaseId\":\"$D1_RELEASE\",\"expectedVersion\":$V,\"planHash\":\"$HASH\",\"acknowledgeDataCompatibility\":true}" > rb.json
-oapx --app "$APP" --key journey-rollback-1 --file rb.json rollback | tee "$OUT/F1-rollback.json"
-oapx --operation "$OP" --timeout 10m wait
-oapx --app "$APP" --key journey-rollback-1 --file rb.json rollback > "$OUT/F1-replay.json"
-oapx --app "$APP" verify
-```
-
-**Expect:**
-- The plan lists every owned web/worker instance and **skips the `migrate` job**.
-- The rollback succeeds, and the replay returns the same operation.
-- `/api` answers `v1` from 3 instances.
-- The migration did **not** run again: there's no `migrate` step in the rollback operation.
-- `/notes` shows `boots` greater than 1, meaning the volume data survived. Compare with `C4-notes.json`.
-
-## Phase G: controller outage (host administration + traffic only)
-
-Stop **only** the OAP service, run the probe for 60 seconds, then start it again
-(commands from the [installation guide](../../../docs/installation.md)):
-
-```sh
-docker ps --format '{{.ID}} {{.Names}}' > "$OUT/G-before.txt"
-(cd "$DIR" && docker compose stop platform)
-python3 -I $J/probe.py --url https://$DOMAIN/api --duration 60 --out "$OUT/G-probe.json"
-(cd "$DIR" && docker compose up -d --wait platform)
-python3 scripts/install.py check --json --directory "$DIR"
-docker ps --format '{{.ID}} {{.Names}}' > "$OUT/G-after.txt"
-```
-
-**Expect:** zero probe failures while OAP is down. Workload and Caddy container
-IDs are unchanged before and after. `oapx --app $APP instances` works again
-after the restart.
-
-## Phase H: scale down with live traffic (agent)
-
-Set `api.instances` back to 1 in `spec.json` (the only change) and send a
-`scale-down` plan:
-
-```sh
-python3 -I $J/probe.py --url https://$DOMAIN/api --duration 120 --out "$OUT/H1-probe.json" &
-# {"action":"scale-down","applicationId":APP,"expectedVersion":V,"specification":<spec with api.instances=1>}
-oapx --file scale-down.json action-plan   # → execute-action → wait
-wait
-```
-
-**Expect:** success after the 31-second drain grace, `H1-probe.json` has **0
-failures**, and one `api` instance remains.
-
-## Phase I: final checks
-
-- `oapx --app $APP verify` passes. `/`, `/api` and `/notes` answer over trusted HTTPS.
-- `python3 scripts/install.py check --json --directory "$DIR"` passes.
-- **Disk:** record `docker system df` and the number of retained `migrate`
-  containers (`docker ps -a --filter name=migrate`). This is evidence for roadmap
-  closeout task 3, not a pass/fail check.
-- **Footprint:** record `docker stats --no-stream` for OAP, PostgreSQL and Caddy.
-
-## Optional phases
-
-- **Owner review path:** repeat H1 with `"requireReview": true`. The agent's
-  `execute-action` must be refused until the owner runs `oapo --plan ID --file
-  approve.json approve-action` with `{"planHash": "..."}`. An agent attempting
-  `approve-action` must be denied.
-- **Component removal:** requires the owner to add `remove-component` to the
-  app grant. Remove `worker` per [component lifecycle](../../../docs/topology-lifecycle.md),
-  with owner approval.
-- **Linked PostgreSQL:** not part of this journey; the existing local gate covers it.
-
-## Receipt: `release-journey.json`
-
-Write this at the end, in `$OUT`, with no secret values:
+### Run receipt: `$OUT/$RUN/release-journey-$RUN.json`
 
 ```json
 {
-  "schemaVersion": 1,
-  "status": "passed | failed",
-  "commit": "<git rev-parse HEAD>",
-  "oapImage": "<OAP_IMAGE>",
-  "host": {"provider": "...", "vcpu": 2, "memoryGiB": 2, "os": "...", "docker": "..."},
-  "tls": "letsencrypt | internal",
-  "interface": "oap CLI",
+  "schemaVersion": 1, "run": "cli | rest | mcp", "status": "passed | failed",
+  "commit": "<sha>", "oapImage": "<id>", "tls": "letsencrypt | internal",
   "steps": {
-    "install": true, "ownerSetup": true, "onboardingGrant": true, "appGrant": true,
-    "createWithoutDeploy": true, "deployWithMigration": true, "planReplaySameOperation": true,
-    "publicHttpsTrusted": true, "unknownHostRejected": true,
+    "validate": true, "createWithoutDeploy": true, "appGrant": true,
+    "deployWithMigration": true, "planReplaySameOperation": true, "publicHttpsTrusted": true,
     "scaleUpTo3": true, "trafficOnAll3": true,
     "failingMigrationBlocksRollout": true, "incidentIdentifiesJob": true,
     "brokenReleaseNotCompleted": true, "incidentIdentifiesApi": true, "correctedToV2": true,
-    "appWideRollback": true, "rollbackSkippedMigration": true, "rollbackReplay": true, "volumeDataRetained": true,
-    "controllerDownTrafficOk": true,
-    "scaleDownTo1": true, "scaleDownFailures": 0
+    "appWideRollback": true, "rollbackSkippedMigration": true, "rollbackReplay": true,
+    "volumeDataRetained": true, "scaleDownTo1": true, "scaleDownFailures": 0
   },
-  "observations": {
-    "scaleUpFailures": 0, "brokenReleaseApiFailures": 0, "migrateContainersRetained": 0,
-    "diskUsage": "...", "idleFootprint": "..."
-  },
+  "observations": {"scaleUpFailures": 0, "brokenReleaseApiFailures": 0},
   "operations": ["<operation IDs in order>"],
-  "findings": ["<anything that differed from Expect>"]
+  "findings": ["<anything that differed from Expect, or an action the interface could not express>"]
 }
 ```
 
-Hand back `release-journey.json`, the `$OUT` directory and the list of findings.
-A run passes only if every step matched **Expect**. Downtime during standard
-deploys (D1, E2) is recorded as an observation, not a failure.
+## Phase X: cross-interface checks (after all three runs)
+
+**X1. Coexistence.** All three apps answer on their own hostname over trusted
+HTTPS. A request with an unknown Host is rejected.
+
+**X2. Isolation.** Each run's app credential is **denied** on the other two apps,
+through its own interface: for example, the MCP agent calls `inspect_capabilities`
+for the CLI app, and the REST agent calls `POST /api/v1/action-plans` with a
+`deploy` for the MCP app. Expect a denial with a structured error, and no new
+plan or operation.
+
+**X3. Controller outage.** Stop only OAP and probe all three apps for 60 s:
+
+```sh
+docker ps --format '{{.ID}} {{.Names}}' > "$OUT/X3-before.txt"
+(cd "$DIR" && docker compose stop platform)
+for RUN in cli rest mcp; do
+  python3 -I $J/probe.py --url https://$RUN.$BASE/api --duration 60 --out "$OUT/X3-$RUN.json" &
+done; wait
+(cd "$DIR" && docker compose up -d --wait platform)
+python3 scripts/install.py check --json --directory "$DIR"
+docker ps --format '{{.ID}} {{.Names}}' > "$OUT/X3-after.txt"
+```
+
+**Expect:** zero probe failures, workload and Caddy container IDs unchanged, and
+each interface works again after restart (one read call per interface).
+
+**X4. Pause and revoke (Owner).** Agent control is workspace-wide. Read it with
+`oapo agent-control`, then pause all agents:
+
+```sh
+printf '{"enabled":false,"expectedVersion":%s,"reason":"journey pause check"}\n' "$CONTROL_VERSION" > pause.json
+oapo --file pause.json set-agent-control
+```
+
+One read call per interface must now be denied. Re-enable with `"enabled":true`
+at the new version, and confirm each interface works again. Then
+`oapo --credential <credentialId> revoke` one run's onboarding credential: its
+next call is denied, and the other runs are unaffected.
+
+**X5. Footprint and disk.** Record `docker stats --no-stream` for OAP, PostgreSQL
+and Caddy, `docker system df`, and the count of retained `migrate` containers.
+
+## Parity report: `$OUT/parity.json`
+
+```json
+{
+  "schemaVersion": 1, "commit": "<sha>",
+  "runs": {"cli": "passed", "rest": "passed", "mcp": "passed"},
+  "coexistence": true, "isolation": true, "controllerOutageFailures": 0, "pauseRevoke": true,
+  "gaps": [
+    {"interface": "mcp", "step": "verify", "used": "inspect_instances", "note": "no verify tool"}
+  ],
+  "differences": ["<any step whose result differed between interfaces>"],
+  "footprint": "...", "disk": "..."
+}
+```
+
+Hand back the three run receipts, `parity.json`, the `$OUT` directory and the
+findings. The journey passes only if all three runs pass and the cross-interface
+checks pass. Downtime during standard deploys (D1, E2) is an observation, not a
+failure. Any action an interface cannot express is listed under `gaps`; whether
+it blocks v0.1 is the owner's decision.
