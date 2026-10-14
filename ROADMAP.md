@@ -117,7 +117,7 @@ new slice IDs so previous M2.1–M2.4 acceptance records retain their meaning.
 | Milestone | Outcome | Status |
 | --- | --- | --- |
 | M2 — Agent-operated standalone core | One agent completes install → deploy → diagnose → correct → verify without dashboard dependence | Complete at `76b4061` |
-| M3 — Application unit and standalone delivery | Application router and scale loop, specification-driven topology and pre-deploy jobs, previews/checks/guarded rollout and environment comparison, source-to-release, Compose import, image/storage safety, lightweight recovery | Active: M3.1 |
+| M3 — Application unit and standalone delivery | Application router and scale loop, specification-driven topology and pre-deploy jobs, previews/checks/guarded rollout and environment comparison, source-to-release, Compose import, image/storage safety, lightweight recovery | Active: M3.2 |
 | M4 — Bounded application insight | Indexed logs when needed, release watches, metrics/analytics and notifications | Deferred |
 | M5 — Operator integration return | Capability-aware existing-resource discovery/assembly and operator adapters/views | Parked until standalone gates pass and owner reprioritizes |
 | M6 — Additional servers and runtimes | Explicit multi-server placement, policy metadata, Firecracker/actor experiments | Deferred |
@@ -130,8 +130,11 @@ M2.6 passed gate `20261013-214602-ceb6aceb` at `c2e1eee`; see
 [portable lifecycle](docs/portable-lifecycle.md). M2.8 passed gate `20261013-231136-dca41e73` at `1664ceb`; see
 [bounded incident diagnosis](docs/incident-diagnosis.md). M2.9 is accepted at
 `76b4061`; see the [standalone runbook/skill](docs/standalone-agent-runbook.md)
-and [measured footprint](docs/footprint.md). The active slice is **M3.1 — application
-router and scale loop**, using Caddy. Owner-configured standalone peers now support
+and [measured footprint](docs/footprint.md). **M3.1 — application router and scale
+loop** is functionally complete at
+`1a2344d`, using Caddy. The active slice is **M3.2 — specification-driven topology
+and pre-deploy jobs**, starting with component addition and reviewed removal.
+Owner-configured standalone peers now support
 spec-declared routes, durable release publication and named-agent 1 → 3 → 1
 scaling with traffic verification and observation-only lost-response recovery.
 Default targets remain fail-closed. Packaged Caddy installation and public Let's
@@ -146,8 +149,11 @@ withdrawal retains running containers and durable removal across sibling publica
 the final routed app can withdraw to a deny-only proxy and explicitly re-enable.
 Packaged proxy footprint is measured separately at idle and under light HTTPS
 traffic; the reference meets memory goals and misses the unchanged combined idle
-CPU goal (2.67% of one core), retained for M3.7. Installed domain-authority and port handoffs and extended drain boundaries
-remain open. See [standalone ingress](docs/standalone-ingress.md). UI/operator expansion remains
+CPU goal (2.67% of one core), retained for M3.7. Installed domain-authority/port
+handoffs and extended drain testing are deferred
+routing hardening; they do not block M3.2. Scheduled renewal observation is a
+separate follow-up verification, not a prerequisite for M3.2. See
+[standalone ingress](docs/standalone-ingress.md). UI/operator expansion remains
 parked. The measured combined idle CPU gap stays open for M3.7.
 
 ## Ordered active queue
@@ -200,9 +206,20 @@ one scaled application, which is the gap no Compose/Coolify-style tool closes.
    applies the reference application, scales the API 1 → 3 with requests reaching
    every instance, scales 3 → 1 with no failed requests, and restarts OAP while
    traffic continues. No blue-green or zero-downtime claim beyond the tested cases.
-2. **Specification-driven topology and pre-deploy jobs:** add and remove components
-   through the specification save/plan path, with explicit review for removal and
-   retained volumes. Add a run-to-completion job kind (for example migrations) that
+2. **Specification-driven topology and pre-deploy jobs:** work in bounded slices,
+   in this order: (a) owned web/worker addition and reviewed one-component removal,
+   (b) pre-deploy jobs, (c) app-wide rollback, (d) definition history/diff/revert and
+   repository export. Close each functional slice before moving on; routing
+   hardening stays deferred. First topology slice uses existing configure/deploy
+   plans for addition and a `remove-component` plan with mandatory exact owner
+   approval for retirement; it retains volumes and commits the new spec only
+   after confirmed stops. Removal changes one owned component, with routes and
+   dependencies unlinked through configuration first. Re-adding an owned component
+   can reuse retained bindings/data under existing storage safeguards. Acceptance
+   uses the named-agent CLI, rejects self/stale approval, preserves siblings and
+   proves data survives removal/re-add. See [component lifecycle](docs/topology-lifecycle.md)
+   and [templates](examples/topology/README.md). The remaining M3.2 scope adds a
+   run-to-completion job kind (for example migrations) that
    a release runs before rolling out dependent components; failure stops the
    release with evidence. Application rollback reuses the existing
    [image rollback](docs/image-rollback.md) across all owned components; schema

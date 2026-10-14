@@ -246,8 +246,10 @@ idle and under light verified HTTPS traffic, writing `ingress-footprint.json`.
 See the [measured reference and limits](footprint.md#packaged-ingress-reference).
 Memory goals pass in the reference; the combined idle CPU goal remains open for M3.7.
 
-**Remaining M3.1:** installed domain-authority/port handoff, extended drain boundaries
-and actual scheduled-renewal evidence.
+**M3.1 functional scope is complete.** Installed domain-authority/port handoff and
+extended drain testing are deferred hardening. Actual scheduled-renewal evidence
+is separate follow-up verification. These do not block M3.2 component lifecycle
+work; the already shipped bounded drain is reused when retiring routed components.
 Public issuance and restart persistence passed on the Vultr host at `bac0f62`;
 Caddy owns automatic renewal independently of OAP.
 

@@ -87,7 +87,7 @@ func (c *Controller) EnqueueRollback(ctx context.Context, appID, key string, req
 	if version < 1 || request.ReleaseID == "" || len(request.PlanHash) != 64 || !request.AcknowledgeDataCompatibility {
 		return domain.Deployment{}, rollbackInvalid("review a rollback plan and acknowledge application data compatibility")
 	}
-	return c.enqueueOperation(ctx, appID, key, nil, version, nil, nil, nil, &request, nil)
+	return c.enqueueOperation(ctx, appID, key, nil, version, nil, nil, nil, &request, nil, nil)
 }
 func (c *Controller) rollbackPlan(ctx context.Context, tx pgx.Tx, app domain.Application, releaseID string) (RollbackPlan, domain.Deployment, error) {
 	plan := RollbackPlan{ApplicationID: app.ID, ReleaseID: releaseID, DefinitionVersion: app.Version, Instances: []RollbackInstance{}, ArtifactAvailability: "Not preflight-verified; the operator must fetch the exact content reference during preparation/deployment"}

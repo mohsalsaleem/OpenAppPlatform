@@ -2122,7 +2122,8 @@
                         "rollback",
                         "recover",
                         "control",
-                        "configure"
+                        "configure",
+                        "remove-component"
                       ]
                     }
                   },
@@ -2191,7 +2192,8 @@
                                 "rollback",
                                 "recover",
                                 "control",
-                                "configure"
+                                "configure",
+                                "remove-component"
                               ]
                             }
                           },
@@ -5351,7 +5353,8 @@
                         "deploy",
                         "restart",
                         "configure",
-                        "recover"
+                        "recover",
+                        "remove-component"
                       ]
                     }
                   }
@@ -6341,7 +6344,8 @@
             "enum": [
               "deploy",
               "restart",
-              "scale-down"
+              "scale-down",
+              "remove-component"
             ]
           },
           "id": {
@@ -7683,7 +7687,8 @@
                 "recover",
                 "rollback",
                 "scale-down",
-                "control"
+                "control",
+                "remove-component"
               ]
             }
           },
@@ -7812,7 +7817,8 @@
               "deploy",
               "restart",
               "recover",
-              "scale-down"
+              "scale-down",
+              "remove-component"
             ]
           },
           "applicationId": {
@@ -7822,7 +7828,8 @@
             "type": "integer"
           },
           "specification": {
-            "$ref": "#/components/schemas/ApplicationSpecification"
+            "$ref": "#/components/schemas/ApplicationSpecification",
+            "description": "Complete desired specification for create/configure/scale-down/remove-component. Removal deletes exactly one owned component from the definition after reviewed retirement; remaining fields stay unchanged."
           },
           "components": {
             "type": "array",
@@ -7876,7 +7883,8 @@
             ]
           },
           "requireReview": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Optional exact owner review for ordinary actions. remove-component always requires exact human owner approval regardless of this flag."
           }
         },
         "required": [

@@ -1,0 +1,19 @@
+{
+  "apiVersion": "oap.dev/v1alpha1",
+  "kind": "Application",
+  "spec": {
+    "name": "topology-example",
+    "targetId": "docker-local",
+    "environment": "staging",
+    "components": [
+      {
+        "name": "web",
+        "kind": "web",
+        "image": "example/web:replace-with-immutable-image",
+        "port": 8080,
+        "hostPort": 8080,
+        "instances": 1
+      }
+    ]
+  }
+}

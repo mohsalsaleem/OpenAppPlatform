@@ -17,7 +17,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { unwrap, api } from "../../api";
 import { ErrorBox } from "../../components/Feedback";
-const actionLabels = { deploy: "Deploy", restart: "Restart", "scale-down": "Retire Instances", rollback: "Roll Back Images", recover: "Recover Operations", control: "Cancel or Close Tracking", configure: "Edit Configuration" } as const;
+const actionLabels = { deploy: "Deploy", restart: "Restart", "scale-down": "Retire Instances", rollback: "Roll Back Images", recover: "Recover Operations", control: "Cancel or Close Tracking", configure: "Edit Configuration", "remove-component": "Remove Components" } as const;
 type AgentAction = keyof typeof actionLabels;
 type Member = ReadResponse<"/api/v1/access/members">[number];
 

@@ -165,7 +165,7 @@ func (c *Controller) publishIngress(ctx context.Context, d domain.Deployment) (b
 	return true, nil
 }
 func (c *Controller) ingressDrain(ctx context.Context, d domain.Deployment) (bool, error) {
-	if d.Operation != "scale-down" || d.Manifest.Ingress == nil {
+	if (d.Operation != "scale-down" && d.Operation != "remove-component") || (d.Operation == "scale-down" && d.Manifest.Ingress == nil) {
 		return true, nil
 	}
 	publication, err := c.Store.IngressPublication(ctx, d.ID)
@@ -196,7 +196,11 @@ func (c *Controller) ingressDrain(ctx context.Context, d domain.Deployment) (boo
 	if err != nil || store.HashJSON(target) != publication.AuthorityHash {
 		return false, ingress.ErrConflict
 	}
-	if err = native.CheckIngressPeer(ctx, d.ApplicationID, d.Manifest); err != nil {
+	peerManifest, err := c.ingressPeerManifest(ctx, d)
+	if err != nil {
+		return false, err
+	}
+	if err = native.CheckIngressPeer(ctx, d.ApplicationID, peerManifest); err != nil {
 		return false, err
 	}
 	settings, _ := native.IngressSettings()

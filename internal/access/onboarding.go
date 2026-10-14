@@ -16,7 +16,7 @@ func (s Service) IssueOnboarding(ctx context.Context, user, name string, permiss
 	}
 	seen := map[string]bool{}
 	for _, action := range permissions.Actions {
-		if !slices.Contains([]string{"deploy", "restart", "configure", "recover"}, action) || seen[action] {
+		if !slices.Contains([]string{"deploy", "restart", "configure", "recover", "remove-component"}, action) || seen[action] {
 			return "", "", ErrDenied
 		}
 		seen[action] = true

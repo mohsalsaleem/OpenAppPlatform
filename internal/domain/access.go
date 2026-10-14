@@ -50,7 +50,7 @@ type AgentPermissions struct {
 	MaxApplications    int      `json:"maxApplications,omitempty"`
 }
 
-var AgentActions = []string{"deploy", "restart", "scale-down", "rollback", "recover", "control", "configure"}
+var AgentActions = []string{"deploy", "restart", "scale-down", "remove-component", "rollback", "recover", "control", "configure"}
 
 func (p Principal) Reads(app, target, environment string) bool {
 	return p.WorkspaceID == "default" && (p.ApplicationID == "" || p.ApplicationID == app) && p.managedScope(app) &&

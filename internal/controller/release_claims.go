@@ -27,7 +27,7 @@ func (c *Controller) EnqueueSelected(ctx context.Context, app, key string, image
 			return domain.Deployment{}, errors.New("image override must belong to a selected component")
 		}
 	}
-	return c.enqueueOperation(ctx, app, key, images, version, nil, nil, nil, nil, selected)
+	return c.enqueueOperation(ctx, app, key, images, version, nil, nil, nil, nil, selected, nil)
 }
 func selectedComponent(selection []string, name string) bool {
 	for _, v := range selection {
@@ -48,10 +48,17 @@ func releaseClaims(release domain.Deployment) (map[string]string, error) {
 		if step.Action == "ingress" {
 			continue
 		}
-		if _, ok := components[step.Component]; !ok {
+		if _, ok := components[step.Component]; !ok && !(release.Operation == "remove-component" && step.Action == "retire") {
 			return nil, errors.New("unknown release component")
 		}
 		claims[step.Component] = "write"
+	}
+	if release.Operation == "remove-component" {
+		for name := range components {
+			if claims[name] != "write" {
+				claims[name] = "read"
+			}
+		}
 	}
 	if len(claims) == 0 {
 		return nil, errors.New("release must select at least one known component")
@@ -104,7 +111,7 @@ func releaseClaims(release domain.Deployment) (map[string]string, error) {
 		}
 	}
 	for _, step := range release.Steps {
-		if step.Action == "ingress" {
+		if step.Action == "ingress" || (release.Operation == "remove-component" && step.Action == "retire") {
 			continue
 		}
 		if err := visit(step.Component); err != nil {

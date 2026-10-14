@@ -70,7 +70,7 @@ func (c *Controller) updateApplicationTx(ctx context.Context, tx pgx.Tx, id stri
 		return domain.Application{}, e
 	}
 	var retiring bool
-	if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM oap_deployments WHERE application_id=$1 AND operation='scale-down' AND state IN ('queued','running','attention'))", id).Scan(&retiring); e != nil {
+	if e = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM oap_deployments WHERE application_id=$1 AND operation IN ('scale-down','remove-component') AND state IN ('queued','running','attention'))", id).Scan(&retiring); e != nil {
 		return domain.Application{}, e
 	}
 	if retiring {
@@ -81,9 +81,6 @@ func (c *Controller) updateApplicationTx(ctx context.Context, tx pgx.Tx, id stri
 	}
 	if current.Manifest.Name != m.Name || current.Manifest.Environment != m.Environment || current.Manifest.TargetID != m.TargetID {
 		return domain.Application{}, errors.New("application identity and target cannot change through configuration editing")
-	}
-	if len(current.Manifest.Components) != len(m.Components) {
-		return domain.Application{}, errors.New("component addition and removal require an explicit topology change workflow")
 	}
 	target, e := c.Store.TargetTx(ctx, tx, m.TargetID)
 	if e != nil {
@@ -102,7 +99,14 @@ func (c *Controller) updateApplicationTx(ctx context.Context, tx pgx.Tx, id stri
 	}
 	for _, comp := range m.Components {
 		old, ok := existing[comp.Name]
-		if !ok || old.Kind != comp.Kind || old.DatabaseEndpoint != comp.DatabaseEndpoint || old.ResourceID != comp.ResourceID || old.Management != comp.Management {
+		if !ok {
+			if target.Operator != "docker" || (comp.Kind != "web" && comp.Kind != "worker") || comp.ResourceID != "" || comp.Management != "" {
+				return domain.Application{}, errors.New("component additions require owned standalone web or worker workloads")
+			}
+			continue
+		}
+		delete(existing, comp.Name)
+		if old.Kind != comp.Kind || old.DatabaseEndpoint != comp.DatabaseEndpoint || old.ResourceID != comp.ResourceID || old.Management != comp.Management {
 			return domain.Application{}, errors.New("component identity and resource adoption cannot change through configuration editing")
 		}
 		if old.Limits != nil && comp.Limits == nil {
@@ -120,6 +124,9 @@ func (c *Controller) updateApplicationTx(ctx context.Context, tx pgx.Tx, id stri
 		if old.ResourceID != "" && (comp.Image != old.Image || comp.Port != old.Port || comp.HostPort != old.HostPort || !maps.Equal(comp.Env, old.Env) || !maps.Equal(comp.Services, old.Services) || !maps.Equal(comp.ServiceEndpoints, old.ServiceEndpoints)) {
 			return domain.Application{}, errors.New("adopted resource runtime configuration must be changed through the operator")
 		}
+	}
+	if len(existing) != 0 {
+		return domain.Application{}, errors.New("component removal requires a reviewed remove-component plan")
 	}
 	updated, e := c.Store.UpdateApplicationTx(ctx, tx, id, m, version)
 	if e != nil {

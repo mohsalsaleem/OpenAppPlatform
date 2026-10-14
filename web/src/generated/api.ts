@@ -935,7 +935,7 @@ export interface paths {
                             expiresAt: string;
                             revoked: boolean;
                             permissions: {
-                                actions: ("deploy" | "restart" | "scale-down" | "rollback" | "recover" | "control" | "configure")[];
+                                actions: ("deploy" | "restart" | "scale-down" | "rollback" | "recover" | "control" | "configure" | "remove-component")[];
                                 targetId: string;
                                 environment: string;
                             } | null;
@@ -963,7 +963,7 @@ export interface paths {
                         /** @enum {string} */
                         scope: "read" | "operate";
                         applicationId: string;
-                        actions?: ("deploy" | "restart" | "scale-down" | "rollback" | "recover" | "control" | "configure")[];
+                        actions?: ("deploy" | "restart" | "scale-down" | "rollback" | "recover" | "control" | "configure" | "remove-component")[];
                         targetId?: string;
                         environment?: string;
                     };
@@ -4018,7 +4018,7 @@ export interface components {
                 deliveryId: string;
             };
             /** @enum {string} */
-            operation?: "deploy" | "restart" | "scale-down";
+            operation?: "deploy" | "restart" | "scale-down" | "remove-component";
             id: string;
             applicationId: string;
             definitionVersion: number;
@@ -4376,7 +4376,7 @@ export interface components {
             inferenceEnabled: boolean;
         };
         AgentPermissions: {
-            actions: ("deploy" | "restart" | "configure" | "recover" | "rollback" | "scale-down" | "control")[];
+            actions: ("deploy" | "restart" | "configure" | "recover" | "rollback" | "scale-down" | "control" | "remove-component")[];
             targetId: string;
             environment: string;
             createApplications?: boolean;
@@ -4410,9 +4410,10 @@ export interface components {
         };
         ActionRequest: {
             /** @enum {string} */
-            action: "create" | "configure" | "deploy" | "restart" | "recover" | "scale-down";
+            action: "create" | "configure" | "deploy" | "restart" | "recover" | "scale-down" | "remove-component";
             applicationId?: string;
             expectedVersion?: number;
+            /** @description Complete desired specification for create/configure/scale-down/remove-component. Removal deletes exactly one owned component from the definition after reviewed retirement; remaining fields stay unchanged. */
             specification?: components["schemas"]["ApplicationSpecification"];
             components?: string[];
             images?: {
@@ -4430,6 +4431,7 @@ export interface components {
                 /** Format: date-time */
                 expectedUpdatedAt: string;
             };
+            /** @description Optional exact owner review for ordinary actions. remove-component always requires exact human owner approval regardless of this flag. */
             requireReview?: boolean;
         };
         ActionResult: {
@@ -6708,7 +6710,7 @@ export interface operations {
                     targetId: string;
                     environment: string;
                     maxApplications: number;
-                    actions: ("deploy" | "restart" | "configure" | "recover")[];
+                    actions: ("deploy" | "restart" | "configure" | "recover" | "remove-component")[];
                 };
             };
         };

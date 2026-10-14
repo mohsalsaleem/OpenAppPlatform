@@ -151,7 +151,7 @@ func (c *Controller) EnqueueImages(ctx context.Context, appID, key string, image
 	return c.EnqueueVersion(ctx, appID, key, images, 0)
 }
 func (c *Controller) EnqueueVersion(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64) (domain.Deployment, error) {
-	return c.enqueueOperation(ctx, appID, key, images, expectedVersion, nil, nil, nil, nil, nil)
+	return c.enqueueOperation(ctx, appID, key, images, expectedVersion, nil, nil, nil, nil, nil, nil)
 }
 
 type RestartRequest struct {
@@ -163,9 +163,9 @@ func (c *Controller) EnqueueRestart(ctx context.Context, appID, key string, requ
 	if request.Component == "" || request.Ordinal < 1 || version < 1 {
 		return domain.Deployment{}, errors.New("component, ordinal and expectedVersion are required")
 	}
-	return c.enqueueOperation(ctx, appID, key, nil, version, &request, nil, nil, nil, nil)
+	return c.enqueueOperation(ctx, appID, key, nil, version, &request, nil, nil, nil, nil, nil)
 }
-func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64, restart *RestartRequest, scaleDown *ScaleDownRequest, provenance *domain.ReleaseSource, rollback *RollbackRequest, selection []string) (domain.Deployment, error) {
+func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, images map[string]string, expectedVersion int64, restart *RestartRequest, scaleDown *ScaleDownRequest, provenance *domain.ReleaseSource, rollback *RollbackRequest, selection []string, removal *domain.Manifest) (domain.Deployment, error) {
 	if strings.HasPrefix(key, "action-plan:") && (store.ActiveActionPlan(ctx) == "" || key != "action-plan:"+store.ActiveActionPlan(ctx)) {
 		return domain.Deployment{}, errors.New("action-plan idempotency namespace is reserved")
 	}
@@ -223,7 +223,8 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		Source     *domain.ReleaseSource `json:"source,omitempty"`
 		Rollback   *RollbackRequest      `json:"rollback,omitempty"`
 		Components []string              `json:"components,omitempty"`
-	}{images, expectedVersion, restart, scaleDown, provenance, rollback, selection})
+		Removal    *domain.Manifest      `json:"removal,omitempty"`
+	}{images, expectedVersion, restart, scaleDown, provenance, rollback, selection, removal})
 	requestSum := sha256.Sum256(requestBody)
 	requestHash := hex.EncodeToString(requestSum[:])
 	var existingID, oldHash string
@@ -280,7 +281,7 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 			}
 			continue
 		}
-		if comp.Management == "observe" && (len(selection) == 0 || selectedComponent(selection, comp.Name)) && (provenance == nil || images[comp.Name] != "") && ((restart == nil && scaleDown == nil) || (restart != nil && restart.Component == comp.Name) || (scaleDown != nil && scaleDown.Component == comp.Name)) {
+		if comp.Management == "observe" && (len(selection) == 0 || selectedComponent(selection, comp.Name)) && (provenance == nil || images[comp.Name] != "") && ((restart == nil && scaleDown == nil && removal == nil) || (restart != nil && restart.Component == comp.Name) || (scaleDown != nil && scaleDown.Component == comp.Name)) {
 			return domain.Deployment{}, errors.New("observe-only components require an explicit management handoff before lifecycle operations")
 		}
 	}
@@ -311,6 +312,14 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 			return domain.Deployment{}, errors.New("release image override names an unknown component")
 		}
 	}
+	var removed domain.Component
+	if removal != nil {
+		removed, e = desiredComponentRemoval(a.Manifest, *removal)
+		if e != nil {
+			return domain.Deployment{}, e
+		}
+		a.Manifest = *removal
+	}
 	if e = a.Manifest.Validate(); e != nil {
 		return domain.Deployment{}, e
 	}
@@ -321,7 +330,7 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	sum := sha256.Sum256(spec)
 	hash := hex.EncodeToString(sum[:])
 	if existingErr == nil {
-		if restart != nil || scaleDown != nil || oldHash != hash {
+		if restart != nil || scaleDown != nil || removal != nil || oldHash != hash {
 			return domain.Deployment{}, domain.ErrConflict
 		}
 		existing, err := c.Store.DeploymentTx(ctx, tx, existingID)
@@ -335,7 +344,7 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	}
 
 	d := domain.Deployment{Operation: "deploy", ID: domain.NewID(), ApplicationID: appID, Manifest: a.Manifest, DefinitionVersion: a.Version, State: "queued", Steps: domain.InitialSteps(a.Manifest)}
-	if len(d.Steps) == 0 {
+	if len(d.Steps) == 0 && removal == nil {
 		return d, errors.New("application has no managed workload to deploy")
 	}
 	d.Source = provenance
@@ -394,7 +403,43 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	if e != nil {
 		return d, e
 	}
-	if restart == nil && scaleDown == nil {
+	if removal != nil {
+		if target.Operator != "docker" || !adapter.Capabilities().Retirement {
+			return d, errors.New("component removal requires standalone Docker retirement")
+		}
+		if _, ok := adapter.(operator.Retirer); !ok {
+			return d, errors.New("target does not implement retirement")
+		}
+		if e = operator.ValidateTargetManifest(d.Manifest, adapter); e != nil {
+			return d, e
+		}
+		var route *domain.Step
+		for _, step := range d.Steps {
+			if step.Action == "ingress" {
+				copy := step
+				route = &copy
+			}
+		}
+		d.Steps = nil
+		for ordinal := removed.Instances; ordinal > 0; ordinal-- {
+			var ref string
+			err := tx.QueryRow(ctx, "SELECT resource_id FROM oap_bindings WHERE application_id=$1 AND component=$2 AND ordinal=$3 AND retired_at IS NULL", appID, removed.Name, ordinal).Scan(&ref)
+			if errors.Is(err, pgx.ErrNoRows) {
+				continue
+			}
+			if err != nil {
+				return d, err
+			}
+			d.Steps = append(d.Steps, domain.Step{Component: removed.Name, Ordinal: ordinal, ResourceID: ref, Action: "retire", Phase: "pending"})
+		}
+		if len(d.Steps) == 0 {
+			d.Steps = []domain.Step{{Component: removed.Name, Ordinal: 1, Action: "retire", Phase: "succeeded", Observed: "no active binding; no stop dispatched"}}
+		}
+		if route != nil {
+			d.Steps = append([]domain.Step{*route}, d.Steps...)
+		}
+		d.Operation = "remove-component"
+	} else if restart == nil && scaleDown == nil {
 		if e = operator.ValidateTargetManifest(a.Manifest, adapter); e != nil {
 			return d, e
 		}
@@ -593,7 +638,7 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 			continue
 		}
 		if step.Action == "ingress" {
-			if d.Operation != "scale-down" {
+			if d.Operation != "scale-down" && d.Operation != "remove-component" {
 				for _, prior := range d.Steps[:i] {
 					if prior.Phase != "succeeded" {
 						return fail(step, "failed", errors.New("workload release failed; previous ingress preserved"))
@@ -616,7 +661,7 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 			}
 			return river.JobSnooze(c.PollInterval)
 		}
-		if (step.Action == "retire" && d.Operation != "scale-down") || (step.Action != "" && step.Action != "restart" && step.Action != "retire") {
+		if (step.Action == "retire" && d.Operation != "scale-down" && d.Operation != "remove-component") || (step.Action != "" && step.Action != "restart" && step.Action != "retire") {
 			return fail(step, "attention", errors.New("unknown operation action"))
 		}
 		var comp domain.Component
@@ -624,6 +669,9 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 			if v.Name == step.Component {
 				comp = v
 			}
+		}
+		if comp.Name == "" && step.Action == "retire" && d.Operation == "remove-component" {
+			comp.Name = step.Component
 		}
 		if comp.Management == "observe" {
 			return fail(step, "attention", errors.New("observe-only component cannot execute lifecycle operations"))
@@ -794,7 +842,7 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 			break
 		}
 	}
-	if d.Operation == "scale-down" && d.State == "succeeded" {
+	if (d.Operation == "scale-down" || d.Operation == "remove-component") && d.State == "succeeded" {
 		return c.finishRetirement(ctx, &d)
 	}
 	return c.Store.SaveDeployment(ctx, d)
@@ -804,5 +852,5 @@ func Healthy(status string) bool {
 }
 
 func (c *Controller) EnqueueSource(ctx context.Context, app, key string, images map[string]string, version int64, provenance *domain.ReleaseSource) (domain.Deployment, error) {
-	return c.enqueueOperation(ctx, app, key, images, version, nil, nil, provenance, nil, nil)
+	return c.enqueueOperation(ctx, app, key, images, version, nil, nil, provenance, nil, nil, nil)
 }

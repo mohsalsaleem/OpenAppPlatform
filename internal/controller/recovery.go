@@ -65,7 +65,7 @@ func (c *Controller) Recover(ctx context.Context, id string, request Recovery) (
 		return d, domain.ErrConflict
 	}
 	if request.RetryFinalization {
-		if d.Operation != "scale-down" || request.Component != "" || request.Ordinal != 0 || request.RetryPreparation || request.RemoteDeploymentID != "" {
+		if (d.Operation != "scale-down" && d.Operation != "remove-component") || request.Component != "" || request.Ordinal != 0 || request.RetryPreparation || request.RemoteDeploymentID != "" {
 			return d, errors.New("finalization retry is only valid for a completed retirement")
 		}
 		for _, step := range d.Steps {

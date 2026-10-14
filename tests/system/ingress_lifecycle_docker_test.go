@@ -34,7 +34,7 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	if socket != "/run/oap-test/docker.sock" {
 		t.Fatal("isolated Engine required")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 260*time.Second)
 	defer cancel()
 	engine := &http.Client{Timeout: 10 * time.Second, Transport: &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 		return (&net.Dialer{}).DialContext(ctx, "unix", socket)
@@ -169,7 +169,7 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, err := service.IssueRestricted(ctx, owner, "Ingress agent", "operate", app.ID, time.Hour, domain.AgentPermissions{Actions: []string{"configure", "deploy", "scale-down", "recover"}, TargetID: targetID, Environment: "staging"})
+	token, err := service.IssueRestricted(ctx, owner, "Ingress agent", "operate", app.ID, time.Hour, domain.AgentPermissions{Actions: []string{"configure", "deploy", "scale-down", "recover", "remove-component"}, TargetID: targetID, Environment: "staging"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,26 +179,42 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	defer api.Close()
 	invoke := func(command string, flags []string, body any, want int) cli.Result {
 		t.Helper()
-		var in, out bytes.Buffer
-		if body != nil {
-			json.NewEncoder(&in).Encode(body)
-		}
-		args := append([]string{"--url", api.URL}, flags...)
-		if body != nil {
-			args = append(args, "--file", "-")
-		}
-		args = append(args, command)
-		code := cli.Run(ctx, args, func(key string) string {
-			if key == "OAP_API_TOKEN" && command != "grant" && command != "approve-action" {
-				return token
+		for attempt := 0; attempt < 2; attempt++ {
+			var in, out bytes.Buffer
+			if body != nil {
+				json.NewEncoder(&in).Encode(body)
 			}
-			return ""
-		}, &in, &out)
-		var result cli.Result
-		if json.Unmarshal(out.Bytes(), &result) != nil || code != want {
-			t.Fatalf("ingress agent %s exit %d expected %d: %s", command, code, want, out.String())
+			args := append([]string{"--url", api.URL}, flags...)
+			if body != nil {
+				args = append(args, "--file", "-")
+			}
+			args = append(args, command)
+			code := cli.Run(ctx, args, func(key string) string {
+				if key == "OAP_API_TOKEN" && command != "grant" && command != "approve-action" {
+					return token
+				}
+				return ""
+			}, &in, &out)
+			var result cli.Result
+			if json.Unmarshal(out.Bytes(), &result) != nil {
+				t.Fatal("invalid CLI envelope")
+			}
+			if attempt == 0 && want == 0 && command == "action-plan" && code == 5 && result.Error != nil && result.Error.Code == "rate_limited" {
+				t.Log("Action planning budget exhausted; respecting the one-minute product limit before retrying rejected creation")
+				select {
+				case <-ctx.Done():
+					t.Fatal(ctx.Err())
+				case <-time.After(61 * time.Second):
+				}
+				continue
+			}
+			if code != want {
+				t.Fatalf("ingress agent %s exit %d expected %d: %s", command, code, want, out.String())
+			}
+			return result
 		}
-		return result
+		t.Fatal("action planning retry exhausted")
+		return cli.Result{}
 	}
 	plan := func(request any) store.ActionPlan {
 		t.Helper()
@@ -612,8 +628,41 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 		t.Fatal("explicit ingress re-enable failed", err)
 	}
 	checkAbsentDomain("sibling.example.test")
+	// M3.2 removal reuses the shipped routing/drain primitive. Clean up the
+	// desired routes first, then retire the exact API through the reviewed plan.
+	current, _ = s.Application(ctx, app.ID)
+	routeOnly := current.Manifest
+	trimmed := *routeOnly.Ingress
+	trimmed.Routes = nil
+	for _, route := range routeOnly.Ingress.Routes {
+		if route.Component != "api" {
+			trimmed.Routes = append(trimmed.Routes, route)
+		}
+	}
+	routeOnly.Ingress = &trimmed
+	execute(plan(controller.ActionRequest{Action: "configure", ApplicationID: app.ID, ExpectedVersion: current.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: routeOnly}}))
+	if value, err = get("/api"); err != nil || value["message"] != "api" {
+		t.Fatal("route cleanup save changed live API", err)
+	}
+	current, _ = s.Application(ctx, app.ID)
+	withoutAPI := current.Manifest
+	withoutAPI.Components = append([]domain.Component(nil), current.Manifest.Components[:1]...)
+	removeAPI := plan(controller.ActionRequest{Action: "remove-component", ApplicationID: app.ID, ExpectedVersion: current.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: withoutAPI}})
+	if !removeAPI.RequiresReview {
+		t.Fatal("routed component retirement omitted owner review")
+	}
+	invoke("execute-action", []string{"--plan", removeAPI.ID}, map[string]any{}, 4)
+	invoke("approve-action", []string{"--credential-file", ownerFile, "--plan", removeAPI.ID}, map[string]any{"planHash": removeAPI.Hash}, 0)
+	wait(execute(removeAPI))
+	if native := call("GET", "/containers/"+domain.ResourceName(app.ID, "api", 1)+"/json", nil); native["State"].(map[string]any)["Running"] != false {
+		t.Fatal("removed routed API still running")
+	}
+	if value, err = get("/api"); err != nil || value["message"] != "frontend" {
+		t.Fatal("retired component remained in routing", err)
+	}
+	checkAbsentDomain("sibling.example.test")
 	if dir := os.Getenv("OAP_TEST_REPORT_DIR"); dir != "" {
-		raw, _ := json.MarshalIndent(map[string]any{"status": "passed", "scope": "owner-provisioned dedicated Caddy; local HTTP", "namedAgent": true, "sharedProxySiblingPreserved": true, "authorizedDomainHandoff": true, "savePreservesLiveDomain": true, "retiredDomainNotResurrected": true, "durableIngressWithdrawal": true, "withdrawalPreservesRunningContainers": true, "withdrawalLostResponseRecovered": true, "finalApplicationWithdrawal": true, "explicitIngressReenable": true, "scale": "1 -> 3 -> 1", "controllerDownTraffic": true, "scaleDownRequests": requests.Load(), "scaleDownFailures": failures.Load(), "publicationJournal": true, "retirementReplay": true, "lostResponseObservedWithoutRedispatch": true, "publicACME": false, "automaticProxyProvisioning": false}, "", "  ")
+		raw, _ := json.MarshalIndent(map[string]any{"status": "passed", "scope": "owner-provisioned dedicated Caddy; local HTTP", "namedAgent": true, "sharedProxySiblingPreserved": true, "authorizedDomainHandoff": true, "savePreservesLiveDomain": true, "retiredDomainNotResurrected": true, "durableIngressWithdrawal": true, "withdrawalPreservesRunningContainers": true, "withdrawalLostResponseRecovered": true, "finalApplicationWithdrawal": true, "explicitIngressReenable": true, "routedComponentRetirement": true, "scale": "1 -> 3 -> 1", "controllerDownTraffic": true, "scaleDownRequests": requests.Load(), "scaleDownFailures": failures.Load(), "publicationJournal": true, "retirementReplay": true, "lostResponseObservedWithoutRedispatch": true, "publicACME": false, "automaticProxyProvisioning": false}, "", "  ")
 		os.WriteFile(filepath.Join(dir, "ingress-lifecycle.json"), append(raw, '\n'), 0600)
 	}
 }

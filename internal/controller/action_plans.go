@@ -87,7 +87,7 @@ func (c *Controller) prepareAction(ctx context.Context, request *ActionRequest) 
 				}
 			}
 		}
-	case "configure", "deploy", "restart", "recover", "scale-down":
+	case "configure", "deploy", "restart", "recover", "scale-down", "remove-component":
 		var err error
 		app, err = c.Store.Application(ctx, request.ApplicationID)
 		if err != nil {
@@ -103,8 +103,8 @@ func (c *Controller) prepareAction(ctx context.Context, request *ActionRequest) 
 	if !allowed {
 		return app, domain.Target{}, access.ErrDenied
 	}
-	if request.Action != "create" && request.Action != "configure" && request.Action != "scale-down" && request.Specification != nil {
-		return app, domain.Target{}, errors.New("specification is only valid for create/configure")
+	if request.Action != "create" && request.Action != "configure" && request.Action != "scale-down" && request.Action != "remove-component" && request.Specification != nil {
+		return app, domain.Target{}, errors.New("specification is only valid for create/configure/scale-down/remove-component")
 	}
 	if request.Action != "deploy" && (len(request.Components) > 0 || len(request.Images) > 0) {
 		return app, domain.Target{}, errors.New("release selection is only valid for deploy")
@@ -124,6 +124,12 @@ func (c *Controller) prepareAction(ctx context.Context, request *ActionRequest) 
 		return app, target, err
 	}
 	switch request.Action {
+	case "remove-component":
+		if request.Specification == nil || target.Operator != "docker" || !adapter.Capabilities().Retirement {
+			return app, target, errors.New("component removal requires a desired specification and standalone Docker retirement")
+		}
+		request.RequireReview = true
+		_, err = desiredComponentRemoval(app.Manifest, request.Specification.Spec)
 	case "create":
 		if err = c.authorizeSecurity(ctx, app.Manifest); err != nil {
 			return app, target, err
@@ -258,7 +264,7 @@ func (c *Controller) actionInputs(ctx context.Context, app domain.Application, r
 			pins[name] = runtimeinputs.Fingerprint(resolved, id)
 		}
 	}
-	if req.Action == "restart" || req.Action == "scale-down" {
+	if req.Action == "restart" || req.Action == "scale-down" || req.Action == "remove-component" {
 		bindings, err := c.Store.Bindings(ctx, app.ID)
 		if err != nil {
 			return "", err
@@ -285,6 +291,9 @@ func (c *Controller) CreateActionPlan(ctx context.Context, req ActionRequest) (s
 	}
 	if req.Action == "scale-down" {
 		effect = "Withdraw routing, wait bounded drain, stop exact excess instances, then save desired count. Volumes are retained; exact owner review is enforced when requested."
+	}
+	if req.Action == "remove-component" {
+		effect = "Withdraw routing, wait bounded drain when published, stop exact removed-component instances, then save the desired specification. Volumes and stopped containers are retained. Exact human owner review is required."
 	}
 	if req.Action == "recover" {
 		effect = "Existing constrained recovery; no arbitrary redispatch, SQL or data restore."
@@ -394,6 +403,8 @@ func (c *Controller) ExecuteActionPlan(ctx context.Context, id string) (store.Ac
 	}
 	ctx = domain.WithAction(store.WithActionPlan(ctx, id, req.Action, inputs), req.Action)
 	switch req.Action {
+	case "remove-component":
+		_, err = c.EnqueueRemoveComponent(ctx, req.ApplicationID, "action-plan:"+id, req.Specification.Spec, req.ExpectedVersion)
 	case "create":
 		_, err = c.CreateApplication(domain.WithCreationKey(ctx, "action-plan:"+id), req.Specification.Spec)
 	case "configure":
