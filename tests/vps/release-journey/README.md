@@ -15,6 +15,11 @@ Afterwards, cross-interface checks confirm the three apps coexist behind the
 shared proxy and that no agent can touch another's app. This covers roadmap v0.1
 closeout tasks 2 and 6. The results are one receipt per run plus a parity report.
 
+**Local first.** Run this journey in the local test environment first, with
+`--ingress-tls internal`, `.test` hostnames in `/etc/hosts` and `--cafile` on the
+probe. Run it on a VPS once per release candidate, for what only real
+infrastructure proves. See the [QA strategy](../../../docs/qa-strategy.md).
+
 **Who runs it:** a testing agent on a disposable VPS. Owner steps (marked
 **Owner**) use the owner credential and must never be mixed into agent steps. A
 human can do them, or the testing agent acting as owner in those steps only.

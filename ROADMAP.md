@@ -93,7 +93,7 @@ validated.
 | # | Task | Done when |
 |---|---|---|
 | 1 | **Record existing evidence** | Gate ID for `3ac90b1` added to [test evidence](docs/v0.1-test-evidence.md) |
-| 2 | **One continuous release journey per agent interface** on a real VPS ([runbook and fixtures](tests/vps/release-journey/README.md)), run by the VPS testing agent | Three runs on one install, **CLI, REST and MCP**, each with its own named agent, app and hostname, using only that interface; then cross-interface coexistence, isolation, controller-outage and pause/revoke checks and a `parity.json` listing any interface gaps. Each run uses one reference app (web, api, notes with a volume, worker, migration job; linked PostgreSQL stays covered by the local gate): create → deploy with migration → routed through Caddy → scale api 1 → 3 with traffic on every instance → inject a failing release → `incident` identifies it → correct via plan → app-wide image rollback (migration not re-run, volume data kept) → `verify` plus HTTP behavior checks → scale 3 → 1 with no failed requests. Writes `release-journey-<run>.json` per run |
+| 2 | **One continuous release journey per agent interface** ([runbook and fixtures](tests/vps/release-journey/README.md)): **locally first** (internal CA, `.test` hostnames), then **once on a real VPS** by the VPS testing agent | Three runs on one install, **CLI, REST and MCP**, each with its own named agent, app and hostname, using only that interface; then cross-interface coexistence, isolation, controller-outage and pause/revoke checks and a `parity.json` listing any interface gaps. Each run uses one reference app (web, api, notes with a volume, worker, migration job; linked PostgreSQL stays covered by the local gate): create → deploy with migration → routed through Caddy → scale api 1 → 3 with traffic on every instance → inject a failing release → `incident` identifies it → correct via plan → app-wide image rollback (migration not re-run, volume data kept) → `verify` plus HTTP behavior checks → scale 3 → 1 with no failed requests. Writes `release-journey-<run>.json` per run |
 | 3 | **Disk safety for small servers** | Documented, tested manual procedure to remove old pre-deploy job containers and unused images without touching active, stopped-but-bound or rollback-target artifacts; listed in known limits |
 | 4 | **Public docs match reality** | README "What works today", "Next" and scale-loop text; `overview.svg` and `scale-loop.svg` no longer say "planned M3.1"; [v0.1 release notes](docs/releases/v0.1.md) list included features and known limits; [standalone ingress](docs/standalone-ingress.md) and the roadmap agree on multi-app aggregation status |
 | 5 | **Release candidate gate** | Fresh exact-tree `make test-local` passes on the final tree, including step 2; gate ID recorded |
@@ -141,6 +141,20 @@ and everything below.
 
 Move M3.5 earlier if outside users are a near-term goal; it is the easiest on-ramp.
 
+## QA track
+
+Runs alongside the product releases; see the [QA strategy](docs/qa-strategy.md).
+Testing is **local-first**: integrity tests and agent evaluations run in the
+isolated local environment. A real VPS is used once per release candidate for
+what only real infrastructure proves (public ACME and DNS, real small-host
+behavior, renewal).
+
+| Slice | Scope | Acceptance |
+|---|---|---|
+| **Q1 Integrity checker** (with v0.2) | Read-only, test-only checker comparing OAP's records with Docker, Caddy, audit and interface outputs; invariants for records vs reality, routes vs health, no double dispatch, audited mutations, canary-secret leaks, scope isolation, data survival, no early success and exact plans; fault scenarios through CLI, REST and MCP | The existing gate scenarios run the checker after every step; each invariant has a scenario that deliberately breaks it and is caught |
+| **Q2 Agent-facing environment** (with v0.2) | `qa-env up/reset/down` with `local`, `small` and `vps` profiles returning one JSON context; cached images and a post-install snapshot | `up` under 5 minutes from nothing, `reset` under 1 minute, identical results across repeated runs |
+| **Q3 Agent evaluations** (with v0.3) | Scenario library, client transcript plus server audit trace joined by a request trace ID, outcome/process/honest-claims grading mapped to the operating-model principles, results per OAP version and per agent | Every scenario in the library runs unattended for at least one agent, with a report citing evidence for each grade |
+
 ## Later milestones
 
 | Milestone | Position |
@@ -181,7 +195,8 @@ existing containers or routes. Do not add monitoring infrastructure to benchmark
 
 Each slice records implemented behavior, unsupported cases, a runnable example,
 meaningful unit/system coverage, reproducible headless end-to-end evidence and an
-acceptance receipt, plus the gate ID. Test Docker networking, data preservation,
+acceptance receipt, plus the gate ID. Once Q1 lands, each slice also adds its
+integrity invariants; once Q3 lands, at least one agent scenario. Test Docker networking, data preservation,
 scope and policy denial, idempotent retries and crash/unknown outcomes where
 relevant. Never mark an operation healthy only because a provider call succeeded.
 
