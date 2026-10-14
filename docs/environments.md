@@ -1,6 +1,8 @@
 # Environments and verified change
 
-Status: **planned, roadmap M3.3.** Builds on the M3.1 router and M3.2
+Status: **planned.** Roadmap slices M3.3a (declared checks and guarded rollout,
+v0.2), M3.3b (previews and promotion, v0.3) and M3.3c (environment comparison,
+v0.4). Builds on the M3.1 router and M3.2
 specification-driven topology. Today OAP supports separate environment records
 grouped under one logical application ([application environments](application-environments.md))
 and comparison of two releases within one environment ([release comparison](release-comparison.md)).
@@ -111,7 +113,7 @@ similar configuration, not proof of identical behavior.
 4. Guarded rollout runs; `wait` and `verify`; a failed check rolls back on its own.
 5. The preview expires and is cleaned up.
 
-## Acceptance (M3.3)
+## Acceptance (M3.3a–c)
 
 - An agent opens a preview for an API change; declared checks pass and are
   recorded against the exact release.

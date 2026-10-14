@@ -76,12 +76,13 @@ use this index.
 
 ## Acceptance records and history
 
+- [v0.1 standalone release boundary](v0.1-standalone-acceptance.md) and [v0.1 test evidence](v0.1-test-evidence.md)
 - [v0.1 acceptance](v0.1-acceptance.md) and [v0.1 release notes](releases/v0.1.md)
 - [M0 exit review](m0-exit-review.md), [M1 security and visibility](m1-security-visibility.md)
 - [Connected preview acceptance](connected-preview-acceptance.md)
 - [Verification report](verification.md)
 - [UI flows](ui-flows.md) (dashboard, parked)
-- [Archived roadmap](../ROADMAP-history-through-2026-10-13.md)
+- Archived roadmaps: [through 14 October](../ROADMAP-history-through-2026-10-14.md) and [through 13 October](../ROADMAP-history-through-2026-10-13.md)
 - [Editable design page](https://chatgpt.com/space/page_48ca8aa82f6881918cae167d00860fe9)
 
 ## Diagrams

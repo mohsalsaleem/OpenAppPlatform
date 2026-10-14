@@ -226,4 +226,4 @@ External model sharing and outbound notifications require their configured conse
 AI-off preserves deterministic checks and manual/API access. Watches are read-only
 and never authorize rollback, restart or database changes.
 
-See [the roadmap acceptance gate](../ROADMAP.md#bounded-post-release-monitoring-mode).
+See the [roadmap](../ROADMAP.md) (M3.3a post-release health window and M4).
