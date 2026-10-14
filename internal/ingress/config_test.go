@@ -101,3 +101,17 @@ func TestCompileRejectsUnsafeOrStaleInputs(t *testing.T) {
 		})
 	}
 }
+
+func TestExplicitStagingACMEAuthority(t *testing.T) {
+	m, d, members, o, now := fixture()
+	d.HTTPS = true
+	o.ACMECA = "https://acme-staging-v02.api.letsencrypt.org/directory"
+	candidate, err := Compile("app", m, d, members, o, now)
+	if err != nil || !strings.Contains(string(candidate.JSON()), o.ACMECA) {
+		t.Fatal("staging issuer not selected", err)
+	}
+	o.ACMECA = "https://untrusted.example/issuer"
+	if _, err = Compile("app", m, d, members, o, now); err == nil {
+		t.Fatal("arbitrary owner issuer accepted")
+	}
+}

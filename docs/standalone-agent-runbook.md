@@ -25,8 +25,9 @@ The inputs above contain placeholders; use real content IDs/paths. Installation
 commands require explicitly authorized host Docker access. An OAP API token does
 not grant host authority. Keep installation configuration/keys, input files and
 credential files private. For remote access, provide an authenticated HTTPS origin;
-this initial install exposes only loopback HTTP. No tunnel or public ingress is
-created automatically.
+this initial install exposes only loopback HTTP. No tunnel or public ingress is created by default. Optional packaged Caddy
+application ingress is selected during init; follow
+[public installation acceptance](standalone-public-acceptance.md).
 
 The owner issues a bounded target/environment creation grant with the CLI `grant`
 command, saving the named-agent credential to a new private file. Choose its app

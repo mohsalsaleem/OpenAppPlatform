@@ -3,9 +3,11 @@
 Caddy is the selected standalone proxy. Existing Coolify routes keep their native
 Traefik integration. M3.1 now supports routed deployment and specification-driven
 scale-down through an explicitly **owner-provisioned dedicated Caddy peer**.
-Default Docker targets keep ingress disabled. Automatic proxy provisioning and
-multi-application lifecycle aggregation remain open; public Let's Encrypt
-acceptance is deferred until a public server/domain is available.
+Default Docker targets keep ingress disabled. The installer now offers explicit
+packaged proxy provisioning and owner-selected internal or public ACME authority.
+Multi-application lifecycle aggregation remains open. See
+[public installation acceptance](standalone-public-acceptance.md) for the exact
+setup/test sequence; local CA tests do not prove public ACME or scheduled renewal.
 
 ## Routing foundation
 
@@ -145,9 +147,11 @@ is not yet enabled as a multi-application controller feature. Another applicatio
 cannot claim an existing domain or ingress authority. Domain changes, disabling
 an established route and proxy identity handoffs need a later explicit workflow.
 
-For HTTPS the target explicitly enables internal CA. Public ACME execution is
-blocked in this operational slice. Trust only the intended local CA for local
-verification; local CA acceptance is not public certificate acceptance.
+For HTTPS the target must explicitly enable internal CA or `publicAcme` set to
+`letsencrypt` / `letsencrypt-staging`. The latter issuer URLs are fixed owner policy;
+applications cannot choose a CA URL. Mixed authorities are rejected. Trust only
+the intended local CA for local verification. Public trust and issuance require
+the separate public-host acceptance; restart persistence does not prove renewal.
 
 The agent's loop is:
 
@@ -190,10 +194,16 @@ without duplication, and injects a lost Caddy response followed by observation-o
 recovery without another native write. It writes `ingress-lifecycle.json`.
 Native fixture tests separately verify local-CA HTTPS and shared-proxy restart.
 
-**Remaining M3.1:** packaged automatic proxy provisioning, safe multi-application
+**Remaining M3.1:** public acceptance and scheduled renewal evidence, safe multi-application
 publication/claims, domain/port handoff and removal, extended drain boundaries,
 HTTPS in the integrated agent journey, and separate proxy footprint accounting.
 Public ACME issuance/renewal remains deferred and does not block local work.
 
 Standard replacement can cause downtime. Neither blue-green nor universal
 zero-downtime behavior is implied by these foundation tests.
+
+The packaged installer maintains separate proxy/control-plane networks, a private
+admin volume shared only with OAP, and durable Caddy configuration/certificate
+volumes. It runs a bounded one-shot volume ownership task. Start never silently
+recreates a recorded peer or refreshes its bootstrap commitment from published
+routes. Removing/replacing that container requires an explicit future handoff.

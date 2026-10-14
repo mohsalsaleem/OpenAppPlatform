@@ -8392,6 +8392,14 @@
           "internalCa": {
             "type": "boolean",
             "default": false
+          },
+          "publicAcme": {
+            "type": "string",
+            "enum": [
+              "letsencrypt",
+              "letsencrypt-staging"
+            ],
+            "description": "Explicit host-owner public ACME authority; mutually exclusive with internalCa."
           }
         }
       }

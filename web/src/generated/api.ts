@@ -4571,6 +4571,11 @@ export interface components {
             httpsPort: number;
             /** @default false */
             internalCa: boolean;
+            /**
+             * @description Explicit host-owner public ACME authority; mutually exclusive with internalCa.
+             * @enum {string}
+             */
+            publicAcme?: "letsencrypt" | "letsencrypt-staging";
         };
     };
     responses: never;

@@ -1,0 +1,19 @@
+{
+  "apiVersion": "oap.dev/v1alpha1",
+  "kind": "Application",
+  "spec": {
+    "name": "static-site",
+    "environment": "production",
+    "targetId": "docker-local",
+    "components": [{
+      "name": "web", "kind": "web", "image": "sha256:REPLACE_WITH_CACHED_IMAGE_ID",
+      "port": 8080, "instances": 1, "strategy": "standard",
+      "limits": {"memoryMiB": 64, "cpuMillis": 150},
+      "readiness": {"requireHealthy": true, "timeoutSeconds": 60}
+    }],
+    "ingress": {
+      "domain": "app.example.com", "https": true,
+      "routes": [{"path": "/", "component": "web"}]
+    }
+  }
+}

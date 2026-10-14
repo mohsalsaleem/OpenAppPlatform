@@ -167,10 +167,13 @@ one scaled application, which is the gap no Compose/Coolify-style tool closes.
    instances are route members; scale-down removes a member, drains it, then stops
    it. Scale-up and scale-down both run through specification apply, not only the
    dashboard. Routes are persisted on disk and keep serving while OAP is down.
-   Public Let's Encrypt issuance/renewal acceptance is deferred until the owner
-   provides a publicly reachable server and controlled domain. Continue local
-   routing, apply, scaling and internal-CA HTTPS acceptance without that dependency;
-   do not claim public certificate support verified from local-CA tests.
+   The owner has provided a public Vultr test host and controlled shipping-site
+   domain, authorizing downtime. Use the [documented fresh installation](docs/standalone-public-acceptance.md)
+   and the same checked-in CLI acceptance runner used locally. Packaged proxy
+   provisioning and explicit owner-selected public ACME authority are implemented;
+   full local regression and public issuance/persistence acceptance must pass before
+   declaring those verified. Scheduled renewal requires separate evidence;
+   local CA or certificate restart persistence does not prove it.
    Workers scale without routes; writable-volume components stay at one instance.
    Fixed host ports remain for single-instance compatibility. Account for the
    proxy as a separate service in footprint measurements. Acceptance: an agent

@@ -100,3 +100,62 @@ class LifecycleSafetyTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     installer.lifecycle(folder, 'update', 'oap:latest')
                 preflight.assert_not_called()
+
+
+class IngressInstallationSafetyTest(unittest.TestCase):
+    def test_provider_diagnostics_are_opt_in_and_private(self):
+        import json
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / 'install'
+            installer.init(folder, IMAGE, operator_only=True)
+            error = installer.ComposeError('synthetic-password=private-test-value')
+            self.assertIsNone(installer.save_diagnostics(error))
+            with patch.object(installer, 'DIAGNOSTICS_DIRECTORY', str(folder)):
+                name = installer.save_diagnostics(error)
+            self.assertEqual((folder / name).stat().st_mode & 0o777, 0o600)
+            self.assertEqual(json.loads((folder / name).read_text())['detail'], error.detail)
+
+    def test_unsupported_inputs_fail_before_creating_installation(self):
+        cases = [dict(ingress_domain='*.example.com'), dict(ingress_domain='127.0.0.1'),
+                 dict(ingress_domain='app.example.com', ingress_tls='arbitrary'),
+                 dict(ingress_domain='app.example.com', ingress_image='caddy:latest'),
+                 dict(ingress_domain='app.example.com', ingress_http_port=443),
+                 dict(ingress_domain='app.example.com', ingress_bind='not-an-address')]
+        for options in cases:
+            with self.subTest(options=options), tempfile.TemporaryDirectory() as tmp:
+                folder = Path(tmp) / 'install'
+                with self.assertRaises(ValueError):
+                    installer.init(folder, IMAGE, operator_only=True, **options)
+                self.assertFalse(folder.exists())
+
+    def test_initial_proxy_claim_and_repeated_start_preserve_authority(self):
+        import json
+        import socket
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp, socket.socket(socket.AF_UNIX) as listener:
+            endpoint = Path(tmp) / 'docker.sock'
+            listener.bind(str(endpoint))
+            folder = Path(tmp) / 'install'
+            with patch.object(installer.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, b'999', b'')):
+                installer.init(folder, IMAGE, endpoint, ingress_domain='app.example.com',
+                               ingress_tls='letsencrypt', ingress_bind='0.0.0.0', environment='production')
+            targets = json.loads((folder / 'targets.json').read_text())
+            self.assertEqual(targets[0]['environment'], 'production')
+            self.assertNotIn('ingress', targets[0]['settings'])
+            directory, values = installer.installation_values(folder)
+            peer, commitment = 'b' * 64, 'c' * 64
+            with patch.object(installer, 'compose', side_effect=[b'', b'', peer.encode(), json.dumps({'ok': True, 'bootstrapHash': commitment}).encode()]):
+                installer.provision_ingress(directory, values)
+            before = (folder / 'targets.json').read_bytes()
+            authority = json.loads(before)[0]['settings']['ingress']
+            self.assertEqual(authority['publicAcme'], 'letsencrypt')
+            self.assertFalse(authority['internalCa'])
+            self.assertEqual(authority['bootstrapHash'], commitment)
+            with patch.object(installer, 'compose', side_effect=[peer.encode(), b'', peer.encode()]) as commands:
+                installer.provision_ingress(directory, values)
+                self.assertEqual(commands.call_count, 3)  # no new bootstrap observation/claim
+            self.assertEqual((folder / 'targets.json').read_bytes(), before)
+            with patch.object(installer, 'compose', side_effect=[('d' * 64).encode()]):
+                with self.assertRaisesRegex(ValueError, 'handoff'):
+                    installer.provision_ingress(directory, values)
+            self.assertEqual((folder / 'targets.json').read_bytes(), before)

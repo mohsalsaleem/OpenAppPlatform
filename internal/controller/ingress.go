@@ -63,7 +63,7 @@ func (c *Controller) publishIngress(ctx context.Context, d domain.Deployment) (b
 		if e != nil {
 			return false, e
 		}
-		candidate, e := ingress.Compile(d.ApplicationID, d.Manifest, *d.Manifest.Ingress, members, ingress.Options{AdminSocket: settings.ProxySocket, HTTPPort: settings.HTTPPort, HTTPSPort: settings.HTTPSPort, InternalCA: settings.InternalCA && d.Manifest.Ingress.HTTPS}, time.Now())
+		candidate, e := ingress.Compile(d.ApplicationID, d.Manifest, *d.Manifest.Ingress, members, ingress.Options{AdminSocket: settings.ProxySocket, HTTPPort: settings.HTTPPort, HTTPSPort: settings.HTTPSPort, InternalCA: settings.InternalCA && d.Manifest.Ingress.HTTPS, ACMECA: settings.ACMECA()}, time.Now())
 		if e != nil {
 			return false, e
 		}
@@ -128,7 +128,7 @@ func (c *Controller) publishIngress(ctx context.Context, d domain.Deployment) (b
 	if err != nil {
 		return false, err
 	}
-	current, err := ingress.Compile(d.ApplicationID, d.Manifest, *d.Manifest.Ingress, members, ingress.Options{AdminSocket: settings.ProxySocket, HTTPPort: settings.HTTPPort, HTTPSPort: settings.HTTPSPort, InternalCA: settings.InternalCA && d.Manifest.Ingress.HTTPS}, time.Now())
+	current, err := ingress.Compile(d.ApplicationID, d.Manifest, *d.Manifest.Ingress, members, ingress.Options{AdminSocket: settings.ProxySocket, HTTPPort: settings.HTTPPort, HTTPSPort: settings.HTTPSPort, InternalCA: settings.InternalCA && d.Manifest.Ingress.HTTPS, ACMECA: settings.ACMECA()}, time.Now())
 	if err != nil {
 		return false, err
 	}
@@ -216,7 +216,7 @@ func (c *Controller) ingressDrain(ctx context.Context, d domain.Deployment) (boo
 	if err != nil {
 		return false, err
 	}
-	current, err := ingress.Compile(d.ApplicationID, d.Manifest, *d.Manifest.Ingress, members, ingress.Options{AdminSocket: settings.ProxySocket, HTTPPort: settings.HTTPPort, HTTPSPort: settings.HTTPSPort, InternalCA: settings.InternalCA && d.Manifest.Ingress.HTTPS}, time.Now())
+	current, err := ingress.Compile(d.ApplicationID, d.Manifest, *d.Manifest.Ingress, members, ingress.Options{AdminSocket: settings.ProxySocket, HTTPPort: settings.HTTPPort, HTTPSPort: settings.HTTPSPort, InternalCA: settings.InternalCA && d.Manifest.Ingress.HTTPS, ACMECA: settings.ACMECA()}, time.Now())
 	if err != nil || current.Hash() != publication.CandidateHash {
 		return false, errors.New("surviving ingress membership changed; retirement is held")
 	}

@@ -3,8 +3,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/access"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/ingress"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/secretstore"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/store"
 	"io"
@@ -20,6 +22,20 @@ func main() {
 	}
 }
 func run() error {
+	if len(os.Args) == 2 && os.Args[1] == "ingress-authority" {
+		client, err := ingress.New("/run/oap-ingress/admin.sock")
+		if err != nil {
+			return fmt.Errorf("private ingress socket unavailable")
+		}
+		defer client.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		snapshot, err := client.Read(ctx)
+		if err != nil {
+			return fmt.Errorf("private ingress observation unavailable")
+		}
+		return json.NewEncoder(os.Stdout).Encode(map[string]any{"schemaVersion": 1, "ok": true, "bootstrapHash": snapshot.Hash, "executed": false})
+	}
 	if len(os.Args) == 2 && (os.Args[1] == "secret-store-init" || os.Args[1] == "secret-put") {
 		path, key := os.Getenv("OAP_SECRET_STORE_FILE"), os.Getenv("OAP_SECRET_KEY_FILE")
 		if os.Args[1] == "secret-store-init" {

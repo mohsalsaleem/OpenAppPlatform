@@ -5,7 +5,7 @@ for OAP metadata. Workloads remain in standalone Docker or their existing operat
 It starts in owner mode; no shared preview token or open signup is enabled.
 
 Requirements: Docker Engine compatible with API v1.45, Docker Compose v2 or newer,
-Python 3, and a trusted OAP image built for the host architecture. Linux and Docker
+Python 3.8 or newer, and a trusted OAP image built for the host architecture. Linux and Docker
 Desktop Unix sockets are supported locally; remote SSH/TLS Engine transports are
 not supported. First builds/downloads require network access. Application images
 can be preloaded for operation without external registries.
@@ -36,8 +36,14 @@ loopback IP used for the published port, allowing the internal container listene
 without widening preview mode. This is a trusted deployment declaration, not
 a server inspection of Docker port configuration. HTTP cookies are configured for this local HTTP endpoint. Before
 hosting the UI externally, provide HTTPS through your operator/proxy, set
-`OAP_COOKIE_SECURE=true`, and review the bind address. A public TLS/domain setup is
-outside this installation package.
+`OAP_COOKIE_SECURE=true`, and review the bind address. The control-plane UI still requires an owner-managed HTTPS endpoint or SSH tunnel.
+For application domains, opt into packaged Caddy ingress with `init --ingress-domain
+app.example.com --ingress-tls letsencrypt --ingress-bind 0.0.0.0`. `start` provisions
+the private proxy and initial authority before OAP starts. Follow the
+[documented public acceptance](standalone-public-acceptance.md); certificates are
+requested only after a routed HTTPS application is deployed. Internal CA and
+Let’s Encrypt staging are explicit alternatives. One app/domain per installed
+proxy is the current limit; proxy identity/TLS-authority handoff remains explicit.
 
 Run Compose from the installation directory so both generated Compose files and
 its private environment resolve consistently. The commands above/below use a
@@ -206,3 +212,8 @@ Keep archives private; they contain sensitive metadata even though reports are
 redacted. Keep at least two verified archives plus an independent off-host copy;
 remove old copies manually only after a newer isolated restore and dependency
 check. No archive deletion, storage provider or backup scheduler is added.
+
+Installer failure diagnostics are opt-in with `--diagnostics`. Bounded provider
+detail is saved only in a new 0600 file under the private installation directory;
+stdout names the file and keeps raw detail out. It can contain configuration: inspect
+locally and do not upload it as telemetry. No diagnostics are uploaded automatically.

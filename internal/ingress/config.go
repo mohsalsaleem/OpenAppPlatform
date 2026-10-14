@@ -1,5 +1,5 @@
 // Package ingress compiles bounded application routes for a dedicated OAP-owned
-// Caddy instance. It is not yet wired into application admission or deployment.
+// Caddy instance, published through the durable application deployment controller.
 package ingress
 
 import (
@@ -18,13 +18,13 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 )
 
-// Definition is the proposed application ingress contract, separate until the
-// controller can enforce domain ownership and durably reconcile publications.
+// Definition is the application ingress contract. The controller enforces
+// domain authority and durably reconciles publications.
 type Definition = domain.IngressDefinition
 type Route = domain.IngressRoute
 
 // Member must come from exact owned runtime bindings, never agent-supplied URLs.
-// The future controller remains responsible for binding identity/authority.
+// The controller supplies and revalidates binding identity/authority.
 type Member struct {
 	ApplicationID, TargetID, Component, Address string
 	Ordinal                                     int
@@ -38,6 +38,7 @@ type Options struct {
 	HTTPPort, HTTPSPort int
 	// InternalCA is only for offline fixture HTTPS, not public certificate issuance.
 	InternalCA bool
+	ACMECA     string
 }
 type Candidate struct {
 	raw  []byte
@@ -66,6 +67,9 @@ func Compile(appID string, m domain.Manifest, d Definition, members []Member, o 
 	}
 	if !d.HTTPS && o.InternalCA {
 		return fail("internal CA requires HTTPS")
+	}
+	if o.ACMECA != "" && (o.InternalCA || (o.ACMECA != "https://acme-v02.api.letsencrypt.org/directory" && o.ACMECA != "https://acme-staging-v02.api.letsencrypt.org/directory")) {
+		return fail("unsupported owner ACME authority")
 	}
 	if len(members) > 64 {
 		return fail("ingress membership exceeds 64 instances")
@@ -141,6 +145,9 @@ func Compile(appID string, m domain.Manifest, d Definition, members []Member, o 
 		server["automatic_https"] = map[string]any{"disable": true}
 	} else {
 		issuer := map[string]any{"module": "acme", "ca": "https://acme-v02.api.letsencrypt.org/directory"}
+		if o.ACMECA != "" {
+			issuer["ca"] = o.ACMECA
+		}
 		if o.InternalCA {
 			issuer = map[string]any{"module": "internal"}
 		}

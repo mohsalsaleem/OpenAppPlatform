@@ -15,7 +15,7 @@ acceptance.
 Use a compatible immutable OAP image and matching `oap` CLI binary. The current
 repository distribution builds the CLI with `go build -o bin/oap ./cmd/oap` and the
 image with the shipping Dockerfile. Published binary/image distribution is not
-claimed. Python 3, local Unix Docker access and Compose v2 are required; remote
+claimed. Python 3.8 or newer, local Unix Docker access and Compose v2 are required; remote
 public Docker endpoints are not supported.
 
 ```sh

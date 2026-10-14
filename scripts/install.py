@@ -5,6 +5,7 @@ import fcntl
 from datetime import datetime, timezone
 import hashlib
 import json
+import ipaddress
 import os
 from pathlib import Path
 import re
@@ -17,6 +18,35 @@ import sys
 ROOT = Path(__file__).resolve().parent.parent
 IMAGE = re.compile(r'^(?:sha256:[a-f0-9]{64}|[A-Za-z0-9/._:-]+@sha256:[a-f0-9]{64})$')
 POSTGRES = 'postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193'
+CADDY = 'caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d'
+TLS_MODES = ('internal', 'letsencrypt-staging', 'letsencrypt')
+
+
+def ingress_options(domain, tls, bind, http_port, https_port, image):
+    if not domain:
+        return None
+    labels = domain.split('.')
+    if (len(domain) > 253 or len(labels) < 2 or
+        any(not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', label) for label in labels)):
+        raise ValueError('Ingress requires one lowercase DNS hostname; wildcards and IP addresses are unsupported')
+    try:
+        ipaddress.ip_address(domain)
+    except ValueError:
+        pass
+    else:
+        raise ValueError('Ingress requires a DNS hostname, not an IP address')
+    if tls not in TLS_MODES or not IMAGE.fullmatch(image):
+        raise ValueError('Use an explicit supported ingress TLS mode and immutable Caddy image')
+    if not (1 <= http_port <= 65535 and 1 <= https_port <= 65535) or http_port == https_port:
+        raise ValueError('Ingress requires distinct valid host ports')
+    try:
+        address = ipaddress.ip_address(bind)
+    except ValueError:
+        raise ValueError('Ingress bind must be an IPv4 address')
+    if address.version != 4:
+        raise ValueError('Initial ingress installation requires an IPv4 bind address')
+    return {'domain': domain, 'tls': tls, 'bind': bind,
+            'httpPort': http_port, 'httpsPort': https_port, 'image': image}
 
 
 def private_write(path, text):
@@ -25,9 +55,17 @@ def private_write(path, text):
         stream.write(text)
 
 
-def init(directory, image, socket=None, operator_only=False, port=8878):
+def init(directory, image, socket=None, operator_only=False, port=8878,
+         environment='staging', ingress_domain=None, ingress_tls='internal',
+         ingress_bind='127.0.0.1', ingress_http_port=80, ingress_https_port=443,
+         ingress_image=CADDY, postgres_image=POSTGRES):
     if not IMAGE.fullmatch(image) or not 1024 <= port <= 65535:
         raise ValueError('Use an immutable OAP image digest/content ID and port 1024–65535')
+    if not re.fullmatch(r'[a-z][a-z0-9-]{0,47}', environment) or not IMAGE.fullmatch(postgres_image):
+        raise ValueError('Use a lowercase environment slug and immutable PostgreSQL image')
+    ingress = ingress_options(ingress_domain, ingress_tls, ingress_bind, ingress_http_port, ingress_https_port, ingress_image)
+    if ingress and (operator_only or port in (ingress_http_port, ingress_https_port)):
+        raise ValueError('Ingress requires standalone Docker and ports separate from the control plane')
     directory = Path(directory).resolve()
     if directory.exists() and any(directory.iterdir()):
         raise ValueError('Installation directory must be empty; existing configuration is never overwritten')
@@ -54,7 +92,7 @@ def init(directory, image, socket=None, operator_only=False, port=8878):
         'COMPOSE_PROJECT_NAME': 'oap-' + secrets.token_hex(4),
         'COMPOSE_FILE': files,
         'OAP_IMAGE': image,
-        'OAP_POSTGRES_IMAGE': POSTGRES,
+        'OAP_POSTGRES_IMAGE': postgres_image,
         'POSTGRES_PASSWORD': secrets.token_urlsafe(32),
         'OAP_SETUP_TOKEN': secrets.token_urlsafe(32),
         'OAP_COOKIE_SECURE': 'false',
@@ -64,12 +102,24 @@ def init(directory, image, socket=None, operator_only=False, port=8878):
     }
     if not operator_only:
         env.update(OAP_DOCKER_SOCKET=str(socket), OAP_DOCKER_GID=str(gid))
+    if ingress:
+        env['COMPOSE_FILE'] += ':compose.ingress.yaml'
+        env.update(OAP_CADDY_IMAGE=ingress['image'], OAP_INGRESS_DOMAIN=ingress['domain'],
+                   OAP_INGRESS_TLS=ingress['tls'], OAP_INGRESS_BIND_ADDR=ingress['bind'],
+                   OAP_INGRESS_HTTP_PORT=str(ingress['httpPort']), OAP_INGRESS_HTTPS_PORT=str(ingress['httpsPort']))
+        bootstrap = {'admin': {'listen': 'unix//run/oap-ingress/admin.sock|0600', 'config': {'persist': True}},
+                     'apps': {'http': {'http_port': 80, 'https_port': 443, 'servers': {'bootstrap': {
+                         'listen': [':80'], 'automatic_https': {'disable': True},
+                         'routes': [{'handle': [{'handler': 'static_response', 'status_code': 404}]}]}}}}}
+        (directory / 'ingress-bootstrap.json').write_text(json.dumps(bootstrap) + '\n')
+        (directory / 'ingress-bootstrap.json').chmod(0o644)
+        shutil.copyfile(ROOT / 'deploy/compose.ingress.yaml', directory / 'compose.ingress.yaml')
     private_write(directory / '.env', ''.join(f'{key}={value}\n' for key, value in env.items()))
     for name in ('compose.yaml', 'compose.docker.yaml'):
         shutil.copyfile(ROOT / 'deploy' / name, directory / name)
     targets = [] if operator_only else [{
         'id': 'docker-local', 'name': 'Local Docker', 'operator': 'docker',
-        'url': 'unix:///var/run/docker.sock', 'environment': 'staging',
+        'url': 'unix:///var/run/docker.sock', 'environment': environment,
         'settings': {'pullPolicy': 'never', 'hostBindIP': '127.0.0.1'},
     }]
     # Parent is private; the mounted reference-only file must be readable by UID 10001.
@@ -215,6 +265,21 @@ def restore_check(directory, archive, database):
 
 PROTOCOL_VERSION = 1
 JSON_OUTPUT = False
+DIAGNOSTICS_DIRECTORY = None
+
+
+def save_diagnostics(error):
+    """Opt-in owner-local provider detail, never stdout or an uploaded report."""
+    if DIAGNOSTICS_DIRECTORY is None or not isinstance(error, ComposeError):
+        return None
+    try:
+        directory, _ = installation_values(DIAGNOSTICS_DIRECTORY)
+        name = 'installation-failure-' + secrets.token_hex(8) + '.json'
+        private_write(directory / name, json.dumps({'schemaVersion': 1, 'provider': 'compose',
+                      'detail': error.detail}) + '\n')
+        return name
+    except (ValueError, OSError):
+        return None
 
 
 def installation_values(directory):
@@ -242,6 +307,63 @@ def rewrite_values(directory, values):
             os.fsync(descriptor)
         finally:
             os.close(descriptor)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def provision_ingress(directory, values):
+    """Establish initial authority once; never rebind a recorded proxy on restart."""
+    if 'OAP_INGRESS_DOMAIN' not in values:
+        return
+    options = ingress_options(values['OAP_INGRESS_DOMAIN'], values['OAP_INGRESS_TLS'],
+                              values['OAP_INGRESS_BIND_ADDR'], int(values['OAP_INGRESS_HTTP_PORT']),
+                              int(values['OAP_INGRESS_HTTPS_PORT']), values['OAP_CADDY_IMAGE'])
+    target_file = directory / 'targets.json'
+    if target_file.is_symlink():
+        raise ValueError('Ingress authority file must be a regular owner-managed file')
+    targets = json.loads(target_file.read_text())
+    eligible = [t for t in targets if t.get('id') == 'docker-local' and t.get('operator') == 'docker']
+    if len(eligible) != 1:
+        raise ValueError('Packaged ingress requires exactly one docker-local target')
+    target = eligible[0]
+    recorded = target['settings'].get('ingress')
+    if recorded and not re.fullmatch(r'[a-f0-9]{64}', recorded.get('bootstrapHash', '')):
+        raise ValueError('Recorded ingress authority is incomplete; inspect installation before proceeding')
+    if recorded:
+        existing = compose(directory, ['ps', '--all', '-q', 'ingress']).decode().strip()
+        if existing != recorded.get('containerId'):
+            raise ValueError('Installed ingress identity changed; explicit handoff is required')
+    else:
+        compose(directory, ['run', '--rm', '--no-deps', '-T', 'ingress-init'])
+    # --no-recreate keeps native identity stable even if someone changes Compose.
+    compose(directory, ['up', '-d', '--no-recreate', '--wait', '--wait-timeout', '90', 'ingress'])
+    peer = compose(directory, ['ps', '-q', 'ingress']).decode().strip()
+    if not re.fullmatch(r'[a-f0-9]{64}', peer):
+        raise ValueError('Cannot establish exact installed proxy identity')
+    authority = {'containerId': peer, 'adminSocket': '/run/oap-ingress/admin.sock',
+                 'proxySocket': '/run/oap-ingress/admin.sock', 'domain': options['domain'],
+                 'httpPort': 80, 'httpsPort': 443, 'internalCa': options['tls'] == 'internal'}
+    if options['tls'] != 'internal':
+        authority['publicAcme'] = options['tls']
+    if recorded:
+        if any(recorded.get(key) != value for key, value in authority.items()) or recorded.get('publicAcme', '') != authority.get('publicAcme', ''):
+            raise ValueError('Installed ingress identity/authority changed; explicit handoff is required')
+        return
+    raw = compose(directory, ['run', '--rm', '--no-deps', '-T', '--entrypoint', '/app/oap-admin',
+                              'platform', 'ingress-authority'])
+    observation = json.loads(raw)
+    commitment = observation.get('bootstrapHash', '')
+    if not observation.get('ok') or not re.fullmatch(r'[a-f0-9]{64}', commitment):
+        raise ValueError('Cannot observe installed ingress bootstrap commitment')
+    authority['bootstrapHash'] = commitment
+    target['settings']['ingress'] = authority
+    temporary = directory / ('targets.' + secrets.token_hex(6) + '.tmp')
+    try:
+        private_write(temporary, json.dumps(targets, indent=2) + '\n')
+        temporary.chmod(0o644)
+        with temporary.open('rb') as stream:
+            os.fsync(stream.fileno())
+        os.replace(temporary, target_file)
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -275,10 +397,13 @@ def lifecycle(directory, action, image=None):
                 raise ValueError('Installation status exceeds bounds')
             rows = json.loads(raw) if raw.lstrip().startswith(b'[') else [json.loads(line) for line in raw.splitlines() if line.strip()]
             services = [{'service': row.get('Service', ''), 'state': row.get('State', ''), 'health': row.get('Health', '')} for row in rows]
+            required = ('platform', 'postgres', 'ingress') if 'OAP_INGRESS_DOMAIN' in values else ('platform', 'postgres')
             return {'schemaVersion': PROTOCOL_VERSION, 'action': action, 'services': services,
-                    'healthy': all(any(row['service'] == name and row['state'] == 'running' and row['health'] == 'healthy' for row in services) for name in ('platform', 'postgres'))}
+                    'healthy': all(any(row['service'] == name and row['state'] == 'running' and row['health'] == 'healthy' for row in services) for name in required)}
         if action == 'start':
-            compose(directory, ['up', '-d', '--wait', '--wait-timeout', '90'])
+            provision_ingress(directory, values)
+            services = ['platform', 'postgres', 'ingress'] if 'OAP_INGRESS_DOMAIN' in values else []
+            compose(directory, ['up', '-d', '--no-recreate', '--wait', '--wait-timeout', '90', *services])
         else:
             candidate = image or values['OAP_IMAGE']
             if not IMAGE.fullmatch(candidate):
@@ -314,7 +439,7 @@ def owner_setup(directory, binary, output):
     return {'schemaVersion': PROTOCOL_VERSION, 'ok': True, 'action': 'owner-setup', 'ownerEstablished': True, 'credentialSaved': True}
 
 def main():
-    global JSON_OUTPUT
+    global JSON_OUTPUT, DIAGNOSTICS_DIRECTORY
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['init', 'start', 'check', 'update', 'recover', 'owner-setup', 'backup', 'restore-check'])
     parser.add_argument('--directory', default='.local/install')
@@ -322,13 +447,23 @@ def main():
     parser.add_argument('--docker-socket')
     parser.add_argument('--operator-only', action='store_true')
     parser.add_argument('--port', type=int, default=8878)
+    parser.add_argument('--environment', default='staging')
+    parser.add_argument('--postgres-image', default=POSTGRES)
+    parser.add_argument('--ingress-domain')
+    parser.add_argument('--ingress-tls', choices=TLS_MODES, default='internal')
+    parser.add_argument('--ingress-bind', default='127.0.0.1')
+    parser.add_argument('--ingress-http-port', type=int, default=80)
+    parser.add_argument('--ingress-https-port', type=int, default=443)
+    parser.add_argument('--ingress-image', default=CADDY)
     parser.add_argument('--archive')
     parser.add_argument('--database')
     parser.add_argument('--json', action='store_true')
+    parser.add_argument('--diagnostics', action='store_true', help='Save bounded raw provider failure locally in a private file; may contain configuration')
     parser.add_argument('--protocol-version', type=int, default=1)
     parser.add_argument('--cli-bin', default=str(ROOT / 'bin/oap'))
     parser.add_argument('--out')
     args = parser.parse_args()
+    DIAGNOSTICS_DIRECTORY = args.directory if args.diagnostics else None
     JSON_OUTPUT = args.json or args.action in ('start', 'check', 'update', 'recover', 'owner-setup')
     if args.protocol_version != PROTOCOL_VERSION:
         raise ValueError('Unsupported installation protocol version')
@@ -347,7 +482,9 @@ def main():
     elif args.action == 'init':
         if not args.image:
             parser.error('--image is required')
-        path = init(args.directory, args.image, args.docker_socket, args.operator_only, args.port)
+        path = init(args.directory, args.image, args.docker_socket, args.operator_only, args.port,
+                    args.environment, args.ingress_domain, args.ingress_tls, args.ingress_bind,
+                    args.ingress_http_port, args.ingress_https_port, args.ingress_image, args.postgres_image)
         if args.json:
             print(json.dumps({'schemaVersion': PROTOCOL_VERSION, 'ok': True, 'action': 'init', 'prepared': True, 'started': False}))
         else:
@@ -368,6 +505,8 @@ def main():
 
 
 if __name__ == '__main__':
+    if sys.version_info < (3, 8):
+        sys.exit('OAP installation requires Python 3.8 or newer; keep system Python unchanged and use a supported interpreter')
     try:
         main()
     except ValueError as error:
@@ -376,9 +515,10 @@ if __name__ == '__main__':
         else:
             print(str(error), file=sys.stderr)
         sys.exit(1)
-    except (RuntimeError, OSError, subprocess.SubprocessError):
+    except (RuntimeError, OSError, subprocess.SubprocessError) as error:
+        diagnostic = save_diagnostics(error)
         if JSON_OUTPUT:
-            print(json.dumps({'schemaVersion': 1, 'ok': False, 'error': {'code': 'installation_unavailable', 'message': 'Inspect installation, controller state and the retained configuration before retrying'}}))
+            print(json.dumps({'schemaVersion': 1, 'ok': False, 'diagnosticsFile': diagnostic, 'error': {'code': 'installation_unavailable', 'message': 'Inspect installation, controller state and the retained configuration before retrying'}}))
         else:
             print('Installation operation failed. Check paths, socket permissions, image identity and controller state; existing data is retained.', file=sys.stderr)
         sys.exit(1)

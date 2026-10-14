@@ -22,6 +22,15 @@ type IngressSettings struct {
 	HTTPPort      int    `json:"httpPort"`
 	HTTPSPort     int    `json:"httpsPort"`
 	InternalCA    bool   `json:"internalCa"`
+	PublicACME    string `json:"publicAcme,omitempty"`
+}
+
+// ACMECA is fixed host-owner policy, never an application-supplied issuer URL.
+func (s IngressSettings) ACMECA() string {
+	if s.PublicACME == "letsencrypt-staging" {
+		return "https://acme-staging-v02.api.letsencrypt.org/directory"
+	}
+	return ""
 }
 
 func (c *Client) IngressSettings() (IngressSettings, bool) {
@@ -35,8 +44,8 @@ func (c *Client) ingressPeer(ctx context.Context, m domain.Manifest) (container,
 	if !ok || m.Ingress == nil || settings.Domain != m.Ingress.Domain {
 		return container{}, errors.New("ingress domain is not authorized by the target owner")
 	}
-	if m.Ingress.HTTPS && !settings.InternalCA {
-		return container{}, errors.New("public ACME is deferred; target must explicitly enable local internal CA")
+	if m.Ingress.HTTPS && !settings.InternalCA && settings.PublicACME == "" {
+		return container{}, errors.New("HTTPS requires explicit owner internal-CA or public-ACME authority")
 	}
 	peer, err := c.inspectContainer(ctx, settings.ContainerID)
 	if err != nil {
@@ -131,6 +140,9 @@ func validateIngressSettings(s *IngressSettings) error {
 	if s == nil {
 		return nil
 	}
+	if (s.PublicACME != "" && s.PublicACME != "letsencrypt" && s.PublicACME != "letsencrypt-staging") || (s.InternalCA && s.PublicACME != "") {
+		return errors.New("ingress requires one explicit supported TLS authority")
+	}
 	if len(s.ContainerID) != 64 || strings.Trim(s.ContainerID, "0123456789abcdef") != "" || len(s.BootstrapHash) != 64 || strings.Trim(s.BootstrapHash, "0123456789abcdef") != "" {
 		return errors.New("ingress requires exact owner-configured peer and bootstrap hashes")
 	}
@@ -160,8 +172,8 @@ func (c *Client) ValidateManifest(m domain.Manifest) error {
 	if !ok || settings.Domain != m.Ingress.Domain {
 		return errors.New("ingress domain is not authorized by the target owner")
 	}
-	if m.Ingress.HTTPS && !settings.InternalCA {
-		return errors.New("public ACME is deferred; enable internal CA explicitly for local HTTPS")
+	if m.Ingress.HTTPS && !settings.InternalCA && settings.PublicACME == "" {
+		return errors.New("HTTPS requires explicit owner internal-CA or public-ACME authority")
 	}
 	return nil
 }
