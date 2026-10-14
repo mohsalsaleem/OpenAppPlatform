@@ -200,7 +200,7 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 		}
 		return result
 	}
-	plan := func(request controller.ActionRequest) store.ActionPlan {
+	plan := func(request any) store.ActionPlan {
 		t.Helper()
 		result := invoke("action-plan", nil, request, 0)
 		raw, _ := json.Marshal(result.Data)
@@ -450,9 +450,6 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	unauthorizedIngress.Domain = "unapproved.example.test"
 	unauthorized.Ingress = &unauthorizedIngress
 	invoke("action-plan", nil, controller.ActionRequest{Action: "configure", ApplicationID: app.ID, ExpectedVersion: current.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: unauthorized}}, 4)
-	removed := changed
-	removed.Ingress = nil
-	invoke("action-plan", nil, controller.ActionRequest{Action: "configure", ApplicationID: app.ID, ExpectedVersion: current.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: removed}}, 4)
 	handoff := plan(controller.ActionRequest{Action: "configure", ApplicationID: app.ID, ExpectedVersion: current.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: changed}})
 	var summary map[string]any
 	if json.Unmarshal(handoff.Summary, &summary) != nil || summary["ingressChange"] == nil {
@@ -518,8 +515,105 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	if value, err = get("/"); err != nil || value["message"] != "frontend" {
 		t.Fatal("sibling publication lost domain handoff", err)
 	}
+	// Withdrawal is a durable publication with nil ingress, not container
+	// deletion or forgetting the app. Approval remains the owner's choice.
+	checkAbsentDomain := func(host string) {
+		t.Helper()
+		request, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://127.0.0.1:%d/", port), nil)
+		request.Host = host
+		response, err := public.Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != 404 {
+			t.Fatal("withdrawn domain still routed", host, response.StatusCode)
+		}
+	}
+	token = firstToken
+	current, _ = s.Application(ctx, app.ID)
+	originalIngress := current.Manifest.Ingress
+	bindingsBefore, err := s.Bindings(ctx, app.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := map[string]any{}
+	for _, binding := range bindingsBefore {
+		if !binding.Retired {
+			started[binding.ResourceID] = call("GET", "/containers/"+binding.ResourceID+"/json", nil)["State"].(map[string]any)["StartedAt"]
+		}
+	}
+	withdrawn := current.Manifest
+	withdrawn.Ingress = nil
+	withdrawRaw, _ := json.Marshal(controller.ActionRequest{Action: "configure", ApplicationID: app.ID, ExpectedVersion: current.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: withdrawn}, RequireReview: true})
+	var withdrawJSON map[string]any
+	json.Unmarshal(withdrawRaw, &withdrawJSON)
+	// Exercise explicit JSON null as well as the omitted-field representation
+	// used for the final sibling withdrawal below.
+	withdrawJSON["specification"].(map[string]any)["spec"].(map[string]any)["ingress"] = nil
+	withdrawSave := plan(withdrawJSON)
+	invoke("execute-action", []string{"--plan", withdrawSave.ID}, map[string]any{}, 4)
+	invoke("approve-action", []string{"--credential-file", ownerFile, "--plan", withdrawSave.ID}, map[string]any{"planHash": withdrawSave.Hash}, 0)
+	execute(withdrawSave)
+	if _, err = get("/"); err != nil {
+		t.Fatal("withdrawal save changed live routes", err)
+	}
+	current, _ = s.Application(ctx, app.ID)
+	writesBeforeWithdrawal := nativeWrites.Load()
+	loseResponse.Store(true)
+	withdrawRelease := execute(plan(controller.ActionRequest{Action: "deploy", ApplicationID: app.ID, ExpectedVersion: current.Version}))
+	invoke("wait", []string{"--operation", withdrawRelease.Result.OperationID, "--timeout", "90s"}, nil, 6)
+	withdrawAttention, _ := s.Deployment(ctx, withdrawRelease.Result.OperationID)
+	if withdrawAttention.State != "attention" || nativeWrites.Load() != writesBeforeWithdrawal+1 {
+		t.Fatal("withdrawal lost response was retried")
+	}
+	checkAbsentDomain("moved.example.test")
+	checkSibling()
+	withdrawRecovery := execute(plan(controller.ActionRequest{Action: "recover", ApplicationID: app.ID, ExpectedVersion: current.Version, DeploymentID: withdrawAttention.ID, Recovery: &controller.Recovery{Component: "@ingress", Ordinal: 1, ExpectedUpdatedAt: withdrawAttention.UpdatedAt}}))
+	wait(withdrawRecovery)
+	if nativeWrites.Load() != writesBeforeWithdrawal+1 {
+		t.Fatal("withdrawal recovery dispatched another write")
+	}
+	for id, startedAt := range started {
+		state := call("GET", "/containers/"+id+"/json", nil)["State"].(map[string]any)
+		if state["Running"] != true || state["StartedAt"] != startedAt {
+			t.Fatal("route withdrawal restarted or stopped workload")
+		}
+	}
+	// Redeployment without ingress does not publish routes again.
+	wait(execute(plan(controller.ActionRequest{Action: "deploy", ApplicationID: app.ID, ExpectedVersion: current.Version})))
+	if nativeWrites.Load() != writesBeforeWithdrawal+1 {
+		t.Fatal("non-routed redeployment republished ingress")
+	}
+	token = issued.Token
+	siblingApp, _ = s.Application(ctx, siblingID)
+	wait(execute(plan(controller.ActionRequest{Action: "deploy", ApplicationID: siblingID, ExpectedVersion: siblingApp.Version})))
+	checkSibling()
+	checkAbsentDomain("moved.example.test")
+	// Removing the final routed app leaves a persistent deny-only proxy.
+	siblingSpec = siblingApp.Manifest
+	siblingSpec.Ingress = nil
+	execute(plan(controller.ActionRequest{Action: "configure", ApplicationID: siblingID, ExpectedVersion: siblingApp.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: siblingSpec}}))
+	siblingApp, _ = s.Application(ctx, siblingID)
+	wait(execute(plan(controller.ActionRequest{Action: "deploy", ApplicationID: siblingID, ExpectedVersion: siblingApp.Version})))
+	checkAbsentDomain("sibling.example.test")
+	checkAbsentDomain("moved.example.test")
+	checkOldDomain()
+	// Re-enabling ingress is an explicit new spec/deploy, not resurrecting it
+	// from the history while compiling another app's publication.
+	token = firstToken
+	current, _ = s.Application(ctx, app.ID)
+	reenabled := current.Manifest
+	reenabled.Ingress = originalIngress
+	execute(plan(controller.ActionRequest{Action: "configure", ApplicationID: app.ID, ExpectedVersion: current.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: reenabled}}))
+	current, _ = s.Application(ctx, app.ID)
+	wait(execute(plan(controller.ActionRequest{Action: "deploy", ApplicationID: app.ID, ExpectedVersion: current.Version})))
+	if value, err = get("/"); err != nil || value["message"] != "frontend" {
+		t.Fatal("explicit ingress re-enable failed", err)
+	}
+	checkAbsentDomain("sibling.example.test")
 	if dir := os.Getenv("OAP_TEST_REPORT_DIR"); dir != "" {
-		raw, _ := json.MarshalIndent(map[string]any{"status": "passed", "scope": "owner-provisioned dedicated Caddy; local HTTP", "namedAgent": true, "sharedProxySiblingPreserved": true, "authorizedDomainHandoff": true, "savePreservesLiveDomain": true, "retiredDomainNotResurrected": true, "scale": "1 -> 3 -> 1", "controllerDownTraffic": true, "scaleDownRequests": requests.Load(), "scaleDownFailures": failures.Load(), "publicationJournal": true, "retirementReplay": true, "lostResponseObservedWithoutRedispatch": true, "publicACME": false, "automaticProxyProvisioning": false}, "", "  ")
+		raw, _ := json.MarshalIndent(map[string]any{"status": "passed", "scope": "owner-provisioned dedicated Caddy; local HTTP", "namedAgent": true, "sharedProxySiblingPreserved": true, "authorizedDomainHandoff": true, "savePreservesLiveDomain": true, "retiredDomainNotResurrected": true, "durableIngressWithdrawal": true, "withdrawalPreservesRunningContainers": true, "withdrawalLostResponseRecovered": true, "finalApplicationWithdrawal": true, "explicitIngressReenable": true, "scale": "1 -> 3 -> 1", "controllerDownTraffic": true, "scaleDownRequests": requests.Load(), "scaleDownFailures": failures.Load(), "publicationJournal": true, "retirementReplay": true, "lostResponseObservedWithoutRedispatch": true, "publicACME": false, "automaticProxyProvisioning": false}, "", "  ")
 		os.WriteFile(filepath.Join(dir, "ingress-lifecycle.json"), append(raw, '\n'), 0600)
 	}
 }

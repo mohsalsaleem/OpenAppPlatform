@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -22,8 +23,11 @@ type ApplicationRoutes struct {
 // Applications may independently enable/disable HTTPS. No mutable Caddy config
 // is imported or merged, and duplicate domain or application identity fails closed.
 func CompileServer(applications []ApplicationRoutes, options Options, now time.Time) (Candidate, error) {
-	if len(applications) < 1 || len(applications) > 32 {
-		return Candidate{}, errors.New("shared ingress requires between 1 and 32 applications")
+	if len(applications) > 32 {
+		return Candidate{}, errors.New("shared ingress supports at most 32 applications")
+	}
+	if err := validateOptions(options); err != nil {
+		return Candidate{}, err
 	}
 	ordered := append([]ApplicationRoutes(nil), applications...)
 	sort.Slice(ordered, func(i, j int) bool { return ordered[i].ApplicationID < ordered[j].ApplicationID })
@@ -31,7 +35,7 @@ func CompileServer(applications []ApplicationRoutes, options Options, now time.T
 	addresses := map[string]bool{}
 	servers := map[string]any{}
 	tlsPolicies := []any{}
-	var admin any
+	var admin any = map[string]any{"listen": "unix/" + options.AdminSocket + "|0600", "config": map[string]any{"persist": true}}
 	for _, app := range ordered {
 		if ids[app.ApplicationID] || app.Manifest.Ingress == nil || domains[app.Manifest.Ingress.Domain] {
 			return Candidate{}, errors.New("shared ingress requires unique applications and domain ownership")
@@ -75,6 +79,11 @@ func CompileServer(applications []ApplicationRoutes, options Options, now time.T
 			policies := tlsApp.(map[string]any)["automation"].(map[string]any)["policies"].([]any)
 			tlsPolicies = append(tlsPolicies, policies...)
 		}
+	}
+	if len(servers) == 0 {
+		// Keep a deny-only HTTP listener when the final app withdraws. No TLS
+		// automation policy or reverse-proxy upstream survives the removal.
+		servers["oap-http"] = map[string]any{"listen": []string{":" + strconv.Itoa(options.HTTPPort)}, "automatic_https": map[string]any{"disable": true}, "routes": []any{}}
 	}
 	for _, entry := range servers {
 		server := entry.(map[string]any)

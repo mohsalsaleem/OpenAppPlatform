@@ -367,6 +367,25 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 			}
 		}
 	}
+	// A release without desired ingress still has to withdraw its last published
+	// routes. Freeze that predecessor in the ingress step for peer validation and
+	// uncertain-response recovery; never infer removal from a mutable desired spec.
+	if d.Manifest.Ingress == nil && restart == nil && scaleDown == nil {
+		var routedRelease bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM oap_deployments WHERE application_id=$1 AND state IN ('queued','running','attention') AND spec->'ingress' IS NOT NULL AND spec->'ingress'<>'null'::jsonb)`, appID).Scan(&routedRelease); err != nil {
+			return d, err
+		}
+		if routedRelease {
+			return d, domain.ErrConflict
+		}
+		previous, err := c.Store.LatestIngressTx(ctx, tx, d.Manifest.TargetID, appID)
+		if err != nil && !errors.Is(err, domain.ErrNotFound) {
+			return d, err
+		}
+		if err == nil && previous.Manifest.Ingress != nil {
+			d.Steps = append(d.Steps, domain.Step{Component: "@ingress", Ordinal: 1, Action: "ingress", Phase: "pending", ResourceID: previous.ID})
+		}
+	}
 	target, e := c.Store.TargetTx(ctx, tx, a.Manifest.TargetID)
 	if e != nil {
 		return d, e
@@ -581,7 +600,7 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 					}
 				}
 			}
-			if d.Manifest.Ingress == nil || step.Component != "@ingress" || step.Ordinal != 1 {
+			if (d.Manifest.Ingress == nil && step.ResourceID == "") || step.Component != "@ingress" || step.Ordinal != 1 {
 				return fail(step, "attention", errors.New("invalid persisted ingress step"))
 			}
 			ready, err := c.publishIngress(ctx, d)

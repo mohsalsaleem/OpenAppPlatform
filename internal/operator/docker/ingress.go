@@ -115,6 +115,9 @@ func (c *Client) AttachIngressPeer(ctx context.Context, app string, m domain.Man
 // and network membership; agent-provided URLs never enter the route compiler.
 func (c *Client) IngressMembers(ctx context.Context, app string, m domain.Manifest, references map[string]string) ([]ingress.Member, error) {
 	out := []ingress.Member{}
+	if m.Ingress == nil {
+		return out, nil
+	}
 	needed := map[string]bool{}
 	for _, r := range m.Ingress.Routes {
 		needed[r.Component] = true

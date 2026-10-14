@@ -90,6 +90,18 @@ func releaseClaims(release domain.Deployment) (map[string]string, error) {
 				return nil, err
 			}
 		}
+	} else {
+		for _, step := range release.Steps {
+			if step.Action == "ingress" {
+				// Withdrawal owns the app-wide route transition. Readers prevent
+				// another component writer publishing the old routes concurrently.
+				for name := range components {
+					if claims[name] != "write" {
+						claims[name] = "read"
+					}
+				}
+			}
+		}
 	}
 	for _, step := range release.Steps {
 		if step.Action == "ingress" {

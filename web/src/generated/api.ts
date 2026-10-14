@@ -3953,7 +3953,8 @@ export interface components {
             environment: string;
             targetId: string;
             components: components["schemas"]["Component"][];
-            ingress?: components["schemas"]["IngressDefinition"];
+            /** @description Optional application routing. Omit or set null to save a desired withdrawal; a separate deployment removes previously published routes without deleting workloads. */
+            ingress?: components["schemas"]["IngressDefinition"] | null;
         };
         Application: {
             groupId: string;
@@ -4204,7 +4205,8 @@ export interface components {
             environment: string;
             targetId: string;
             components: components["schemas"]["ComponentInput"][];
-            ingress?: components["schemas"]["IngressDefinition"];
+            /** @description Optional application routing. Omit or set null to save a desired withdrawal; a separate deployment removes previously published routes without deleting workloads. */
+            ingress?: components["schemas"]["IngressDefinition"] | null;
         };
         RouteMember: {
             ordinal: number;

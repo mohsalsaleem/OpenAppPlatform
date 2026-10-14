@@ -166,8 +166,27 @@ review uses the existing `requireReview` approval flow. A lost publication respo
 uses the existing observation-only recovery; it must not be dispatched again.
 DNS and public certificate readiness still need separate verification. This is
 a hostname switch, not a DNS migration or a guarantee for existing long-lived
-connections. Ingress removal, installed allowlist expansion, listener-port changes
+connections. Installed allowlist expansion, listener-port changes
 and proxy identity handoffs still need explicit future workflows.
+
+To remove public routing, omit `spec.ingress` or set it to `null` in a complete
+application specification. Review and execute a `configure` plan, then a separate
+`deploy` plan at the saved version. Save leaves the existing routes live. Deployment
+journals withdrawal against the exact last confirmed publication and private peer
+identity. It replaces the proxy config without that app's routes while retaining
+the sibling applications' last published definitions. Optional exact owner review
+uses `requireReview` as with other plans. This does not delete containers, volumes,
+Docker networks or stored certificates; unchanged workloads keep running. Other
+runtime edits in the same spec retain ordinary deployment semantics.
+
+The nil-ingress publication is durable: later sibling publications cannot restore
+an older route snapshot, and a subsequent non-routed deploy does not republish it.
+An uncertain withdrawal is recovered by observing its frozen candidate, never by
+resending the write. Removing the final routed app leaves a private-admin,
+deny-only HTTP listener with no upstreams or TLS automation policy. Existing long
+connections follow Caddy's bounded configuration-reload behavior; removal does not
+claim that every stream has finished. Re-enabling routes requires another explicit
+configure/deploy. Installed owner domain authority remains unchanged.
 
 For HTTPS the target must explicitly enable internal CA or `publicAcme` set to
 `letsencrypt` / `letsencrypt-staging`. The latter issuer URLs are fixed owner policy;
@@ -217,9 +236,12 @@ recovery without another native write. It writes `ingress-lifecycle.json`.
 The same lifecycle test creates a second app through a separately granted CLI
 identity and preserves its routes through scale-up, scale-down and lost-response
 recovery. It rejects a stale authority confirmation and unshipped sibling changes.
+It also removes an app's ingress with a lost-response recovery, verifies unchanged
+container start times, retains withdrawal through a later sibling deployment,
+removes the final routed app and explicitly re-enables ingress.
 Native fixture tests separately verify local-CA HTTPS and shared-proxy restart.
 
-**Remaining M3.1:** installed domain-authority/port handoff and ingress removal, extended drain boundaries,
+**Remaining M3.1:** installed domain-authority/port handoff, extended drain boundaries,
 actual scheduled-renewal evidence and separate proxy footprint acceptance.
 Public issuance and restart persistence passed on the Vultr host at `bac0f62`;
 Caddy owns automatic renewal independently of OAP.

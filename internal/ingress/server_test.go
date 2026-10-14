@@ -1,9 +1,34 @@
 package ingress
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
+
+func TestEmptySharedServerRetainsOnlyDenyListenerAndPrivateAdmin(t *testing.T) {
+	_, _, _, options, now := fixture()
+	options.InternalCA = true
+	candidate, err := CompileServer(nil, options, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config map[string]any
+	if err = json.Unmarshal(candidate.JSON(), &config); err != nil {
+		t.Fatal(err)
+	}
+	apps := config["apps"].(map[string]any)
+	if _, ok := apps["tls"]; ok || strings.Contains(string(candidate.JSON()), "reverse_proxy") || strings.Contains(string(candidate.JSON()), "upstreams") {
+		t.Fatal("withdrawn server retains routes or certificate automation")
+	}
+	if config["admin"].(map[string]any)["listen"] != "unix/"+options.AdminSocket+"|0600" || !strings.Contains(string(candidate.JSON()), `"status_code":404`) {
+		t.Fatal("empty server lacks private admin or deny response")
+	}
+	options.AdminSocket = "/tmp/foreign.sock"
+	if _, err = CompileServer(nil, options, now); err == nil {
+		t.Fatal("empty server bypassed authority validation")
+	}
+}
 
 func TestSharedServerPreservesAppsModesAndDeterminism(t *testing.T) {
 	m, d, members, o, now := fixture()

@@ -59,17 +59,11 @@ func Compile(appID string, m domain.Manifest, d Definition, members []Member, o 
 	if err := d.Validate(m); err != nil {
 		return Candidate{}, err
 	}
-	if !strings.HasPrefix(o.AdminSocket, "/run/oap-ingress/") || strings.Contains(o.AdminSocket, "..") || strings.ContainsAny(o.AdminSocket, "|\x00\r\n") || len(o.AdminSocket) > 100 {
-		return fail("admin socket must be a private /run/oap-ingress path")
-	}
-	if o.HTTPPort < 1 || o.HTTPPort > 65535 || o.HTTPSPort < 1 || o.HTTPSPort > 65535 || o.HTTPPort == o.HTTPSPort {
-		return fail("distinct valid HTTP and HTTPS listener ports are required")
+	if err := validateOptions(o); err != nil {
+		return Candidate{}, err
 	}
 	if !d.HTTPS && o.InternalCA {
 		return fail("internal CA requires HTTPS")
-	}
-	if o.ACMECA != "" && (o.InternalCA || (o.ACMECA != "https://acme-v02.api.letsencrypt.org/directory" && o.ACMECA != "https://acme-staging-v02.api.letsencrypt.org/directory")) {
-		return fail("unsupported owner ACME authority")
 	}
 	if len(members) > 64 {
 		return fail("ingress membership exceeds 64 instances")
@@ -158,6 +152,20 @@ func Compile(appID string, m domain.Manifest, d Definition, members []Member, o 
 		return Candidate{}, err
 	}
 	return Candidate{raw: raw, hash: Hash(raw)}, nil
+}
+
+// validateOptions also guards an empty shared proxy after the last withdrawal.
+func validateOptions(o Options) error {
+	if !strings.HasPrefix(o.AdminSocket, "/run/oap-ingress/") || strings.Contains(o.AdminSocket, "..") || strings.ContainsAny(o.AdminSocket, "|\x00\r\n") || len(o.AdminSocket) > 100 {
+		return errors.New("admin socket must be a private /run/oap-ingress path")
+	}
+	if o.HTTPPort < 1 || o.HTTPPort > 65535 || o.HTTPSPort < 1 || o.HTTPSPort > 65535 || o.HTTPPort == o.HTTPSPort {
+		return errors.New("distinct valid HTTP and HTTPS listener ports are required")
+	}
+	if o.ACMECA != "" && (o.InternalCA || (o.ACMECA != "https://acme-v02.api.letsencrypt.org/directory" && o.ACMECA != "https://acme-staging-v02.api.letsencrypt.org/directory")) {
+		return errors.New("unsupported owner ACME authority")
+	}
+	return nil
 }
 
 // Hash normalizes JSON object order/whitespace; array order remains significant.

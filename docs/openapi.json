@@ -5361,7 +5361,7 @@
           }
         },
         "operationId": "post_onboarding_grant",
-        "description": "One Docker target/environment, 24-hour expiry, explicit lifecycle actions on newly created applications only, maximum 1\u201310 apps."
+        "description": "One Docker target/environment, 24-hour expiry, explicit lifecycle actions on newly created applications only, maximum 1–10 apps."
       }
     },
     "/api/v1/specifications/validate": {
@@ -6009,7 +6009,7 @@
           },
           "port": {
             "type": "integer",
-            "description": "Web services require 1\u201365535. Workers require zero; observed resources may use zero when the operator reports no port.",
+            "description": "Web services require 1–65535. Workers require zero; observed resources may use zero when the operator reports no port.",
             "minimum": 0,
             "maximum": 65535
           },
@@ -6108,7 +6108,15 @@
             "minItems": 1
           },
           "ingress": {
-            "$ref": "#/components/schemas/IngressDefinition"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/IngressDefinition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional application routing. Omit or set null to save a desired withdrawal; a separate deployment removes previously published routes without deleting workloads."
           }
         },
         "required": [
@@ -6869,7 +6877,7 @@
           },
           "port": {
             "type": "integer",
-            "description": "Web services require 1\u201365535. Workers require zero; observed resources may use zero when the operator reports no port.",
+            "description": "Web services require 1–65535. Workers require zero; observed resources may use zero when the operator reports no port.",
             "minimum": 0,
             "maximum": 65535
           },
@@ -6966,7 +6974,15 @@
             "minItems": 1
           },
           "ingress": {
-            "$ref": "#/components/schemas/IngressDefinition"
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/IngressDefinition"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional application routing. Omit or set null to save a desired withdrawal; a separate deployment removes previously published routes without deleting workloads."
           }
         },
         "required": [

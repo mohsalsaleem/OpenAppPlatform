@@ -3,9 +3,21 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"github.com/jackc/pgx/v5"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/domain"
 	"time"
 )
+
+// LatestIngressTx includes withdrawal publications. A nil ingress in the latest
+// frozen release is a durable tombstone, not permission to restore older routes.
+func (s *Store) LatestIngressTx(ctx context.Context, tx pgx.Tx, target, app string) (domain.Deployment, error) {
+	var id string
+	err := tx.QueryRow(ctx, `SELECT deployment_id FROM oap_ingress_publications WHERE target_id=$1 AND application_id=$2 AND phase='applied' ORDER BY created_at DESC,deployment_id DESC LIMIT 1`, target, app).Scan(&id)
+	if err != nil {
+		return domain.Deployment{}, mapError(err)
+	}
+	return s.DeploymentTx(ctx, tx, id)
+}
 
 // IngressPublication is private dispatch evidence. Native config/ETag never enter
 // API projections. The controller holds the target's publication lock around it.
@@ -78,7 +90,7 @@ func (s *Store) IngressSiblings(ctx context.Context, target, app string) ([]doma
 	if pending {
 		return nil, domain.ErrConflict
 	}
-	rows, err := s.Pool.Query(ctx, `SELECT DISTINCT ON(application_id) deployment_id FROM oap_ingress_publications WHERE target_id=$1 AND application_id<>$2 AND phase='applied' ORDER BY application_id, created_at DESC, deployment_id DESC LIMIT 32`, target, app)
+	rows, err := s.Pool.Query(ctx, `SELECT latest.deployment_id FROM (SELECT DISTINCT ON(application_id) deployment_id,application_id FROM oap_ingress_publications WHERE target_id=$1 AND application_id<>$2 AND phase='applied' ORDER BY application_id,created_at DESC,deployment_id DESC) latest JOIN oap_deployments d ON d.id=latest.deployment_id WHERE d.spec->'ingress' IS NOT NULL AND d.spec->'ingress'<>'null'::jsonb ORDER BY latest.application_id LIMIT 32`, target, app)
 	if err != nil {
 		return nil, err
 	}

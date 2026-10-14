@@ -34,6 +34,10 @@ func (c *Controller) publishIngress(ctx context.Context, d domain.Deployment) (b
 	if err = c.authorizeRelease(ctx, d); err != nil {
 		return false, err
 	}
+	peerManifest, err := c.ingressPeerManifest(ctx, d)
+	if err != nil {
+		return false, err
+	}
 	target, err := c.Store.Target(ctx, d.Manifest.TargetID)
 	if err != nil {
 		return false, err
@@ -46,7 +50,13 @@ func (c *Controller) publishIngress(ctx context.Context, d domain.Deployment) (b
 	defer client.Close()
 	publication, err := c.Store.IngressPublication(ctx, d.ID)
 	if errors.Is(err, domain.ErrNotFound) {
-		if e := native.AttachIngressPeer(ctx, d.ApplicationID, d.Manifest); e != nil {
+		var e error
+		if d.Manifest.Ingress == nil {
+			e = native.CheckIngressPeer(ctx, d.ApplicationID, peerManifest)
+		} else {
+			e = native.AttachIngressPeer(ctx, d.ApplicationID, peerManifest)
+		}
+		if e != nil {
 			return false, e
 		}
 		bindings, e := c.Store.Bindings(ctx, d.ApplicationID)
@@ -87,7 +97,7 @@ func (c *Controller) publishIngress(ctx context.Context, d domain.Deployment) (b
 	if err != nil {
 		return false, err
 	}
-	if err = native.CheckIngressPeer(ctx, d.ApplicationID, d.Manifest); err != nil {
+	if err = native.CheckIngressPeer(ctx, d.ApplicationID, peerManifest); err != nil {
 		return false, err
 	}
 	if publication.ApplicationID != d.ApplicationID || publication.TargetID != d.Manifest.TargetID || publication.AuthorityHash != authority {
@@ -257,7 +267,11 @@ func (c *Controller) recoverIngress(ctx context.Context, d domain.Deployment, re
 	if err != nil || store.HashJSON(target) != publication.AuthorityHash {
 		return ingress.ErrConflict
 	}
-	if err = native.CheckIngressPeer(ctx, d.ApplicationID, d.Manifest); err != nil {
+	peerManifest, err := c.ingressPeerManifest(ctx, d)
+	if err != nil {
+		return err
+	}
+	if err = native.CheckIngressPeer(ctx, d.ApplicationID, peerManifest); err != nil {
 		return err
 	}
 	settings, _ := native.IngressSettings()
@@ -283,8 +297,14 @@ func (c *Controller) compileIngress(ctx context.Context, native *docker.Client, 
 	if err != nil {
 		return ingress.Candidate{}, err
 	}
-	applications := []ingress.ApplicationRoutes{{ApplicationID: d.ApplicationID, Manifest: d.Manifest, Members: members}}
+	applications := []ingress.ApplicationRoutes{}
+	if d.Manifest.Ingress != nil {
+		applications = append(applications, ingress.ApplicationRoutes{ApplicationID: d.ApplicationID, Manifest: d.Manifest, Members: members})
+	}
 	for _, sibling := range siblings {
+		if sibling.Manifest.Ingress == nil {
+			continue // The latest publication withdrew this sibling's routes.
+		}
 		if err = native.CheckIngressPeer(ctx, sibling.ApplicationID, sibling.Manifest); err != nil {
 			return ingress.Candidate{}, err
 		}
@@ -305,4 +325,27 @@ func (c *Controller) compileIngress(ctx context.Context, native *docker.Client, 
 		applications = append(applications, ingress.ApplicationRoutes{ApplicationID: sibling.ApplicationID, Manifest: sibling.Manifest, Members: observed})
 	}
 	return ingress.CompileServer(applications, ingress.Options{AdminSocket: settings.ProxySocket, HTTPPort: settings.HTTPPort, HTTPSPort: settings.HTTPSPort, InternalCA: settings.InternalCA, ACMECA: settings.ACMECA()}, time.Now())
+}
+
+// Withdrawal validates the exact peer/network using its frozen, confirmed
+// predecessor. Desired ingress is nil, so it cannot supply this authority itself.
+func (c *Controller) ingressPeerManifest(ctx context.Context, d domain.Deployment) (domain.Manifest, error) {
+	if d.Manifest.Ingress != nil {
+		return d.Manifest, nil
+	}
+	for _, step := range d.Steps {
+		if step.Action != "ingress" || step.Component != "@ingress" || step.Ordinal != 1 || step.ResourceID == "" {
+			continue
+		}
+		previous, err := c.Store.Deployment(ctx, step.ResourceID)
+		if err != nil {
+			return domain.Manifest{}, err
+		}
+		publication, err := c.Store.IngressPublication(ctx, previous.ID)
+		if err != nil || previous.ApplicationID != d.ApplicationID || previous.Manifest.TargetID != d.Manifest.TargetID || previous.Manifest.Ingress == nil || publication.ApplicationID != d.ApplicationID || publication.TargetID != d.Manifest.TargetID || publication.Phase != "applied" {
+			return domain.Manifest{}, ingress.ErrConflict
+		}
+		return previous.Manifest, nil
+	}
+	return domain.Manifest{}, errors.New("ingress withdrawal requires a confirmed predecessor")
 }
