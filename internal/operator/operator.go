@@ -9,6 +9,7 @@ import (
 )
 
 type Capabilities struct {
+	PreDeployJobs       bool `json:"preDeployJobs"`
 	ApplicationIngress  bool `json:"applicationIngress"`
 	ContainerSecurity   bool `json:"containerSecurity"`
 	RegistryCredentials bool `json:"registryCredentials"`
@@ -31,6 +32,7 @@ type Capabilities struct {
 	ImmutableImages     bool `json:"immutableImages"`
 }
 type Resource struct {
+	RuntimeID    string `json:"runtimeId,omitempty"`
 	ID           string `json:"id"`
 	Name         string `json:"name"`
 	Description  string `json:"description,omitempty"`
@@ -46,10 +48,14 @@ type Spec struct {
 	Name, Ownership string
 	Component       domain.Component
 	Variables       VariableJournal `json:"-"`
+	// JobReleaseID identifies an internal, release-scoped run-to-completion
+	// container. This is not a manifest field or a public execution interface.
+	JobReleaseID string `json:"-"`
 }
 type DeploymentStatus struct {
 	State          string
 	ResourceStatus string
+	ExitCode       *int
 }
 type Adapter interface {
 	Capabilities() Capabilities
@@ -67,11 +73,19 @@ type Restarter interface {
 	Restart(context.Context, string) (string, error)
 }
 
+type JobRunner interface {
+	EnsureJob(context.Context, Spec, string) (Resource, error)
+	RunJob(context.Context, string, string) (string, error)
+}
+
 func ValidateRuntime(m domain.Manifest, caps Capabilities) error {
 	if m.Ingress != nil && !caps.ApplicationIngress {
 		return errors.New("application ingress is not enabled for this target")
 	}
 	for _, c := range m.Components {
+		if c.Kind == "job" && !caps.PreDeployJobs {
+			return errors.New("pre-deploy jobs require standalone Docker")
+		}
 		if c.Security != nil && !caps.ContainerSecurity {
 			return errors.New("container security remains managed in the operator for this target")
 		}
@@ -155,6 +169,13 @@ var ErrUnreachable = errors.New("operator is unreachable")
 func ValidateTargetManifest(m domain.Manifest, adapter Adapter) error {
 	if err := ValidateRuntime(m, adapter.Capabilities()); err != nil {
 		return err
+	}
+	for _, component := range m.Components {
+		if component.Kind == "job" {
+			if _, ok := adapter.(JobRunner); !ok {
+				return errors.New("target does not implement job execution")
+			}
+		}
 	}
 	if validator, ok := adapter.(interface{ ValidateManifest(domain.Manifest) error }); ok {
 		return validator.ValidateManifest(m)

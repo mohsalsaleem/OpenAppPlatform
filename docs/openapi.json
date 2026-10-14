@@ -3558,6 +3558,9 @@
                           },
                           "restoreImage": {
                             "type": "string"
+                          },
+                          "resourceId": {
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -3568,6 +3571,25 @@
                         ],
                         "additionalProperties": false
                       }
+                    },
+                    "applicationId": {
+                      "type": "string"
+                    },
+                    "latestReleaseId": {
+                      "type": "string"
+                    },
+                    "targetHash": {
+                      "type": "string"
+                    },
+                    "effect": {
+                      "type": "string"
+                    },
+                    "skippedJobs": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Pre-deploy jobs excluded from image rollback; migrations are never implicitly rerun or reversed."
                     }
                   },
                   "required": [
@@ -5364,7 +5386,7 @@
           }
         },
         "operationId": "post_onboarding_grant",
-        "description": "One Docker target/environment, 24-hour expiry, explicit lifecycle actions on newly created applications only, maximum 1–10 apps."
+        "description": "One Docker target/environment, 24-hour expiry, explicit lifecycle actions on newly created applications only, maximum 1\u201310 apps."
       }
     },
     "/api/v1/specifications/validate": {
@@ -6003,16 +6025,18 @@
             "enum": [
               "web",
               "worker",
-              "database"
+              "database",
+              "job"
             ],
-            "default": "web"
+            "default": "web",
+            "description": "Web service, long-running worker, observed database link, or one release-scoped run-to-completion job. Jobs are standalone Docker only."
           },
           "image": {
             "type": "string"
           },
           "port": {
             "type": "integer",
-            "description": "Web services require 1–65535. Workers require zero; observed resources may use zero when the operator reports no port.",
+            "description": "Web services require 1\u201365535. Workers and jobs require zero; observed resources may use zero when the operator reports no port.",
             "minimum": 0,
             "maximum": 65535
           },
@@ -6228,6 +6252,10 @@
           },
           "url": {
             "type": "string"
+          },
+          "runtimeId": {
+            "type": "string",
+            "description": "Exact native process ID, when exposed by the runtime, for observation-only interrupted-dispatch recovery."
           }
         },
         "required": [
@@ -6275,6 +6303,10 @@
           },
           "error": {
             "type": "string"
+          },
+          "exitCode": {
+            "type": "integer",
+            "description": "Native job exit code when the process has terminated; omitted while unknown or running."
           }
         },
         "required": [
@@ -6432,6 +6464,16 @@
           "checkedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "web",
+              "worker",
+              "database",
+              "job"
+            ],
+            "description": "Component kind; completed jobs are not long-running workload health."
           }
         },
         "required": [
@@ -6586,6 +6628,10 @@
           "applicationIngress": {
             "type": "boolean",
             "description": "Target has explicit host-owner standalone Caddy authority. Domain, peer identity and actual native readiness are verified during admission/execution."
+          },
+          "preDeployJobs": {
+            "type": "boolean",
+            "description": "Release-scoped image jobs with exit-code evidence; no automatic restart."
           }
         },
         "required": [
@@ -6607,7 +6653,8 @@
           "namedVolumes",
           "resourceLimits",
           "containerSecurity",
-          "applicationIngress"
+          "applicationIngress",
+          "preDeployJobs"
         ],
         "additionalProperties": false
       },
@@ -6872,16 +6919,18 @@
             "enum": [
               "web",
               "worker",
-              "database"
+              "database",
+              "job"
             ],
-            "default": "web"
+            "default": "web",
+            "description": "Web service, long-running worker, observed database link, or one release-scoped run-to-completion job. Jobs are standalone Docker only."
           },
           "image": {
             "type": "string"
           },
           "port": {
             "type": "integer",
-            "description": "Web services require 1–65535. Workers require zero; observed resources may use zero when the operator reports no port.",
+            "description": "Web services require 1\u201365535. Workers and jobs require zero; observed resources may use zero when the operator reports no port.",
             "minimum": 0,
             "maximum": 65535
           },
@@ -8012,6 +8061,16 @@
           },
           "errorCode": {
             "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "web",
+              "worker",
+              "database",
+              "job"
+            ],
+            "description": "Component kind; completed jobs are not long-running workload health."
           }
         },
         "required": [

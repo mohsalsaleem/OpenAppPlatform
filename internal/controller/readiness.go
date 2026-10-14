@@ -14,6 +14,9 @@ func observationTimeout(component domain.Component) time.Duration {
 }
 
 func releaseReady(component domain.Component, status string) bool {
+	if component.Kind == "job" {
+		return status == "completed:0"
+	}
 	if component.Kind == "database" {
 		return status == "running:healthy" || strings.HasPrefix(status, "running:healthy:")
 	}

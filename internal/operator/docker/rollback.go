@@ -15,8 +15,13 @@ func (c *Client) CheckRollbackConfiguration(ctx context.Context, ref string, com
 	if err != nil {
 		return errors.New("cannot verify rollback container")
 	}
-	if !c.owned(container) || len(container.Mounts) != 0 {
-		return errors.New("rollback requires an owned container without mounted data")
+	if !c.owned(container) {
+		return errors.New("rollback requires an owned container")
+	}
+	if len(container.Mounts) > 0 || len(component.Volumes) > 0 {
+		if err := c.checkMounts(container, operator.Spec{Name: ref, Ownership: container.Config.Labels[prefix+"owner"], Component: component}); err != nil {
+			return err
+		}
 	}
 	if err := c.checkLimits(container, operator.Spec{Component: component}); err != nil {
 		return err

@@ -35,6 +35,8 @@ type RollbackInstance struct {
 	RestoreImage string `json:"restoreImage"`
 }
 type RollbackPlan struct {
+	Effect               string             `json:"effect"`
+	SkippedJobs          []string           `json:"skippedJobs"`
 	ApplicationID        string             `json:"applicationId"`
 	ReleaseID            string             `json:"releaseId"`
 	LatestReleaseID      string             `json:"latestReleaseId"`
@@ -105,6 +107,9 @@ func (c *Controller) rollbackPlan(ctx context.Context, tx pgx.Tx, app domain.App
 		return plan, original, rollbackInvalid("snapshot configuration/topology differs; image-only rollback cannot restore it")
 	}
 	for _, comp := range app.Manifest.Components {
+		if comp.Kind == "job" || comp.Kind == "database" {
+			continue
+		}
 		if comp.Management == "observe" || comp.ResourceID != "" {
 			return plan, original, rollbackInvalid("rollback currently requires OAP-owned managed image components")
 		}
@@ -127,6 +132,13 @@ func (c *Controller) rollbackPlan(ctx context.Context, tx pgx.Tx, app domain.App
 		return plan, original, err
 	}
 	plan.TargetHash = rollbackTargetHash(target)
+	plan.Effect = "Restore recorded owned workload images using standard deployment. Keep current configuration, routes and named volumes. No migration jobs, schema reversal or application-data restore. Acknowledge data compatibility; downtime is possible."
+	plan.SkippedJobs = []string{}
+	for _, comp := range app.Manifest.Components {
+		if comp.Kind == "job" {
+			plan.SkippedJobs = append(plan.SkippedJobs, comp.Name)
+		}
+	}
 	adapter, err := c.Factory(target)
 	if err != nil {
 		return plan, original, err
@@ -138,8 +150,8 @@ func (c *Controller) rollbackPlan(ctx context.Context, tx pgx.Tx, app domain.App
 	uniqueInstances := map[string]bool{}
 	changedImage := false
 	for _, step := range original.Steps {
-		if step.Phase != "succeeded" || step.Action != "" || step.ResourceID == "" || !Healthy(step.Observed) {
-			return plan, original, rollbackInvalid("source snapshot lacks completed healthy instance verification")
+		if step.Action == "ingress" {
+			continue
 		}
 		var comp domain.Component
 		for _, candidate := range original.Manifest.Components {
@@ -148,10 +160,16 @@ func (c *Controller) rollbackPlan(ctx context.Context, tx pgx.Tx, app domain.App
 				break
 			}
 		}
+		if comp.Kind == "job" {
+			continue
+		}
+		if step.Phase != "succeeded" || step.Action != "" || step.ResourceID == "" || !Healthy(step.Observed) {
+			return plan, original, rollbackInvalid("source snapshot lacks completed healthy instance verification")
+		}
 		if comp.Name == "" || (!registryContentRef.MatchString(comp.Image) && !(target.Operator == "docker" && dockerContentID.MatchString(comp.Image))) {
 			return plan, original, rollbackInvalid("rollback image must be a recorded registry digest or Docker content ID")
 		}
-		if len(comp.Volumes) > 0 {
+		if len(comp.Volumes) > 0 && target.Operator != "docker" {
 			return plan, original, rollbackInvalid("persistent components require operator review of data compatibility before image rollback")
 		}
 		instanceKey := step.Component + ":" + strconv.Itoa(step.Ordinal)
@@ -172,7 +190,10 @@ func (c *Controller) rollbackPlan(ctx context.Context, tx pgx.Tx, app domain.App
 			return plan, original, rollbackInvalid("rollback instance ownership or port configuration changed")
 		}
 		var imageReleaseID string
-		if err = tx.QueryRow(ctx, "SELECT id FROM oap_deployments WHERE application_id=$1 AND operation='deploy' AND steps @> jsonb_build_array(jsonb_build_object('component',$2::text)) ORDER BY created_at DESC,id DESC LIMIT 1", app.ID, comp.Name).Scan(&imageReleaseID); err != nil {
+		if err = tx.QueryRow(ctx, `SELECT id FROM oap_deployments WHERE application_id=$1 AND operation='deploy' AND EXISTS (
+ SELECT 1 FROM jsonb_array_elements(steps) s WHERE s->>'component'=$2 AND (s->>'ordinal')::integer=$3 AND s->>'resourceId'=$4
+ AND (s->>'phase'='succeeded' OR (s->>'phase' IN ('observing','failed') AND COALESCE(s->>'remoteDeploymentId','')<>''))
+) ORDER BY created_at DESC,id DESC LIMIT 1`, app.ID, comp.Name, step.Ordinal, binding).Scan(&imageReleaseID); err != nil {
 			return plan, original, err
 		}
 		imageRelease, err := c.Store.DeploymentTx(ctx, tx, imageReleaseID)
@@ -212,6 +233,9 @@ func (c *Controller) rollbackPlan(ctx context.Context, tx pgx.Tx, app domain.App
 		return plan, original, rollbackInvalid("source snapshot has no instances")
 	}
 	for _, comp := range original.Manifest.Components {
+		if target.Operator == "docker" && comp.Kind != "job" && comp.Kind != "database" && selected[comp.Name] != comp.Instances {
+			return plan, original, rollbackInvalid("app-wide rollback requires a complete successful workload snapshot; a partial component release is not an app snapshot")
+		}
 		if count := selected[comp.Name]; count != 0 && count != comp.Instances {
 			return plan, original, rollbackInvalid("source snapshot has incomplete replica verification")
 		}

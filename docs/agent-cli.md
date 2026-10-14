@@ -118,3 +118,23 @@ This projection excludes arguments, raw job errors, credentials and other apps.
 `missing` or `unavailable` does not imply that dispatch never happened and does
 not authorize retries, queue mutation or control-database repairs. The durable
 operation and its reviewed recovery plan remain authoritative.
+
+## Pre-deploy jobs and app-wide image rollback
+
+Declare standalone `job` components and their dependents in the application spec.
+Use the existing action-plan/execute-action/wait flow. The expanded plan includes
+required jobs and their immutable images, even when only an API was selected.
+Operation steps expose native exit codes; incident selection provides redacted
+job logs. The exact native `runtimeId` is available through instance inspection
+for observation-only recovery after a lost dispatch response. See
+[pre-deploy jobs](pre-deploy-jobs.md).
+
+With an owner-issued rollback grant, read a plan using
+`oap --app APP --file rollback-input.json rollback-plan`, supplying `releaseId`
+and `expectedVersion`. Execute its reviewed hash using
+`oap --app APP --key STABLE_KEY --file rollback-reviewed.json rollback`, adding
+`planHash` and `acknowledgeDataCompatibility: true`. Observe with
+`oap --operation ID --timeout 90s wait`. This restores a complete successful
+owned-workload image snapshot, preserves supported named volumes/current routes,
+and excludes migration jobs. It does not revert the desired spec or application
+data. See [image rollback](image-rollback.md).

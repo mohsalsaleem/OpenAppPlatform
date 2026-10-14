@@ -117,7 +117,7 @@ new slice IDs so previous M2.1–M2.4 acceptance records retain their meaning.
 | Milestone | Outcome | Status |
 | --- | --- | --- |
 | M2 — Agent-operated standalone core | One agent completes install → deploy → diagnose → correct → verify without dashboard dependence | Complete at `76b4061` |
-| M3 — Application unit and standalone delivery | Application router and scale loop, specification-driven topology and pre-deploy jobs, previews/checks/guarded rollout and environment comparison, source-to-release, Compose import, image/storage safety, lightweight recovery | Active: M3.2 |
+| M3 — Application unit and standalone delivery | Application router and scale loop, specification-driven topology and pre-deploy jobs, previews/checks/guarded rollout and environment comparison, source-to-release, Compose import, image/storage safety, lightweight recovery | Active: v0.1 closeout |
 | M4 — Bounded application insight | Indexed logs when needed, release watches, metrics/analytics and notifications | Deferred |
 | M5 — Operator integration return | Capability-aware existing-resource discovery/assembly and operator adapters/views | Parked until standalone gates pass and owner reprioritizes |
 | M6 — Additional servers and runtimes | Explicit multi-server placement, policy metadata, Firecracker/actor experiments | Deferred |
@@ -132,8 +132,10 @@ M2.6 passed gate `20261013-214602-ceb6aceb` at `c2e1eee`; see
 `76b4061`; see the [standalone runbook/skill](docs/standalone-agent-runbook.md)
 and [measured footprint](docs/footprint.md). **M3.1 — application router and scale
 loop** is functionally complete at
-`1a2344d`, using Caddy. The active slice is **M3.2 — specification-driven topology
-and pre-deploy jobs**, starting with component addition and reviewed removal.
+`1a2344d`, using Caddy. The active work is **v0.1 closeout**: pre-deploy jobs and basic app-wide image
+rollback from M3.2, followed by the exact-tree standalone release acceptance.
+Component addition/removal is already delivered; definition history/export
+and the remaining M3 milestones are post-v0.1.
 Owner-configured standalone peers now support
 spec-declared routes, durable release publication and named-agent 1 → 3 → 1
 scaling with traffic verification and observation-only lost-response recovery.
@@ -157,6 +159,19 @@ separate follow-up verification, not a prerequisite for M3.2. See
 parked. The measured combined idle CPU gap stays open for M3.7.
 
 ## Ordered active queue
+
+### v0.1 release boundary
+
+The v0.1 execution queue is now limited to: **finish pre-deploy jobs → basic
+app-wide image rollback → one complete standalone agent release acceptance**.
+M3.1 routing/scaling and M3.2 component addition/removal are already delivered.
+Definition history/revert/export, previews, guarded rollout, environment
+comparison, expanded source/build integration, Compose import and automated
+image/storage management are post-v0.1. M3.7 optimization does not block v0.1
+unless acceptance exposes a release-blocking problem. Preserve existing
+installation, trust, secret/storage safety, diagnostics and crash recovery.
+The M3 list below remains the longer-term order, not the v0.1 release gate.
+See [v0.1 standalone release acceptance](docs/v0.1-standalone-acceptance.md).
 
 | Order | Deliverable | Acceptance gate | Stop boundary |
 | --- | --- | --- | --- |
@@ -221,7 +236,12 @@ one scaled application, which is the gap no Compose/Coolify-style tool closes.
    and [templates](examples/topology/README.md). The remaining M3.2 scope adds a
    run-to-completion job kind (for example migrations) that
    a release runs before rolling out dependent components; failure stops the
-   release with evidence. Application rollback reuses the existing
+   release with evidence. The pre-deploy job kind, shared agent interfaces and basic app-wide image
+   rollback are implemented locally, pending the exact-tree release gate.
+   Only release acceptance remains in the v0.1 execution queue; history/export
+   and M3.3 onward stay post-v0.1. See
+   [pre-deploy job implementation and remaining acceptance](docs/pre-deploy-jobs.md).
+   Application rollback reuses the existing
    [image rollback](docs/image-rollback.md) across all owned components; schema
    and data are never rolled back implicitly. Make OAP's stored definition
    versions usable as the specification's history: record author (owner or named

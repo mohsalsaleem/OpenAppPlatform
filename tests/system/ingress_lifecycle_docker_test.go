@@ -34,7 +34,7 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	if socket != "/run/oap-test/docker.sock" {
 		t.Fatal("isolated Engine required")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 260*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 330*time.Second)
 	defer cancel()
 	engine := &http.Client{Timeout: 10 * time.Second, Transport: &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 		return (&net.Dialer{}).DialContext(ctx, "unix", socket)
@@ -152,7 +152,7 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	c.PollInterval = 100 * time.Millisecond
-	m := domain.Manifest{Name: "ingress-app", TargetID: targetID, Environment: "staging", Components: []domain.Component{{Name: "frontend", Kind: "web", Image: pinned, Port: 8080, Instances: 1, Env: map[string]string{"OAP_TEST_MESSAGE": "frontend"}, Readiness: &domain.ReadinessPolicy{RequireHealthy: true, TimeoutSeconds: 60}}, {Name: "api", Kind: "web", Image: pinned, Port: 8080, Instances: 1, Env: map[string]string{"OAP_TEST_MESSAGE": "api"}, Readiness: &domain.ReadinessPolicy{RequireHealthy: true, TimeoutSeconds: 60}}}, Ingress: &domain.IngressDefinition{Domain: "app.example.test", Routes: []domain.IngressRoute{{Path: "/", Component: "frontend"}, {Path: "/api", Component: "api", StripPrefix: true}}}}
+	m := domain.Manifest{Name: "ingress-app", TargetID: targetID, Environment: "staging", Components: []domain.Component{{Name: "frontend", Kind: "web", Image: pinned, Port: 8080, Instances: 1, Env: map[string]string{"OAP_TEST_MESSAGE": "frontend", "FIXTURE_PORT": "8080"}, Readiness: &domain.ReadinessPolicy{RequireHealthy: true, TimeoutSeconds: 60}}, {Name: "api", Kind: "web", Image: pinned, Port: 8080, Instances: 1, Env: map[string]string{"OAP_TEST_MESSAGE": "api", "FIXTURE_PORT": "8080"}, Readiness: &domain.ReadinessPolicy{RequireHealthy: true, TimeoutSeconds: 60}}}, Ingress: &domain.IngressDefinition{Domain: "app.example.test", Routes: []domain.IngressRoute{{Path: "/", Component: "frontend"}, {Path: "/api", Component: "api", StripPrefix: true}}}}
 	app, err := c.CreateApplication(ctx, m)
 	if err != nil {
 		t.Fatal(err)
@@ -169,7 +169,7 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	token, err := service.IssueRestricted(ctx, owner, "Ingress agent", "operate", app.ID, time.Hour, domain.AgentPermissions{Actions: []string{"configure", "deploy", "scale-down", "recover", "remove-component"}, TargetID: targetID, Environment: "staging"})
+	token, err := service.IssueRestricted(ctx, owner, "Ingress agent", "operate", app.ID, time.Hour, domain.AgentPermissions{Actions: []string{"configure", "deploy", "scale-down", "recover", "remove-component", "rollback"}, TargetID: targetID, Environment: "staging"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,6 +340,31 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	if err != nil || value["message"] != "api" {
 		t.Fatal("API route", err)
 	}
+
+	oldVersion := value["version"]
+	rollbackImage := call("GET", "/images/"+os.Getenv("OAP_TEST_DOCKER_REPLACEMENT_IMAGE")+"/json", nil)["Id"].(string)
+	changedImages := execute(plan(controller.ActionRequest{Action: "deploy", ApplicationID: app.ID, ExpectedVersion: app.Version, Components: []string{"frontend", "api"}, Images: map[string]string{"frontend": rollbackImage, "api": rollbackImage}}))
+	wait(changedImages)
+	value, err = get("/api")
+	if err != nil || value["version"] == oldVersion {
+		t.Fatal("routed image upgrade", err)
+	}
+	rollbackRead := invoke("rollback-plan", []string{"--app", app.ID}, map[string]any{"releaseId": first.Result.OperationID, "expectedVersion": app.Version}, 0)
+	rawRollback, _ := json.Marshal(rollbackRead.Data)
+	var rollback controller.RollbackPlan
+	json.Unmarshal(rawRollback, &rollback)
+	if len(rollback.Instances) != 2 {
+		t.Fatal("routed app rollback did not select both components")
+	}
+	rollbackResult := invoke("rollback", []string{"--app", app.ID, "--key", "routed-app-rollback"}, map[string]any{"releaseId": first.Result.OperationID, "expectedVersion": app.Version, "planHash": rollback.PlanHash, "acknowledgeDataCompatibility": true}, 0)
+	invoke("wait", []string{"--operation", rollbackResult.OperationID, "--timeout", "90s"}, nil, 0)
+	for _, path := range []string{"/", "/api"} {
+		value, err = get(path)
+		if err != nil || value["version"] != oldVersion {
+			t.Fatal("routed app image restore", path, err)
+		}
+	}
+	checkSibling()
 	current, _ := s.Application(ctx, app.ID)
 	spec := current.Manifest
 	spec.Components = append([]domain.Component(nil), spec.Components...)
@@ -662,7 +687,7 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	}
 	checkAbsentDomain("sibling.example.test")
 	if dir := os.Getenv("OAP_TEST_REPORT_DIR"); dir != "" {
-		raw, _ := json.MarshalIndent(map[string]any{"status": "passed", "scope": "owner-provisioned dedicated Caddy; local HTTP", "namedAgent": true, "sharedProxySiblingPreserved": true, "authorizedDomainHandoff": true, "savePreservesLiveDomain": true, "retiredDomainNotResurrected": true, "durableIngressWithdrawal": true, "withdrawalPreservesRunningContainers": true, "withdrawalLostResponseRecovered": true, "finalApplicationWithdrawal": true, "explicitIngressReenable": true, "routedComponentRetirement": true, "scale": "1 -> 3 -> 1", "controllerDownTraffic": true, "scaleDownRequests": requests.Load(), "scaleDownFailures": failures.Load(), "publicationJournal": true, "retirementReplay": true, "lostResponseObservedWithoutRedispatch": true, "publicACME": false, "automaticProxyProvisioning": false}, "", "  ")
+		raw, _ := json.MarshalIndent(map[string]any{"status": "passed", "scope": "owner-provisioned dedicated Caddy; local HTTP", "namedAgent": true, "sharedProxySiblingPreserved": true, "authorizedDomainHandoff": true, "savePreservesLiveDomain": true, "retiredDomainNotResurrected": true, "durableIngressWithdrawal": true, "withdrawalPreservesRunningContainers": true, "withdrawalLostResponseRecovered": true, "finalApplicationWithdrawal": true, "explicitIngressReenable": true, "routedComponentRetirement": true, "routedAppImageRollback": true, "scale": "1 -> 3 -> 1", "controllerDownTraffic": true, "scaleDownRequests": requests.Load(), "scaleDownFailures": failures.Load(), "publicationJournal": true, "retirementReplay": true, "lostResponseObservedWithoutRedispatch": true, "publicACME": false, "automaticProxyProvisioning": false}, "", "  ")
 		os.WriteFile(filepath.Join(dir, "ingress-lifecycle.json"), append(raw, '\n'), 0600)
 	}
 }

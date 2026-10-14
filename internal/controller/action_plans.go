@@ -175,6 +175,10 @@ func (c *Controller) prepareAction(ctx context.Context, request *ActionRequest) 
 			}
 		}
 		seen := map[string]bool{}
+		request.Components, err = domain.ExpandJobDependencies(app.Manifest, request.Components)
+		if err != nil {
+			return app, target, err
+		}
 		images := map[string]string{}
 		for _, name := range request.Components {
 			if seen[name] {
@@ -218,7 +222,7 @@ func (c *Controller) prepareAction(ctx context.Context, request *ActionRequest) 
 		}
 		found := false
 		for _, comp := range app.Manifest.Components {
-			if comp.Name == request.Component && request.Ordinal <= comp.Instances && comp.Management != "observe" && comp.Kind != "database" {
+			if comp.Name == request.Component && request.Ordinal <= comp.Instances && comp.Management != "observe" && comp.Kind != "database" && comp.Kind != "job" {
 				found = true
 			}
 		}
@@ -289,6 +293,17 @@ func (c *Controller) CreateActionPlan(ctx context.Context, req ActionRequest) (s
 	if req.Action == "deploy" || req.Action == "restart" {
 		effect = "Standard runtime lifecycle; interruption/downtime is possible. No application data restore."
 	}
+	jobs := []string{}
+	if req.Action == "deploy" {
+		for _, comp := range app.Manifest.Components {
+			if comp.Kind == "job" && selectedComponent(req.Components, comp.Name) {
+				jobs = append(jobs, comp.Name)
+			}
+		}
+		if len(jobs) > 0 {
+			effect += " Runs declared pre-deploy job images; these processes may change application data. Failure blocks dependent workloads. Recovery never implicitly reruns a migration."
+		}
+	}
 	if req.Action == "scale-down" {
 		effect = "Withdraw routing, wait bounded drain, stop exact excess instances, then save desired count. Volumes are retained; exact owner review is enforced when requested."
 	}
@@ -300,6 +315,7 @@ func (c *Controller) CreateActionPlan(ctx context.Context, req ActionRequest) (s
 	}
 	summary := map[string]any{"untrustedEvidence": true, "effect": effect, "components": req.Components, "images": req.Images, "component": req.Component, "ordinal": req.Ordinal, "deploymentId": req.DeploymentID, "policy": "owner-issued action grant; requested exact owner review is enforced", "missingEvidence": []string{"application behavior", "final admission conflicts"}}
 	if req.Action == "deploy" {
+		summary["preDeployJobs"] = jobs
 		summary["desiredIngress"] = app.Manifest.Ingress
 		summary["ingressPublication"] = "Replaces this application's last published routes; nil desired ingress withdraws its routes without deleting containers, volumes or certificates. Sibling applications retain their last published routes. Domain changes withdraw the old hostname for new requests. DNS and certificate readiness require separate verification."
 	}

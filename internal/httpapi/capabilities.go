@@ -28,6 +28,8 @@ func applicationActions(app domain.Application, caps operator.Capabilities, p do
 				decision = actionCapability{Reason: "runtime does not support standard deployment"}
 			case action == "restart" && !caps.Restart:
 				decision = actionCapability{Reason: "runtime does not support restart"}
+			case action == "restart" && component.Kind == "job":
+				decision = actionCapability{Reason: "jobs run per release and cannot be restarted"}
 			}
 			actions[action] = decision
 		}

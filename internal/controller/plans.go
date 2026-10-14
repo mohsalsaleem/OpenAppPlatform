@@ -56,6 +56,10 @@ func (c *Controller) CreateDeploymentPlan(ctx context.Context, appID string, ver
 		return DeploymentPlan{}, errors.New("select 1–16 managed image components")
 	}
 	components = slices.Clone(components)
+	components, err = domain.ExpandJobDependencies(a.Manifest, components)
+	if err != nil {
+		return DeploymentPlan{}, err
+	}
 	sort.Strings(components)
 	resolved := map[string]string{}
 	for i, name := range components {
@@ -90,6 +94,12 @@ func (c *Controller) CreateDeploymentPlan(ctx context.Context, appID string, ver
 		}
 	}
 	v := DeploymentPlan{ID: domain.NewID(), ApplicationID: appID, CredentialID: p.CredentialID, DefinitionVersion: version, TargetID: a.Manifest.TargetID, Environment: a.Manifest.Environment, Components: components, Images: resolved, Effect: "Standard lifecycle may restart selected workloads and cause downtime. No application data restore, migration, paid provisioning or destructive cleanup is authorized."}
+	for _, comp := range a.Manifest.Components {
+		if comp.Kind == "job" && slices.Contains(components, comp.Name) {
+			v.Effect = "Runs declared pre-deploy job images, which may change application data, before dependent workloads. Failure blocks rollout. Standard deployment may cause downtime. No implicit migration retry, data restore or destructive cleanup."
+			break
+		}
+	}
 	raw, _ := json.Marshal(v)
 	sum := sha256.Sum256(append(raw, []byte(definitionHash(a.Manifest))...))
 	v.PlanHash = hex.EncodeToString(sum[:])

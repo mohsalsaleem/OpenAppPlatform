@@ -177,6 +177,7 @@ func (c *Controller) Recover(ctx context.Context, id string, request Recovery) (
 			step.ObservationStartedAt = &now
 			step.RemoteDeploymentID = remote
 			step.Observed = status.ResourceStatus
+			step.ExitCode = status.ExitCode
 			step.RecoveryPhase = ""
 		}
 	}

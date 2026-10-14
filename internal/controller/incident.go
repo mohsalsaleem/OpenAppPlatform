@@ -312,7 +312,7 @@ func incidentVerification(out Incident, incomplete bool) (string, []Verification
 		}
 		active++
 		switch item.Status {
-		case "running", "healthy", "running:healthy":
+		case "running", "healthy", "running:healthy", "completed:0":
 		case "unavailable", "":
 			if state != "issue" {
 				state = "inconclusive"

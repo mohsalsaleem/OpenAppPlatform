@@ -8,6 +8,7 @@ import (
 )
 
 type Instance struct {
+	Kind       string             `json:"kind,omitempty"`
 	Retired    bool               `json:"retired"`
 	Component  string             `json:"component"`
 	Ordinal    int                `json:"ordinal"`
@@ -53,7 +54,7 @@ func (c *Controller) instancesBounded(ctx context.Context, id string, limit int)
 			if limit > 0 && ctx.Err() != nil {
 				return out, true, ctx.Err()
 			}
-			item := Instance{Component: comp.Name, Ordinal: ordinal, Status: "not deployed", CheckedAt: time.Now().UTC()}
+			item := Instance{Kind: comp.Kind, Component: comp.Name, Ordinal: ordinal, Status: "not deployed", CheckedAt: time.Now().UTC()}
 			for _, b := range bindings {
 				if b.Component == comp.Name && b.Ordinal == ordinal {
 					item.ResourceID = b.ResourceID

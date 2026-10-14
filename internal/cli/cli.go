@@ -249,7 +249,7 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 		return finish(json.RawMessage(docs.OpenAPI), nil, 0)
 	}
 	if command == "help" {
-		return finish(map[string]any{"commands": []string{"help", "schema", "meta", "targets", "capabilities", "apps", "create", "get", "update", "instances", "diagnostics", "deploy", "operation", "wait", "verify", "setup", "login", "grant", "app-grant", "revoke", "agent-control", "set-agent-control", "plan", "get-plan", "approve", "execute-plan", "target-capabilities", "resources", "whoami", "validate-spec", "diff-spec", "export-spec", "incident", "action-plan", "get-action-plan", "review-action-input", "approve-action", "execute-action"}, "flagsBeforeCommand": true, "contextFlags": []string{"url", "app", "target", "environment", "operation", "component", "ordinal"}, "input": "--file path.json or --file -; deploy requires --key and expectedVersion > 0; agent create requires --key", "auth": "OAP_API_TOKEN or --session-file; no credentials in flags/output", "wait": "--timeout 1s..30m; observes without cancelling", "verification": "current instance health only, not end-to-end application behavior", "exitCodes": map[string]int{"success": 0, "input": 2, "denied": 3, "rejected": 4, "unavailable": 5, "operationStopped": 6, "timeout": 7}}, nil, 0)
+		return finish(map[string]any{"commands": []string{"help", "schema", "meta", "targets", "capabilities", "apps", "create", "get", "update", "instances", "diagnostics", "deploy", "operation", "wait", "verify", "setup", "login", "grant", "app-grant", "revoke", "agent-control", "set-agent-control", "plan", "get-plan", "approve", "execute-plan", "target-capabilities", "resources", "whoami", "validate-spec", "diff-spec", "export-spec", "incident", "action-plan", "get-action-plan", "review-action-input", "approve-action", "execute-action", "rollback-plan", "rollback"}, "flagsBeforeCommand": true, "contextFlags": []string{"url", "app", "target", "environment", "operation", "component", "ordinal"}, "input": "--file path.json or --file -; deploy requires --key and expectedVersion > 0; agent create requires --key", "auth": "OAP_API_TOKEN or --session-file; no credentials in flags/output", "wait": "--timeout 1s..30m; observes without cancelling", "verification": "current instance health only, not end-to-end application behavior", "exitCodes": map[string]int{"success": 0, "input": 2, "denied": 3, "rejected": 4, "unavailable": 5, "operationStopped": 6, "timeout": 7}}, nil, 0)
 	}
 	c := Client{URL: *endpoint, Token: getenv("OAP_API_TOKEN")}
 	if *session != "" {
@@ -457,7 +457,7 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 	case "create":
 		method = "POST"
 		path = "/api/v1/applications"
-	case "get", "update", "instances", "diagnostics", "capabilities", "verify", "deploy", "incident":
+	case "get", "update", "instances", "diagnostics", "capabilities", "verify", "deploy", "incident", "rollback-plan", "rollback":
 		if !idPattern.MatchString(*app) {
 			return emitFailure(nil, failure("invalid_application", "Provide --app ID", false, "check_context"))
 		}
@@ -472,6 +472,11 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 		case "deploy":
 			method = "POST"
 			path += "/deployments"
+		case "rollback":
+			method = "POST"
+			path += "/rollbacks"
+		case "rollback-plan":
+			path += "/rollback-plan"
 		}
 	default:
 		return emitFailure(nil, failure("unknown_command", "Use help for supported commands", false, "help"))
@@ -492,7 +497,7 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 		}
 	}
 	var body []byte
-	if method != "GET" && method != "DELETE" {
+	if (method != "GET" && method != "DELETE") || command == "rollback-plan" {
 		if *file == "" {
 			return emitFailure(nil, failure("input_required", "Provide --file JSON; configuration save and deploy are separate", false, "inspect_schema"))
 		}
@@ -505,11 +510,25 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 			ExpectedVersion int64 `json:"expectedVersion"`
 		}
 		_ = json.Unmarshal(body, &v)
-		if (command == "update" || command == "deploy" || command == "plan" || command == "set-agent-control") && v.ExpectedVersion < 1 {
+		if (command == "update" || command == "deploy" || command == "plan" || command == "set-agent-control" || command == "rollback" || command == "rollback-plan") && v.ExpectedVersion < 1 {
 			return emitFailure(nil, failure("version_required", "Supply expectedVersion > 0 from the current application", false, "refresh_application"))
 		}
-		if (command == "deploy" || (command == "create" && c.Token != "")) && (!idPattern.MatchString(*key) || strings.HasPrefix(*key, "plan:")) {
+		if (command == "deploy" || command == "rollback" || (command == "create" && c.Token != "")) && (!idPattern.MatchString(*key) || strings.HasPrefix(*key, "plan:")) {
 			return emitFailure(nil, failure("key_required", "Provide a stable --key for this release and reuse it on retries", false, "supply_idempotency_key"))
+		}
+		if command == "rollback-plan" {
+			var request struct {
+				ReleaseID       string `json:"releaseId"`
+				ExpectedVersion int64  `json:"expectedVersion"`
+			}
+			if json.Unmarshal(body, &request) != nil || !idPattern.MatchString(request.ReleaseID) {
+				return emitFailure(nil, failure("invalid_release", "Supply the exact preceding successful releaseId", false, "inspect_operation"))
+			}
+			query := url.Values{}
+			query.Set("releaseId", request.ReleaseID)
+			query.Set("expectedVersion", strconv.FormatInt(request.ExpectedVersion, 10))
+			path += "?" + query.Encode()
+			body = nil
 		}
 	}
 	// Assertions fail before mutation; they never choose a hidden default target.
@@ -562,14 +581,14 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 			}
 		}
 	}
-	if command == "deploy" || command == "create" {
+	if command == "deploy" || command == "create" || command == "rollback" {
 		result.IdempotencyKey = *key
 	}
 	raw, f := c.Call(ctx, method, path, body, *key)
 	if f != nil {
 		return emitFailure(nil, f)
 	}
-	if command == "deploy" || command == "execute-plan" {
+	if command == "deploy" || command == "execute-plan" || command == "rollback" {
 		var v domain.Deployment
 		if json.Unmarshal(raw, &v) != nil || v.ID == "" {
 			return emitFailure(nil, failure("invalid_response", "Release admission response lacks an operation ID; inspect before retry", false, "inspect_operation"))
@@ -589,6 +608,7 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 	}
 	if command == "verify" {
 		var instances []struct {
+			Kind    string `json:"kind"`
 			Status  string `json:"status"`
 			Retired bool   `json:"retired"`
 			Error   string `json:"error"`
@@ -603,7 +623,11 @@ func Run(ctx context.Context, args []string, getenv func(string) string, in io.R
 				continue
 			}
 			count++
-			if i.Error != "" || !(i.Status == "running" || i.Status == "healthy" || i.Status == "running:healthy") {
+			ready := i.Status == "running" || i.Status == "healthy" || i.Status == "running:healthy"
+			if i.Kind == "job" {
+				ready = i.Status == "completed:0"
+			}
+			if i.Error != "" || !ready {
 				healthy = false
 			}
 		}

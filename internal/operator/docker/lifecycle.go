@@ -58,6 +58,11 @@ func (c *Client) network(ctx context.Context, ownership string) (string, error) 
 	return name, e
 }
 func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource, error) {
+	if s.JobReleaseID != "" {
+		if err := validateJobSpec(s); err != nil {
+			return operator.Resource{}, err
+		}
+	}
 	if err := s.Component.ValidateStorageAndLimits(); err != nil {
 		return operator.Resource{}, err
 	}
@@ -80,6 +85,14 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 		}
 		if len(active.Mounts) > 0 && len(s.Component.Volumes) == 0 && active.Config.Labels[prefix+"revision"] != rev {
 			return operator.Resource{}, errors.New("replacement cannot omit existing mounted data; review storage through the operator")
+		}
+		if s.JobReleaseID != "" {
+			if err := c.checkJob(active, s.Name, s.JobReleaseID); err != nil {
+				return operator.Resource{}, err
+			}
+			if active.Config.Labels[prefix+"revision"] != rev {
+				return operator.Resource{}, errors.New("prepared job inputs changed within the release")
+			}
 		}
 		if len(s.Component.Volumes) > 0 && (len(active.Mounts) > 0 || active.Config.Labels[prefix+"revision"] == rev) {
 			if err := c.checkMounts(active, s); err != nil {
@@ -105,6 +118,14 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	if e == nil {
 		if !c.owned(candidate) || candidate.Config.Labels[prefix+"owner"] != s.Ownership {
 			return operator.Resource{}, errors.New("candidate container belongs to another owner")
+		}
+		if s.JobReleaseID != "" {
+			if err := c.checkJob(candidate, s.Name, s.JobReleaseID); err != nil {
+				return operator.Resource{}, err
+			}
+			if candidate.Config.Labels[prefix+"revision"] != rev {
+				return operator.Resource{}, errors.New("prepared job inputs changed within the release")
+			}
 		}
 		if candidate.Config.Labels[prefix+"revision"] == rev {
 			if len(s.Component.Volumes) > 0 {
@@ -135,6 +156,10 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	port := strconv.Itoa(s.Component.Port) + "/tcp"
 	labels := map[string]string{prefix + "target": c.target.ID, prefix + "environment": c.target.Environment, prefix + "reference": s.Name, prefix + "owner": s.Ownership, prefix + "revision": rev, prefix + "artifact": s.Component.Image, prefix + "port": strconv.Itoa(s.Component.Port)}
 	host := map[string]any{"Privileged": false, "SecurityOpt": []string{"no-new-privileges:true"}, "NetworkMode": network, "RestartPolicy": map[string]string{"Name": "unless-stopped"}, "Memory": int64(128 << 20), "NanoCpus": int64(250000000)}
+	if s.JobReleaseID != "" {
+		labels[prefix+"job-release"] = s.JobReleaseID
+		host["RestartPolicy"] = map[string]string{"Name": "no"}
+	}
 	if s.Component.Security != nil && s.Component.Security.AllowPrivilegeEscalation {
 		host["SecurityOpt"] = []string{}
 	}
@@ -158,6 +183,12 @@ func (c *Client) Ensure(ctx context.Context, s operator.Spec) (operator.Resource
 	}
 	sort.Strings(env)
 	input := map[string]any{"Env": env, "Image": imageID, "Labels": labels, "HostConfig": host, "NetworkingConfig": map[string]any{"EndpointsConfig": map[string]any{network: map[string]any{"Aliases": []string{s.Component.Name}}}}}
+	if s.JobReleaseID != "" {
+		// A job has no stable service alias and completion, rather than an image
+		// health check, determines success.
+		input["NetworkingConfig"] = map[string]any{"EndpointsConfig": map[string]any{network: map[string]any{}}}
+		input["Healthcheck"] = map[string]any{"Test": []string{"NONE"}}
+	}
 	if s.Component.Kind != "worker" {
 		input["ExposedPorts"] = map[string]any{port: map[string]any{}}
 	}
@@ -185,6 +216,14 @@ func (c *Client) Deploy(ctx context.Context, ref string) (string, error) {
 		if !c.owned(active) {
 			return "", errors.New("container is outside target")
 		}
+		if release := active.Config.Labels[prefix+"job-release"]; release != "" {
+			if err := c.checkJob(active, ref, release); err != nil {
+				return "", err
+			}
+			if active.State.Status != "created" {
+				return active.ID, nil
+			}
+		}
 		if !active.State.Running {
 			if e = c.request(ctx, "POST", "/containers/"+url.PathEscape(active.ID)+"/start", nil, nil); e != nil {
 				return "", e
@@ -197,6 +236,14 @@ func (c *Client) Deploy(ctx context.Context, ref string) (string, error) {
 	}
 	if !c.owned(candidate) || candidate.Config.Labels[prefix+"reference"] != ref {
 		return "", errors.New("candidate is outside target")
+	}
+	if release := candidate.Config.Labels[prefix+"job-release"]; release != "" {
+		if err := c.checkJob(candidate, ref, release); err != nil {
+			return "", err
+		}
+		if candidate.State.Status != "created" {
+			return "", errors.New("job candidate has already executed; observe its outcome before recovery")
+		}
 	}
 	old, e := c.inspectContainer(ctx, ref)
 	if e == nil {
@@ -238,6 +285,17 @@ func (c *Client) Observe(ctx context.Context, deploymentID, ref string) (operato
 	if !c.owned(active) || active.ID != deploymentID {
 		return operator.DeploymentStatus{}, errors.New("Docker instance changed while observing deployment")
 	}
+	if release := active.Config.Labels[prefix+"job-release"]; release != "" {
+		result, err := c.ObserveJob(ctx, ref, release, deploymentID)
+		status := result.State
+		if result.ExitCode != nil {
+			status = "completed:" + strconv.Itoa(*result.ExitCode)
+			if result.State == "failed" {
+				status = "failed:" + strconv.Itoa(*result.ExitCode)
+			}
+		}
+		return operator.DeploymentStatus{State: result.State, ResourceStatus: status, ExitCode: result.ExitCode}, err
+	}
 	status := c.projection(active).Status
 	state := "running"
 	if active.State.Running {
@@ -275,6 +333,9 @@ func (c *Client) Restart(ctx context.Context, ref string) (string, error) {
 	active, e := c.inspectContainer(ctx, ref)
 	if e != nil {
 		return "", e
+	}
+	if active.Config.Labels[prefix+"job-release"] != "" {
+		return "", errors.New("completed or uncertain jobs cannot be restarted; create a new reviewed release")
 	}
 	if !c.owned(active) || active.Config.Labels[prefix+"reference"] != ref {
 		return "", errors.New("instance is outside this target")

@@ -23,6 +23,17 @@ func (c *Controller) dependenciesReady(ctx context.Context, adapter operator.Ada
 		if dependency.Name == "" {
 			return false, errors.New("frozen dependency is absent")
 		}
+		if dependency.Kind == "job" {
+			skip := release.Operation == "restart"
+			for _, step := range release.Steps {
+				if step.RollbackFrom != "" {
+					skip = true
+				}
+			}
+			if skip {
+				continue
+			}
+		}
 		selected := 0
 		for _, step := range release.Steps {
 			if step.Component != name {
@@ -41,6 +52,9 @@ func (c *Controller) dependenciesReady(ctx context.Context, adapter operator.Ada
 				return false, fmt.Errorf("dependency %s has an incomplete replica selection", name)
 			}
 			continue
+		}
+		if dependency.Kind == "job" && release.Operation != "restart" {
+			return false, errors.New("job dependency must run in this release; a previous completion cannot satisfy it")
 		}
 		// An unselected dependency is checked against the frozen replica count and
 		// its current active bindings, rather than the latest editable definition.

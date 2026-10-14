@@ -100,7 +100,7 @@ func (c *Controller) updateApplicationTx(ctx context.Context, tx pgx.Tx, id stri
 	for _, comp := range m.Components {
 		old, ok := existing[comp.Name]
 		if !ok {
-			if target.Operator != "docker" || (comp.Kind != "web" && comp.Kind != "worker") || comp.ResourceID != "" || comp.Management != "" {
+			if target.Operator != "docker" || (comp.Kind != "web" && comp.Kind != "worker" && comp.Kind != "job") || comp.ResourceID != "" || comp.Management != "" {
 				return domain.Application{}, errors.New("component additions require owned standalone web or worker workloads")
 			}
 			continue

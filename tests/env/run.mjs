@@ -35,7 +35,7 @@ try{
  for(let index=0;index<packages.length;index++){
   const relative=packages[index].replace('github.com/mohsalsaleem/OpenAppPlatform','').replace(/^\//,'');
   const systemPackage=packages[index].endsWith('/tests/system');
-  const text=await run(`core-${index}`,`/opt/oap/tests/${index}.test`,['-test.v',systemPackage?'-test.timeout=540s':'-test.timeout=300s'],`/workspace/${relative}`,systemPackage?600000:360000);
+  const text=await run(`core-${index}`,`/opt/oap/tests/${index}.test`,['-test.v',systemPackage?'-test.timeout=660s':'-test.timeout=300s'],`/workspace/${relative}`,systemPackage?720000:360000);
   const skipped=[...text.matchAll(/--- SKIP: ([^ ]+)/g)].map(m=>m[1]);
   report.steps.at(-1).package=packages[index];report.steps.at(-1).skipped=skipped;await persist();
   if(skipped.some(name=>!report.expectedSkips.includes(name)))throw Error(`Unexpected test skip: ${skipped.join(', ')}`);

@@ -198,6 +198,19 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 	if e != nil {
 		return domain.Deployment{}, e
 	}
+	if restart == nil && scaleDown == nil && removal == nil && rollback == nil {
+		if len(selection) == 0 && provenance != nil {
+			for name := range images {
+				selection = append(selection, name)
+			}
+		}
+		if len(selection) > 0 {
+			selection, e = domain.ExpandJobDependencies(a.Manifest, selection)
+			if e != nil {
+				return domain.Deployment{}, e
+			}
+		}
+	}
 	for _, name := range selection {
 		found := false
 		for _, component := range a.Manifest.Components {
@@ -275,6 +288,9 @@ func (c *Controller) enqueueOperation(ctx context.Context, appID, key string, im
 		}
 	}
 	for _, comp := range a.Manifest.Components {
+		if comp.Kind == "job" && ((restart != nil && restart.Component == comp.Name) || (scaleDown != nil && scaleDown.Component == comp.Name)) {
+			return domain.Deployment{}, errors.New("jobs cannot be restarted or scaled; use a new reviewed release")
+		}
 		if comp.Kind == "database" {
 			if selectedComponent(selection, comp.Name) || images[comp.Name] != "" || (restart != nil && restart.Component == comp.Name) || (scaleDown != nil && scaleDown.Component == comp.Name) {
 				return domain.Deployment{}, errors.New("database lifecycle remains owned by the operator")
@@ -734,7 +750,33 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 				if e = c.authorizeRelease(ctx, d); e != nil {
 					return fail(step, "attention", e)
 				}
-				r, e := a.Ensure(ctx, operator.Spec{Name: domain.ResourceName(d.ApplicationID, comp.Name, step.Ordinal), Ownership: "OpenAppPlatform:" + d.ApplicationID + ":" + comp.Name, Component: runtime, Variables: c.Store.VariableJournal(d.Manifest.TargetID, d.ApplicationID, comp.Name, step.Ordinal)})
+				spec := operator.Spec{Name: domain.ResourceName(d.ApplicationID, comp.Name, step.Ordinal), Ownership: "OpenAppPlatform:" + d.ApplicationID + ":" + comp.Name, Component: runtime, Variables: c.Store.VariableJournal(d.Manifest.TargetID, d.ApplicationID, comp.Name, step.Ordinal)}
+				var r operator.Resource
+				if comp.Kind == "job" {
+					bindings, err := c.Store.Bindings(ctx, d.ApplicationID)
+					if err != nil {
+						return err
+					}
+					for _, binding := range bindings {
+						if binding.Component != comp.Name || binding.ResourceID == "oap-job-"+d.ID+"-"+comp.Name {
+							continue
+						}
+						prior, err := a.Inspect(ctx, binding.ResourceID)
+						if err != nil {
+							return fail(step, "attention", errors.New("previous job outcome cannot be verified"))
+						}
+						if strings.HasPrefix(prior.Status, "running") || prior.Status == "restarting" {
+							return fail(step, "attention", errors.New("previous release's job is still running; inspect it before another migration"))
+						}
+					}
+					runner, ok := a.(operator.JobRunner)
+					if !ok {
+						return fail(step, "failed", errors.New("job execution is unavailable"))
+					}
+					r, e = runner.EnsureJob(ctx, spec, d.ID)
+				} else {
+					r, e = a.Ensure(ctx, spec)
+				}
 				if e != nil {
 					if safe := c.RuntimeInputs.Redact(e.Error()); safe != e.Error() {
 						return errors.New(safe)
@@ -747,7 +789,12 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 				step.ResourceID = r.ID
 			}
 			if step.Action != "retire" {
-				if e = c.Store.Bind(ctx, d.Manifest.TargetID, step.ResourceID, d.ApplicationID, comp.Name, step.Ordinal); e != nil {
+				if comp.Kind == "job" {
+					e = c.Store.BindJob(ctx, d.Manifest.TargetID, step.ResourceID, d.ApplicationID, comp.Name, d.ID)
+				} else {
+					e = c.Store.Bind(ctx, d.Manifest.TargetID, step.ResourceID, d.ApplicationID, comp.Name, step.Ordinal)
+				}
+				if e != nil {
 					return fail(step, "attention", errors.New("resource is already bound to another component"))
 				}
 			}
@@ -778,6 +825,12 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 					return fail(step, "attention", errors.New("restart capability is unavailable"))
 				}
 				remote, e = restarter.Restart(ctx, step.ResourceID)
+			} else if comp.Kind == "job" {
+				runner, ok := a.(operator.JobRunner)
+				if !ok {
+					return fail(step, "attention", errors.New("job execution is unavailable"))
+				}
+				remote, e = runner.RunJob(ctx, step.ResourceID, d.ID)
 			} else {
 				remote, e = a.Deploy(ctx, step.ResourceID)
 			}
@@ -812,9 +865,14 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 				return e
 			}
 			step.Observed = status.ResourceStatus
+			step.ExitCode = status.ExitCode
 			if status.State == "failed" {
 				step.Phase = "failed"
 				step.Error = "provider deployment failed"
+				if comp.Kind == "job" {
+					d.State = "failed"
+					step.Error = "pre-deploy job failed; remaining release steps were not dispatched"
+				}
 			} else if status.State == "succeeded" && (step.Action == "retire" || releaseReady(comp, status.ResourceStatus)) {
 				step.Phase = "succeeded"
 			}

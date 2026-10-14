@@ -81,7 +81,7 @@ func New(t domain.Target) (*Client, error) {
 	return &Client{target: t, settings: settings, base: "http://docker", http: &http.Client{Transport: transport, Timeout: 30 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) Capabilities() operator.Capabilities {
-	return operator.Capabilities{ApplicationIngress: c.settings.Ingress != nil, ContainerSecurity: true, RegistryCredentials: true, NamedVolumes: true, ResourceLimits: true, DatabaseLinks: true, Workers: true, HTTPHealthChecks: true, ImageRollback: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ApplicationDNS: true, ServiceEndpoints: true}
+	return operator.Capabilities{PreDeployJobs: true, ApplicationIngress: c.settings.Ingress != nil, ContainerSecurity: true, RegistryCredentials: true, NamedVolumes: true, ResourceLimits: true, DatabaseLinks: true, Workers: true, HTTPHealthChecks: true, ImageRollback: true, Standard: true, Discovery: true, ImmutableImages: true, Restart: true, Retirement: true, Environment: true, ApplicationDNS: true, ServiceEndpoints: true}
 }
 func (c *Client) request(ctx context.Context, method, path string, input, output any) error {
 	var body io.Reader
@@ -131,6 +131,9 @@ type container struct {
 	Image      string            `json:"Image"`
 	Mounts     []json.RawMessage `json:"Mounts"`
 	HostConfig struct {
+		RestartPolicy struct {
+			Name string `json:"Name"`
+		} `json:"RestartPolicy"`
 		Privileged   bool   `json:"Privileged"`
 		NetworkMode  string `json:"NetworkMode"`
 		Memory       int64  `json:"Memory"`
@@ -175,11 +178,19 @@ func (c *Client) owned(v container) bool {
 }
 func (c *Client) projection(v container) operator.Resource {
 	status := v.State.Status
+	if v.Config.Labels[prefix+"job-release"] != "" && (status == "exited" || status == "dead") {
+		if status == "exited" && v.State.ExitCode == 0 {
+			status = "completed:0"
+		} else {
+			status = "failed:" + strconv.Itoa(v.State.ExitCode)
+		}
+	}
 	if v.State.Health != nil {
 		status += ":" + v.State.Health.Status
 	}
 	port, _ := strconv.Atoi(v.Config.Labels[prefix+"port"])
 	resource := operator.Resource{Port: port, ID: v.Config.Labels[prefix+"reference"], Name: strings.TrimPrefix(v.Name, "/"), Description: v.Config.Labels[prefix+"owner"], Status: status, Image: v.Config.Labels[prefix+"artifact"], ArtifactKind: "image", Environment: c.target.Environment}
+	resource.RuntimeID = v.ID
 	for _, ports := range v.NetworkSettings.Ports {
 		if len(ports) > 0 {
 			resource.URL = "http://" + net.JoinHostPort(ports[0].HostIP, ports[0].HostPort)

@@ -3917,12 +3917,13 @@ export interface components {
             };
             name: string;
             /**
+             * @description Web service, long-running worker, observed database link, or one release-scoped run-to-completion job. Jobs are standalone Docker only.
              * @default web
              * @enum {string}
              */
-            kind: "web" | "worker" | "database";
+            kind: "web" | "worker" | "database" | "job";
             image: string;
-            /** @description Web services require 1–65535. Workers require zero; observed resources may use zero when the operator reports no port. */
+            /** @description Web services require 1–65535. Workers and jobs require zero; observed resources may use zero when the operator reports no port. */
             port: number;
             /** @description Zero adds no host port mapping. Existing operator routes may still expose the resource. */
             hostPort?: number;
@@ -3985,6 +3986,8 @@ export interface components {
             port?: number;
             image?: string;
             url?: string;
+            /** @description Exact native process ID, when exposed by the runtime, for observation-only interrupted-dispatch recovery. */
+            runtimeId?: string;
         };
         Step: {
             rollbackFrom?: string;
@@ -4001,6 +4004,8 @@ export interface components {
             remoteDeploymentId?: string;
             observed?: string;
             error?: string;
+            /** @description Native job exit code when the process has terminated; omitted while unknown or running. */
+            exitCode?: number;
         };
         Deployment: {
             control?: {
@@ -4043,6 +4048,11 @@ export interface components {
             error?: string;
             /** Format: date-time */
             checkedAt: string;
+            /**
+             * @description Component kind; completed jobs are not long-running workload health.
+             * @enum {string}
+             */
+            kind?: "web" | "worker" | "database" | "job";
         };
         Recovery: {
             component?: string;
@@ -4090,6 +4100,8 @@ export interface components {
             containerSecurity: boolean;
             /** @description Target has explicit host-owner standalone Caddy authority. Domain, peer identity and actual native readiness are verified during admission/execution. */
             applicationIngress: boolean;
+            /** @description Release-scoped image jobs with exit-code evidence; no automatic restart. */
+            preDeployJobs: boolean;
         };
         Restart: {
             component: string;
@@ -4168,12 +4180,13 @@ export interface components {
             };
             name: string;
             /**
+             * @description Web service, long-running worker, observed database link, or one release-scoped run-to-completion job. Jobs are standalone Docker only.
              * @default web
              * @enum {string}
              */
-            kind: "web" | "worker" | "database";
+            kind: "web" | "worker" | "database" | "job";
             image: string;
-            /** @description Web services require 1–65535. Workers require zero; observed resources may use zero when the operator reports no port. */
+            /** @description Web services require 1–65535. Workers and jobs require zero; observed resources may use zero when the operator reports no port. */
             port: number;
             /** @description Zero adds no host port mapping. Existing operator routes may still expose the resource. */
             hostPort?: number;
@@ -4472,6 +4485,11 @@ export interface components {
             /** Format: date-time */
             checkedAt: string;
             errorCode?: string;
+            /**
+             * @description Component kind; completed jobs are not long-running workload health.
+             * @enum {string}
+             */
+            kind?: "web" | "worker" | "database" | "job";
         };
         IncidentStep: {
             component: string;
@@ -6131,7 +6149,14 @@ export interface operations {
                             ordinal: number;
                             currentImage: string;
                             restoreImage: string;
+                            resourceId?: string;
                         }[];
+                        applicationId?: string;
+                        latestReleaseId?: string;
+                        targetHash?: string;
+                        effect?: string;
+                        /** @description Pre-deploy jobs excluded from image rollback; migrations are never implicitly rerun or reversed. */
+                        skippedJobs?: string[];
                     };
                 };
             };

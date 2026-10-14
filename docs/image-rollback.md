@@ -15,7 +15,10 @@ The prior deployment must have recorded successful/healthy verification for ever
 selected replica, an immutable registry digest (or a Docker content ID on Docker),
 and the same non-image configuration as the current definition: component identities,
 replica counts, ports, variables/connections, readiness and dependency policies.
-The source selection is retained; unselected components are not redeployed. Current
+Standalone Docker requires a complete successful snapshot of all owned web/worker
+components for app-wide rollback. Migration jobs and observed database links are
+excluded from execution; schema and application data are never reversed. The
+existing operator path retains its source selection. Current
 bindings must match the source IDs, remain active, and belong to this application.
 Current operator-reported image configuration must match the latest image release
 for that component. Active/attention work, mutable references, incomplete verification,
@@ -47,8 +50,9 @@ data. Image availability is not preflight-proven: the operator must fetch the ex
 content reference and the new release must pass readiness. Standard rollout can
 interrupt requests and may fail if an image is unavailable.
 
-Docker additionally rejects mounted data that its managed runtime contract cannot
-reconstruct, verifies host bindings and configured environment values, and can use
+Docker permits unchanged OAP-managed named volumes after verifying the exact
+mount contract and volume ownership; it rejects other mounted data. It preserves
+those volumes, verifies host bindings and configured environment values, and can use
 already-cached content IDs without a registry. Coolify verifies native ports/mappings
 and referenced literal runtime variables; preparation preserves native domains,
 storage and unrelated variables. Native operator lifecycle semantics still apply.
@@ -122,3 +126,19 @@ restore through that system's documented procedure. OAP does not infer that an
 older image or configuration reverses a migration, reconstructs volumes, or
 restores external secrets. Native source workflows retain their operator-owned
 recovery path. Automatic stateful/schema recovery is not delivered by this slice.
+
+## Agent interfaces
+
+`oap --app APP --file rollback-input.json rollback-plan` reads a plan; the input
+contains `releaseId` and the current `expectedVersion`. Inspect every instance,
+`effect` and `skippedJobs`. Execute with
+`oap --app APP --key STABLE_KEY --file rollback-reviewed.json rollback`, including
+`planHash` and `acknowledgeDataCompatibility: true`. Then use `wait --operation ID`
+and verify application behavior. The named agent needs the owner's explicit
+`rollback` grant. Reusing the same request/key returns the original operation.
+
+Operating MCP exposes `plan_rollback` and `execute_rollback`, with the same fixed
+API paths and review fields. MCP remains explicitly enabled and tool-allowlisted;
+server permissions are rechecked. A preceding partial component-only release is
+not a whole-app snapshot. Different topology/configuration requires configuration
+work separately; desired images are not silently rewritten after rollback.

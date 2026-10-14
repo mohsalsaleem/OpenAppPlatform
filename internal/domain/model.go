@@ -118,8 +118,11 @@ func (m *Manifest) Validate() error {
 		if c.Kind == "" {
 			c.Kind = "web"
 		}
-		if c.Kind != "web" && c.Kind != "worker" && c.Kind != "database" {
-			return errors.New("kind must be web, worker or database; scheduled jobs are not implemented")
+		if c.Kind != "web" && c.Kind != "worker" && c.Kind != "database" && c.Kind != "job" {
+			return errors.New("kind must be web, worker, database or job")
+		}
+		if c.Kind == "job" && (c.Port != 0 || c.HostPort != 0 || c.ResourceID != "" || c.Management != "" || c.Instances > 1 || c.HealthCheck != nil || len(c.Volumes) > 0 || (c.Readiness != nil && c.Readiness.RequireHealthy)) {
+			return errors.New("jobs require one owned image process, no ports, volumes or health probes; readiness only sets the observation timeout")
 		}
 		if c.Kind == "database" {
 			if c.Management != "observe" || c.ResourceID == "" || c.Port != 0 || c.Instances > 1 || c.HealthCheck != nil || c.Readiness != nil {
@@ -171,7 +174,7 @@ func (m *Manifest) Validate() error {
 				return errors.New("security exceptions require a reason of 12 to 240 bytes without line breaks")
 			}
 		}
-		if c.Kind != "worker" && ((c.Port < 1 && !(c.Management == "observe" && c.Port == 0)) || c.Port > 65535) {
+		if c.Kind != "worker" && c.Kind != "job" && ((c.Port < 1 && !(c.Management == "observe" && c.Port == 0)) || c.Port > 65535) {
 			return errors.New("port must be between 1 and 65535")
 		}
 		if (c.Image == "" && c.Management != "observe") || len(c.Image) > 512 || (c.Image != "" && !imageCharacters.MatchString(c.Image)) || (strings.Contains(c.Image, "@") && !digestSuffix.MatchString(c.Image)) {
@@ -251,6 +254,7 @@ type ReleaseControl struct {
 	Operations   []ProviderReconciliation `json:"operations,omitempty"`
 }
 type Step struct {
+	ExitCode              *int            `json:"exitCode,omitempty"`
 	Control               *ReleaseControl `json:"control,omitempty"`
 	RollbackTargetHash    string          `json:"rollbackTargetHash,omitempty"`
 	RollbackFrom          string          `json:"rollbackFrom,omitempty"`
