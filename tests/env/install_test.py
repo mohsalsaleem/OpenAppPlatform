@@ -159,3 +159,28 @@ class IngressInstallationSafetyTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'handoff'):
                     installer.provision_ingress(directory, values)
             self.assertEqual((folder / 'targets.json').read_bytes(), before)
+
+
+class AgentAcceptanceBoundaryTest(unittest.TestCase):
+    def test_agent_runner_rejects_missing_and_owner_credentials_before_cli(self):
+        import json
+        import subprocess
+        import sys
+        runner = Path(__file__).resolve().parents[2] / 'scripts/standalone-acceptance.py'
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            specification = folder / 'spec.json'
+            specification.write_text('{}')
+            command = [sys.executable, str(runner), 'deploy', '--directory', tmp,
+                       '--spec', str(specification), '--cli-bin', '/missing-cli']
+            missing = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertIn('requires --credential-file', missing.stdout)
+            owner = folder / 'owner.json'
+            owner.write_text(json.dumps({'session': 'private-owner-session'}))
+            owner.chmod(0o600)
+            denied = subprocess.run([*command, '--credential-file', str(owner)], capture_output=True, text=True)
+            self.assertNotEqual(denied.returncode, 0)
+            self.assertIn('refuses owner credentials', denied.stdout)
+            self.assertNotIn('private-owner-session', denied.stdout + denied.stderr)
+            self.assertFalse((folder / 'acceptance-state.json').exists())

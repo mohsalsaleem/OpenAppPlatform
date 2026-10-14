@@ -24,7 +24,7 @@ def main():
     parser.add_argument('action', choices=['deploy', 'verify'])
     parser.add_argument('--directory', required=True)
     parser.add_argument('--spec', required=True)
-    parser.add_argument('--owner-input')
+    parser.add_argument('--credential-file', help='Private agent credential issued by the human owner')
     parser.add_argument('--cli-bin', default=str(ROOT / 'bin/oap'))
     parser.add_argument('--url', default='http://127.0.0.1:8878')
     parser.add_argument('--origin')
@@ -51,10 +51,10 @@ def main():
             os.fsync(stream.fileno())
         os.replace(temporary, state_file)
 
-    clean = {k: v for k, v in os.environ.items() if k not in ('OAP_API_TOKEN', 'OAP_SESSION_FILE', 'OAP_CREDENTIAL_FILE', 'OAP_URL')}
+    clean = {k: v for k, v in os.environ.items() if k not in ('OAP_API_TOKEN', 'OAP_SESSION_FILE', 'OAP_CREDENTIAL_FILE', 'OAP_URL', 'OAP_SETUP_TOKEN')}
 
     def cli(identity, command, flags=(), body=None):
-        commandline = [args.cli_bin, '--url', args.url, '--credential-file', str(folder / (identity + '.json')), *flags]
+        commandline = [args.cli_bin, '--url', args.url, '--credential-file', args.credential_file, *flags]
         if body is not None:
             commandline += ['--file', '-']
         result = subprocess.run([*commandline, command], input=None if body is None else json.dumps(body),
@@ -68,24 +68,15 @@ def main():
         return value
 
     if args.action == 'deploy':
-        if not (folder / 'owner.json').exists():
-            if not args.owner_input:
-                raise ValueError('First deployment requires a private owner-input file')
-            p = Path(args.owner_input)
-            info = p.lstat()
-            if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077:
-                raise ValueError('Owner input must be a private regular file')
-            result = subprocess.run([sys.executable, str(ROOT / 'scripts/install.py'), 'owner-setup', '--json',
-                '--directory', str(folder), '--cli-bin', args.cli_bin, '--out', str(folder / 'owner.json')],
-                input=p.read_bytes(), capture_output=True, env=clean, timeout=45)
-            if result.returncode:
-                raise ValueError('Documented owner setup failed; inspect setup status before retrying')
-        if not (folder / 'agent.json').exists():
-            manifest = specification['spec']
-            cli('owner', 'grant', ['--out', str(folder / 'agent.json')], {
-                'name': 'Standalone acceptance agent', 'targetId': manifest['targetId'],
-                'environment': manifest['environment'], 'maxApplications': 1,
-                'actions': ['configure', 'deploy', 'restart', 'recover']})
+        if not args.credential_file:
+            raise ValueError('Agent deployment requires --credential-file supplied by the owner')
+        credential_path = Path(args.credential_file)
+        info = credential_path.lstat()
+        if not stat.S_ISREG(info.st_mode) or info.st_mode & 0o077 or info.st_size > 4096:
+            raise ValueError('Use a private regular agent credential file')
+        credential = json.loads(credential_path.read_text())
+        if credential.get('session') or not credential.get('token') or not credential.get('credentialId'):
+            raise ValueError('Agent acceptance refuses owner credentials; request an owner-issued agent grant')
         cli('agent', 'validate-spec', body={'specification': specification})
         if 'createPlan' not in state:
             state['createPlan'] = cli('agent', 'action-plan', body={'action': 'create', 'specification': specification})['data']

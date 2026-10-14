@@ -111,9 +111,18 @@ def run():
         owner_input = folder / 'private-owner.json'
         owner_input.write_text(json.dumps({'email':'ingress-owner@example.invalid','name':'Owner','password':secrets.token_urlsafe(32)}))
         owner_input.chmod(0o600)
+        # Human-owner fixture establishes trust through product primitives; the
+        # agent runner receives only the resulting scoped credential.
+        install('owner-setup', '--cli-bin', '/opt/oap/oap', '--out', str(owner), body=json.loads(owner_input.read_text()))
+        cli(owner, 'grant', '--out', str(agent), body={
+            'name': 'Standalone acceptance agent', 'targetId': 'docker-local',
+            'environment': 'staging', 'maxApplications': 1,
+            'actions': ['configure', 'deploy', 'restart', 'recover']})
         acceptance = ['python3','scripts/standalone-acceptance.py']
-        flags = ['--directory',str(folder),'--spec',str(spec_file),'--cli-bin','/opt/oap/oap','--url',base]
-        deployed = subprocess.run([*acceptance,'deploy',*flags,'--owner-input',str(owner_input)],capture_output=True,text=True,env=clean,timeout=180)
+        agent_work = folder / 'agent-work'
+        agent_work.mkdir(mode=0o700)
+        flags = ['--directory',str(agent_work),'--spec',str(spec_file),'--cli-bin','/opt/oap/oap','--url',base]
+        deployed = subprocess.run([*acceptance,'deploy',*flags,'--credential-file',str(agent)],capture_output=True,text=True,env=clean,timeout=180)
         if deployed.returncode: raise RuntimeError('Documented CLI acceptance deployment failed: '+deployed.stdout)
         result=json.loads(deployed.stdout)
         app={'applicationId':result['applicationId']}

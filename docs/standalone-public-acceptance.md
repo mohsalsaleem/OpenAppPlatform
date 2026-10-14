@@ -62,7 +62,7 @@ certificates are not normally trusted. Staging-to-production authority handoff
 is not implicit: use separate disposable installations until a reviewed handoff
 workflow exists. Default installations without ingress retain their old behavior.
 
-## Establish owner and scoped agent
+## Human owner establishes trust and grants agent access
 
 Extract/use the matching shipping `oap` binary as described in the installation
 guide. Create a private owner input file containing `{email,name,password}`;
@@ -80,7 +80,11 @@ python3 scripts/install.py owner-setup --json --directory /opt/oap-standalone \
 cap of one and `configure/deploy/restart/recover`. Keep owner and agent identities
 separate. The installation helper never auto-creates an owner or an agent.
 
-## Deploy through the specification
+The human owner performs this step. An operating agent receives only the scoped
+agent credential, never the owner password/session or installer setup token. The
+acceptance runner does not set up owners or issue grants and refuses owner sessions.
+
+## Agent deploys through the CLI
 
 Build the site's static image from the retained source using its Dockerfile.
 Declare its immutable content ID in an `oap.dev/v1alpha1` Application. The web
@@ -135,7 +139,7 @@ p.write_text(json.dumps(x, indent=2) + '\n')
 PY
 python3 scripts/standalone-acceptance.py deploy --directory /opt/oap-standalone \
   --spec /opt/nisha-site-build/application.json --cli-bin ./bin/oap \
-  --owner-input private-owner.json
+  --credential-file /opt/oap-standalone/agent.json
 python3 scripts/standalone-acceptance.py verify --directory /opt/oap-standalone \
   --spec /opt/nisha-site-build/application.json --origin https://www.nishashipping.com \
   --source-root /usr/share/nginx/html/nishashipping

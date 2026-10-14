@@ -42,6 +42,15 @@ hosting while standalone workload acceptance runs on isolated Docker.
 
 ## Product and engineering rules
 
+Agents operate only through documented product interfaces and primitives. The
+human owner establishes trust and issues a bounded agent grant; an operating
+agent must not create or hold owner authority. Acceptance journeys use one
+management interface (CLI, API, or MCP) throughout; internal transport calls and
+application traffic probes do not constitute a second management interface.
+Missing primitives are product gaps to fix, not permission to use raw metadata,
+installer secrets, private endpoints, or improvised host changes.
+
+
 - OAP owns each application specification and its version history; service
   repositories release only their own component's immutable image. No repository
   or Git host is a required or second writable source of the specification. See
@@ -125,9 +134,11 @@ and [measured footprint](docs/footprint.md). The active slice is **M3.1 — appl
 router and scale loop**, using Caddy. Owner-configured standalone peers now support
 spec-declared routes, durable release publication and named-agent 1 → 3 → 1
 scaling with traffic verification and observation-only lost-response recovery.
-Default targets remain fail-closed. Automatic proxy packaging, multi-application
-lifecycle aggregation, route/domain handoffs, integrated HTTPS and proxy footprint
-acceptance remain open. See [standalone ingress](docs/standalone-ingress.md). UI/operator expansion remains
+Default targets remain fail-closed. Packaged Caddy installation and public Let's
+Encrypt issuance/persistence passed gate `20261014-094928-0ce51041` and Vultr
+acceptance at `bac0f62`. Caddy automatic renewal is configured; an actual scheduled
+renewal has not yet been observed. Multi-application lifecycle aggregation,
+route/domain handoffs and proxy footprint acceptance remain open. See [standalone ingress](docs/standalone-ingress.md). UI/operator expansion remains
 parked. The measured combined idle CPU gap stays open for M3.7.
 
 ## Ordered active queue
