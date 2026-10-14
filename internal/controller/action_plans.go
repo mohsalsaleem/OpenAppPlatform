@@ -290,10 +290,17 @@ func (c *Controller) CreateActionPlan(ctx context.Context, req ActionRequest) (s
 		effect = "Existing constrained recovery; no arbitrary redispatch, SQL or data restore."
 	}
 	summary := map[string]any{"untrustedEvidence": true, "effect": effect, "components": req.Components, "images": req.Images, "component": req.Component, "ordinal": req.Ordinal, "deploymentId": req.DeploymentID, "policy": "owner-issued action grant; requested exact owner review is enforced", "missingEvidence": []string{"application behavior", "final admission conflicts"}}
+	if req.Action == "deploy" && app.Manifest.Ingress != nil {
+		summary["desiredIngress"] = app.Manifest.Ingress
+		summary["ingressPublication"] = "Replaces this application's last published routes; sibling applications retain their last published routes. Domain changes withdraw the old hostname for new requests. DNS and certificate readiness require separate verification."
+	}
 	if req.Specification != nil {
 		summary["specification"] = domain.ExportSpecification(req.Specification.Spec)
 		if app.ID != "" {
 			summary["diff"] = domain.SpecificationDiff(app, req.Specification.Spec)
+			if req.Action == "configure" && !reflect.DeepEqual(app.Manifest.Ingress, req.Specification.Spec.Ingress) {
+				summary["ingressChange"] = map[string]any{"previous": app.Manifest.Ingress, "desired": req.Specification.Spec.Ingress, "publication": "A separate deploy publishes the desired routes and withdraws the previously published routes. Saving leaves live routes unchanged."}
+			}
 		}
 	}
 	plan.Summary, _ = json.Marshal(summary)

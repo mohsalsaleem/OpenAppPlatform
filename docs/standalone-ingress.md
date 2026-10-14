@@ -156,8 +156,18 @@ sibling evidence internally. A sibling's unresolved publication blocks a new
 publication; stale config hashes and changed runtime membership also fail closed.
 An unavailable sibling can therefore hold another app's routing change; existing
 Caddy configuration continues serving. Serialize routed application changes while
-these bounded shared-authority fences apply. Domain changes, ingress removal and
-proxy identity handoffs still need explicit future workflows.
+these bounded shared-authority fences apply. An application can switch to another
+hostname already in the owner's exact allowlist using configure/deploy plans.
+The configure plan exposes the previous and desired ingress; save leaves live
+routes unchanged. The deploy plan exposes desired ingress and atomically replaces
+the application's published routes, withdrawing its former hostname for new
+requests. Sibling publications retain the new hostname. Optional exact owner
+review uses the existing `requireReview` approval flow. A lost publication response
+uses the existing observation-only recovery; it must not be dispatched again.
+DNS and public certificate readiness still need separate verification. This is
+a hostname switch, not a DNS migration or a guarantee for existing long-lived
+connections. Ingress removal, installed allowlist expansion, listener-port changes
+and proxy identity handoffs still need explicit future workflows.
 
 For HTTPS the target must explicitly enable internal CA or `publicAcme` set to
 `letsencrypt` / `letsencrypt-staging`. The latter issuer URLs are fixed owner policy;
@@ -209,7 +219,7 @@ identity and preserves its routes through scale-up, scale-down and lost-response
 recovery. It rejects a stale authority confirmation and unshipped sibling changes.
 Native fixture tests separately verify local-CA HTTPS and shared-proxy restart.
 
-**Remaining M3.1:** domain/port handoff and removal, extended drain boundaries,
+**Remaining M3.1:** installed domain-authority/port handoff and ingress removal, extended drain boundaries,
 actual scheduled-renewal evidence and separate proxy footprint acceptance.
 Public issuance and restart persistence passed on the Vultr host at `bac0f62`;
 Caddy owns automatic renewal independently of OAP.

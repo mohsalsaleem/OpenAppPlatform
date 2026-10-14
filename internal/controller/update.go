@@ -82,8 +82,8 @@ func (c *Controller) updateApplicationTx(ctx context.Context, tx pgx.Tx, id stri
 	if current.Manifest.Name != m.Name || current.Manifest.Environment != m.Environment || current.Manifest.TargetID != m.TargetID {
 		return domain.Application{}, errors.New("application identity and target cannot change through configuration editing")
 	}
-	if current.Manifest.Ingress != nil && (m.Ingress == nil || current.Manifest.Ingress.Domain != m.Ingress.Domain) {
-		return domain.Application{}, errors.New("ingress removal or domain handoff requires explicit route retirement")
+	if current.Manifest.Ingress != nil && m.Ingress == nil {
+		return domain.Application{}, errors.New("ingress removal requires explicit route retirement")
 	}
 	if len(current.Manifest.Components) != len(m.Components) {
 		return domain.Application{}, errors.New("component addition and removal require an explicit topology change workflow")

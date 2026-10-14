@@ -140,7 +140,9 @@ acceptance at `bac0f62`. Caddy automatic renewal is configured; an actual schedu
 renewal has not yet been observed. Shared-proxy lifecycle aggregation now retains
 last-published sibling definitions under exact owner domain authority; the local
 gate exercises two separately scoped CLI identities and preserved sibling routes.
-Route/domain handoffs, extended drain boundaries and proxy footprint acceptance
+Specification-driven hostname switches within existing owner authority retain
+sibling routes and support observation-only recovery. Installed domain-authority
+and port handoffs, ingress removal, extended drain boundaries and proxy footprint acceptance
 remain open. See [standalone ingress](docs/standalone-ingress.md). UI/operator expansion remains
 parked. The measured combined idle CPU gap stays open for M3.7.
 

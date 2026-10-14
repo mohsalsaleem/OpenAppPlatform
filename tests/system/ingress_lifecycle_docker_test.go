@@ -137,7 +137,7 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	go bridge.Serve(bridgeListener)
 	defer bridge.Close()
 	pinned := call("GET", "/images/"+image+"/json", nil)["Id"].(string)
-	settings, _ := json.Marshal(docker.Settings{PullPolicy: "never", HostBindIP: "127.0.0.1", Ingress: &docker.IngressSettings{ContainerID: proxyID, AdminSocket: directory + "/publisher.sock", ProxySocket: proxySocket, Domain: "app.example.test", Domains: []string{"sibling.example.test"}, BootstrapHash: snapshot.Hash, HTTPPort: 8080, HTTPSPort: 8443, InternalCA: true}})
+	settings, _ := json.Marshal(docker.Settings{PullPolicy: "never", HostBindIP: "127.0.0.1", Ingress: &docker.IngressSettings{ContainerID: proxyID, AdminSocket: directory + "/publisher.sock", ProxySocket: proxySocket, Domain: "app.example.test", Domains: []string{"sibling.example.test", "moved.example.test"}, BootstrapHash: snapshot.Hash, HTTPPort: 8080, HTTPSPort: 8443, InternalCA: true}})
 	target := domain.Target{ID: targetID, Name: "Ingress fixture", Operator: "docker", URL: "unix://" + socket, Environment: "staging", Settings: settings}
 	adapter, err = docker.New(target)
 	if err != nil {
@@ -189,7 +189,7 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 		}
 		args = append(args, command)
 		code := cli.Run(ctx, args, func(key string) string {
-			if key == "OAP_API_TOKEN" && command != "grant" {
+			if key == "OAP_API_TOKEN" && command != "grant" && command != "approve-action" {
 				return token
 			}
 			return ""
@@ -442,12 +442,34 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	ingressCopy := *changed.Ingress
 	ingressCopy.Routes = append([]domain.IngressRoute(nil), ingressCopy.Routes...)
 	ingressCopy.Routes[1].StripPrefix = false
+	ingressCopy.Domain = "moved.example.test"
 	changed.Ingress = &ingressCopy
-	execute(plan(controller.ActionRequest{Action: "configure", ApplicationID: app.ID, ExpectedVersion: current.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: changed}}))
+	// Domain authority remains owner-configured; save never changes live routes.
+	unauthorized := changed
+	unauthorizedIngress := *changed.Ingress
+	unauthorizedIngress.Domain = "unapproved.example.test"
+	unauthorized.Ingress = &unauthorizedIngress
+	invoke("action-plan", nil, controller.ActionRequest{Action: "configure", ApplicationID: app.ID, ExpectedVersion: current.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: unauthorized}}, 4)
+	removed := changed
+	removed.Ingress = nil
+	invoke("action-plan", nil, controller.ActionRequest{Action: "configure", ApplicationID: app.ID, ExpectedVersion: current.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: removed}}, 4)
+	handoff := plan(controller.ActionRequest{Action: "configure", ApplicationID: app.ID, ExpectedVersion: current.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: changed}})
+	var summary map[string]any
+	if json.Unmarshal(handoff.Summary, &summary) != nil || summary["ingressChange"] == nil {
+		t.Fatal("route transition missing from reviewed plan")
+	}
+	execute(handoff)
+	if _, err := get("/"); err != nil {
+		t.Fatal("saving domain handoff changed live routes", err)
+	}
 	current, _ = s.Application(ctx, app.ID)
 	writeCount := nativeWrites.Load()
 	loseResponse.Store(true)
-	uncertain := execute(plan(controller.ActionRequest{Action: "deploy", ApplicationID: app.ID, ExpectedVersion: current.Version, Components: []string{"api"}}))
+	handoffRelease := plan(controller.ActionRequest{Action: "deploy", ApplicationID: app.ID, ExpectedVersion: current.Version, Components: []string{"api"}, RequireReview: true})
+	invoke("execute-action", []string{"--plan", handoffRelease.ID}, map[string]any{}, 4)
+	// Approval uses the owner CLI identity, execution remains the scoped agent.
+	invoke("approve-action", []string{"--credential-file", ownerFile, "--plan", handoffRelease.ID}, map[string]any{"planHash": handoffRelease.Hash}, 0)
+	uncertain := execute(handoffRelease)
 	invoke("wait", []string{"--operation", uncertain.Result.OperationID, "--timeout", "90s"}, nil, 6)
 	stopped, _ := s.Deployment(ctx, uncertain.Result.OperationID)
 	if stopped.State != "attention" || nativeWrites.Load() != writeCount+1 {
@@ -462,8 +484,42 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	if nativeWrites.Load() != writeCount+1 || recovery.Result.OperationID != stopped.ID {
 		t.Fatal("ingress observation recovery issued another write")
 	}
+	checkOldDomain := func() {
+		t.Helper()
+		request, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://127.0.0.1:%d/", port), nil)
+		request.Host = "app.example.test"
+		response, err := public.Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != 404 {
+			t.Fatal("old domain still routed", response.StatusCode)
+		}
+	}
+	checkOldDomain()
+	m.Ingress.Domain = "moved.example.test"
+	value, err = get("/")
+	if err != nil || value["message"] != "frontend" {
+		t.Fatal("new domain not serving", err)
+	}
+	// A sibling's later publication must retain the handoff, not resurrect the
+	// application's former hostname from an older release.
+	token = issued.Token
+	siblingApp, _ = s.Application(ctx, siblingID)
+	siblingSpec = siblingApp.Manifest
+	siblingSpec.Components = append([]domain.Component(nil), siblingSpec.Components...)
+	siblingSpec.Components[0].Env = map[string]string{"OAP_TEST_MESSAGE": "sibling"}
+	execute(plan(controller.ActionRequest{Action: "configure", ApplicationID: siblingID, ExpectedVersion: siblingApp.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: siblingSpec}}))
+	siblingApp, _ = s.Application(ctx, siblingID)
+	wait(execute(plan(controller.ActionRequest{Action: "deploy", ApplicationID: siblingID, ExpectedVersion: siblingApp.Version})))
+	checkSibling()
+	checkOldDomain()
+	if value, err = get("/"); err != nil || value["message"] != "frontend" {
+		t.Fatal("sibling publication lost domain handoff", err)
+	}
 	if dir := os.Getenv("OAP_TEST_REPORT_DIR"); dir != "" {
-		raw, _ := json.MarshalIndent(map[string]any{"status": "passed", "scope": "owner-provisioned dedicated Caddy; local HTTP", "namedAgent": true, "sharedProxySiblingPreserved": true, "scale": "1 -> 3 -> 1", "controllerDownTraffic": true, "scaleDownRequests": requests.Load(), "scaleDownFailures": failures.Load(), "publicationJournal": true, "retirementReplay": true, "lostResponseObservedWithoutRedispatch": true, "publicACME": false, "automaticProxyProvisioning": false}, "", "  ")
+		raw, _ := json.MarshalIndent(map[string]any{"status": "passed", "scope": "owner-provisioned dedicated Caddy; local HTTP", "namedAgent": true, "sharedProxySiblingPreserved": true, "authorizedDomainHandoff": true, "savePreservesLiveDomain": true, "retiredDomainNotResurrected": true, "scale": "1 -> 3 -> 1", "controllerDownTraffic": true, "scaleDownRequests": requests.Load(), "scaleDownFailures": failures.Load(), "publicationJournal": true, "retirementReplay": true, "lostResponseObservedWithoutRedispatch": true, "publicACME": false, "automaticProxyProvisioning": false}, "", "  ")
 		os.WriteFile(filepath.Join(dir, "ingress-lifecycle.json"), append(raw, '\n'), 0600)
 	}
 }
