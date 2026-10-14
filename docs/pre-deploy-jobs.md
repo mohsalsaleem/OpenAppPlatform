@@ -1,5 +1,8 @@
 # Pre-deploy jobs
 
+Status: complete for v0.1 at `3ac90b1` (M3.2's v0.1 scope), with full local
+acceptance.
+
 On standalone Docker, declare `kind: "job"` for an image-defined run-to-completion
 process and list it in the dependent component's `dependsOn`. A job runs once per
 release before its dependent workloads. Selected releases automatically include

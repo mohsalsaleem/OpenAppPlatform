@@ -132,10 +132,11 @@ M2.6 passed gate `20261013-214602-ceb6aceb` at `c2e1eee`; see
 `76b4061`; see the [standalone runbook/skill](docs/standalone-agent-runbook.md)
 and [measured footprint](docs/footprint.md). **M3.1 — application router and scale
 loop** is functionally complete at
-`1a2344d`, using Caddy. The active work is **v0.1 closeout**: pre-deploy jobs and basic app-wide image
-rollback from M3.2, followed by the exact-tree standalone release acceptance.
-Component addition/removal is already delivered; definition history/export
-and the remaining M3 milestones are post-v0.1.
+`1a2344d`, using Caddy. **M3.2's v0.1 scope is complete** at `3ac90b1` with full local acceptance:
+component addition and reviewed removal, pre-deploy jobs and basic app-wide image
+rollback. M3.2's remaining scope (definition history, version diff/revert and
+repository export) is deferred beyond v0.1 and is not v0.1 work. The remaining
+M3 milestones are post-v0.1.
 Owner-configured standalone peers now support
 spec-declared routes, durable release publication and named-agent 1 → 3 → 1
 scaling with traffic verification and observation-only lost-response recovery.
@@ -162,9 +163,11 @@ parked. The measured combined idle CPU gap stays open for M3.7.
 
 ### v0.1 release boundary
 
-The v0.1 execution queue is now limited to: **finish pre-deploy jobs → basic
-app-wide image rollback → one complete standalone agent release acceptance**.
-M3.1 routing/scaling and M3.2 component addition/removal are already delivered.
+The v0.1 execution queue was: **pre-deploy jobs → basic app-wide image rollback
+→ one complete standalone agent release acceptance**. M3.1 routing/scaling and
+M3.2's v0.1 scope (component addition/removal, pre-deploy jobs and app-wide
+image rollback) are delivered; M3.2's v0.1 scope passed full local acceptance at
+`3ac90b1`.
 Definition history/revert/export, previews, guarded rollout, environment
 comparison, expanded source/build integration, Compose import and automated
 image/storage management are post-v0.1. M3.7 optimization does not block v0.1
@@ -236,11 +239,12 @@ one scaled application, which is the gap no Compose/Coolify-style tool closes.
    and [templates](examples/topology/README.md). The remaining M3.2 scope adds a
    run-to-completion job kind (for example migrations) that
    a release runs before rolling out dependent components; failure stops the
-   release with evidence. The pre-deploy job kind, shared agent interfaces and basic app-wide image
-   rollback are implemented locally, pending the exact-tree release gate.
-   Only release acceptance remains in the v0.1 execution queue; history/export
-   and M3.3 onward stay post-v0.1. See
-   [pre-deploy job implementation and remaining acceptance](docs/pre-deploy-jobs.md).
+   release with evidence. **Status: v0.1 scope complete; remaining scope
+   deferred.** Parts (a)–(c) (component addition/removal, the pre-deploy job kind
+   with shared agent interfaces, and basic app-wide image rollback) are complete
+   at `3ac90b1` with full local acceptance. Part (d), definition history/diff/revert
+   and repository export, is deferred beyond v0.1, along with M3.3 onward. See
+   [pre-deploy jobs](docs/pre-deploy-jobs.md).
    Application rollback reuses the existing
    [image rollback](docs/image-rollback.md) across all owned components; schema
    and data are never rolled back implicitly. Make OAP's stored definition
