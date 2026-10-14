@@ -144,7 +144,7 @@ class Sampler:
         self.proxy, self.interval = proxy, interval
 
     def rss(self, identifier, service):
-        if service == 'platform':
+        if service != 'postgres':
             raw = self.native(['exec', identifier, 'awk', r'/^VmRSS:/{printf "%.0f\n", $2*1024}', '/proc/1/status'])
         else:
             # Sum PostgreSQL process VmRSS. Shared buffers can be counted by
@@ -164,7 +164,8 @@ class Sampler:
         return result
 
     def phase(self, name, duration, action=None, tick=None):
-        counts = self.proxy.snapshot()
+        counts = self.proxy.snapshot() if self.proxy is not None else None
+        services = tuple(self.identifiers())
         before_db = self.metadata()
         started = time.monotonic()
         samples = [self.collect()]
@@ -178,12 +179,12 @@ class Sampler:
             samples.append(self.collect())
             next_tick += self.interval
         elapsed = time.monotonic() - started
-        end_counts = self.proxy.snapshot()
+        end_counts = self.proxy.snapshot() if self.proxy is not None else None
         report = {'name': name, 'elapsedSeconds': round(elapsed, 3), 'sampleIntervalSeconds': self.interval,
                   'samples': len(samples), 'services': {}, 'metadataBefore': before_db, 'metadataAfter': self.metadata(),
-                  'runtimeRequests': {k: end_counts.get(k, 0) - counts.get(k, 0) for k in end_counts}}
-        report['runtimeRequestsPerSecond'] = round(sum(report['runtimeRequests'].values()) / elapsed, 4)
-        for service in ('platform', 'postgres'):
+                  'runtimeRequests': None if counts is None else {k: end_counts.get(k, 0) - counts.get(k, 0) for k in end_counts}}
+        report['runtimeRequestsPerSecond'] = None if counts is None else round(sum(report['runtimeRequests'].values()) / elapsed, 4)
+        for service in services:
             observed = [s['services'].get(service, {}) for s in samples]
             resident = [s['rssBytes'] for s in observed if 'rssBytes' in s]
             working = [s['workingSetBytes'] for s in observed if s.get('workingSetBytes') is not None]

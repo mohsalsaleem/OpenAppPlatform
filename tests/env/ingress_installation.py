@@ -10,6 +10,8 @@ import ssl
 import subprocess
 import time
 
+from ingress_footprint import measure
+
 
 def run():
     endpoint = os.environ.get('OAP_TEST_DOCKER_SOCKET')
@@ -162,6 +164,8 @@ def run():
         def identity():
             return native(['inspect', workload, '--format', '{{.Id}} {{.State.StartedAt}}']).decode().strip()
         initial = identity()
+        footprint = measure(endpoint, native, compose, request, os.environ.get('OAP_TEST_RUNTIME_COMMIT', 'unrecorded'))
+        print('Packaged ingress footprint measured: ' + json.dumps(footprint), flush=True)
         compose('stop', 'platform')
         for _ in range(20):
             assert request()[0] == 200
@@ -186,7 +190,8 @@ def run():
         receipt = {'status': 'passed', 'freshPackagedInstallation': True, 'scopedAgentPlanApply': True,
                    'verifiedLocalHTTPS': True, 'privateProxyAdministration': True, 'controllerOutageRequests': 20,
                    'controllerOutageFailures': 0, 'workloadIdentityUnchanged': True, 'proxyResume': True,
-                   'certificatePersisted': True, 'proxyAuthorityUnchanged': True, 'publicACMEVerified': False}
+                   'certificatePersisted': True, 'proxyAuthorityUnchanged': True, 'publicACMEVerified': False,
+                   'footprintReport': footprint['report']}
         Path('/report/ingress-installation.json').write_text(json.dumps(receipt, indent=2) + '\n')
         print(json.dumps(receipt), flush=True)
     finally:

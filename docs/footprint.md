@@ -61,3 +61,42 @@ reference meets both memory comparisons and **misses the combined idle CPU goal*
 operability; do not claim the CPU target is met, silently raise it, or introduce a
 monitoring stack to benchmark. Functional M2 exit and measured operating cost are
 separate from a universal performance guarantee.
+
+## Packaged ingress reference
+
+[Separate proxy reference](ingress-footprint-reference.json) measures the accepted
+`b85c42e` runtime using the candidate M3.1 sampling harness and the documented
+packaged installer/owner-grant/agent CLI flow. This is a historical reference,
+not the exact-tree receipt for a later commit. Every full local gate now repeats
+the profile and writes `ingress-footprint.json` alongside installation acceptance.
+
+This profile has one app, one web instance and local-CA HTTPS. It samples OAP,
+dedicated PostgreSQL and packaged Caddy separately every five seconds: 30 seconds
+idle, followed by 30 seconds with five fresh verified HTTPS connections every five
+seconds (30 successful requests). Actual elapsed time and sample counts are in
+the report. This is light burst traffic, not a throughput, multi-app scaling or
+public ACME benchmark. No additional monitoring service is installed.
+
+| Service | Idle RSS peak | Idle CPU, percent of one core | Light HTTPS RSS peak | Light HTTPS CPU |
+| --- | --- | --- | --- | --- |
+| OAP | 21.39 MiB | 0.82% | 21.41 MiB | 0.76% |
+| PostgreSQL | 131.40 MiB | 1.17% | 134.29 MiB | 1.34% |
+| Caddy | 45.30 MiB | 0.68% | 45.36 MiB | 0.81% |
+
+The conservative sum of idle service peaks is **198.09 MiB**. The existing
+256 MiB OAP RSS and 512 MiB stack RSS goals pass in this profile, including Caddy
+in the stack. Combined idle CPU is **2.67% of one core**, exceeding the unchanged
+1% goal. Keep that gap in M3.7; completing measurement does not establish that the
+platform has met all lightweight goals. The older ten-app profile remains a
+different measurement, not a directly comparable Caddy on/off experiment.
+
+OAP/Caddy RSS is PID 1 VmRSS. PostgreSQL remains a conservative process sum which
+can count shared pages repeatedly. The report includes Docker working set and
+per-image size; image sizes can overlap shared layers and are not summed as host
+disk usage. CPU includes ordinary health checks and sampler exec overhead. Short
+windows can miss peaks and host contention affects results. Workloads, Docker
+Engine, builds and test runners are excluded from service accounting. Adapter
+request counting is not instrumented in this profile and is explicitly `null`,
+not zero. Missing/reset counters fail measurement completeness; exceeded goals
+are recorded separately from functional test success. These figures do not claim
+the same operating cost on the public VPS or on other architectures.

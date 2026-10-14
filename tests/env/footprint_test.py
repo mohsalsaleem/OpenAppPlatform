@@ -6,10 +6,32 @@ import tempfile
 import threading
 import unittest
 
-from footprint import SocketProxy, UnixHTTP, cpu_percent, working_set
+from footprint import Sampler, SocketProxy, UnixHTTP, cpu_percent, working_set
+from ingress_footprint import goals
 
 
 class FootprintTests(unittest.TestCase):
+    def test_optional_proxy_never_claims_zero_requests_and_all_services_are_reported(self):
+        sampler = Sampler('', None, lambda: {'platform': 'p', 'postgres': 'd', 'ingress': 'c'}, lambda: {}, None, interval=.001)
+        sampler.collect = lambda: {'services': {name: {'missing': True} for name in ('platform', 'postgres', 'ingress')}}
+        phase = sampler.phase('missing_fixture', .003)
+        self.assertIsNone(phase['runtimeRequests'])
+        self.assertIsNone(phase['runtimeRequestsPerSecond'])
+        self.assertEqual(set(phase['services']), {'platform', 'postgres', 'ingress'})
+        self.assertIsNone(phase['services']['ingress']['rssPeakBytes'])
+        self.assertEqual(goals(phase['services'])['stackIdleCpuUnderOneCorePercent']['status'], 'unavailable')
+
+    def test_stack_goals_include_caddy_and_report_missing_or_missed(self):
+        values = {name: {'rssPeakBytes': 10, 'cpuMeanOneCorePercent': .2, 'cpuIntervals': 6, 'missingSamples': 0} for name in ('platform', 'postgres', 'ingress')}
+        measured = goals(values)
+        self.assertEqual(measured['stackIdleSummedRssUnder512MiB']['measured'], 30)
+        self.assertEqual(measured['stackIdleCpuUnderOneCorePercent']['status'], 'met')
+        values['ingress']['cpuMeanOneCorePercent'] = 1
+        self.assertEqual(goals(values)['stackIdleCpuUnderOneCorePercent']['status'], 'missed')
+        values['ingress']['missingSamples'] = 1
+        self.assertEqual(goals(values)['stackIdleSummedRssUnder512MiB']['status'], 'unavailable')
+        self.assertIsNone(goals(values)['stackIdleCpuUnderOneCorePercent']['measured'])
+
     def test_cpu_missing_reset_and_working_set(self):
         old = {'cpu_stats': {'cpu_usage': {'total_usage': 100}, 'system_cpu_usage': 1000, 'online_cpus': 4}}
         new = {'cpu_stats': {'cpu_usage': {'total_usage': 110}, 'system_cpu_usage': 2000, 'online_cpus': 4}}

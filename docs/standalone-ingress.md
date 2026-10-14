@@ -241,8 +241,13 @@ container start times, retains withdrawal through a later sibling deployment,
 removes the final routed app and explicitly re-enables ingress.
 Native fixture tests separately verify local-CA HTTPS and shared-proxy restart.
 
-**Remaining M3.1:** installed domain-authority/port handoff, extended drain boundaries,
-actual scheduled-renewal evidence and separate proxy footprint acceptance.
+The packaged installation gate separately samples OAP, PostgreSQL and Caddy at
+idle and under light verified HTTPS traffic, writing `ingress-footprint.json`.
+See the [measured reference and limits](footprint.md#packaged-ingress-reference).
+Memory goals pass in the reference; the combined idle CPU goal remains open for M3.7.
+
+**Remaining M3.1:** installed domain-authority/port handoff, extended drain boundaries
+and actual scheduled-renewal evidence.
 Public issuance and restart persistence passed on the Vultr host at `bac0f62`;
 Caddy owns automatic renewal independently of OAP.
 

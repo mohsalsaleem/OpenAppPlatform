@@ -144,7 +144,9 @@ Specification-driven hostname switches within existing owner authority retain
 sibling routes and support observation-only recovery. Specification-driven ingress
 withdrawal retains running containers and durable removal across sibling publications;
 the final routed app can withdraw to a deny-only proxy and explicitly re-enable.
-Installed domain-authority and port handoffs, extended drain boundaries and proxy footprint acceptance
+Packaged proxy footprint is measured separately at idle and under light HTTPS
+traffic; the reference meets memory goals and misses the unchanged combined idle
+CPU goal (2.67% of one core), retained for M3.7. Installed domain-authority and port handoffs and extended drain boundaries
 remain open. See [standalone ingress](docs/standalone-ingress.md). UI/operator expansion remains
 parked. The measured combined idle CPU gap stays open for M3.7.
 
