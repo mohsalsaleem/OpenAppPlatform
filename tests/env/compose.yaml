@@ -18,7 +18,8 @@ services:
     privileged: true
     environment:
       DOCKER_TLS_CERTDIR: ''
-    command: ['dockerd', '--host=unix:///run/oap-test/docker.sock', '--storage-driver=overlay2']
+    # Retained app networks across the full suite exceed Docker's ~29 default pools.
+    command: ['dockerd', '--host=unix:///run/oap-test/docker.sock', '--storage-driver=overlay2', '--default-address-pool=base=10.64.0.0/10,size=24']
     volumes:
       - docker-socket:/run/oap-test
       - ${OAP_TEST_RUN_DIR:?}:/report

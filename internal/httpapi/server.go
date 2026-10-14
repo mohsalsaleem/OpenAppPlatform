@@ -345,6 +345,8 @@ func (s *Server) routes() http.Handler {
 			fail(w, e)
 			return
 		}
+		queue := c.OperationQueue(r.Context(), d.ID)
+		d.Queue = &queue
 		write(w, 200, d)
 	})
 	mux.HandleFunc("GET /api/v1/applications/{id}/instances", func(w http.ResponseWriter, r *http.Request) {

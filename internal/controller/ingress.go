@@ -63,7 +63,7 @@ func (c *Controller) publishIngress(ctx context.Context, d domain.Deployment) (b
 		if e != nil {
 			return false, e
 		}
-		candidate, e := ingress.Compile(d.ApplicationID, d.Manifest, *d.Manifest.Ingress, members, ingress.Options{AdminSocket: settings.ProxySocket, HTTPPort: settings.HTTPPort, HTTPSPort: settings.HTTPSPort, InternalCA: settings.InternalCA && d.Manifest.Ingress.HTTPS, ACMECA: settings.ACMECA()}, time.Now())
+		candidate, e := c.compileIngress(ctx, native, d, members, settings)
 		if e != nil {
 			return false, e
 		}
@@ -128,7 +128,7 @@ func (c *Controller) publishIngress(ctx context.Context, d domain.Deployment) (b
 	if err != nil {
 		return false, err
 	}
-	current, err := ingress.Compile(d.ApplicationID, d.Manifest, *d.Manifest.Ingress, members, ingress.Options{AdminSocket: settings.ProxySocket, HTTPPort: settings.HTTPPort, HTTPSPort: settings.HTTPSPort, InternalCA: settings.InternalCA && d.Manifest.Ingress.HTTPS, ACMECA: settings.ACMECA()}, time.Now())
+	current, err := c.compileIngress(ctx, native, d, members, settings)
 	if err != nil {
 		return false, err
 	}
@@ -216,7 +216,7 @@ func (c *Controller) ingressDrain(ctx context.Context, d domain.Deployment) (boo
 	if err != nil {
 		return false, err
 	}
-	current, err := ingress.Compile(d.ApplicationID, d.Manifest, *d.Manifest.Ingress, members, ingress.Options{AdminSocket: settings.ProxySocket, HTTPPort: settings.HTTPPort, HTTPSPort: settings.HTTPSPort, InternalCA: settings.InternalCA && d.Manifest.Ingress.HTTPS, ACMECA: settings.ACMECA()}, time.Now())
+	current, err := c.compileIngress(ctx, native, d, members, settings)
 	if err != nil || current.Hash() != publication.CandidateHash {
 		return false, errors.New("surviving ingress membership changed; retirement is held")
 	}
@@ -274,4 +274,35 @@ func (c *Controller) recoverIngress(ctx context.Context, d domain.Deployment, re
 		return ingress.ErrUnknown
 	}
 	return c.Store.ConfirmIngress(ctx, publication)
+}
+
+// compileIngress rebuilds the entire target from durable published sibling
+// definitions and fresh exact runtime bindings. Agents cannot supply siblings.
+func (c *Controller) compileIngress(ctx context.Context, native *docker.Client, d domain.Deployment, members []ingress.Member, settings docker.IngressSettings) (ingress.Candidate, error) {
+	siblings, err := c.Store.IngressSiblings(ctx, d.Manifest.TargetID, d.ApplicationID)
+	if err != nil {
+		return ingress.Candidate{}, err
+	}
+	applications := []ingress.ApplicationRoutes{{ApplicationID: d.ApplicationID, Manifest: d.Manifest, Members: members}}
+	for _, sibling := range siblings {
+		if err = native.CheckIngressPeer(ctx, sibling.ApplicationID, sibling.Manifest); err != nil {
+			return ingress.Candidate{}, err
+		}
+		bindings, e := c.Store.Bindings(ctx, sibling.ApplicationID)
+		if e != nil {
+			return ingress.Candidate{}, e
+		}
+		refs := map[string]string{}
+		for _, binding := range bindings {
+			if !binding.Retired {
+				refs[binding.Component+"/"+strconv.Itoa(binding.Ordinal)] = binding.ResourceID
+			}
+		}
+		observed, e := native.IngressMembers(ctx, sibling.ApplicationID, sibling.Manifest, refs)
+		if e != nil {
+			return ingress.Candidate{}, e
+		}
+		applications = append(applications, ingress.ApplicationRoutes{ApplicationID: sibling.ApplicationID, Manifest: sibling.Manifest, Members: observed})
+	}
+	return ingress.CompileServer(applications, ingress.Options{AdminSocket: settings.ProxySocket, HTTPPort: settings.HTTPPort, HTTPSPort: settings.HTTPSPort, InternalCA: settings.InternalCA, ACMECA: settings.ACMECA()}, time.Now())
 }

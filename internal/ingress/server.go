@@ -18,7 +18,7 @@ type ApplicationRoutes struct {
 
 // CompileServer builds a single dedicated proxy's complete configuration. Every
 // participating application is explicit; omission removes its routes, so the
-// future durable controller must aggregate all authorized desired applications.
+// durable controller aggregates all last-published sibling applications.
 // Applications may independently enable/disable HTTPS. No mutable Caddy config
 // is imported or merged, and duplicate domain or application identity fails closed.
 func CompileServer(applications []ApplicationRoutes, options Options, now time.Time) (Candidate, error) {

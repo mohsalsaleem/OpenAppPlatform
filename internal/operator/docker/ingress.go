@@ -14,15 +14,29 @@ import (
 // IngressSettings is explicit host-owner authority for an already provisioned,
 // dedicated Caddy peer. No application can select its socket or native identity.
 type IngressSettings struct {
-	ContainerID   string `json:"containerId"`
-	AdminSocket   string `json:"adminSocket"`
-	ProxySocket   string `json:"proxySocket"`
-	Domain        string `json:"domain"`
-	BootstrapHash string `json:"bootstrapHash"`
-	HTTPPort      int    `json:"httpPort"`
-	HTTPSPort     int    `json:"httpsPort"`
-	InternalCA    bool   `json:"internalCa"`
-	PublicACME    string `json:"publicAcme,omitempty"`
+	ContainerID   string   `json:"containerId"`
+	AdminSocket   string   `json:"adminSocket"`
+	ProxySocket   string   `json:"proxySocket"`
+	Domain        string   `json:"domain"`
+	Domains       []string `json:"domains,omitempty"`
+	BootstrapHash string   `json:"bootstrapHash"`
+	HTTPPort      int      `json:"httpPort"`
+	HTTPSPort     int      `json:"httpsPort"`
+	InternalCA    bool     `json:"internalCa"`
+	PublicACME    string   `json:"publicAcme,omitempty"`
+}
+
+// AllowsDomain checks the explicit owner allowlist; no wildcard authority.
+func (s IngressSettings) AllowsDomain(domain string) bool {
+	if domain == s.Domain {
+		return true
+	}
+	for _, allowed := range s.Domains {
+		if allowed == domain {
+			return true
+		}
+	}
+	return false
 }
 
 // ACMECA is fixed host-owner policy, never an application-supplied issuer URL.
@@ -41,7 +55,7 @@ func (c *Client) IngressSettings() (IngressSettings, bool) {
 }
 func (c *Client) ingressPeer(ctx context.Context, m domain.Manifest) (container, error) {
 	settings, ok := c.IngressSettings()
-	if !ok || m.Ingress == nil || settings.Domain != m.Ingress.Domain {
+	if !ok || m.Ingress == nil || !settings.AllowsDomain(m.Ingress.Domain) {
 		return container{}, errors.New("ingress domain is not authorized by the target owner")
 	}
 	if m.Ingress.HTTPS && !settings.InternalCA && settings.PublicACME == "" {
@@ -153,6 +167,20 @@ func validateIngressSettings(s *IngressSettings) error {
 	if err := check.Validate(domain.Manifest{Components: []domain.Component{{Name: "probe", Kind: "web", Port: 80}}}); err != nil {
 		return err
 	}
+	if len(s.Domains) > 31 {
+		return errors.New("ingress permits at most 32 owner domains")
+	}
+	seen := map[string]bool{s.Domain: true}
+	for _, host := range s.Domains {
+		if seen[host] {
+			return errors.New("duplicate owner ingress domain")
+		}
+		seen[host] = true
+		check.Domain = host
+		if err := check.Validate(domain.Manifest{Components: []domain.Component{{Name: "probe", Kind: "web", Port: 80}}}); err != nil {
+			return err
+		}
+	}
 	client, err := ingress.New(s.AdminSocket)
 	if err != nil {
 		return err
@@ -169,7 +197,7 @@ func (c *Client) ValidateManifest(m domain.Manifest) error {
 		return nil
 	}
 	settings, ok := c.IngressSettings()
-	if !ok || settings.Domain != m.Ingress.Domain {
+	if !ok || !settings.AllowsDomain(m.Ingress.Domain) {
 		return errors.New("ingress domain is not authorized by the target owner")
 	}
 	if m.Ingress.HTTPS && !settings.InternalCA && settings.PublicACME == "" {

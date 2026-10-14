@@ -137,7 +137,7 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	go bridge.Serve(bridgeListener)
 	defer bridge.Close()
 	pinned := call("GET", "/images/"+image+"/json", nil)["Id"].(string)
-	settings, _ := json.Marshal(docker.Settings{PullPolicy: "never", HostBindIP: "127.0.0.1", Ingress: &docker.IngressSettings{ContainerID: proxyID, AdminSocket: directory + "/publisher.sock", ProxySocket: proxySocket, Domain: "app.example.test", BootstrapHash: snapshot.Hash, HTTPPort: 8080, HTTPSPort: 8443, InternalCA: true}})
+	settings, _ := json.Marshal(docker.Settings{PullPolicy: "never", HostBindIP: "127.0.0.1", Ingress: &docker.IngressSettings{ContainerID: proxyID, AdminSocket: directory + "/publisher.sock", ProxySocket: proxySocket, Domain: "app.example.test", Domains: []string{"sibling.example.test"}, BootstrapHash: snapshot.Hash, HTTPPort: 8080, HTTPSPort: 8443, InternalCA: true}})
 	target := domain.Target{ID: targetID, Name: "Ingress fixture", Operator: "docker", URL: "unix://" + socket, Environment: "staging", Settings: settings}
 	adapter, err = docker.New(target)
 	if err != nil {
@@ -189,7 +189,7 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 		}
 		args = append(args, command)
 		code := cli.Run(ctx, args, func(key string) string {
-			if key == "OAP_API_TOKEN" {
+			if key == "OAP_API_TOKEN" && command != "grant" {
 				return token
 			}
 			return ""
@@ -235,6 +235,70 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	defer func() { c.Jobs.Stop(context.Background()) }()
 	first := execute(plan(controller.ActionRequest{Action: "deploy", ApplicationID: app.ID, ExpectedVersion: app.Version}))
 	wait(first)
+	// A separate owner-issued onboarding grant creates and deploys the sibling
+	// through the same CLI. The original agent never receives sibling authority.
+	firstToken := token
+	grantOwnerSession, e := service.Issue(ctx, owner, "session", "Owner", "operate", "", time.Hour)
+	if e != nil {
+		t.Fatal(e)
+	}
+	ownerFile := filepath.Join(directory, "owner.json")
+	ownerRaw, _ := json.Marshal(map[string]any{"schemaVersion": 1, "origin": api.URL, "session": grantOwnerSession})
+	if e = os.WriteFile(ownerFile, ownerRaw, 0600); e != nil {
+		t.Fatal(e)
+	}
+	agentFile := filepath.Join(directory, "sibling-agent.json")
+	invoke("grant", []string{"--credential-file", ownerFile, "--out", agentFile}, map[string]any{"name": "Sibling agent", "targetId": targetID, "environment": "staging", "maxApplications": 1, "actions": []string{"configure", "deploy", "recover"}}, 0)
+	agentRaw, e := os.ReadFile(agentFile)
+	if e != nil {
+		t.Fatal(e)
+	}
+	var issued struct {
+		Token string `json:"token"`
+	}
+	if json.Unmarshal(agentRaw, &issued) != nil || issued.Token == "" {
+		t.Fatal("missing scoped sibling credential")
+	}
+	token = issued.Token
+	siblingSpec := domain.Manifest{Name: "ingress-sibling", TargetID: targetID, Environment: "staging", Components: []domain.Component{{Name: "web", Kind: "web", Image: pinned, Port: 8080, Instances: 1, Env: map[string]string{"OAP_TEST_MESSAGE": "sibling"}, Readiness: &domain.ReadinessPolicy{RequireHealthy: true, TimeoutSeconds: 60}}}, Ingress: &domain.IngressDefinition{Domain: "sibling.example.test", Routes: []domain.IngressRoute{{Path: "/", Component: "web"}}}}
+	created := execute(plan(controller.ActionRequest{Action: "create", Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: siblingSpec}}))
+	siblingID := created.Result.ApplicationID
+	t.Cleanup(func() {
+		bindings, _ := s.Bindings(context.Background(), siblingID)
+		for _, b := range bindings {
+			adapter.Stop(context.Background(), b.ResourceID)
+		}
+	})
+	siblingApp, _ := s.Application(ctx, siblingID)
+	wait(execute(plan(controller.ActionRequest{Action: "deploy", ApplicationID: siblingID, ExpectedVersion: siblingApp.Version})))
+	// Saved desired sibling changes must not enter another app's publication.
+	siblingApp, _ = s.Application(ctx, siblingID)
+	unshipped := siblingApp.Manifest
+	unshipped.Components = append([]domain.Component(nil), unshipped.Components...)
+	unshipped.Components[0].Env = map[string]string{"OAP_TEST_MESSAGE": "not-deployed"}
+	execute(plan(controller.ActionRequest{Action: "configure", ApplicationID: siblingID, ExpectedVersion: siblingApp.Version, Specification: &domain.ApplicationSpecification{APIVersion: "oap.dev/v1alpha1", Kind: "Application", Spec: unshipped}}))
+	oldPublication, e := s.IngressPublication(ctx, first.Result.OperationID)
+	if e != nil || !errors.Is(s.ConfirmIngress(ctx, oldPublication), domain.ErrConflict) {
+		t.Fatal("old application publication could rewind shared authority", e)
+	}
+	token = firstToken
+	// Scope isolation remains enforced even though the controller aggregates routes.
+	invoke("get", []string{"--app", siblingID}, nil, 3)
+	checkSibling := func() {
+		t.Helper()
+		request, _ := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("http://127.0.0.1:%d/", port), nil)
+		request.Host = "sibling.example.test"
+		response, e := (&http.Client{Timeout: 3 * time.Second}).Do(request)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer response.Body.Close()
+		var value map[string]string
+		if response.StatusCode != 200 || json.NewDecoder(response.Body).Decode(&value) != nil || value["message"] != "sibling" {
+			t.Fatal("sibling route was lost")
+		}
+	}
+	checkSibling()
 	public := &http.Client{Timeout: 3 * time.Second}
 	defer public.CloseIdleConnections()
 	get := func(path string) (map[string]string, error) {
@@ -272,6 +336,7 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	current, _ = s.Application(ctx, app.ID)
 	up := execute(plan(controller.ActionRequest{Action: "deploy", ApplicationID: app.ID, ExpectedVersion: current.Version, Components: []string{"api"}}))
 	wait(up)
+	checkSibling()
 	after, _ := nativeClient.Read(ctx)
 	if after.Hash == before.Hash {
 		t.Fatal("scale-up did not publish membership")
@@ -339,6 +404,7 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	}()
 	retired := execute(down)
 	wait(retired)
+	checkSibling()
 	stopTraffic()
 	<-finished
 	if failures.Load() != 0 || requests.Load() < 10 {
@@ -387,13 +453,17 @@ func TestAgentStandaloneIngressReleaseScaleAndControllerRecovery(t *testing.T) {
 	if stopped.State != "attention" || nativeWrites.Load() != writeCount+1 {
 		t.Fatal("lost response dispatch was retried")
 	}
+	if _, e := s.IngressSiblings(ctx, targetID, siblingID); !errors.Is(e, domain.ErrConflict) {
+		t.Fatal("uncertain sibling publication did not fence proxy", e)
+	}
 	recovery := execute(plan(controller.ActionRequest{Action: "recover", ApplicationID: app.ID, ExpectedVersion: current.Version, DeploymentID: stopped.ID, Recovery: &controller.Recovery{Component: "@ingress", Ordinal: 1, ExpectedUpdatedAt: stopped.UpdatedAt}}))
 	wait(recovery)
+	checkSibling()
 	if nativeWrites.Load() != writeCount+1 || recovery.Result.OperationID != stopped.ID {
 		t.Fatal("ingress observation recovery issued another write")
 	}
 	if dir := os.Getenv("OAP_TEST_REPORT_DIR"); dir != "" {
-		raw, _ := json.MarshalIndent(map[string]any{"status": "passed", "scope": "owner-provisioned dedicated Caddy; local HTTP", "namedAgent": true, "scale": "1 -> 3 -> 1", "controllerDownTraffic": true, "scaleDownRequests": requests.Load(), "scaleDownFailures": failures.Load(), "publicationJournal": true, "retirementReplay": true, "lostResponseObservedWithoutRedispatch": true, "publicACME": false, "automaticProxyProvisioning": false}, "", "  ")
+		raw, _ := json.MarshalIndent(map[string]any{"status": "passed", "scope": "owner-provisioned dedicated Caddy; local HTTP", "namedAgent": true, "sharedProxySiblingPreserved": true, "scale": "1 -> 3 -> 1", "controllerDownTraffic": true, "scaleDownRequests": requests.Load(), "scaleDownFailures": failures.Load(), "publicationJournal": true, "retirementReplay": true, "lostResponseObservedWithoutRedispatch": true, "publicACME": false, "automaticProxyProvisioning": false}, "", "  ")
 		os.WriteFile(filepath.Join(dir, "ingress-lifecycle.json"), append(raw, '\n'), 0600)
 	}
 }

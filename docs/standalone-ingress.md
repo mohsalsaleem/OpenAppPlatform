@@ -141,11 +141,23 @@ OAP through its normal host procedure. Applications cannot set these fields:
 `adminSocket` is the OAP-visible path; `proxySocket` is the path inside Caddy.
 Ports are Caddy listener ports; host mappings remain owner-managed. The configured
 peer must be unprivileged, avoid host networking and isolate administration.
-Owner-provisioned mode supports **one routed application/domain per configured
-Docker target/peer**. The shared compiler can aggregate 32 applications, but that
-is not yet enabled as a multi-application controller feature. Another application
-cannot claim an existing domain or ingress authority. Domain changes, disabling
-an established route and proxy identity handoffs need a later explicit workflow.
+Owner-provisioned mode supports up to **32 routed applications on one target/peer**.
+`domain` retains the original exact hostname; optional `domains` adds up to 31
+explicit owner-approved hostnames. The installer accepts repeated
+`--ingress-domain` flags on a fresh installation. Duplicate domains, wildcards and
+unapproved app hostnames fail closed. Existing proxy authority is not silently
+expanded: changing an installed allowlist requires a future explicit handoff.
+
+Every publication compiles the changing application's frozen release together
+with each sibling's last published release and freshly inspected owned bindings.
+Saved, unshipped sibling specs do not become routes. One agent cannot inspect or
+operate a sibling merely because both share the proxy. The controller supplies
+sibling evidence internally. A sibling's unresolved publication blocks a new
+publication; stale config hashes and changed runtime membership also fail closed.
+An unavailable sibling can therefore hold another app's routing change; existing
+Caddy configuration continues serving. Serialize routed application changes while
+these bounded shared-authority fences apply. Domain changes, ingress removal and
+proxy identity handoffs still need explicit future workflows.
 
 For HTTPS the target must explicitly enable internal CA or `publicAcme` set to
 `letsencrypt` / `letsencrypt-staging`. The latter issuer URLs are fixed owner policy;
@@ -187,17 +199,20 @@ Use `oap --file change.json action-plan`, inspect the returned plan, then
 The grace period is conservative and bounded, not proof that arbitrary long-lived
 streams drain forever. Its dispatch timestamp survives controller replacement.
 
-**Acceptance:** the named-agent API/CLI test releases frontend/API, scales API
+**Acceptance:** the named-agent CLI test releases frontend/API, scales API
 1 → 3 → 1 under continuous public-path requests, verifies all three boot IDs,
 keeps traffic flowing with the controller stopped/recreated, replays retirement
 without duplication, and injects a lost Caddy response followed by observation-only
 recovery without another native write. It writes `ingress-lifecycle.json`.
+The same lifecycle test creates a second app through a separately granted CLI
+identity and preserves its routes through scale-up, scale-down and lost-response
+recovery. It rejects a stale authority confirmation and unshipped sibling changes.
 Native fixture tests separately verify local-CA HTTPS and shared-proxy restart.
 
-**Remaining M3.1:** public acceptance and scheduled renewal evidence, safe multi-application
-publication/claims, domain/port handoff and removal, extended drain boundaries,
-HTTPS in the integrated agent journey, and separate proxy footprint accounting.
-Public ACME issuance/renewal remains deferred and does not block local work.
+**Remaining M3.1:** domain/port handoff and removal, extended drain boundaries,
+actual scheduled-renewal evidence and separate proxy footprint acceptance.
+Public issuance and restart persistence passed on the Vultr host at `bac0f62`;
+Caddy owns automatic renewal independently of OAP.
 
 Standard replacement can cause downtime. Neither blue-green nor universal
 zero-downtime behavior is implied by these foundation tests.
@@ -207,3 +222,11 @@ admin volume shared only with OAP, and durable Caddy configuration/certificate
 volumes. It runs a bounded one-shot volume ownership task. Start never silently
 recreates a recorded peer or refreshes its bootstrap commitment from published
 routes. Removing/replacing that container requires an explicit future handoff.
+
+
+The reproducible Docker test daemon uses an explicit private `/24` address pool
+because retained fixture networks across all phases exceed Docker's default pool
+count. This affects only the disposable engine, not the host or VPS daemon.
+A real host can also exhaust its Docker address pools; operation inspection reports
+`network_creation_rejected` without exposing provider request paths or secrets.
+Review host networking through the owner before changing daemon policy.

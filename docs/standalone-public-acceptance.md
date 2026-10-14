@@ -56,6 +56,10 @@ starting OAP. Existing publications must not silently acquire a replacement
 proxy identity. The API stays loopback-only. No certificate is requested until
 an authorized application with HTTPS routes is deployed.
 
+On a fresh installation, repeat `--ingress-domain` for additional exact hostnames
+(up to 32). Each app owns a distinct hostname; agents cannot expand that allowlist.
+Changing an established authority remains an explicit future handoff.
+
 For local acceptance use `--ingress-tls internal`, a `.test` hostname and loopback
 port mappings. `letsencrypt-staging` is an explicit optional test mode; its
 certificates are not normally trusted. Staging-to-production authority handoff

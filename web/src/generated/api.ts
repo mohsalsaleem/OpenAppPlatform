@@ -4029,6 +4029,7 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            queue?: components["schemas"]["OperationQueueObservation"];
         };
         Instance: {
             /** @description Retained instance reserved for this application after confirmed stop. */
@@ -4576,6 +4577,21 @@ export interface components {
              * @enum {string}
              */
             publicAcme?: "letsencrypt" | "letsencrypt-staging";
+            /** @description Additional exact owner-authorized domains; no wildcard authority. */
+            domains?: string[];
+        };
+        /** @description Observation-only dispatch evidence for this operation; missing or unavailable jobs never permit redispatch. Excludes raw errors, arguments and credentials. */
+        OperationQueueObservation: {
+            /** @enum {string} */
+            state: "available" | "cancelled" | "completed" | "discarded" | "pending" | "retryable" | "running" | "scheduled" | "missing" | "unavailable";
+            attempt?: number;
+            maxAttempts?: number;
+            /** Format: date-time */
+            scheduledAt?: string;
+            paused?: boolean;
+            lastErrorCode?: string;
+            /** Format: date-time */
+            observedAt: string;
         };
     };
     responses: never;

@@ -33,7 +33,7 @@ func (s *Store) IngressExpected(ctx context.Context, target, app, authority, boo
 	if err != nil {
 		return "", err
 	}
-	if owner != app || key != authority {
+	if key != authority {
 		return "", domain.ErrConflict
 	}
 	return hash, nil
@@ -54,7 +54,7 @@ func (s *Store) ConfirmIngress(ctx context.Context, p IngressPublication) error 
 		return err
 	}
 	defer tx.Rollback(ctx)
-	result, err := tx.Exec(ctx, `INSERT INTO oap_ingress_authority(target_id,application_id,authority_hash,config_hash) VALUES($1,$2,$3,$4) ON CONFLICT(target_id) DO UPDATE SET config_hash=EXCLUDED.config_hash WHERE oap_ingress_authority.application_id=EXCLUDED.application_id AND oap_ingress_authority.authority_hash=EXCLUDED.authority_hash`, p.TargetID, p.ApplicationID, p.AuthorityHash, p.CandidateHash)
+	result, err := tx.Exec(ctx, `INSERT INTO oap_ingress_authority(target_id,application_id,authority_hash,config_hash) VALUES($1,$2,$3,$4) ON CONFLICT(target_id) DO UPDATE SET config_hash=EXCLUDED.config_hash WHERE oap_ingress_authority.authority_hash=EXCLUDED.authority_hash AND oap_ingress_authority.config_hash IN ($5,$4)`, p.TargetID, p.ApplicationID, p.AuthorityHash, p.CandidateHash, p.ExpectedHash)
 	if err != nil {
 		return err
 	}
@@ -66,4 +66,46 @@ func (s *Store) ConfirmIngress(ctx context.Context, p IngressPublication) error 
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+// IngressSiblings returns last published release definitions, never unsaved or
+// unshipped desired specs. A sibling's uncertain publication fences the target.
+func (s *Store) IngressSiblings(ctx context.Context, target, app string) ([]domain.Deployment, error) {
+	var pending bool
+	if err := s.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM oap_ingress_publications WHERE target_id=$1 AND application_id<>$2 AND phase<>'applied')`, target, app).Scan(&pending); err != nil {
+		return nil, err
+	}
+	if pending {
+		return nil, domain.ErrConflict
+	}
+	rows, err := s.Pool.Query(ctx, `SELECT DISTINCT ON(application_id) deployment_id FROM oap_ingress_publications WHERE target_id=$1 AND application_id<>$2 AND phase='applied' ORDER BY application_id, created_at DESC, deployment_id DESC LIMIT 32`, target, app)
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) >= 32 {
+		return nil, domain.ErrConflict
+	}
+	out := make([]domain.Deployment, 0, len(ids))
+	for _, id := range ids {
+		d, e := s.Deployment(ctx, id)
+		if e != nil {
+			return nil, e
+		}
+		out = append(out, d)
+	}
+	return out, nil
 }

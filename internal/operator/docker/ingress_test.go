@@ -34,3 +34,17 @@ func TestOwnerMustExplicitlyAuthorizePublicACME(t *testing.T) {
 		t.Fatal("arbitrary issuer admitted")
 	}
 }
+
+func TestOwnerIngressDomainAllowlist(t *testing.T) {
+	s := IngressSettings{Domain: "one.example.test", Domains: []string{"two.example.test"}}
+	for _, host := range []string{"one.example.test", "two.example.test"} {
+		if !s.AllowsDomain(host) {
+			t.Fatal("owner domain rejected", host)
+		}
+	}
+	for _, host := range []string{"three.example.test", "*.example.test", "ONE.example.test", ""} {
+		if s.AllowsDomain(host) {
+			t.Fatal("unauthorized domain accepted", host)
+		}
+	}
+}

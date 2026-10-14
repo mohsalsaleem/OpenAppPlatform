@@ -6374,6 +6374,9 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "queue": {
+            "$ref": "#/components/schemas/OperationQueueObservation"
           }
         },
         "required": [
@@ -8400,6 +8403,63 @@
               "letsencrypt-staging"
             ],
             "description": "Explicit host-owner public ACME authority; mutually exclusive with internalCa."
+          },
+          "domains": {
+            "type": "array",
+            "maxItems": 31,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            },
+            "description": "Additional exact owner-authorized domains; no wildcard authority."
+          }
+        }
+      },
+      "OperationQueueObservation": {
+        "type": "object",
+        "description": "Observation-only dispatch evidence for this operation; missing or unavailable jobs never permit redispatch. Excludes raw errors, arguments and credentials.",
+        "required": [
+          "state",
+          "observedAt"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "available",
+              "cancelled",
+              "completed",
+              "discarded",
+              "pending",
+              "retryable",
+              "running",
+              "scheduled",
+              "missing",
+              "unavailable"
+            ]
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "maxAttempts": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "scheduledAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "paused": {
+            "type": "boolean"
+          },
+          "lastErrorCode": {
+            "type": "string",
+            "pattern": "^(network_creation_rejected|image_not_cached|worker_retry|lock_connection_unavailable|deployment_lock_failed|deployment_read_failed|deployment_adapter_failed|operation_decode_failed|database_[A-Z0-9]{5})$"
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }

@@ -109,3 +109,12 @@ owner-mode system regression checks app-scoped capability grants and sibling den
 M2.5 is accepted only when the full local gate passes; M2.6 then becomes the next
 implementation slice. Fresh named-agent bootstrap and external controller rescue are covered by the
 separate M2.6 acceptance, not by this preview-authority CLI fixture.
+
+
+Operation inspection includes bounded `queue` evidence: job state, attempts,
+scheduled time, optional pause status, a classified retry code and observation
+time. CLI `operation` and MCP deployment inspection use the same public API.
+This projection excludes arguments, raw job errors, credentials and other apps.
+`missing` or `unavailable` does not imply that dispatch never happened and does
+not authorize retries, queue mutation or control-database repairs. The durable
+operation and its reviewed recovery plan remain authoritative.

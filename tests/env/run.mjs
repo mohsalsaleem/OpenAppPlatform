@@ -77,7 +77,8 @@ try{
  platform=spawn('/opt/oap/platform',['-targets','/workspace/.local/observed-targets.json','-web','/workspace/web/dist'],{env,stdio:['ignore','pipe','pipe']});
  let ownerLog='';platform.stdout.on('data',b=>ownerLog+=b);platform.stderr.on('data',b=>ownerLog+=b);
  await waitReady();
- await run('owner-browser','node',['node_modules/@playwright/test/cli.js','test','tests/auth.spec.ts'],'/workspace/web');
+ try { await run('owner-browser','node',['node_modules/@playwright/test/cli.js','test','tests/auth.spec.ts'],'/workspace/web'); }
+ catch(error) { await writeFile('/report/owner-platform.log',ownerLog);const {cp}=await import('node:fs/promises');await cp('/workspace/web/test-results','/report/owner-browser-failure',{recursive:true}).catch(()=>{});throw error; }
  platform.kill('SIGTERM');await new Promise(r=>platform.on('close',r));platform=null;
  await writeFile('/report/owner-platform.log',ownerLog);
  for(const name of await readdir('/workspace/.local'))if(name.endsWith('.png'))await copyFile('/workspace/.local/'+name,'/report/'+name);

@@ -275,18 +275,31 @@ type ReleaseSource struct {
 	DeliveryID string `json:"deliveryId"`
 }
 
+// OperationQueueObservation contains bounded dispatch evidence only; it never
+// contains job arguments, raw errors, credentials or sibling operations.
+type OperationQueueObservation struct {
+	State         string     `json:"state"`
+	Attempt       *int       `json:"attempt,omitempty"`
+	MaxAttempts   *int       `json:"maxAttempts,omitempty"`
+	ScheduledAt   *time.Time `json:"scheduledAt,omitempty"`
+	Paused        *bool      `json:"paused,omitempty"`
+	LastErrorCode string     `json:"lastErrorCode,omitempty"`
+	ObservedAt    time.Time  `json:"observedAt"`
+}
+
 type Deployment struct {
-	Control           *ReleaseControl `json:"control,omitempty"`
-	Source            *ReleaseSource  `json:"source,omitempty"`
-	Operation         string          `json:"operation,omitempty"`
-	ID                string          `json:"id"`
-	ApplicationID     string          `json:"applicationId"`
-	DefinitionVersion int64           `json:"definitionVersion"`
-	State             string          `json:"state"`
-	Manifest          Manifest        `json:"manifest"`
-	Steps             []Step          `json:"steps"`
-	CreatedAt         time.Time       `json:"createdAt"`
-	UpdatedAt         time.Time       `json:"updatedAt"`
+	Queue             *OperationQueueObservation `json:"queue,omitempty"`
+	Control           *ReleaseControl            `json:"control,omitempty"`
+	Source            *ReleaseSource             `json:"source,omitempty"`
+	Operation         string                     `json:"operation,omitempty"`
+	ID                string                     `json:"id"`
+	ApplicationID     string                     `json:"applicationId"`
+	DefinitionVersion int64                      `json:"definitionVersion"`
+	State             string                     `json:"state"`
+	Manifest          Manifest                   `json:"manifest"`
+	Steps             []Step                     `json:"steps"`
+	CreatedAt         time.Time                  `json:"createdAt"`
+	UpdatedAt         time.Time                  `json:"updatedAt"`
 }
 
 func NewID() string {

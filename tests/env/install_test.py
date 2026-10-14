@@ -137,7 +137,7 @@ class IngressInstallationSafetyTest(unittest.TestCase):
             listener.bind(str(endpoint))
             folder = Path(tmp) / 'install'
             with patch.object(installer.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, b'999', b'')):
-                installer.init(folder, IMAGE, endpoint, ingress_domain='app.example.com',
+                installer.init(folder, IMAGE, endpoint, ingress_domain=['app.example.com', 'second.example.com'],
                                ingress_tls='letsencrypt', ingress_bind='0.0.0.0', environment='production')
             targets = json.loads((folder / 'targets.json').read_text())
             self.assertEqual(targets[0]['environment'], 'production')
@@ -148,12 +148,18 @@ class IngressInstallationSafetyTest(unittest.TestCase):
                 installer.provision_ingress(directory, values)
             before = (folder / 'targets.json').read_bytes()
             authority = json.loads(before)[0]['settings']['ingress']
+            self.assertEqual(authority['domains'], ['second.example.com'])
             self.assertEqual(authority['publicAcme'], 'letsencrypt')
             self.assertFalse(authority['internalCa'])
             self.assertEqual(authority['bootstrapHash'], commitment)
             with patch.object(installer, 'compose', side_effect=[peer.encode(), b'', peer.encode()]) as commands:
                 installer.provision_ingress(directory, values)
                 self.assertEqual(commands.call_count, 3)  # no new bootstrap observation/claim
+            self.assertEqual((folder / 'targets.json').read_bytes(), before)
+            changed = dict(values, OAP_INGRESS_DOMAINS='[]')
+            with patch.object(installer, 'compose', side_effect=[peer.encode(), b'', peer.encode()]):
+                with self.assertRaisesRegex(ValueError, 'handoff'):
+                    installer.provision_ingress(directory, changed)
             self.assertEqual((folder / 'targets.json').read_bytes(), before)
             with patch.object(installer, 'compose', side_effect=[('d' * 64).encode()]):
                 with self.assertRaisesRegex(ValueError, 'handoff'):
@@ -184,3 +190,13 @@ class AgentAcceptanceBoundaryTest(unittest.TestCase):
             self.assertIn('refuses owner credentials', denied.stdout)
             self.assertNotIn('private-owner-session', denied.stdout + denied.stderr)
             self.assertFalse((folder / 'acceptance-state.json').exists())
+
+
+class IngressDomainAllowlistTest(unittest.TestCase):
+    def test_multiple_domains_are_explicit_bounded_and_validated_before_init(self):
+        options = installer.ingress_options(['one.example.test', 'two.example.test'], 'internal', '127.0.0.1', 80, 443, installer.CADDY)
+        self.assertEqual(options['domain'], 'one.example.test')
+        self.assertEqual(options['domains'], ['two.example.test'])
+        for domains in ([''], ['one.example.test', 'one.example.test'], ['one.example.test', '*.example.test'], ['one.example.test', '127.0.0.1'], [f'a{i}.example.test' for i in range(33)]):
+            with self.assertRaises(ValueError):
+                installer.ingress_options(domains, 'internal', '127.0.0.1', 80, 443, installer.CADDY)

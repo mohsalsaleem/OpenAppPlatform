@@ -25,6 +25,13 @@ TLS_MODES = ('internal', 'letsencrypt-staging', 'letsencrypt')
 def ingress_options(domain, tls, bind, http_port, https_port, image):
     if not domain:
         return None
+    if isinstance(domain, list):
+        if any(not host for host in domain) or len(domain) > 32 or len(set(domain)) != len(domain):
+            raise ValueError('Use at most 32 unique owner ingress domains')
+        options = [ingress_options(host, tls, bind, http_port, https_port, image) for host in domain]
+        result = options[0]
+        result['domains'] = sorted(domain[1:])
+        return result
     labels = domain.split('.')
     if (len(domain) > 253 or len(labels) < 2 or
         any(not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', label) for label in labels)):
@@ -107,6 +114,8 @@ def init(directory, image, socket=None, operator_only=False, port=8878,
         env.update(OAP_CADDY_IMAGE=ingress['image'], OAP_INGRESS_DOMAIN=ingress['domain'],
                    OAP_INGRESS_TLS=ingress['tls'], OAP_INGRESS_BIND_ADDR=ingress['bind'],
                    OAP_INGRESS_HTTP_PORT=str(ingress['httpPort']), OAP_INGRESS_HTTPS_PORT=str(ingress['httpsPort']))
+        if ingress.get('domains'):
+            env['OAP_INGRESS_DOMAINS'] = json.dumps(ingress['domains'], separators=(',', ':'))
         bootstrap = {'admin': {'listen': 'unix//run/oap-ingress/admin.sock|0600', 'config': {'persist': True}},
                      'apps': {'http': {'http_port': 80, 'https_port': 443, 'servers': {'bootstrap': {
                          'listen': [':80'], 'automatic_https': {'disable': True},
@@ -318,6 +327,10 @@ def provision_ingress(directory, values):
     options = ingress_options(values['OAP_INGRESS_DOMAIN'], values['OAP_INGRESS_TLS'],
                               values['OAP_INGRESS_BIND_ADDR'], int(values['OAP_INGRESS_HTTP_PORT']),
                               int(values['OAP_INGRESS_HTTPS_PORT']), values['OAP_CADDY_IMAGE'])
+    domains = json.loads(values.get('OAP_INGRESS_DOMAINS', '[]'))
+    if domains:
+        options = ingress_options([options['domain'], *domains], options['tls'], options['bind'],
+                                  options['httpPort'], options['httpsPort'], options['image'])
     target_file = directory / 'targets.json'
     if target_file.is_symlink():
         raise ValueError('Ingress authority file must be a regular owner-managed file')
@@ -343,10 +356,12 @@ def provision_ingress(directory, values):
     authority = {'containerId': peer, 'adminSocket': '/run/oap-ingress/admin.sock',
                  'proxySocket': '/run/oap-ingress/admin.sock', 'domain': options['domain'],
                  'httpPort': 80, 'httpsPort': 443, 'internalCa': options['tls'] == 'internal'}
+    if options.get('domains'):
+        authority['domains'] = options['domains']
     if options['tls'] != 'internal':
         authority['publicAcme'] = options['tls']
     if recorded:
-        if any(recorded.get(key) != value for key, value in authority.items()) or recorded.get('publicAcme', '') != authority.get('publicAcme', ''):
+        if any(recorded.get(key) != value for key, value in authority.items()) or recorded.get('publicAcme', '') != authority.get('publicAcme', '') or recorded.get('domains', []) != authority.get('domains', []):
             raise ValueError('Installed ingress identity/authority changed; explicit handoff is required')
         return
     raw = compose(directory, ['run', '--rm', '--no-deps', '-T', '--entrypoint', '/app/oap-admin',
@@ -449,7 +464,7 @@ def main():
     parser.add_argument('--port', type=int, default=8878)
     parser.add_argument('--environment', default='staging')
     parser.add_argument('--postgres-image', default=POSTGRES)
-    parser.add_argument('--ingress-domain')
+    parser.add_argument('--ingress-domain', action='append', help='Owner-authorized hostname; repeat for up to 32 applications')
     parser.add_argument('--ingress-tls', choices=TLS_MODES, default='internal')
     parser.add_argument('--ingress-bind', default='127.0.0.1')
     parser.add_argument('--ingress-http-port', type=int, default=80)

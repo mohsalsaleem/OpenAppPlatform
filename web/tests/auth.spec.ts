@@ -3,6 +3,8 @@ test("owner setup, sessions, invitations, read-only membership, and scoped agent
   page,
   browser,
 }) => {
+  // Includes two real Docker actions, each with a bounded 60-second wait.
+  test.setTimeout(150_000);
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "Set Up Your Workspace" }),
@@ -236,6 +238,9 @@ test("owner setup, sessions, invitations, read-only membership, and scoped agent
     viewer.getByRole("heading", { name: "Welcome Back" }),
   ).toBeVisible();
   await viewerContext.close();
+  // Audit polling intentionally pauses in background tabs. Return to the owner.
+  await page.bringToFront();
+  await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe("visible");
   await page.reload();
   await expect(
     page.getByText("Read-only member", { exact: true }),
@@ -256,7 +261,18 @@ test("owner setup, sessions, invitations, read-only membership, and scoped agent
   await page.getByRole("tab", { name: "Audit Log", exact: true }).click();
   const auditRow = page.locator(".step").filter({ has: page.getByRole("link", { name: "View Operation" }) });
   await expect(auditRow).toHaveCount(1);
-  await expect(auditRow.getByText("Completed", { exact: true })).toBeVisible({ timeout: 60000 });
+  try {
+    await expect(auditRow.getByText("Completed", { exact: true })).toBeVisible({ timeout: 60000 });
+  } catch (error) {
+    // Preserve only public status evidence, never request bodies or credentials.
+    const observed = await page.request.get(`/api/v1/deployments/${operation.id}`);
+    const value = observed.ok() ? await observed.json() : {};
+    const feed = await page.request.get("/api/v1/access/audit");
+    const events = feed.ok() ? await feed.json() : [];
+    console.error(JSON.stringify({ operationHTTP: observed.status(), state: value.state,
+      updatedAt: value.updatedAt, queue: value.queue, auditState: events.find((event: any) => event.operationId === operation.id)?.operationState }));
+    throw error;
+  }
   await page.screenshot({ path: "../.local/ui-audit-operation.png", fullPage: true });
   await auditRow.getByRole("link", { name: "View Operation" }).click();
   await expect(page.getByRole("tab", { name: "Activity", exact: true })).toHaveAttribute("data-state", "active");

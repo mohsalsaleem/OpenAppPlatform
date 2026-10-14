@@ -531,7 +531,7 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 	}()
 	var locked bool
 	if e = conn.QueryRow(ctx, "SELECT pg_try_advisory_lock(hashtext($1))", id).Scan(&locked); e != nil {
-		return e
+		return fmt.Errorf("deployment lock failed: %w", e)
 	}
 	if !locked {
 		return river.JobSnooze(c.PollInterval)
@@ -539,14 +539,14 @@ func (c *Controller) Advance(ctx context.Context, id string) error {
 	// Closing the dedicated session releases the advisory lock.
 	d, e := c.Store.Deployment(ctx, id)
 	if e != nil {
-		return e
+		return fmt.Errorf("deployment read failed: %w", e)
 	}
 	if domain.Terminal(d.State) {
 		return nil
 	}
 	a, e := c.Adapter(ctx, d.Manifest.TargetID)
 	if e != nil {
-		return e
+		return fmt.Errorf("deployment adapter failed: %w", e)
 	}
 	d.State = "running"
 	fail := func(step *domain.Step, state string, err error) error {

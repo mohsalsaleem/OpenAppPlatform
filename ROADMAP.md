@@ -137,8 +137,11 @@ scaling with traffic verification and observation-only lost-response recovery.
 Default targets remain fail-closed. Packaged Caddy installation and public Let's
 Encrypt issuance/persistence passed gate `20261014-094928-0ce51041` and Vultr
 acceptance at `bac0f62`. Caddy automatic renewal is configured; an actual scheduled
-renewal has not yet been observed. Multi-application lifecycle aggregation,
-route/domain handoffs and proxy footprint acceptance remain open. See [standalone ingress](docs/standalone-ingress.md). UI/operator expansion remains
+renewal has not yet been observed. Shared-proxy lifecycle aggregation now retains
+last-published sibling definitions under exact owner domain authority; the local
+gate exercises two separately scoped CLI identities and preserved sibling routes.
+Route/domain handoffs, extended drain boundaries and proxy footprint acceptance
+remain open. See [standalone ingress](docs/standalone-ingress.md). UI/operator expansion remains
 parked. The measured combined idle CPU gap stays open for M3.7.
 
 ## Ordered active queue
