@@ -77,14 +77,31 @@ A 1 GB VPS cannot safely compile large projects alongside running workloads; the
 first VPS journey lost SSH while compiling on such a host
 ([feedback](vps-journey-feedback.md)). So on-server builds need:
 
+- **One build at a time:** builds go through a durable River queue with one
+  worker on small hosts (no new queue service). Agents see queue position and
+  the reason for waiting.
+- **Limited parallelism inside a build:** on small hosts BuildKit runs one step
+  at a time, Go compiles with `-p 1` and Node gets a heap limit, so peak memory is
+  the largest stage, not the sum of parallel stages. The first VPS attempt ran the
+  Node and Go stages of OAP's own image in parallel.
 - **Admission control:** the builder checks available memory and disk before
-  starting, and queues or refuses a build rather than letting the host fall
-  over. Running applications always take priority over builds.
+  starting, and keeps a build queued with a stated reason rather than letting the
+  host fall over. Running applications always take priority over builds: builder
+  processes get lower priority, so under pressure the build is killed, never a
+  workload or `sshd`.
 - **Hard limits:** builder memory, CPU and time caps sized to the host.
 - **An off-host option:** an agent or CI can build elsewhere and send a verified
   image bundle (commit, image ID, checksum) for OAP to load and release, using
   the same provenance records as on-server builds.
 - **1 GB reference:** Z2 acceptance runs on a 1 GB host.
+
+Defaults chosen from host memory at install time, owner-overridable:
+
+| Host memory | Builds at once | Parallelism inside a build | Builder memory cap |
+|---|---|---|---|
+| 1 GB | 1 | 1 (stages in sequence) | ~500 MiB |
+| 2–4 GB | 1–2 | Moderate | ~40% of RAM |
+| Larger | Owner-set | Default | Owner-set |
 
 ## Server facts without a shell
 

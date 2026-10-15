@@ -20,7 +20,8 @@ closeout tasks 2 and 6. The results are one receipt per run plus a parity report
 probe. Run it on a VPS once per release candidate, for what only real
 infrastructure proves. See the [QA strategy](../../../docs/qa-strategy.md).
 
-**Who runs it:** a testing agent with SSH access to a disposable 1 GB VPS. Owner steps (marked
+**Who runs it:** a testing agent with SSH access to a disposable 1 GB VPS. A ready-to-use
+prompt is in [HANDOFF.md](HANDOFF.md). Owner steps (marked
 **Owner**) use the owner credential and must never be mixed into agent steps. A
 human can do them, or the testing agent acting as owner in those steps only.
 
