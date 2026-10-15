@@ -112,7 +112,8 @@ platform, every image ID and every file checksum.
 export REPO=$PWD J=$PWD/tests/vps/release-journey BUNDLE=/opt/oap-journey-bundle BIN=/opt/oap-journey-bundle/bin
 export DIR=/opt/oap-journey OUT=/opt/oap-journey-evidence
 export BASE=journey.example.com URL=http://127.0.0.1:8878
-mkdir -p "$OUT" && install -d -m 700 "$DIR/creds"
+mkdir -p "$OUT"
+# Leave DIR absent or empty: install.py init refuses existing contents.
 git rev-parse HEAD | tee "$OUT/A-checkout.txt"    # must equal the bundle commit
 { uname -a; nproc; free -m; swapon --show; df -h /var/lib/docker /opt; docker version --format '{{.Server.Version}}'; } \
   > "$OUT/A-preflight.txt" 2>&1
@@ -127,7 +128,7 @@ until Phase X ends.
 
 ```sh
 python3 -I $J/bundle.py load --bundle "$BUNDLE" | tee "$OUT/A-load.json"
-. "$BUNDLE/journey.env"     # exports OAP_IMAGE, JOB, WEB, API1, API2, APIBAD, NOTES, WORKER
+. "$BUNDLE/journey.env"     # exports OAP_IMAGE, JOB, WEB, API1, API2, APIBAD, NOTES, NOTES2, WORKER
 ```
 
 **Expect:** `ok: true`. Every checksum and image ID matches the manifest.
@@ -140,10 +141,12 @@ python3 scripts/install.py init --json --directory "$DIR" --image "$OAP_IMAGE" \
   --ingress-domain "cli.$BASE" --ingress-domain "rest.$BASE" --ingress-domain "mcp.$BASE"
 python3 scripts/install.py start --json --directory "$DIR"
 python3 scripts/install.py check --json --directory "$DIR" | tee "$OUT/A-check.json"
+install -d -m 700 "$DIR/creds"
 ```
 
 **Expect:** `check` reports healthy OAP, PostgreSQL and Caddy. The OAP API answers
 only on loopback. No certificate is requested until an app with HTTPS routes deploys.
+Create the private credential directory only after initialization succeeds.
 
 **After every phase,** copy evidence off the VPS from the build machine, so a lost
 host loses nothing: `rsync -a vps:/opt/oap-journey-evidence/ ./evidence/`. Record
@@ -226,7 +229,8 @@ Notes per interface:
 ## The journey (repeat for `RUN=cli`, then `rest`, then `mcp`)
 
 ```sh
-export RUN=cli  DOMAIN=$RUN.$BASE  CRED=$DIR/creds/onboard-$RUN.json
+export RUN=cli
+export DOMAIN=$RUN.$BASE CRED=$DIR/creds/onboard-$RUN.json
 mkdir -p "$OUT/$RUN"
 echo '{}' > empty.json
 ```
@@ -320,9 +324,13 @@ incident reports `issue` for `api`, with the image change in its comparison.
 Record `/api` availability as an observation. If the operation lands in
 `attention` instead of `failed`, stop and capture it as a finding.
 
-**E3. Correct.** The same deploy request with `"api":"<API2>"`, then *execute*,
-*wait*, *instance health*. **Expect:** success, and the probe with
-`--expect-instances 3` shows `v2` on all 3.
+**E3. Correct and exercise the volume.** Create a deploy plan with
+`{"action":"deploy","applicationId":APP,"expectedVersion":V,"components":["api","notes"],"images":{"api":"<API2>","notes":"<NOTES2>"}}`,
+then *execute*, *wait*, *instance health*. **Expect:** success, the probe with
+`--expect-instances 3` shows `v2` on all 3, and `/notes` reports `boots: 2`.
+The notes variant has the same program and volume contract but a distinct image
+ID. This replaces the container through the product's deploy interface and
+proves it read the existing volume. Record this counter for comparison in F.
 
 ### F: app-wide rollback to D1
 
@@ -336,7 +344,9 @@ rollback again; *instance health*.
 - Success, and the repeated request returns the same operation.
 - `/api` serves `v1` from 3 instances.
 - No `migrate` step in the rollback operation.
-- `/notes` `boots` is greater than in C4 (the volume survived).
+- `/notes` `boots` is greater than in E3 (the volume survived another image
+  replacement). An unchanged notes image need not restart during rollback;
+  that is why E3 deploys a distinct notes image first.
 
 ### H: scale down under traffic
 

@@ -32,6 +32,8 @@ REPO = HERE.parents[2]
 FIXTURES = [
     ('oap-journey-api:base', None, 'examples/hello-api', {}),
     ('oap-journey-notes:v1', None, 'examples/persistent-web', {}),
+    ('oap-journey-notes:v2', 'tests/vps/release-journey/notes-variant.Dockerfile', 'tests/vps/release-journey',
+     {'BASE': 'oap-journey-notes:v1'}),
     ('oap-journey-worker:v1', None, 'examples/worker', {}),
     ('oap-journey-job:v1', 'tests/vps/release-journey/job.Dockerfile', 'tests/vps/release-journey', {}),
     ('oap-journey-api:web-v1', 'tests/vps/release-journey/api-variant.Dockerfile', 'tests/vps/release-journey',
@@ -47,7 +49,8 @@ OAP_TAG = 'openappplatform:rc'
 # exported variable name -> tag
 EXPORTS = {'OAP_IMAGE': OAP_TAG, 'JOB': 'oap-journey-job:v1', 'WEB': 'oap-journey-api:web-v1',
            'API1': 'oap-journey-api:v1', 'API2': 'oap-journey-api:v2', 'APIBAD': 'oap-journey-api:broken',
-           'NOTES': 'oap-journey-notes:v1', 'WORKER': 'oap-journey-worker:v1'}
+           'NOTES': 'oap-journey-notes:v1', 'NOTES2': 'oap-journey-notes:v2',
+           'WORKER': 'oap-journey-worker:v1'}
 
 
 class Runner:
