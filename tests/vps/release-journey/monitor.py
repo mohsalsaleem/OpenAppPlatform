@@ -14,6 +14,7 @@ Start it in the background before Phase A3 and keep it running through Phase X:
   nohup python3 -I monitor.py run --out $OUT/monitor.jsonl --duration 14400 &
 """
 import argparse
+import datetime
 import json
 import signal
 import subprocess
@@ -117,15 +118,26 @@ def summary(args):
               'maxLoad1': max(r.get('load1', 0) for r in rows),
               'containerPeakMiB': dict(sorted(peaks.items()))}
     if args.kernel_log:
-        try:
-            log = subprocess.run(['dmesg'], capture_output=True, text=True, timeout=20).stdout
-        except (OSError, subprocess.TimeoutExpired):
-            log = ''
-        if not log:
+        # An earlier host incident must not fail a later candidate's journey.
+        start = datetime.datetime.strptime(rows[0]['t'], '%Y-%m-%dT%H:%M:%SZ')
+        end = datetime.datetime.strptime(rows[-1]['t'], '%Y-%m-%dT%H:%M:%SZ')
+        since = start.strftime('%Y-%m-%d %H:%M:%S UTC')
+        until = end.strftime('%Y-%m-%d %H:%M:%S UTC')
+        log = None
+        commands = [
+            ['journalctl', '-k', '--no-pager', '-q', '--since', since, '--until', until],
+            ['dmesg', '--since', since, '--until', until],
+        ]
+        for command in commands:
             try:
-                log = subprocess.run(['journalctl', '-k', '--no-pager', '-q'], capture_output=True, text=True, timeout=30).stdout
+                process = subprocess.run(command, capture_output=True, text=True, timeout=30)
             except (OSError, subprocess.TimeoutExpired):
-                log = None
+                continue
+            if process.returncode == 0:
+                log = process.stdout
+                break
+        result['kernelLogScope'] = {'from': rows[0]['t'], 'to': rows[-1]['t']}
+        result['kernelLogAvailable'] = log is not None
         result['oomKills'] = None if log is None else sum(1 for line in log.splitlines()
                                                            if 'Out of memory' in line or 'oom-kill' in line)
     print(json.dumps(result, indent=2))

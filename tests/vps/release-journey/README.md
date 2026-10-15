@@ -430,6 +430,9 @@ docker ps -a --filter name=migrate --format '{{.Names}}' | wc -l > "$OUT/X5-migr
 **Expect:** `oomKills: 0`, `minMemAvailableMiB` above 100, no swap used, and SSH
 responsive throughout. Compare container peaks with the memory budget above and
 record any item that exceeded its estimate.
+Kernel OOM observations cover the monitor's first through last sample, so earlier
+host incidents are not attributed to this journey. `kernelLogAvailable: false`
+and `oomKills: null` mean evidence is unavailable; they do not prove zero OOMs.
 
 ## Parity report: `$OUT/parity.json`
 
