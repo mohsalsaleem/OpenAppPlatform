@@ -16,13 +16,16 @@ spec.loader.exec_module(monitor)
 
 
 class KernelWindowTests(unittest.TestCase):
+    now = monitor.datetime.datetime(2026, 10, 15, 10, 1, 0)
+
     def summary(self, responses):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'monitor.jsonl'
             path.write_text('\n'.join(json.dumps({'t': t, 'memAvailableMiB': 300}) for t in
                                       ('2026-10-15T10:00:00Z', '2026-10-15T10:01:00Z')))
             output = io.StringIO()
-            with patch.object(monitor.subprocess, 'run', side_effect=responses) as calls:
+            with patch.object(monitor.subprocess, 'run', side_effect=responses) as calls, \
+                    patch.object(monitor, 'utcnow', return_value=self.now):
                 with contextlib.redirect_stdout(output):
                     self.assertEqual(monitor.summary(SimpleNamespace(file=str(path), kernel_log=True)), 0)
             return json.loads(output.getvalue()), calls.call_args_list
@@ -34,6 +37,13 @@ class KernelWindowTests(unittest.TestCase):
         command = calls[0].args[0]
         self.assertIn('2026-10-15 10:00:00 UTC', command)
         self.assertIn('2026-10-15 10:01:00 UTC', command)
+
+    def test_window_extends_past_last_sample_to_summary_time(self):
+        self.now = monitor.datetime.datetime(2026, 10, 15, 10, 30, 0)
+        result, calls = self.summary([subprocess.CompletedProcess([], 0, stdout='kernel: oom-kill: monitor\n')])
+        self.assertIn('2026-10-15 10:30:00 UTC', calls[0].args[0])
+        self.assertEqual(result['kernelLogScope']['to'], '2026-10-15T10:30:00Z')
+        self.assertEqual(result['oomKills'], 1)
 
     def test_current_window_oom_is_reported(self):
         result, _ = self.summary([subprocess.CompletedProcess([], 0, stdout='kernel: oom-kill: process\n')])

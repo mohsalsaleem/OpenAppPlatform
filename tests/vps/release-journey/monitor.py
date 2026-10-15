@@ -93,6 +93,10 @@ def run(args):
     return 0
 
 
+def utcnow():
+    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None, microsecond=0)
+
+
 def summary(args):
     rows = []
     with open(args.file) as handle:
@@ -120,7 +124,9 @@ def summary(args):
     if args.kernel_log:
         # An earlier host incident must not fail a later candidate's journey.
         start = datetime.datetime.strptime(rows[0]['t'], '%Y-%m-%dT%H:%M:%SZ')
-        end = datetime.datetime.strptime(rows[-1]['t'], '%Y-%m-%dT%H:%M:%SZ')
+        # Extend to now: an OOM that killed the monitor (or stalled the host)
+        # happens after the last sample and must still be counted.
+        end = max(datetime.datetime.strptime(rows[-1]['t'], '%Y-%m-%dT%H:%M:%SZ'), utcnow())
         since = start.strftime('%Y-%m-%d %H:%M:%S UTC')
         until = end.strftime('%Y-%m-%d %H:%M:%S UTC')
         log = None
@@ -136,7 +142,7 @@ def summary(args):
             if process.returncode == 0:
                 log = process.stdout
                 break
-        result['kernelLogScope'] = {'from': rows[0]['t'], 'to': rows[-1]['t']}
+        result['kernelLogScope'] = {'from': rows[0]['t'], 'to': end.strftime('%Y-%m-%dT%H:%M:%SZ')}
         result['kernelLogAvailable'] = log is not None
         result['oomKills'] = None if log is None else sum(1 for line in log.splitlines()
                                                            if 'Out of memory' in line or 'oom-kill' in line)

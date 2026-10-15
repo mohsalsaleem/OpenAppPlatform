@@ -1,19 +1,25 @@
-# v0.1 release journey on a real VPS: CLI, REST and MCP
+# v0.1 release journey on a real VPS
 
-**Purpose:** prove that an agent can manage an application end to end, reliably,
-through **each** of OAP's agent interfaces. The same journey runs three times on
-one server, once per interface:
+**Purpose:** prove the v0.1 promise on a **1 GB VPS**: a multi-component
+application operated end to end by an owner-authorized agent through the **CLI**,
+plus a short smoke check that the **REST API** and **MCP** work end to end too.
 
-| Run | Interface | Agent identity | Hostname |
+| Run | Interface | Scope | Hostname |
 |---|---|---|---|
-| `cli` | `oap` JSON CLI | Journey agent (CLI) | `cli.$BASE` |
-| `rest` | REST API (`curl`) | Journey agent (REST) | `rest.$BASE` |
-| `mcp` | stdio MCP (`oap-mcp -operate`) | Journey agent (MCP) | `mcp.$BASE` |
+| `cli` | `oap` JSON CLI | **Full journey** (C–H) | `cli.$BASE` |
+| `rest` | REST API (`curl`) | **Smoke** (S1–S6) | `rest.$BASE` |
+| `mcp` | stdio MCP (`oap-mcp -operate`) | **Smoke** (S1–S6) | `mcp.$BASE` |
 
 Each run uses its own named agent, its own application and its own hostname.
-Afterwards, cross-interface checks confirm the three apps coexist behind the
-shared proxy and that no agent can touch another's app. This covers roadmap v0.1
-closeout tasks 2 and 6. The results are one receipt per run plus a parity report.
+Final checks confirm the apps coexist behind the shared proxy, survive an OAP
+outage, and that the host stayed healthy. This covers roadmap v0.1 closeout
+tasks 2 and 6. Results: one CLI receipt, two smoke receipts and a summary.
+
+**Scope on purpose.** Full REST and MCP journeys, interface parity, the
+cross-interface isolation matrix and pause/revoke checks belong to the QA track
+(Q1 integrity checker, Q3 agent evaluations). Their steps are kept in
+[Deferred to the QA track](#deferred-to-the-qa-track) so nothing is lost. The
+local gate already covers isolation and pause/revoke through the CLI.
 
 **Local first.** Run this journey in the local test environment first, with
 `--ingress-tls internal`, `.test` hostnames in `/etc/hosts` and `--cafile` on the
@@ -122,7 +128,7 @@ echo $! > "$OUT/monitor.pid"
 ```
 
 **Expect:** total memory ≤ 1 GiB is fine; record it. The monitor keeps running
-until Phase X ends.
+until the final checks end.
 
 **A3. Load the bundle (VPS).**
 
@@ -226,7 +232,7 @@ Notes per interface:
   deliberately not an MCP tool. Note any other step the tools can't express as a
   finding with the closest available tool.
 
-## The journey (repeat for `RUN=cli`, then `rest`, then `mcp`)
+## The full journey (CLI run)
 
 ```sh
 export RUN=cli
@@ -388,36 +394,126 @@ one `api` instance remains.
 }
 ```
 
-## Phase X: cross-interface checks (after all three runs)
+## S: REST and MCP smoke checks
 
-**X1. Coexistence.** All three apps answer on their own hostname over trusted
+Run once with `RUN=rest` and once with `RUN=mcp`, after the CLI journey, using
+only that run's interface (see the [interface reference](#interface-reference)).
+Each takes about 10 minutes. Record every request and response.
+
+```sh
+export RUN=rest     # then mcp
+export DOMAIN=$RUN.$BASE CRED=$DIR/creds/onboard-$RUN.json
+mkdir -p "$OUT/$RUN"
+```
+
+- **S1. Discover.** MCP: `list` shows the lifecycle tools. REST: read the
+  target capabilities. **Expect:** a structured answer, no error.
+- **S2. Validate and create.** Fill the spec as in C1 (with this run's domain),
+  *validate*, then *create a plan* `create` and *execute* it. Record `APP` and `V`.
+  **Expect:** saved, no containers started.
+- **S3. Owner app grant** exactly as C3, for this run's app; switch `CRED` to it.
+- **S4. Deploy.** *Create a plan* `deploy`, *execute*, *wait*, *instance
+  health*; then *execute* the same plan again. **Expect:** success with the
+  `migrate` step at `exitCode: 0`; the replay returns the same `operationId`;
+  `https://$DOMAIN/api` answers `v1` over trusted HTTPS.
+- **S5. Incident read.** *Incident* for `api`. **Expect:** `observed_healthy`
+  with freshness fields, and `applicationBehaviorVerified: false`.
+- **S6. One denial.** Ask for *capabilities* of the CLI run's app. **Expect:** a
+  structured denial, with no plan or operation created.
+
+Smoke receipt `$OUT/$RUN/smoke-$RUN.json`:
+
+```json
+{"schemaVersion": 1, "run": "rest | mcp", "status": "passed | failed",
+ "steps": {"discover": true, "validate": true, "createWithoutDeploy": true, "appGrant": true,
+           "deployWithMigration": true, "planReplaySameOperation": true, "publicHttpsTrusted": true,
+           "incidentRead": true, "crossAppDenied": true},
+ "operations": ["..."], "findings": ["..."]}
+```
+
+## Final checks (after the CLI journey and both smoke checks)
+
+**X1. Coexistence.** All three apps (CLI, REST and MCP runs) answer on their own hostname over trusted
 HTTPS. A request with an unknown Host is rejected. Send it over HTTPS to a known
 hostname (valid SNI and certificate) with `Host: unknown.invalid`; expect 404,
 421 or 403. An HTTP-to-HTTPS redirect alone does not prove host rejection.
 
-**X2. Isolation.** Each run's app credential is **denied** on the other two apps,
-through its own interface: for example, the MCP agent calls `inspect_capabilities`
-for the CLI app, and the REST agent calls `POST /api/v1/action-plans` with a
-`deploy` for the MCP app. Expect a denial with a structured error, and no new
-plan or operation.
-
-**X3. Controller outage.** Stop only OAP and probe all three apps for 60 s:
+**X2. Controller outage.** Stop only OAP and probe all three apps for 60 s:
 
 ```sh
-docker ps --format '{{.ID}} {{.Names}}' > "$OUT/X3-before.txt"     # VPS
+docker ps --format '{{.ID}} {{.Names}}' > "$OUT/X2-before.txt"     # VPS
 (cd "$DIR" && docker compose stop platform)                        # VPS
 for R in cli rest mcp; do                                          # [build machine]
-  python3 -I $J/probe.py --url https://$R.$BASE/api --duration 60 --concurrency 2 --out "$PROBE_OUT/X3-$R.json" &
+  python3 -I $J/probe.py --url https://$R.$BASE/api --duration 60 --concurrency 2 --out "$PROBE_OUT/X2-$R.json" &
 done; wait
 (cd "$DIR" && docker compose up -d --wait platform)                # VPS
 python3 scripts/install.py check --json --directory "$DIR"
-docker ps --format '{{.ID}} {{.Names}}' > "$OUT/X3-after.txt"
+docker ps --format '{{.ID}} {{.Names}}' > "$OUT/X2-after.txt"
 ```
 
 **Expect:** zero probe failures, workload and Caddy container IDs unchanged, and
 each interface works again after restart (one read call per interface).
 
-**X4. Pause and revoke (Owner).** Agent control is workspace-wide. Read it with
+**X3. Host health, footprint and disk.** Stop the monitor and summarize it:
+
+```sh
+kill "$(cat "$OUT/monitor.pid")"
+sudo python3 -I $J/monitor.py summary --file "$OUT/monitor.jsonl" --kernel-log | tee "$OUT/X3-host.json"
+docker stats --no-stream > "$OUT/X3-stats.txt"
+docker system df > "$OUT/X3-disk.txt"
+docker ps -a --filter name=migrate --format '{{.Names}}' | wc -l > "$OUT/X3-migrate-containers.txt"
+```
+
+**Expect:** `oomKills: 0`, `minMemAvailableMiB` above 100, no swap used, and SSH
+responsive throughout. Compare container peaks with the memory budget above and
+record any item that exceeded its estimate.
+Kernel OOM observations cover the window from the monitor's first sample until
+the summary runs, so earlier host incidents are not attributed to this journey,
+and an OOM that killed the monitor itself is still counted. `kernelLogAvailable: false`
+and `oomKills: null` mean evidence is unavailable; they do not prove zero OOMs.
+
+## Summary receipt: `$OUT/v0.1-journey.json`
+
+```json
+{
+  "schemaVersion": 1, "commit": "<sha>",
+  "cli": "passed | failed", "smoke": {"rest": "passed | failed", "mcp": "passed | failed"},
+  "coexistence": true, "controllerOutageFailures": 0,
+  "host": {"memTotalMiB": 985, "swap": false, "minMemAvailableMiB": 0, "oomKills": 0,
+           "kernelLogAvailable": true, "maxLoad1": 0, "sshLost": false, "containerPeakMiB": {}},
+  "timings": {"prepareSeconds": 0, "loadSeconds": 0, "phaseA": "…", "cli": "…", "smoke": "…", "final": "…"},
+  "bundle": {"commit": "<sha>", "platform": "linux/amd64", "dirtyTree": false},
+  "findings": ["..."]
+}
+```
+
+Hand back `release-journey-cli.json`, `smoke-rest.json`, `smoke-mcp.json`,
+`v0.1-journey.json`, the VPS `$OUT` directory, the build machine's `prepare.json`
+and `evidence/` (including probes), and the findings.
+
+The journey passes only if the CLI journey and both smoke checks pass, the final
+checks pass, and on the 1 GB host there were no OOM kills and the host stayed
+responsive. If the host becomes unreachable, keep every partial receipt already
+copied off and record where it stopped. Downtime during standard deploys (D1,
+E2) is an observation, not a failure.
+
+## Deferred to the QA track
+
+Not part of v0.1. Kept here as the starting point for Q1 (integrity checker) and
+Q3 (agent evaluations and interface parity).
+
+- **Full REST and MCP journeys:** run phases C–H with `RUN=rest` and `RUN=mcp`,
+  producing `release-journey-<run>.json`.
+- **Parity report** `parity.json`: steps whose results differed between
+  interfaces, and actions an interface could not express (known: MCP has no
+  `verify` tool, use `inspect_instances`; owner approval is CLI-only by design).
+- **Isolation matrix:** Each run's app credential is **denied** on the other two apps,
+through its own interface: for example, the MCP agent calls `inspect_capabilities`
+for the CLI app, and the REST agent calls `POST /api/v1/action-plans` with a
+`deploy` for the MCP app. Expect a denial with a structured error, and no new
+plan or operation.
+
+- **Pause and revoke across interfaces:** Agent control is workspace-wide. Read it with
 `oapo agent-control`, then pause all agents:
 
 ```sh
@@ -430,49 +526,3 @@ at the new version, and confirm each interface works again. Then
 `oapo --credential <credentialId> revoke` one run's onboarding credential: its
 next call is denied, and the other runs are unaffected.
 
-**X5. Host health, footprint and disk.** Stop the monitor and summarize it:
-
-```sh
-kill "$(cat "$OUT/monitor.pid")"
-sudo python3 -I $J/monitor.py summary --file "$OUT/monitor.jsonl" --kernel-log | tee "$OUT/X5-host.json"
-docker stats --no-stream > "$OUT/X5-stats.txt"
-docker system df > "$OUT/X5-disk.txt"
-docker ps -a --filter name=migrate --format '{{.Names}}' | wc -l > "$OUT/X5-migrate-containers.txt"
-```
-
-**Expect:** `oomKills: 0`, `minMemAvailableMiB` above 100, no swap used, and SSH
-responsive throughout. Compare container peaks with the memory budget above and
-record any item that exceeded its estimate.
-Kernel OOM observations cover the monitor's first through last sample, so earlier
-host incidents are not attributed to this journey. `kernelLogAvailable: false`
-and `oomKills: null` mean evidence is unavailable; they do not prove zero OOMs.
-
-## Parity report: `$OUT/parity.json`
-
-```json
-{
-  "schemaVersion": 1, "commit": "<sha>",
-  "runs": {"cli": "passed", "rest": "passed", "mcp": "passed"},
-  "coexistence": true, "isolation": true, "controllerOutageFailures": 0, "pauseRevoke": true,
-  "gaps": [
-    {"interface": "mcp", "step": "verify", "used": "inspect_instances", "note": "no verify tool"}
-  ],
-  "differences": ["<any step whose result differed between interfaces>"],
-  "host": {"memTotalMiB": 985, "swap": false, "minMemAvailableMiB": 0, "oomKills": 0,
-           "maxLoad1": 0, "sshLost": false, "containerPeakMiB": {}},
-  "timings": {"prepareSeconds": 0, "loadSeconds": 0, "phaseA": "…", "runs": {"cli": "…", "rest": "…", "mcp": "…"}, "phaseX": "…"},
-  "bundle": {"commit": "<sha>", "platform": "linux/amd64", "dirtyTree": false},
-  "footprint": "...", "disk": "..."
-}
-```
-
-Hand back the three run receipts, `parity.json`, the VPS `$OUT` directory, the
-build machine's `prepare.json` and `evidence/` (including probes), and the
-findings.
-
-The journey passes only if all three runs pass, the cross-interface checks pass,
-and on the 1 GB host there were no OOM kills and the host stayed responsive. If
-the host becomes unreachable, keep every partial receipt already copied off and
-record where it stopped. Downtime during standard deploys (D1, E2) is an
-observation, not a failure. Any action an interface cannot express is listed
-under `gaps`; whether it blocks v0.1 is the owner's decision.
