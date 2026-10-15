@@ -293,12 +293,19 @@ curl -sS https://$DOMAIN/notes | tee "$OUT/$RUN/C4-notes.json"
 **D1.** In the spec, change only `api.instances` from 1 to 3. *Create a plan*
 `{"action":"configure","applicationId":APP,"expectedVersion":V,"specification":<spec>}`
 and *execute*; then *create a plan* `deploy` at the new `V`, *execute*, *wait*.
-Run the probe for the whole step:
+Run the probe for the whole step. Durations are maximum windows; after the
+operation finishes, send SIGTERM to the probe and wait for its JSON summary.
+The probe must still be running when the action finishes; an expired window
+does not prove coverage of the whole action. This avoids idle waits while
+retaining observations throughout configuration and rollout.
 
 ```sh
 # [build machine] start, then run configure → deploy → wait on the VPS
 python3 -I $J/probe.py --url https://$RUN.$BASE/api --duration 240 --concurrency 2 --out "$PROBE_OUT/$RUN-D1.json" &
-wait
+PROBE_PID=$!
+# Run configure → deploy → wait on the VPS before the following two commands.
+kill -TERM "$PROBE_PID"
+wait "$PROBE_PID"
 # [build machine] afterwards
 python3 -I $J/probe.py --url https://$RUN.$BASE/api --duration 20 --expect-instances 3 --out "$PROBE_OUT/$RUN-D1-after.json"
 ```
@@ -323,6 +330,8 @@ to `"0"` and configure (save only).
 incident reports `issue` for `api`, with the image change in its comparison.
 Record `/api` availability as an observation. If the operation lands in
 `attention` instead of `failed`, stop and capture it as a finding.
+Stop the traffic probe after the operation and incident observations complete;
+retain its summary before starting E3.
 
 **E3. Correct and exercise the volume.** Create a deploy plan with
 `{"action":"deploy","applicationId":APP,"expectedVersion":V,"components":["api","notes"],"images":{"api":"<API2>","notes":"<NOTES2>"}}`,
@@ -353,6 +362,8 @@ rollback again; *instance health*.
 Change only `api.instances` back to 1. *Create a plan*
 `{"action":"scale-down","applicationId":APP,"expectedVersion":V,"specification":<spec>}`,
 *execute*, *wait*, with the probe running for 120 s.
+Use 120 s as the maximum probe window and stop it after the operation finishes,
+as in D1. Keep the probe running throughout the drain and successful completion.
 **Expect:** success after the 31-second drain grace, **0 probe failures**, and
 one `api` instance remains.
 
@@ -380,7 +391,9 @@ one `api` instance remains.
 ## Phase X: cross-interface checks (after all three runs)
 
 **X1. Coexistence.** All three apps answer on their own hostname over trusted
-HTTPS. A request with an unknown Host is rejected.
+HTTPS. A request with an unknown Host is rejected. Send it over HTTPS to a known
+hostname (valid SNI and certificate) with `Host: unknown.invalid`; expect 404,
+421 or 403. An HTTP-to-HTTPS redirect alone does not prove host rejection.
 
 **X2. Isolation.** Each run's app credential is **denied** on the other two apps,
 through its own interface: for example, the MCP agent calls `inspect_capabilities`

@@ -8,6 +8,7 @@ Application traffic only: it never calls OAP or Docker.
 """
 import argparse
 import json
+import signal
 import ssl
 import sys
 import threading
@@ -34,6 +35,13 @@ def main():
     summary = {'url': args.url, 'requests': 0, 'failures': 0, 'statuses': {}, 'instances': {},
                'versions': {}, 'errors': {}, 'startedAt': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
     deadline = time.monotonic() + args.duration
+    stop = threading.Event()
+    # The operator can end a probe after the observed action completes without
+    # losing its measurements. The duration remains an upper bound.
+    def finish(_signum, _frame):
+        stop.set()
+    signal.signal(signal.SIGTERM, finish)
+    signal.signal(signal.SIGINT, finish)
 
     def record(status, instance=None, version=None, error=None):
         with lock:
@@ -49,7 +57,7 @@ def main():
                 summary['versions'][version] = summary['versions'].get(version, 0) + 1
 
     def worker():
-        while time.monotonic() < deadline:
+        while not stop.is_set() and time.monotonic() < deadline:
             request = urllib.request.Request(args.url, headers={'Cache-Control': 'no-store'})
             try:
                 with urllib.request.urlopen(request, timeout=args.timeout, context=context) as response:
@@ -66,7 +74,7 @@ def main():
                 record(e.code)
             except Exception as e:  # connection reset, timeout, TLS, DNS
                 record(0, error=type(e).__name__)
-            time.sleep(args.interval)
+            stop.wait(args.interval)
 
     threads = [threading.Thread(target=worker, daemon=True) for _ in range(args.concurrency)]
     for thread in threads:
@@ -75,6 +83,7 @@ def main():
         thread.join()
 
     summary['finishedAt'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+    summary['stoppedBySignal'] = stop.is_set()
     summary['distinctInstances'] = len(summary['instances'])
     ok = True
     if args.expect_instances is not None and summary['distinctInstances'] < args.expect_instances:
