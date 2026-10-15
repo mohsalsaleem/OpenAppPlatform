@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "run": "mcp",
+  "status": "passed",
+  "commit": "11d5b85c38a390d84c464cd04e9defa522915953",
+  "oapImage": "sha256:0559df05edafa9255583e105f97dab107df9849bd5e3288b7ec0bb6a73f39ba2",
+  "tls": "letsencrypt",
+  "steps": {
+    "discover": true,
+    "validate": true,
+    "createWithoutDeploy": true,
+    "appGrant": true,
+    "deployWithMigration": true,
+    "planReplaySameOperation": true,
+    "publicHttpsTrusted": true,
+    "incidentRead": true,
+    "crossAppDenied": true
+  },
+  "observations": {},
+  "operations": [
+    "d49861cbb705c4a15381e8bc09ac666c"
+  ],
+  "findings": [],
+  "applicationId": "6e4cd89d26588f608ad41d2cefcc7125",
+  "durationSeconds": 97.07,
+  "finishedAt": "2026-10-15T15:22:47Z"
+}

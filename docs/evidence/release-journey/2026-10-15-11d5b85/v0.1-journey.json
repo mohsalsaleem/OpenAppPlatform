@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "commit": "11d5b85c38a390d84c464cd04e9defa522915953",
+  "environment": "vps",
+  "tls": "letsencrypt",
+  "vpsExecuted": true,
+  "status": "failed",
+  "cli": "failed",
+  "smoke": {
+    "rest": "passed",
+    "mcp": "passed"
+  },
+  "coexistence": true,
+  "controllerOutageFailures": 0,
+  "workloadAndProxyIdsUnchanged": true,
+  "findings": [
+    {
+      "id": "VPS-H-001",
+      "step": "CLI H: scale down 3 to 1",
+      "expected": {
+        "operationState": "succeeded",
+        "trafficFailures": 0
+      },
+      "observed": {
+        "operationState": "succeeded",
+        "requests": 277,
+        "trafficFailures": 2,
+        "errors": {
+          "RemoteDisconnected": 1,
+          "URLError": 1
+        }
+      },
+      "evidence": [
+        "vps/cli/H-probe.json",
+        "vps/cli/038-H-wait-response.json",
+        "vps/cli/039-failure-instances-response.json",
+        "vps/cli/040-failure-incident-response.json",
+        "vps/H-diagnostics/caddy-window.log",
+        "vps/H-diagnostics/api-container-state.jsonl"
+      ],
+      "assessment": "A Caddy configuration reload and context-canceled server-shutdown log occurred in the probe window. API containers report no OOM kills or restarts. Root cause is not established; URLError detail and per-request timestamps are not captured by this probe. No product fix or retry was performed."
+    }
+  ],
+  "host": {
+    "ok": true,
+    "samples": 256,
+    "from": "2026-10-15T15:02:38Z",
+    "to": "2026-10-15T15:25:56Z",
+    "memTotalMiB": 985,
+    "minMemAvailableMiB": 256,
+    "maxSwapUsedMiB": 0,
+    "maxLoad1": 3.75,
+    "containerPeakMiB": {
+      "--": 0.0,
+      "oap-1ad0a49a-ingress-1": 27.0,
+      "oap-1ad0a49a-platform-1": 24.8,
+      "oap-1ad0a49a-postgres-1": 70.7,
+      "oap-3d902c7f0296-api-1": 4.3,
+      "oap-3d902c7f0296-api-2": 1.9,
+      "oap-3d902c7f0296-api-3": 2.2,
+      "oap-3d902c7f0296-notes-1": 4.1,
+      "oap-3d902c7f0296-web-1": 4.4,
+      "oap-3d902c7f0296-worker-1": 3.8,
+      "oap-6da7d31a92af-api-1": 2.6,
+      "oap-6da7d31a92af-notes-1": 2.8,
+      "oap-6da7d31a92af-web-1": 1.7,
+      "oap-6da7d31a92af-worker-1": 1.3,
+      "oap-6e4cd89d2658-api-1": 2.7,
+      "oap-6e4cd89d2658-notes-1": 3.6,
+      "oap-6e4cd89d2658-web-1": 1.7,
+      "oap-6e4cd89d2658-worker-1": 4.2,
+      "oap-d4474dd3f399-web-1": 21.1,
+      "oap-fec6a656-ingress-1": 18.7,
+      "oap-fec6a656-platform-1": 12.3,
+      "oap-fec6a656-postgres-1": 52.9,
+      "oap-job-c53675dfe151992d8b5866ec583f240a-migrate": 0.6
+    },
+    "kernelLogScope": {
+      "from": "2026-10-15T15:02:38Z",
+      "to": "2026-10-15T15:25:58Z"
+    },
+    "kernelLogAvailable": true,
+    "oomKills": 0,
+    "sshLost": false
+  },
+  "timings": {
+    "startedAt": "2026-10-15T15:02:37Z",
+    "finishedAt": "2026-10-15T15:25:55Z",
+    "totalSeconds": 1398.94,
+    "phaseABFinishedAt": "2026-10-15T15:04:39Z",
+    "runs": {
+      "cli": 706.27,
+      "rest": 106.53,
+      "mcp": 97.07
+    }
+  },
+  "bundle": {
+    "commit": "11d5b85c38a390d84c464cd04e9defa522915953",
+    "platform": "linux/amd64",
+    "dirtyTree": false
+  },
+  "hostHealth": "passed",
+  "publicHttps": {
+    "systemTrustVerified": true,
+    "issuer": "Let's Encrypt",
+    "hostnames": [
+      "cli.nishashipping.com",
+      "rest.nishashipping.com",
+      "mcp.nishashipping.com"
+    ],
+    "renewalTested": false
+  },
+  "interfaceGaps": [
+    {
+      "interface": "mcp",
+      "action": "verify",
+      "alternative": "inspect_instances",
+      "status": "known and documented; smoke checks passed"
+    }
+  ],
+  "evidenceNaming": {
+    "X3-before/after/stop/start/check and per-run X3-probe": "Current runbook X2 controller outage; original driver filenames retained",
+    "X5-stats/disk/retained-jobs": "Current runbook X3 footprint and disk; original driver filenames retained"
+  },
+  "scope": {
+    "productCodeChanged": false,
+    "failedRunRetried": false,
+    "fullRestMcpJourneys": false,
+    "pauseRevokeMatrix": false,
+    "priorLocalRestScaleDownFinding": "Still unresolved; current CLI VPS finding reproduces scale-down traffic loss, without establishing a shared root cause."
+  }
+}

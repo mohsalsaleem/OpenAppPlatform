@@ -1,0 +1,28 @@
+[
+  {
+    "id": "VPS-H-001",
+    "step": "CLI H: scale down 3 to 1",
+    "expected": {
+      "operationState": "succeeded",
+      "trafficFailures": 0
+    },
+    "observed": {
+      "operationState": "succeeded",
+      "requests": 277,
+      "trafficFailures": 2,
+      "errors": {
+        "RemoteDisconnected": 1,
+        "URLError": 1
+      }
+    },
+    "evidence": [
+      "vps/cli/H-probe.json",
+      "vps/cli/038-H-wait-response.json",
+      "vps/cli/039-failure-instances-response.json",
+      "vps/cli/040-failure-incident-response.json",
+      "vps/H-diagnostics/caddy-window.log",
+      "vps/H-diagnostics/api-container-state.jsonl"
+    ],
+    "assessment": "A Caddy configuration reload and context-canceled server-shutdown log occurred in the probe window. API containers report no OOM kills or restarts. Root cause is not established; URLError detail and per-request timestamps are not captured by this probe. No product fix or retry was performed."
+  }
+]

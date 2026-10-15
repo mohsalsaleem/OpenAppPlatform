@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "run": "cli",
+  "status": "failed",
+  "commit": "11d5b85c38a390d84c464cd04e9defa522915953",
+  "oapImage": "sha256:0559df05edafa9255583e105f97dab107df9849bd5e3288b7ec0bb6a73f39ba2",
+  "tls": "letsencrypt",
+  "steps": {
+    "validate": true,
+    "createWithoutDeploy": true,
+    "appGrant": true,
+    "deployWithMigration": true,
+    "planReplaySameOperation": true,
+    "publicHttpsTrusted": true,
+    "scaleUpTo3": true,
+    "trafficOnAll3": true,
+    "failingMigrationBlocksRollout": true,
+    "incidentIdentifiesJob": true,
+    "brokenReleaseNotCompleted": true,
+    "incidentIdentifiesApi": true,
+    "correctedToV2": true,
+    "appWideRollback": true,
+    "rollbackSkippedMigration": true,
+    "rollbackReplay": true,
+    "volumeDataRetained": true,
+    "scaleDownFailures": 2
+  },
+  "observations": {
+    "scaleUpFailures": 2,
+    "brokenReleaseApiFailures": 2,
+    "scaleDownOperationState": "succeeded"
+  },
+  "operations": [
+    "3e911e8f058409539c19fa053cb038bd",
+    "c53675dfe151992d8b5866ec583f240a",
+    "93380e672cfeafab9324f36d78491a66",
+    "418aa624f9e7afe8720332e091599374",
+    "a8eb236d779b398369932aa8e230ea7a",
+    "0cbed87bf54e33cf0ed30d2a524f7f9a",
+    "e3099247ee2df3ba5f0cd83c4d581167"
+  ],
+  "findings": [
+    {
+      "id": "VPS-H-001",
+      "step": "CLI H: scale down 3 to 1",
+      "expected": {
+        "operationState": "succeeded",
+        "trafficFailures": 0
+      },
+      "observed": {
+        "operationState": "succeeded",
+        "requests": 277,
+        "trafficFailures": 2,
+        "errors": {
+          "RemoteDisconnected": 1,
+          "URLError": 1
+        }
+      },
+      "evidence": [
+        "vps/cli/H-probe.json",
+        "vps/cli/038-H-wait-response.json",
+        "vps/cli/039-failure-instances-response.json",
+        "vps/cli/040-failure-incident-response.json",
+        "vps/H-diagnostics/caddy-window.log",
+        "vps/H-diagnostics/api-container-state.jsonl"
+      ],
+      "assessment": "A Caddy configuration reload and context-canceled server-shutdown log occurred in the probe window. API containers report no OOM kills or restarts. Root cause is not established; URLError detail and per-request timestamps are not captured by this probe. No product fix or retry was performed."
+    }
+  ],
+  "applicationId": "3d902c7f0296fbd1306dad9c312f451f",
+  "durationSeconds": 706.27,
+  "finishedAt": "2026-10-15T15:17:11Z"
+}
