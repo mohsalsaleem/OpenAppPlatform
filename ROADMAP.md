@@ -102,8 +102,8 @@ remains is proving it as one journey, documenting it accurately and cutting the
 release. Do these in order. The real VPS journey must target **1 GB RAM**;
 constrain the test and move candidate builds off-host rather than requiring a
 larger runtime server. See [VPS journey feedback](docs/vps-journey-feedback.md)
-for the blocked attempt and acceptance requirements. This constraint is not yet
-validated.
+for the blocked attempt and acceptance requirements. The runbook is revised
+(off-host bundle, memory budget, host monitor); the 1 GB run is not yet validated.
 
 | # | Task | Done when |
 |---|---|---|
@@ -146,7 +146,7 @@ on-server builds (Z2); its component-scoped release grants remain.
 | Slice | Scope | Acceptance |
 |---|---|---|
 | **Z1 Bootstrap and handoff** | Agent-guided install on a fresh VPS (OAP, PostgreSQL, Caddy, builder); owner setup; agent grant; installer removes the temporary host key and reports it; break-glass re-entry is an explicit, time-limited owner action. Read-only **server facts** API (disk, memory, CPU, images, build cache, reclaimable space, per-app usage; other apps only as totals). Fallback hostname via `sslip.io` when no domain is given | An agent goes from a fresh VPS to a live HTTPS app with no domain supplied; after handoff its old host key no longer works; server facts never name another grant's apps |
-| **Z2 On-server builds** | Optional isolated builder (rootless BuildKit, no Docker socket or host mounts, CPU/memory/time limits, cache budget); input is a Git commit or an uploaded source bundle; output is a local image with commit provenance; component-scoped release grants (from M3.4); agent-triggered releases, Git webhooks optional | An agent builds and releases three components from one commit; a hostile Dockerfile cannot reach the host or Docker socket; a component credential cannot build or release another component |
+| **Z2 On-server builds** | Optional isolated builder (rootless BuildKit, no Docker socket or host mounts, CPU/memory/time limits, cache budget) with memory and disk admission control; off-host built image bundles accepted as an alternative; input is a Git commit or an uploaded source bundle; output is a local image with commit provenance; component-scoped release grants (from M3.4); agent-triggered releases, Git webhooks optional | On a **1 GB** host: an agent builds and releases three components from one commit while apps keep serving; a build that would exhaust memory is queued or refused, not run; an off-host built bundle loads and releases with the same provenance; a hostile Dockerfile cannot reach the host or Docker socket; a component credential cannot build or release another component |
 | **Z3 Owned data services** | Postgres, Redis and MySQL as owned single-instance components with retained volumes; OAP-generated credentials bound as secrets; dependants wired by reference; documented backup and restore procedure | An app with Postgres and Redis deploys with credentials never appearing in any agent-visible output; data survives app releases and rollback |
 | **Z4 Quotas and disk management** | Per-app quotas (CPU, memory, disk, instances, build minutes) and app count per grant; disk-aware clean-up of images, build cache and old job containers under thresholds, extending M3.6a | One app cannot exceed its quota; under disk pressure clean-up frees space without touching running, bound or rollback-target artifacts |
 | **Z5 Policy and safety rails** | Owner-editable risk tiers (routine, sensitive, destructive); secret requests filled by the owner through a separate link; circuit breakers and mutation rate limits; blast radius in every plan; Docker socket proxy limiting OAP's own Docker API use | A sensitive change waits for owner approval; repeated failed deploys auto-pause the agent; a secret request never exposes the value to the agent; OAP's Docker access is limited to its allowlist |

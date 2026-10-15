@@ -14,7 +14,8 @@
         "instances": 1,
         "strategy": "standard",
         "env": {"JOB_EXIT_CODE": "0"},
-        "readiness": {"timeoutSeconds": 60}
+        "readiness": {"timeoutSeconds": 60},
+        "limits": {"memoryMiB": 64, "cpuMillis": 200}
       },
       {
         "name": "api",

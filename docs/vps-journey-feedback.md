@@ -48,5 +48,27 @@ Phase X on a 1 GB VPS without OOM termination or loss of host responsiveness.
 It produces all three run receipts, parity, timings and the evidence archive.
 The preparation/build lane and exact candidate identity are recorded.
 
-This is pending work. The existing runbook still describes the original 2 GB
-procedure; neither 1 GB support nor successful VPS interface parity is proven.
+## Response (runbook revision)
+
+The [runbook](../tests/vps/release-journey/README.md) now targets a 1 GB VPS
+without swap:
+
+- **Off-host build lane:** `bundle.py prepare` builds the candidate image, the
+  `oap` and `oap-mcp` binaries for the VPS platform and every fixture image on a
+  build machine, with a manifest of the commit, image IDs and checksums.
+  `bundle.py load` verifies checksums, loads the images and confirms each image
+  ID. No Go, Node or Docker builds run on the VPS.
+- **Memory budget:** OAP, PostgreSQL and Caddy from the measured footprint
+  (~200 MiB together); total estimate ~615 MiB of 985, with a stop rule below
+  100 MiB available.
+- **Bounded fixtures:** every fixture has a 64 MiB cap (OAP's minimum limit;
+  actual use is a few MiB). Runs are sequential; each run ends scaled back to one
+  API instance, so retained apps stay small during coexistence checks.
+- **Traffic off the host:** `probe.py` runs on the build machine against the
+  public URLs, at lower concurrency.
+- **Evidence:** `monitor.py` samples memory, swap, load and container usage every
+  5 s and summarizes peaks and kernel OOM kills; evidence is copied off the VPS
+  after every phase; preparation, load and phase timings are recorded.
+
+The behaviors under test are unchanged. 1 GB support and VPS interface parity
+are still unproven until the revised journey passes.

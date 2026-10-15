@@ -71,6 +71,21 @@ that keeps host access can bypass every OAP rule.
 | Workload hardening: no privileged containers, host network or bind mounts; per-app networks; optional read-only root filesystem | Applications escaping to the host | Exists |
 | Tamper-evident audit with a request trace ID | Undetected misbehavior; enables agent evaluation | Partly exists; Q3 |
 
+## Builds on small servers
+
+A 1 GB VPS cannot safely compile large projects alongside running workloads; the
+first VPS journey lost SSH while compiling on such a host
+([feedback](vps-journey-feedback.md)). So on-server builds need:
+
+- **Admission control:** the builder checks available memory and disk before
+  starting, and queues or refuses a build rather than letting the host fall
+  over. Running applications always take priority over builds.
+- **Hard limits:** builder memory, CPU and time caps sized to the host.
+- **An off-host option:** an agent or CI can build elsewhere and send a verified
+  image bundle (commit, image ID, checksum) for OAP to load and release, using
+  the same provenance records as on-server builds.
+- **1 GB reference:** Z2 acceptance runs on a 1 GB host.
+
 ## Server facts without a shell
 
 A read-only API gives agents what they need to manage the server: disk, memory

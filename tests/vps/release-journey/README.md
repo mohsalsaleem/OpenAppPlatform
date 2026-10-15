@@ -20,16 +20,16 @@ closeout tasks 2 and 6. The results are one receipt per run plus a parity report
 probe. Run it on a VPS once per release candidate, for what only real
 infrastructure proves. See the [QA strategy](../../../docs/qa-strategy.md).
 
-**Who runs it:** a testing agent on a disposable VPS. Owner steps (marked
+**Who runs it:** a testing agent with SSH access to a disposable 1 GB VPS. Owner steps (marked
 **Owner**) use the owner credential and must never be mixed into agent steps. A
 human can do them, or the testing agent acting as owner in those steps only.
 
 ## Ground rules
 
 1. **One interface per run.** Every agent step in a run uses only that run's
-   interface. `docker`, `curl` against the app's public URL, and `probe.py` are
-   used only to build images and observe application traffic. Owner steps always
-   use the CLI.
+   interface. `docker`, `curl` against the app's public URL, `probe.py` and
+   `monitor.py` are used only to prepare images and observe traffic and the host.
+   Owner steps always use the CLI.
 2. **Identities stay separate.** Never pass credentials in arguments, prompts or
    logs. Credential files are mode 0600 inside a 0700 directory.
 3. **No workarounds.** Never edit the control database, call undocumented
@@ -43,49 +43,97 @@ human can do them, or the testing agent acting as owner in those steps only.
 5. **Retain everything** in `$OUT/<run>/`: request bodies, responses, plan IDs and
    hashes, operation IDs and probe summaries, numbered in order.
 
+## Target: a 1 GB VPS
+
+The journey must pass on a **1 GB RAM VPS without swap**; a bigger server is not
+the fix ([feedback](../../../docs/vps-journey-feedback.md)). The first attempt
+failed because it compiled the platform, frontend and fixtures **on** the VPS.
+So nothing is compiled on the VPS: a build machine prepares a verified bundle,
+and the VPS only loads images and runs OAP.
+
+**Memory budget** (MiB; OAP, PostgreSQL and Caddy from the measured
+[footprint reference](../../../docs/footprint.md); the rest are estimates the
+monitor will confirm):
+
+| Item | Expected | Notes |
+|---|---|---|
+| Kernel, systemd, sshd | ~150 | Varies by image |
+| Docker Engine and containerd | ~100 | |
+| OAP | ~25 | Measured idle peak 21 |
+| PostgreSQL | ~140 | Measured idle peak 131–134 |
+| Caddy | ~50 | Measured idle peak 45 |
+| Fixtures at peak: 6 containers in the active run, 4 each in the two retained runs | ~100 | Small Go programs, ~5–10 each; the 64 MiB limits are caps, not usage |
+| Agent tooling on the VPS (CLI, MCP server, Python helpers) | ~50 | Short-lived processes |
+| **Total** | **~615** | Leaves ~300 of 985 for page cache and peaks |
+
+**Stop rule:** if available memory falls below **100 MiB** for more than a
+minute, or SSH stops answering, stop the run, record it, and collect evidence
+after recovery. Do not add swap to pass.
+
 ## What you need
 
-**Pending test revision:** the owner requires this journey to run on a **1 GB
-VPS**. The procedure below still assumes the original 2 GB host and on-host
-builds; it has not proven the 1 GB target. Constrain fixture overhead and add a
-reproducible off-host build lane before repeating it on a 1 GB server. See
-[VPS journey feedback](../../../docs/vps-journey-feedback.md) for observations
-and acceptance requirements.
+**Build machine** (a laptop, workstation or CI runner; not the VPS): Docker
+(default `docker` builder), Go, Git, Python ≥ 3.8, and the repository at the
+**release candidate commit** with a clean working tree.
 
-- A fresh Linux VPS (2 vCPU / 2 GB RAM or more) with Docker Engine (API ≥ 1.45),
-  Compose v2, Python ≥ 3.8, Go (to build the CLI and MCP server), Git and `curl`.
-  Public TCP 80/443 open.
-- Three DNS A records pointing at the VPS: `cli.$BASE`, `rest.$BASE`, `mcp.$BASE`.
-  Without DNS, use `--ingress-tls internal`, `.test` names in `/etc/hosts` and
-  `--cafile` on the probe; record that public ACME was **not** tested.
-- The OAP repository at the **release candidate commit**. Record `git rev-parse HEAD`.
+**VPS:** fresh Linux, **1 vCPU / 1 GB RAM**, no swap required, ≥ 10 GB free disk,
+Docker Engine (API ≥ 1.45), Compose v2, Python ≥ 3.8, Git and `curl`. **No Go or
+Node.** Public TCP 80/443 open. A checkout of the same commit (for the installer
+and these journey files; nothing is built from it).
 
-## Phase A: build and install (once, host administration)
+**DNS:** three A records pointing at the VPS: `cli.$BASE`, `rest.$BASE`,
+`mcp.$BASE`. Without DNS, use `--ingress-tls internal`, `.test` names and
+`--cafile` on the probe, and record that public ACME was **not** tested.
+
+**Where things run:** OAP's API is loopback-only, so `oap`, `oap-mcp`, `curl`
+against the API and the MCP helper run **on the VPS** over SSH. `probe.py` runs
+**on the build machine** (it only needs the public URL), which keeps traffic
+generation off the 1 GB host and tests real external access.
+
+## Phase A: prepare, load and install (once)
+
+**A1. Build the bundle (build machine).** Use the VPS's platform
+(`linux/amd64` or `linux/arm64`).
 
 ```sh
-export REPO=$PWD J=$PWD/tests/vps/release-journey
+git checkout <RC_SHA> && git status --porcelain   # must be empty
+python3 -I tests/vps/release-journey/bundle.py prepare --out ./journey-bundle --platform linux/amd64 \
+  | tee prepare.json
+scp -r ./journey-bundle vps:/opt/oap-journey-bundle
+```
+
+**Expect:** `ok: true`, `dirtyTree: false`. `manifest.json` records the commit,
+platform, every image ID and every file checksum.
+
+**A2. Preflight and monitor (VPS).**
+
+```sh
+export REPO=$PWD J=$PWD/tests/vps/release-journey BUNDLE=/opt/oap-journey-bundle BIN=/opt/oap-journey-bundle/bin
 export DIR=/opt/oap-journey OUT=/opt/oap-journey-evidence
 export BASE=journey.example.com URL=http://127.0.0.1:8878
 mkdir -p "$OUT" && install -d -m 700 "$DIR/creds"
+git rev-parse HEAD | tee "$OUT/A-checkout.txt"    # must equal the bundle commit
+{ uname -a; nproc; free -m; swapon --show; df -h /var/lib/docker /opt; docker version --format '{{.Server.Version}}'; } \
+  > "$OUT/A-preflight.txt" 2>&1
+nohup python3 -I $J/monitor.py run --out "$OUT/monitor.jsonl" --duration 21600 > /dev/null 2>&1 &
+echo $! > "$OUT/monitor.pid"
+```
 
-docker build --label org.opencontainers.image.revision="$(git rev-parse HEAD)" -t openappplatform:rc .
-go build -o bin/oap ./cmd/oap && go build -o bin/oap-mcp ./cmd/oap-mcp
-OAP_IMAGE=$(docker image inspect --format '{{.Id}}' openappplatform:rc)
+**Expect:** total memory ≤ 1 GiB is fine; record it. The monitor keeps running
+until Phase X ends.
 
-docker build -t oap-journey-api:base  examples/hello-api
-docker build -t oap-journey-notes:v1  examples/persistent-web
-docker build -t oap-journey-worker:v1 examples/worker
-docker build -t oap-journey-job:v1 -f $J/job.Dockerfile $J
-for v in web-v1 v1 v2; do
-  docker build -t oap-journey-api:$v -f $J/api-variant.Dockerfile \
-    --build-arg BASE=oap-journey-api:base --build-arg VERSION=$v $J
-done
-docker build -t oap-journey-api:broken -f $J/api-broken.Dockerfile --build-arg BASE=oap-journey-api:base $J
-id() { docker image inspect --format '{{.Id}}' "$1"; }
-export JOB=$(id oap-journey-job:v1) WEB=$(id oap-journey-api:web-v1) API1=$(id oap-journey-api:v1) \
-       API2=$(id oap-journey-api:v2) APIBAD=$(id oap-journey-api:broken) \
-       NOTES=$(id oap-journey-notes:v1) WORKER=$(id oap-journey-worker:v1)
+**A3. Load the bundle (VPS).**
 
+```sh
+python3 -I $J/bundle.py load --bundle "$BUNDLE" | tee "$OUT/A-load.json"
+. "$BUNDLE/journey.env"     # exports OAP_IMAGE, JOB, WEB, API1, API2, APIBAD, NOTES, WORKER
+```
+
+**Expect:** `ok: true`. Every checksum and image ID matches the manifest.
+
+**A4. Install (VPS, host administration).**
+
+```sh
 python3 scripts/install.py init --json --directory "$DIR" --image "$OAP_IMAGE" \
   --environment production --ingress-tls letsencrypt --ingress-bind 0.0.0.0 \
   --ingress-domain "cli.$BASE" --ingress-domain "rest.$BASE" --ingress-domain "mcp.$BASE"
@@ -96,6 +144,10 @@ python3 scripts/install.py check --json --directory "$DIR" | tee "$OUT/A-check.j
 **Expect:** `check` reports healthy OAP, PostgreSQL and Caddy. The OAP API answers
 only on loopback. No certificate is requested until an app with HTTPS routes deploys.
 
+**After every phase,** copy evidence off the VPS from the build machine, so a lost
+host loses nothing: `rsync -a vps:/opt/oap-journey-evidence/ ./evidence/`. Record
+each phase's start and end time in `$OUT/timings.txt`.
+
 ## Phase B: owner trust (once, **Owner**)
 
 Write `private-owner.json` with `{"email","name","password"}` (mode 0600, outside
@@ -103,8 +155,8 @@ the repository), then:
 
 ```sh
 python3 scripts/install.py owner-setup --json --directory "$DIR" \
-  --cli-bin ./bin/oap --out "$DIR/creds/owner.json" < private-owner.json
-oapo() { ./bin/oap --url "$URL" --credential-file "$DIR/creds/owner.json" "$@"; }
+  --cli-bin "$BIN/oap" --out "$DIR/creds/owner.json" < private-owner.json
+oapo() { "$BIN/oap" --url "$URL" --credential-file "$DIR/creds/owner.json" "$@"; }
 for RUN in cli rest mcp; do
   printf '{"name":"Journey agent (%s)","targetId":"docker-local","environment":"production","maxApplications":1,"actions":["configure","deploy","recover","rollback"]}\n' "$RUN" > grant-$RUN.json
   oapo --out "$DIR/creds/onboard-$RUN.json" --file grant-$RUN.json grant | tee "$OUT/B-grant-$RUN.json"
@@ -145,7 +197,7 @@ Terminal operation states: `succeeded`, `failed`, `attention`, `cancelled`, `aba
 
 ```sh
 # CLI
-oapx() { ./bin/oap --url "$URL" --credential-file "$CRED" "$@"; }
+oapx() { "$BIN/oap" --url "$URL" --credential-file "$CRED" "$@"; }
 oapx --file body.json action-plan
 
 # REST: build the auth header file once per credential (never put the token in arguments)
@@ -155,9 +207,9 @@ rest() { curl -sS -H @"$DIR/creds/$RUN.hdr" -H 'Content-Type: application/json' 
 rest -X POST "$URL/api/v1/action-plans" --data @body.json
 
 # MCP: preferably configure oap-mcp as an MCP server in your own agent client:
-#   command: ./bin/oap-mcp   args: -url $URL -operate -credential-file $CRED
+#   command: $BIN/oap-mcp   args: -url $URL -operate -credential-file $CRED
 # or use the helper, which performs the same stdio handshake:
-mcpx() { python3 -I $J/mcp_call.py --bin ./bin/oap-mcp --url "$URL" --credential-file "$CRED" "$@"; }
+mcpx() { python3 -I $J/mcp_call.py --bin "$BIN/oap-mcp" --url "$URL" --credential-file "$CRED" "$@"; }
 mcpx list                                             # expect 19 tools incl. lifecycle tools
 echo '{"request": '"$(cat body.json)"'}' | mcpx call create_action_plan --args -
 ```
@@ -177,6 +229,16 @@ export RUN=cli  DOMAIN=$RUN.$BASE  CRED=$DIR/creds/onboard-$RUN.json
 mkdir -p "$OUT/$RUN"
 echo '{}' > empty.json
 ```
+
+On the **build machine**, for the probes:
+
+```sh
+export J=$PWD/tests/vps/release-journey PROBE_OUT=$PWD/evidence/probes BASE=journey.example.com RUN=cli
+mkdir -p "$PROBE_OUT"
+```
+
+`[build machine]` marks probe commands; everything else runs on the VPS. Start a
+probe, run the VPS steps, then wait for the probe to finish.
 
 Each step names the action from the reference table and the JSON body to send.
 `V` is always the current definition version (from the last `configure` or
@@ -229,10 +291,11 @@ and *execute*; then *create a plan* `deploy` at the new `V`, *execute*, *wait*.
 Run the probe for the whole step:
 
 ```sh
-python3 -I $J/probe.py --url https://$DOMAIN/api --duration 240 --out "$OUT/$RUN/D1-probe.json" &
-# … configure, deploy, wait …
+# [build machine] start, then run configure → deploy → wait on the VPS
+python3 -I $J/probe.py --url https://$RUN.$BASE/api --duration 240 --concurrency 2 --out "$PROBE_OUT/$RUN-D1.json" &
 wait
-python3 -I $J/probe.py --url https://$DOMAIN/api --duration 20 --expect-instances 3 --out "$OUT/$RUN/D1-after.json"
+# [build machine] afterwards
+python3 -I $J/probe.py --url https://$RUN.$BASE/api --duration 20 --expect-instances 3 --out "$PROBE_OUT/$RUN-D1-after.json"
 ```
 
 **Expect:** success. The migration runs again (new release, new job). `D1-after`
@@ -317,12 +380,12 @@ plan or operation.
 **X3. Controller outage.** Stop only OAP and probe all three apps for 60 s:
 
 ```sh
-docker ps --format '{{.ID}} {{.Names}}' > "$OUT/X3-before.txt"
-(cd "$DIR" && docker compose stop platform)
-for RUN in cli rest mcp; do
-  python3 -I $J/probe.py --url https://$RUN.$BASE/api --duration 60 --out "$OUT/X3-$RUN.json" &
+docker ps --format '{{.ID}} {{.Names}}' > "$OUT/X3-before.txt"     # VPS
+(cd "$DIR" && docker compose stop platform)                        # VPS
+for R in cli rest mcp; do                                          # [build machine]
+  python3 -I $J/probe.py --url https://$R.$BASE/api --duration 60 --concurrency 2 --out "$PROBE_OUT/X3-$R.json" &
 done; wait
-(cd "$DIR" && docker compose up -d --wait platform)
+(cd "$DIR" && docker compose up -d --wait platform)                # VPS
 python3 scripts/install.py check --json --directory "$DIR"
 docker ps --format '{{.ID}} {{.Names}}' > "$OUT/X3-after.txt"
 ```
@@ -343,8 +406,19 @@ at the new version, and confirm each interface works again. Then
 `oapo --credential <credentialId> revoke` one run's onboarding credential: its
 next call is denied, and the other runs are unaffected.
 
-**X5. Footprint and disk.** Record `docker stats --no-stream` for OAP, PostgreSQL
-and Caddy, `docker system df`, and the count of retained `migrate` containers.
+**X5. Host health, footprint and disk.** Stop the monitor and summarize it:
+
+```sh
+kill "$(cat "$OUT/monitor.pid")"
+sudo python3 -I $J/monitor.py summary --file "$OUT/monitor.jsonl" --kernel-log | tee "$OUT/X5-host.json"
+docker stats --no-stream > "$OUT/X5-stats.txt"
+docker system df > "$OUT/X5-disk.txt"
+docker ps -a --filter name=migrate --format '{{.Names}}' | wc -l > "$OUT/X5-migrate-containers.txt"
+```
+
+**Expect:** `oomKills: 0`, `minMemAvailableMiB` above 100, no swap used, and SSH
+responsive throughout. Compare container peaks with the memory budget above and
+record any item that exceeded its estimate.
 
 ## Parity report: `$OUT/parity.json`
 
@@ -357,12 +431,21 @@ and Caddy, `docker system df`, and the count of retained `migrate` containers.
     {"interface": "mcp", "step": "verify", "used": "inspect_instances", "note": "no verify tool"}
   ],
   "differences": ["<any step whose result differed between interfaces>"],
+  "host": {"memTotalMiB": 985, "swap": false, "minMemAvailableMiB": 0, "oomKills": 0,
+           "maxLoad1": 0, "sshLost": false, "containerPeakMiB": {}},
+  "timings": {"prepareSeconds": 0, "loadSeconds": 0, "phaseA": "…", "runs": {"cli": "…", "rest": "…", "mcp": "…"}, "phaseX": "…"},
+  "bundle": {"commit": "<sha>", "platform": "linux/amd64", "dirtyTree": false},
   "footprint": "...", "disk": "..."
 }
 ```
 
-Hand back the three run receipts, `parity.json`, the `$OUT` directory and the
-findings. The journey passes only if all three runs pass and the cross-interface
-checks pass. Downtime during standard deploys (D1, E2) is an observation, not a
-failure. Any action an interface cannot express is listed under `gaps`; whether
-it blocks v0.1 is the owner's decision.
+Hand back the three run receipts, `parity.json`, the VPS `$OUT` directory, the
+build machine's `prepare.json` and `evidence/` (including probes), and the
+findings.
+
+The journey passes only if all three runs pass, the cross-interface checks pass,
+and on the 1 GB host there were no OOM kills and the host stayed responsive. If
+the host becomes unreachable, keep every partial receipt already copied off and
+record where it stopped. Downtime during standard deploys (D1, E2) is an
+observation, not a failure. Any action an interface cannot express is listed
+under `gaps`; whether it blocks v0.1 is the owner's decision.
