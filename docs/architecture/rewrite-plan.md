@@ -213,7 +213,8 @@ adapter is not carried over; other operators can return later as extensions.
 | R0.5 | done | | `CLAUDE.md` points to this plan and names `make rewrite-check` |
 | R1.1 | done | `00e35fe` | `buf lint` clean; `make gen` reproducible (checked by `make rewrite-check`); `internal/surface/wire` golden tests pin field names, enum strings, presence, unknown-field errors and the 7 documented 64-bit revision fields |
 | R1.2 | done | `5eaefb0`, `849a37c` | Round-trip property test over 3,000 seeded random trees passes; 27 strict-subset rejections with why codes and line numbers; 30 schema and semantic rejection cases. 14 of 17 example specs convert and validate (goldens in `internal/adapters/desiredyaml/testdata/examples`); the other 3 depend on Coolify-only resource adoption and fail with `convert.unsupported`, as the amended acceptance requires. `849a37c` keeps `dependsOn` as ordering (`after`), covering the pre-deploy job pattern |
-| R1.3–R1.7 | not started | | |
+| R1.3 | done | `6fac44b` | Golden graphs in `internal/core/model/testdata/worlds` for `two-components` (converged, healthy), `topology` (release and instance mismatch; stale; never observed) and the pre-deploy job app (failed job for the desired release, old release still serving, leftover component). Tests also cover job states, release stability under scaling and determinism under observation order. Affordance slots are present and filled by R1.6 |
+| R1.4–R1.7 | not started | | |
 | R2.1–R2.11 | not started | | |
 | R3.1–R3.9 | not started | | |
 | R4.1–R4.5 | not started | | |
