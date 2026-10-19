@@ -1,0 +1,40 @@
+api_version: oap.dev/v1
+components:
+  api:
+    health:
+      interval_seconds: 2
+      mode: http
+      path: /health/ready
+      retries: 10
+      start_period_seconds: 5
+      timeout_seconds: 1
+    image: replace-with-built-immutable-api-image
+    instances: 2
+    kind: web
+    port: 8080
+    readiness:
+      require_healthy: true
+      timeout_seconds: 180
+  frontend:
+    health:
+      interval_seconds: 2
+      mode: http
+      path: /health/ready
+      retries: 10
+      start_period_seconds: 5
+      timeout_seconds: 1
+    image: replace-with-built-immutable-frontend-image
+    instances: 1
+    kind: web
+    port: 8080
+    readiness:
+      require_healthy: true
+      timeout_seconds: 180
+    uses:
+      api:
+        endpoint: https://replace-with-shared-api-domain.example.test
+        env: UPSTREAM_URL
+        type: http
+environment: staging
+kind: Application
+name: connected-preview

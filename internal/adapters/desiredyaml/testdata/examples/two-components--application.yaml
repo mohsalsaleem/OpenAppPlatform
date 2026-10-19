@@ -1,0 +1,15 @@
+api_version: oap.dev/v1
+components:
+  api:
+    image: nginx:1.27-alpine
+    instances: 1
+    kind: web
+    port: 80
+  frontend:
+    image: nginx:1.27-alpine
+    instances: 1
+    kind: web
+    port: 80
+environment: staging
+kind: Application
+name: two-components

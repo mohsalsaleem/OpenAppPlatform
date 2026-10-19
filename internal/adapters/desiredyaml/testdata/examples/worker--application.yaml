@@ -1,0 +1,12 @@
+api_version: oap.dev/v1
+components:
+  worker:
+    image: REPLACE_WITH_WORKER_IMAGE
+    instances: 1
+    kind: worker
+    readiness:
+      require_healthy: true
+      timeout_seconds: 120
+environment: staging
+kind: Application
+name: worker-example

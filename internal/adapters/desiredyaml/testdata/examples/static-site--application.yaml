@@ -1,0 +1,22 @@
+api_version: oap.dev/v1
+components:
+  web:
+    image: sha256:REPLACE_WITH_CACHED_IMAGE_ID
+    instances: 1
+    kind: web
+    port: 8080
+    readiness:
+      require_healthy: true
+      timeout_seconds: 60
+    resources:
+      cpu_millis: 150
+      memory_mib: 64
+environment: production
+ingress:
+  domain: app.example.com
+  https: true
+  routes:
+    /:
+      component: web
+kind: Application
+name: static-site
