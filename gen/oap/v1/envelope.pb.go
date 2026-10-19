@@ -221,7 +221,9 @@ func (x *AgentPolicy) GetMay() []string {
 	return nil
 }
 
-// Scope limits an agent by C4 level. Empty lists mean nothing is in scope.
+// Scope limits an agent by C4 level. "*" matches every name. Applications must
+// be listed; leaving components empty puts every component of the listed
+// applications in scope.
 type Scope struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Applications  []string               `protobuf:"bytes,1,rep,name=applications,proto3" json:"applications,omitempty"`

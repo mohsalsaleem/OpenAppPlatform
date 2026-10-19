@@ -25,7 +25,9 @@ message AgentPolicy {
   repeated string may = 3;
 }
 
-// Scope limits an agent by C4 level. Empty lists mean nothing is in scope.
+// Scope limits an agent by C4 level. "*" matches every name. Applications must
+// be listed; leaving components empty puts every component of the listed
+// applications in scope.
 message Scope {
   repeated string applications = 1;
   repeated string components = 2;
