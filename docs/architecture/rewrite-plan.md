@@ -74,7 +74,10 @@ These hold for every task. Breaking one is a defect, even if all tests pass.
 12. **Here (cloud session):** phases 0–1 and the simulation parts of phase 2. Push
     every finished task; the container is temporary.
 13. **Owner's machine (local Claude Code):** adapter contract tests against real
-    Docker and Caddy, and local acceptance journeys.
+    Docker and Caddy, and local acceptance journeys. The owner's test server
+    (`vultr_oap`, reached over SSH from the owner's machine) may also run them
+    (owner decision, 2026-10-19); test binaries are cross-compiled locally, not
+    built there, and the server rules below apply.
 14. **Owner's server:** phase 5 deploy and the release journey. On the server, an
     agent touches only resources carrying OAP labels, never builds there unless the
     task says so, never edits databases or Caddy by hand, never prints credentials,
@@ -160,6 +163,11 @@ Depends on phase 2.
 | R3.7 | `ask` with a `Notifier` port (log and webhook first) | Ask, answer and expiry flow through `watch`; an expired ask can't be answered |
 | R3.8 | Briefing: generated Markdown per server and app, served by `observe`, at `/.well-known/oap/briefing.md` and as an MCP resource | Golden briefings for the reference apps; owner `briefing.md` content appears labelled as owner-written |
 | R3.9 | Security tests for the whole surface | An agent can't act beyond its scope through any interface; a scan of every response and log in the acceptance run finds no secret values. **Decision needed first:** default autonomy for a fresh install |
+| R3.10 | `oap host connect`: bootstrap key, pinned host key, password from the TTY only, break-glass ([onboarding](onboarding.md)) | A test drives `connect` without a TTY and the password is refused; the key is in `authorized_keys` with its tag; `~/.ssh` is untouched |
+| R3.11 | `oap host check`: read-only probe, typed findings | Golden findings for fixture hosts (supported, old OS, no swap, port busy, foreign workloads, existing OAP); the probe makes no writes (checked by a read-only filesystem in the test) |
+| R3.12 | Host fixes as approved steps, with a manifest and undo | Each fix's apply then undo returns the fixture host to its starting state; an unapproved fix never runs; destructive fixes can't be grouped |
+| R3.13 | `oap host install`: `oapd` and Caddy as containers, idempotent, upgrade by digest | Running install twice changes nothing the second time; Caddy is observed as an OAP system component; a fresh 1 GB host stays inside the footprint budget |
+| R3.14 | Hand-off and uninstall | After hand-off the bootstrap key no longer authenticates; uninstall on a fresh host leaves only what was there before, compared by a host snapshot |
 
 **Phase exit:** the local journey (create, deploy with a migration, scale,
 injected failure, explain, fix, roll back, verify) passes driven only through
@@ -193,6 +201,11 @@ Depends on phase 4. R5.3 runs on the owner's server.
 
 Decided: Docker is the only runtime operator for the rewrite. The Coolify
 adapter is not carried over; other operators can return later as extensions.
+
+Decided for [onboarding](onboarding.md) (owner, 2026-10-19), needed before
+R3.11–R3.13: supported systems are Ubuntu 22.04 and 24.04 and Debian 12; OAP
+installs Docker itself, as a sensitive fix the owner approves; the automatic
+hostname is sslip.io unless the owner gives a domain.
 
 | Decision (rewrite doc §17) | Needed before | Recommendation |
 |---|---|---|
@@ -228,7 +241,7 @@ adapter is not carried over; other operators can return later as extensions.
 | R2.7 | done | `80d18c9` | With half of all events dropped, the observer's picture is never wrong for longer than one 5 s interval (20 seeds; 4 under `-race`); without drops it is exact after every poll; freshness on every node |
 | R2.8 | done | `3396c09`, `8b28c4d` | The real executor scales 3→1 under traffic on two routes; each seed draws a reload lag (0–1 s) and a request rate (one every 20–500 ms). `3396c09`: with the naive order (route-remove then stop), all 1,000 seeds lose requests (11,107 of 109,962: 8,532 refused, 2,575 reset), matching the VPS run's URLError and RemoteDisconnected. `8b28c4d`: with the planner's plan, 0 of 144,683 requests fail over 1,000 seeds (50 under `-race`; `make rewrite-check` runs the full count). No production change was needed: the rule (R1.5) and the executor's confirm and drain (R2.4) already existed. Failing first: the same test run against the naive order fails on seed 1. Each safety step matters (not committed): without the confirmed reload 669 of 1,000 seeds lose requests, without the drain 970. Not covered, because no ordering can prevent them: reloads that reset in-flight connections, instances exiting during drain, and requests longer than the drain timeout. Whether real Caddy resets connections on reload is for R2.9's contract suite |
 | R2.9–R2.11 | not started | | |
-| R3.1–R3.9 | not started | | |
+| R3.1–R3.14 | not started | | |
 | R4.1–R4.5 | not started | | |
 | R5.1–R5.5 | not started | | |
 
