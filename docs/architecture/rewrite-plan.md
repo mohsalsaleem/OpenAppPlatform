@@ -1,0 +1,215 @@
+# Rewrite plan: tasks, acceptance and guardrails
+
+This plan turns the [agent-native rewrite](agent-native-rewrite.md) into tasks
+that any agent can pick up, in any environment, without relying on conversation
+memory. The repository is the only shared state: this plan, its status table and
+the rules in [`CLAUDE.md`](../../CLAUDE.md).
+
+## How work proceeds
+
+- **One task at a time, in order** unless the plan marks tasks as parallel. A task
+  starts only when the tasks it depends on are `done`.
+- **Each task ends with evidence:** the acceptance commands, run on the task's final
+  commit, with their result recorded in the status table.
+- **Branch:** all rewrite work lands on `rewrite`. Each phase is merged to `rewrite`
+  through a pull request the owner reviews. `main` is untouched until cutover.
+- **Commit trailer:** every commit names its task, for example `Task: R1.4`.
+
+## Guardrails
+
+These hold for every task. Breaking one is a defect, even if all tests pass.
+
+### Scope
+
+1. **Only what the task says.** Work not listed in the current task is out of scope.
+   If it is needed, stop and propose a plan change (below); don't do it "while here".
+2. **Changing the plan is a pull request to this file**, approved by the owner
+   before any code relies on it. This includes adding, splitting or dropping tasks
+   and editing any acceptance criterion.
+3. **Architecture changes need an ADR** in `docs/architecture/adr/`, approved by the
+   owner. Anything that contradicts [the rewrite doc](agent-native-rewrite.md) is an
+   architecture change.
+4. **The old tree is frozen.** No edits under `internal/` packages that exist on
+   `main` today, `cmd/platform`, `cmd/oap`, `cmd/oap-mcp`, `cmd/oap-admin`,
+   `cmd/oap-build-client` or `web/`, except security fixes the owner approves. The
+   new tree uses new paths (below). R0.3 enforces this.
+
+### Tests and acceptance
+
+5. **Never skip, disable, weaken or delete a test or acceptance check to get green.**
+   No `t.Skip` in the new tree except adapter tests gated on an explicit
+   environment variable (for example `OAP_TEST_DOCKER=1`). Every gated skip is
+   listed in the task's evidence.
+6. **Failing first for bug fixes.** A fix for a known failure (such as VPS-H-001)
+   lands after a test that reproduces it, and the evidence shows that test failing
+   on the commit before the fix.
+7. **Report results as they are.** A task with a failing or unrun acceptance check
+   is `blocked` or `in progress`, never `done`.
+
+### Code
+
+8. **Layer rules** from the rewrite doc's section 12, enforced by R0.2:
+   - `internal/core` imports only the standard library (minus I/O, time and
+     randomness: no `os`, `net`, `io/fs`, `database/sql`, `time.Now`, `math/rand`)
+     and generated message types.
+   - `internal/engine` imports `core` and `ports`, never `adapters`, `service` or
+     `surface`.
+   - `internal/adapters` imports `ports` and generated types, never `core`
+     internals, `engine`, `service` or `surface`.
+   - `internal/surface` imports `service` and generated code only.
+9. **Dependencies are allowlisted.** The project runs on two third-party modules
+   today, and the rewrite keeps that discipline. Allowed: `connectrpc.com/connect`,
+   `google.golang.org/protobuf`, `github.com/hashicorp/go-plugin` (phase 4), a
+   pure-Go SQLite driver (`modernc.org/sqlite`), one YAML library
+   (`gopkg.in/yaml.v3`) and their transitive dependencies. Tools (not linked):
+   `buf`, `protoc-gen-go`, `protoc-gen-connect-go`, pinned in `tools/`. Anything else
+   needs owner approval.
+10. **Generated code is reproducible.** `make gen` on a clean checkout produces no
+    diff. Generated files are never edited by hand.
+11. **No secrets anywhere:** not in code, fixtures, logs, test output or evidence.
+    R3.9 adds a scan test.
+
+### Environments
+
+12. **Here (cloud session):** phases 0–1 and the simulation parts of phase 2. Push
+    every finished task; the container is temporary.
+13. **Owner's machine (local Claude Code):** adapter contract tests against real
+    Docker and Caddy, and local acceptance journeys.
+14. **Owner's server:** phase 5 deploy and the release journey. On the server, an
+    agent touches only resources carrying OAP labels, never builds there unless the
+    task says so, never edits databases or Caddy by hand, never prints credentials,
+    and asks before anything destructive or outside OAP.
+
+### Stop and ask the owner when
+
+- an acceptance criterion can't be met as written;
+- a task needs to touch packages it doesn't list;
+- a decision from the rewrite doc's section 17 is needed (see "Decisions by task");
+- a security or data-loss question comes up;
+- a new dependency seems necessary.
+
+## Definition of done (every task)
+
+- [ ] Acceptance checks pass on the final commit and are recorded below.
+- [ ] `make rewrite-check` passes (from R0.4 on).
+- [ ] No guardrail broken; no out-of-scope changes in the diff.
+- [ ] Docs touched by the task are updated (rewrite doc, this plan's status).
+- [ ] Pushed to the remote.
+
+## Phase 0: Branch and guardrails
+
+| ID | Task | Acceptance |
+|---|---|---|
+| R0.1 | Create `rewrite` from `main` with the rewrite docs. Add empty new-tree paths: `proto/oap/v1`, `gen/`, `internal/{core,engine,ports,adapters,service,surface}`, `cmd/oapd`, `cmd/oapctl` (the new CLI's working name until cutover) | `go build ./...` and the existing `go test ./...` (without database-backed tests) pass unchanged |
+| R0.2 | Architecture test (`tests/arch`) enforcing the layer rules of guardrail 8 with `go list -deps` | Passes on the tree; a commit-local experiment adding a forbidden import (for example `os` in `internal/core`) makes it fail, shown in the evidence and not committed |
+| R0.3 | Frozen-path check: fails if the diff from the merge base with `main` touches frozen paths, unless a commit carries `Owner-Approved: security` | Passes on the tree; a trial edit to `internal/controller` fails it |
+| R0.4 | `make rewrite-check`: `gofmt` check, `go vet`, `go test -race` for the new tree, the architecture test, the frozen-path check, `buf lint` (once protos exist) and the generated-code diff check. A `rewrite` CI workflow running it on pushes to `rewrite` (needs owner approval to add the workflow) | Target passes locally; workflow runs green on the branch |
+| R0.5 | `CLAUDE.md` with the rules agents follow on this branch | File exists and points to this plan |
+
+## Phase 1: Schema and core
+
+Depends on phase 0. Runs entirely here.
+
+| ID | Task | Acceptance |
+|---|---|---|
+| R1.1 | Protos: `world.proto`, `agent.proto` (seven RPCs), `journal.proto`, `envelope.proto`, error details (`why` codes, remedy). `buf.yaml`, `buf.gen.yaml`, pinned tools, `make gen` | `buf lint` clean; `make gen` reproducible; JSON golden tests show the agreed conventions: field names as written, enums as strings, explicit presence, no int64 except where documented |
+| R1.2 | Desired-state format: strict YAML subset, JSON Schema validation, canonical form, content hash; converter from today's portable spec | Property test: parse → canonical → parse is identical; implicit booleans, floats, anchors and duplicate keys are rejected with `why` codes; every spec under `examples/` converts and validates |
+| R1.3 | World model (`core/model`): the graph from desired state plus observations, with desired, actual, health, freshness and affordance slots | Golden graphs for three reference apps (`two-components`, `topology`, `pre-deploy-jobs`), including stale observations and mismatches |
+| R1.4 | Intent compiler: scale, deploy release, roll back to release, configure, add component, remove component, spec patch | Table tests per intent; an unknown or invalid intent returns a typed error with a remedy; output is a desired-state diff, never side effects |
+| R1.5 | Planner: step vocabulary, ordering rules, blast radius, computed undo, reversibility | Property tests over generated topologies: (a) no plan stops an instance that is still a route member; (b) every removal runs `route-remove` → `edge-reload-confirmed` → `drain` → `stop`; (c) for reversible plans, applying undo to the result gives back the original desired state; (d) volume deletion and destructive migrations are marked irreversible. Golden plans for scale 1→3→1, deploy with pre-deploy job, rollback and component removal |
+| R1.6 | Policy engine: envelope parsing; scope, invariants, risk tiers, change-fact mapping, breaker inputs; verdict with reasons | Table tests for each rule; irreversible changes always need the owner whatever the envelope says; a risk value supplied by the agent is ignored; verdicts are deterministic |
+| R1.7 | Proposal identity: content hash over base revision, intent, plan, change-fact snapshot and envelope version | Changing any input changes the hash; re-evaluating a stored proposal reproduces its verdict exactly |
+
+**Phase exit:** `make rewrite-check` green; the architecture test shows `core` has
+no I/O imports; the owner reviews the phase pull request.
+
+## Phase 2: Engine, storage and simulation
+
+Depends on phase 1. R2.1–R2.8 run here; R2.9–R2.11 need real Docker and Caddy.
+
+| ID | Task | Acceptance |
+|---|---|---|
+| R2.1 | Ports: `Runtime`, `Edge`, `Builder`, `DesiredRepo`, `OpStore`, `Secrets`, `FactSource`, `Notifier`, `Clock` | Interfaces only; the architecture test confirms nothing else lives in `ports` |
+| R2.2 | SQLite operational store: schema, migrations, journal with monotonic revisions, WAL | Crash-consistency test with faults injected at the storage port; reopened databases always pass integrity checks; revisions never go backwards |
+| R2.3 | Job queue on SQLite: leases, attempts, single dispatch | Randomized test (at least 10,000 seeded runs, `-race`) with concurrent dispatchers and lease expiry: no job runs twice concurrently, none is lost |
+| R2.4 | Step executor: intent before effect, observe before re-dispatch | In simulation, a crash between every pair of steps of every golden plan converges with no duplicate effects (fake runtime counts creations) |
+| R2.5 | Per-application serializer | Concurrent applies on one app run in order; different apps run in parallel; property test over random schedules |
+| R2.6 | Simulation harness: fake Runtime and Edge with a traffic generator, fault injection and seeds | The same seed gives an identical trace; faults include reloads that drop in-flight connections, exits during drain, slow readiness and lost responses |
+| R2.7 | Observer: runtime events, periodic resync, freshness | In simulation, missed events are healed by resync within one interval; freshness is reported on every node |
+| R2.8 | VPS-H-001: reproduce, then fix | Commit 1: the harness shows lost requests when scaling 3→1 with a naive order (removal without confirmed reload and drain) across seeds. Commit 2: with the planner's ordering rule, 0 failed requests over at least 1,000 seeds. If simulation can't reproduce the loss, stop and report: the root cause lies elsewhere |
+| R2.9 | Docker and Caddy adapters, with one contract suite run against both the fakes and the real systems | The same contract suite passes against the fakes and against real Docker and Caddy (`OAP_TEST_DOCKER=1`); resources are adopted only by OAP labels. **Decision needed first:** keep or drop Coolify |
+| R2.10 | Desired-state Git repository adapter | Commits carry author and message; history, diff and revert work; export to a mirror is one-way |
+| R2.11 | Secret store adapter (format compatible with today's encrypted store, for migration) | Reads a store written by today's code; secrets never appear in journal entries or errors (test) |
+
+**Phase exit:** with real Docker and Caddy on the owner's machine, scaling 1→3→1
+under continuous traffic shows 0 failed requests; OAP with SQLite stays under its
+60 MiB footprint budget during that run.
+
+## Phase 3: API, identity and people
+
+Depends on phase 2.
+
+| ID | Task | Acceptance |
+|---|---|---|
+| R3.1 | Service layer: the seven primitives over core and engine | Service tests for each primitive using simulation adapters |
+| R3.2 | Connect server in `cmd/oapd`; errors with typed `why` and remedy | The same request works over gRPC, gRPC-Web and Connect JSON (curl), with identical results |
+| R3.3 | `watch` and `await` as server streams, resumable from a revision | A client that disconnects and resumes from its last revision misses no event and sees none twice |
+| R3.4 | MCP surface generated from the protos (stdio and HTTPS) | Parity test: one scenario through Connect JSON, gRPC, MCP and the CLI produces identical journals |
+| R3.5 | CLI (`cmd/oapctl`): generated client, human output, `--json`, `--events` | Golden output tests for each mode |
+| R3.6 | Owner one-time login on the server; device login for agents; short-lived scoped tokens; session approval modes; pause and revoke | Expired, revoked and out-of-scope tokens are rejected; pause takes effect on the next request. **Decision needed first:** default session approval mode |
+| R3.7 | `ask` with a `Notifier` port (log and webhook first) | Ask, answer and expiry flow through `watch`; an expired ask can't be answered |
+| R3.8 | Briefing: generated Markdown per server and app, served by `observe`, at `/.well-known/oap/briefing.md` and as an MCP resource | Golden briefings for the reference apps; owner `briefing.md` content appears labelled as owner-written |
+| R3.9 | Security tests for the whole surface | An agent can't act beyond its scope through any interface; a scan of every response and log in the acceptance run finds no secret values. **Decision needed first:** default autonomy for a fresh install |
+
+**Phase exit:** the local journey (create, deploy with a migration, scale,
+injected failure, explain, fix, roll back, verify) passes driven only through
+MCP, and again only through the CLI.
+
+## Phase 4: Extensions
+
+Depends on phase 3.
+
+| ID | Task | Acceptance |
+|---|---|---|
+| R4.1 | Plugin host (go-plugin): versioned extension protos, capability grants, timeouts, memory caps | A crashing or hanging extension doesn't affect the core; the extension protos have no field that can carry a policy verdict; installing an extension is a `sensitive` proposal |
+| R4.2 | Builders: on-host build queue (one build at a time by default, with memory admission) and registry-only | Two concurrent build requests on a 1 GB-class memory limit run one after another; the host never runs out of memory in the test |
+| R4.3 | GitHub change facts (read-only GitHub App) | Facts for a recorded fixture repository map to the envelope's risk tiers; CI-not-green is denied |
+| R4.4 | Notifications: webhook and email | Ask and digest delivery with retries; failures surface in `observe` |
+| R4.5 | Compose import | The examples from [Compose import](../compose-import.md) convert to valid applications with the documented warnings |
+
+## Phase 5: Cutover
+
+Depends on phase 4. R5.3 runs on the owner's server.
+
+| ID | Task | Acceptance |
+|---|---|---|
+| R5.1 | `oap migrate`: one-way move of an install made by today's code | On an install created from `main`, migration completes with apps continuously serving (probe shows 0 failures), the old database left untouched, and every spec, grant and release accounted for |
+| R5.2 | Port the acceptance journeys (`tests/env`) and the VPS release journey to the new interfaces | All ported journeys pass locally |
+| R5.3 | Deploy to the owner's server and run the release journey over CLI, Connect and MCP | The journey passes on a 1 GB host with the evidence pack (receipts, monitor summary, findings) committed under `docs/evidence/` |
+| R5.4 | Agent store (Turso/libSQL) and harness packages | A fresh machine syncs the store, logs in and resumes managing a server with no credentials synced. **Decisions needed first:** sync default; which harnesses first |
+| R5.5 | Docs, roadmap, release notes; retire the old tree | Old tree removed from `rewrite`; docs describe only the new system; the owner approves the merge to `main` |
+
+## Decisions by task
+
+| Decision (rewrite doc §17) | Needed before | Recommendation |
+|---|---|---|
+| Keep or drop the Coolify adapter | R2.9 | Drop |
+| Default session approval mode | R3.6 | Approve every session; offer trusted identity at first login |
+| Default autonomy for a fresh install | R3.9 | Routine changes allowed; everything else asks |
+| Turso Cloud or self-hosted libSQL | R5.4 | Self-hosted option first, Cloud as opt-in |
+| Harness packages first | R5.4 | Claude Code skills and generic MCP |
+| Patch VPS-H-001 on today's code | Any time | Only if real installs need it before cutover |
+
+## Status
+
+| ID | Status | Commit | Evidence |
+|---|---|---|---|
+| R0.1–R0.5 | not started | | |
+| R1.1–R1.7 | not started | | |
+| R2.1–R2.11 | not started | | |
+| R3.1–R3.9 | not started | | |
+| R4.1–R4.5 | not started | | |
+| R5.1–R5.5 | not started | | |
+
+Statuses: `not started`, `in progress`, `blocked (reason)`, `done`. Rows are split
+per task once work on a phase begins.

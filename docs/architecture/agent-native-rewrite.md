@@ -563,7 +563,9 @@ agent store and harness packages, all inside the layered design of section 12.
 
 ## 14. Migration plan
 
-A full rewrite, built in phases that each end with something testable:
+A full rewrite, built in phases that each end with something testable. Tasks,
+acceptance checks and guardrails are in the [rewrite plan](rewrite-plan.md).
+
 
 1. **Schema and core:** the protos, the world model, and the pure intent
    compiler, policy engine, planner and undo, with golden and property tests. The
