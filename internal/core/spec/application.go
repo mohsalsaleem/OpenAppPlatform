@@ -49,6 +49,7 @@ type Component struct {
 	Instances          int               `json:"instances,omitempty"`
 	Env                map[string]string `json:"env,omitempty"`
 	Secrets            map[string]string `json:"secrets,omitempty"`
+	Destructive        bool              `json:"destructive,omitempty"`
 	After              []string          `json:"after,omitempty"`
 	Uses               map[string]Use    `json:"uses,omitempty"`
 	Volumes            map[string]string `json:"volumes,omitempty"`
@@ -191,6 +192,9 @@ func (a *Application) check() []Problem {
 			if len(c.Volumes) == 0 {
 				add(Join(at, "volumes"), WhyKindRule, "data components need at least one volume")
 			}
+		}
+		if c.Destructive && c.Kind != KindJob {
+			add(Join(at, "destructive"), WhyKindRule, "only jobs can be destructive")
 		}
 		if c.HostPort != 0 {
 			if c.Instances != 1 {

@@ -75,3 +75,28 @@ func Clone(tree any) any {
 	}
 	return tree
 }
+
+// MergePatch returns an RFC 7386 merge patch that turns from into to. A nil
+// value in the patch means "remove this key". Both must be maps.
+func MergePatch(from, to map[string]any) map[string]any {
+	patch := map[string]any{}
+	for k := range from {
+		if _, kept := to[k]; !kept {
+			patch[k] = nil
+		}
+	}
+	for k, tv := range to {
+		fv, had := from[k]
+		if had && Equal(fv, tv) {
+			continue
+		}
+		fm, fromMap := fv.(map[string]any)
+		tm, toMap := tv.(map[string]any)
+		if had && fromMap && toMap {
+			patch[k] = MergePatch(fm, tm)
+		} else {
+			patch[k] = Clone(tv)
+		}
+	}
+	return patch
+}

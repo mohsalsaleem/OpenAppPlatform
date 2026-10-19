@@ -1,0 +1,21 @@
+ 0 write-desired         
+ 1 run-job                migrate#1 @new after [0]
+ 2 start-instance         api#1 @new after [0 1]
+ 3 await-ready            api#1 @new after [2]
+ 4 route-add              api#1 @new after [3]
+ 5 route-remove           api#1 @old after [3]
+ 6 edge-reload-confirmed  api#1 @new after [4 5]
+ 7 drain                  api#1 @old after [6]
+ 8 stop                   api#1 @old after [7]
+ 9 start-instance         api#2 @new after [0 1 8]
+10 await-ready            api#2 @new after [9]
+11 route-add              api#2 @new after [10]
+12 route-remove           api#2 @old after [10]
+13 edge-reload-confirmed  api#2 @new after [11 12]
+14 drain                  api#2 @old after [13]
+15 stop                   api#2 @old after [14]
+16 start-instance         worker#1 @new after [0]
+17 await-ready            worker#1 @new after [16]
+18 stop                   worker#1 @old after [17]
+blast radius: [api migrate worker], downtime none-expected
+undo: {"Rollback":{"to_release":"sha256:50f71d5f33cb45a40a9cdf26a67f2bdc1041a2b0470547c1633af2f2c7221778"}}

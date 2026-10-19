@@ -174,6 +174,7 @@ func TestParseApplicationRejections(t *testing.T) {
 		{"after twice", "components.web.after", []any{"db", "db"}, "components.web.after[1]", WhyConflict},
 		{"after and uses", "components.web.after", []any{"api"}, "components.web.after[0]", WhyConflict},
 		{"after cycle", "components.db.after", []any{"migrate"}, "components", WhyCycle},
+		{"destructive web", "components.api.destructive", true, "components.api.destructive", WhyKindRule},
 		{"cycle", "components.db.uses", obj(t, `{"api": {"type": "http"}}`), "components", WhyCycle},
 	}
 	for _, c := range cases {

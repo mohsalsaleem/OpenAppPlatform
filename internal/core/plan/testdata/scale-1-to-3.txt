@@ -1,0 +1,11 @@
+ 0 write-desired         
+ 1 start-instance         web#2 @same after [0]
+ 2 await-ready            web#2 @same after [1]
+ 3 route-add              web#2 @same after [2]
+ 4 edge-reload-confirmed  web#2 @same after [3]
+ 5 start-instance         web#3 @same after [0 4]
+ 6 await-ready            web#3 @same after [5]
+ 7 route-add              web#3 @same after [6]
+ 8 edge-reload-confirmed  web#3 @same after [7]
+blast radius: [web], downtime none-expected
+undo: {"Scale":{"component":"web","instances":1}}

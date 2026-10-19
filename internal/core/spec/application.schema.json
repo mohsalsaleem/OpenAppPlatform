@@ -73,6 +73,10 @@
           "propertyNames": {"$ref": "#/$defs/env_name"},
           "additionalProperties": {"$ref": "#/$defs/slug"}
         },
+        "destructive": {
+          "description": "Jobs only: runs change data in ways a rollback can't undo, so plans that run this job are irreversible and need the owner.",
+          "type": "boolean"
+        },
         "after": {
           "description": "Components that must be ready (or, for jobs, succeed) before this one starts. Ordering only; use uses for connections.",
           "type": "array",
