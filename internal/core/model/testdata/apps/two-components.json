@@ -1,0 +1,10 @@
+{
+  "api_version": "oap.dev/v1",
+  "kind": "Application",
+  "name": "two-components",
+  "environment": "staging",
+  "components": {
+    "frontend": {"kind": "web", "image": "nginx:1.27-alpine", "port": 80},
+    "api": {"kind": "web", "image": "nginx:1.27-alpine", "port": 80}
+  }
+}

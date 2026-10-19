@@ -1,0 +1,14 @@
+{
+  "api_version": "oap.dev/v1",
+  "kind": "Application",
+  "name": "shop",
+  "environment": "production",
+  "ingress": {"domain": "shop.example.com", "https": true, "routes": {"/": {"component": "api"}}},
+  "components": {
+    "migrate": {"kind": "job", "image": "registry.example/migrations:7", "secrets": {"DATABASE_URL": "database-url"}},
+    "api": {"kind": "web", "image": "registry.example/api:7", "port": 8080, "instances": 2, "after": ["migrate"],
+            "uses": {"db": {"type": "database"}}},
+    "db": {"kind": "data", "image": "postgres:17-alpine", "port": 5432, "volumes": {"pgdata": "/var/lib/postgresql/data"},
+           "resources": {"memory_mib": 256, "cpu_millis": 500}}
+  }
+}
