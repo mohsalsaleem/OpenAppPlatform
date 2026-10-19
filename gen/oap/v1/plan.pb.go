@@ -154,8 +154,10 @@ func (StepKind) EnumDescriptor() ([]byte, []int) {
 }
 
 // Proposal is a compiled, policy-checked plan. Its id is a content hash over
-// the base revision, intent, plan, change-fact snapshot and envelope version;
-// Apply commits exactly that proposal.
+// everything the plan and verdict depend on: the base revision and desired
+// state, the agent, the intent, the steps, the change-fact snapshot, the
+// envelope version and the policy context. Apply commits exactly that
+// proposal, and replaying it reproduces the same verdict.
 type Proposal struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	Id           string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -173,8 +175,15 @@ type Proposal struct {
 	Next            []string     `protobuf:"bytes,10,rep,name=next,proto3" json:"next,omitempty"`
 	EnvelopeVersion string       `protobuf:"bytes,11,opt,name=envelope_version,json=envelopeVersion,proto3" json:"envelope_version,omitempty"`
 	ChangeFacts     *ChangeFacts `protobuf:"bytes,12,opt,name=change_facts,json=changeFacts,proto3" json:"change_facts,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// The agent the proposal was judged for.
+	Agent string `protobuf:"bytes,13,opt,name=agent,proto3" json:"agent,omitempty"`
+	// Content hash of the application's desired state the plan starts from.
+	BaseSpecHash string         `protobuf:"bytes,14,opt,name=base_spec_hash,json=baseSpecHash,proto3" json:"base_spec_hash,omitempty"`
+	Context      *PolicyContext `protobuf:"bytes,15,opt,name=context,proto3" json:"context,omitempty"`
+	// Why the plan can't be undone; empty when it can.
+	Irreversible  []string `protobuf:"bytes,16,rep,name=irreversible,proto3" json:"irreversible,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Proposal) Reset() {
@@ -291,6 +300,104 @@ func (x *Proposal) GetChangeFacts() *ChangeFacts {
 	return nil
 }
 
+func (x *Proposal) GetAgent() string {
+	if x != nil {
+		return x.Agent
+	}
+	return ""
+}
+
+func (x *Proposal) GetBaseSpecHash() string {
+	if x != nil {
+		return x.BaseSpecHash
+	}
+	return ""
+}
+
+func (x *Proposal) GetContext() *PolicyContext {
+	if x != nil {
+		return x.Context
+	}
+	return nil
+}
+
+func (x *Proposal) GetIrreversible() []string {
+	if x != nil {
+		return x.Irreversible
+	}
+	return nil
+}
+
+// PolicyContext is the recent activity a verdict depended on, recorded so a
+// stored proposal can be re-judged exactly.
+type PolicyContext struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Paused                bool                   `protobuf:"varint,1,opt,name=paused,proto3" json:"paused,omitempty"`
+	FailedAppliesLastHour int32                  `protobuf:"varint,2,opt,name=failed_applies_last_hour,json=failedAppliesLastHour,proto3" json:"failed_applies_last_hour,omitempty"`
+	ReleasesLastHour      int32                  `protobuf:"varint,3,opt,name=releases_last_hour,json=releasesLastHour,proto3" json:"releases_last_hour,omitempty"`
+	MemoryBudgetMib       int32                  `protobuf:"varint,4,opt,name=memory_budget_mib,json=memoryBudgetMib,proto3" json:"memory_budget_mib,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *PolicyContext) Reset() {
+	*x = PolicyContext{}
+	mi := &file_oap_v1_plan_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PolicyContext) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PolicyContext) ProtoMessage() {}
+
+func (x *PolicyContext) ProtoReflect() protoreflect.Message {
+	mi := &file_oap_v1_plan_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PolicyContext.ProtoReflect.Descriptor instead.
+func (*PolicyContext) Descriptor() ([]byte, []int) {
+	return file_oap_v1_plan_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *PolicyContext) GetPaused() bool {
+	if x != nil {
+		return x.Paused
+	}
+	return false
+}
+
+func (x *PolicyContext) GetFailedAppliesLastHour() int32 {
+	if x != nil {
+		return x.FailedAppliesLastHour
+	}
+	return 0
+}
+
+func (x *PolicyContext) GetReleasesLastHour() int32 {
+	if x != nil {
+		return x.ReleasesLastHour
+	}
+	return 0
+}
+
+func (x *PolicyContext) GetMemoryBudgetMib() int32 {
+	if x != nil {
+		return x.MemoryBudgetMib
+	}
+	return 0
+}
+
 // Step is one typed unit of work. Every operation compiles to steps.
 type Step struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
@@ -308,7 +415,7 @@ type Step struct {
 
 func (x *Step) Reset() {
 	*x = Step{}
-	mi := &file_oap_v1_plan_proto_msgTypes[1]
+	mi := &file_oap_v1_plan_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -320,7 +427,7 @@ func (x *Step) String() string {
 func (*Step) ProtoMessage() {}
 
 func (x *Step) ProtoReflect() protoreflect.Message {
-	mi := &file_oap_v1_plan_proto_msgTypes[1]
+	mi := &file_oap_v1_plan_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -333,7 +440,7 @@ func (x *Step) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Step.ProtoReflect.Descriptor instead.
 func (*Step) Descriptor() ([]byte, []int) {
-	return file_oap_v1_plan_proto_rawDescGZIP(), []int{1}
+	return file_oap_v1_plan_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Step) GetKind() StepKind {
@@ -396,7 +503,7 @@ type BlastRadius struct {
 
 func (x *BlastRadius) Reset() {
 	*x = BlastRadius{}
-	mi := &file_oap_v1_plan_proto_msgTypes[2]
+	mi := &file_oap_v1_plan_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -408,7 +515,7 @@ func (x *BlastRadius) String() string {
 func (*BlastRadius) ProtoMessage() {}
 
 func (x *BlastRadius) ProtoReflect() protoreflect.Message {
-	mi := &file_oap_v1_plan_proto_msgTypes[2]
+	mi := &file_oap_v1_plan_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -421,7 +528,7 @@ func (x *BlastRadius) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlastRadius.ProtoReflect.Descriptor instead.
 func (*BlastRadius) Descriptor() ([]byte, []int) {
-	return file_oap_v1_plan_proto_rawDescGZIP(), []int{2}
+	return file_oap_v1_plan_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *BlastRadius) GetComponents() []string {
@@ -457,7 +564,7 @@ type ChangeFacts struct {
 
 func (x *ChangeFacts) Reset() {
 	*x = ChangeFacts{}
-	mi := &file_oap_v1_plan_proto_msgTypes[3]
+	mi := &file_oap_v1_plan_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -469,7 +576,7 @@ func (x *ChangeFacts) String() string {
 func (*ChangeFacts) ProtoMessage() {}
 
 func (x *ChangeFacts) ProtoReflect() protoreflect.Message {
-	mi := &file_oap_v1_plan_proto_msgTypes[3]
+	mi := &file_oap_v1_plan_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -482,7 +589,7 @@ func (x *ChangeFacts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangeFacts.ProtoReflect.Descriptor instead.
 func (*ChangeFacts) Descriptor() ([]byte, []int) {
-	return file_oap_v1_plan_proto_rawDescGZIP(), []int{3}
+	return file_oap_v1_plan_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ChangeFacts) GetRepository() string {
@@ -552,7 +659,7 @@ var File_oap_v1_plan_proto protoreflect.FileDescriptor
 
 const file_oap_v1_plan_proto_rawDesc = "" +
 	"\n" +
-	"\x11oap/v1/plan.proto\x12\x06oap.v1\x1a\x13oap/v1/errors.proto\x1a\x13oap/v1/intent.proto\x1a\x12oap/v1/world.proto\"\xd5\x03\n" +
+	"\x11oap/v1/plan.proto\x12\x06oap.v1\x1a\x13oap/v1/errors.proto\x1a\x13oap/v1/intent.proto\x1a\x12oap/v1/world.proto\"\xe6\x04\n" +
 	"\bProposal\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
 	"\rbase_revision\x18\x02 \x01(\x04R\fbaseRevision\x12&\n" +
@@ -566,7 +673,16 @@ const file_oap_v1_plan_proto_rawDesc = "" +
 	"\x04next\x18\n" +
 	" \x03(\tR\x04next\x12)\n" +
 	"\x10envelope_version\x18\v \x01(\tR\x0fenvelopeVersion\x126\n" +
-	"\fchange_facts\x18\f \x01(\v2\x13.oap.v1.ChangeFactsR\vchangeFacts\"\xc2\x01\n" +
+	"\fchange_facts\x18\f \x01(\v2\x13.oap.v1.ChangeFactsR\vchangeFacts\x12\x14\n" +
+	"\x05agent\x18\r \x01(\tR\x05agent\x12$\n" +
+	"\x0ebase_spec_hash\x18\x0e \x01(\tR\fbaseSpecHash\x12/\n" +
+	"\acontext\x18\x0f \x01(\v2\x15.oap.v1.PolicyContextR\acontext\x12\"\n" +
+	"\firreversible\x18\x10 \x03(\tR\firreversible\"\xba\x01\n" +
+	"\rPolicyContext\x12\x16\n" +
+	"\x06paused\x18\x01 \x01(\bR\x06paused\x127\n" +
+	"\x18failed_applies_last_hour\x18\x02 \x01(\x05R\x15failedAppliesLastHour\x12,\n" +
+	"\x12releases_last_hour\x18\x03 \x01(\x05R\x10releasesLastHour\x12*\n" +
+	"\x11memory_budget_mib\x18\x04 \x01(\x05R\x0fmemoryBudgetMib\"\xc2\x01\n" +
 	"\x04Step\x12$\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x10.oap.v1.StepKindR\x04kind\x12\x1c\n" +
 	"\tcomponent\x18\x02 \x01(\tR\tcomponent\x12\x18\n" +
@@ -626,33 +742,35 @@ func file_oap_v1_plan_proto_rawDescGZIP() []byte {
 }
 
 var file_oap_v1_plan_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_oap_v1_plan_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_oap_v1_plan_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_oap_v1_plan_proto_goTypes = []any{
-	(Risk)(0),           // 0: oap.v1.Risk
-	(StepKind)(0),       // 1: oap.v1.StepKind
-	(*Proposal)(nil),    // 2: oap.v1.Proposal
-	(*Step)(nil),        // 3: oap.v1.Step
-	(*BlastRadius)(nil), // 4: oap.v1.BlastRadius
-	(*ChangeFacts)(nil), // 5: oap.v1.ChangeFacts
-	(*Intent)(nil),      // 6: oap.v1.Intent
-	(Verdict)(0),        // 7: oap.v1.Verdict
-	(*Reason)(nil),      // 8: oap.v1.Reason
+	(Risk)(0),             // 0: oap.v1.Risk
+	(StepKind)(0),         // 1: oap.v1.StepKind
+	(*Proposal)(nil),      // 2: oap.v1.Proposal
+	(*PolicyContext)(nil), // 3: oap.v1.PolicyContext
+	(*Step)(nil),          // 4: oap.v1.Step
+	(*BlastRadius)(nil),   // 5: oap.v1.BlastRadius
+	(*ChangeFacts)(nil),   // 6: oap.v1.ChangeFacts
+	(*Intent)(nil),        // 7: oap.v1.Intent
+	(Verdict)(0),          // 8: oap.v1.Verdict
+	(*Reason)(nil),        // 9: oap.v1.Reason
 }
 var file_oap_v1_plan_proto_depIdxs = []int32{
-	6, // 0: oap.v1.Proposal.intent:type_name -> oap.v1.Intent
-	7, // 1: oap.v1.Proposal.verdict:type_name -> oap.v1.Verdict
-	8, // 2: oap.v1.Proposal.reasons:type_name -> oap.v1.Reason
-	0, // 3: oap.v1.Proposal.risk:type_name -> oap.v1.Risk
-	3, // 4: oap.v1.Proposal.steps:type_name -> oap.v1.Step
-	4, // 5: oap.v1.Proposal.blast_radius:type_name -> oap.v1.BlastRadius
-	6, // 6: oap.v1.Proposal.undo:type_name -> oap.v1.Intent
-	5, // 7: oap.v1.Proposal.change_facts:type_name -> oap.v1.ChangeFacts
-	1, // 8: oap.v1.Step.kind:type_name -> oap.v1.StepKind
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	9, // [9:9] is the sub-list for extension type_name
-	9, // [9:9] is the sub-list for extension extendee
-	0, // [0:9] is the sub-list for field type_name
+	7,  // 0: oap.v1.Proposal.intent:type_name -> oap.v1.Intent
+	8,  // 1: oap.v1.Proposal.verdict:type_name -> oap.v1.Verdict
+	9,  // 2: oap.v1.Proposal.reasons:type_name -> oap.v1.Reason
+	0,  // 3: oap.v1.Proposal.risk:type_name -> oap.v1.Risk
+	4,  // 4: oap.v1.Proposal.steps:type_name -> oap.v1.Step
+	5,  // 5: oap.v1.Proposal.blast_radius:type_name -> oap.v1.BlastRadius
+	7,  // 6: oap.v1.Proposal.undo:type_name -> oap.v1.Intent
+	6,  // 7: oap.v1.Proposal.change_facts:type_name -> oap.v1.ChangeFacts
+	3,  // 8: oap.v1.Proposal.context:type_name -> oap.v1.PolicyContext
+	1,  // 9: oap.v1.Step.kind:type_name -> oap.v1.StepKind
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_oap_v1_plan_proto_init() }
@@ -669,7 +787,7 @@ func file_oap_v1_plan_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_oap_v1_plan_proto_rawDesc), len(file_oap_v1_plan_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

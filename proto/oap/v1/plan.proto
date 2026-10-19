@@ -16,8 +16,10 @@ enum Risk {
 }
 
 // Proposal is a compiled, policy-checked plan. Its id is a content hash over
-// the base revision, intent, plan, change-fact snapshot and envelope version;
-// Apply commits exactly that proposal.
+// everything the plan and verdict depend on: the base revision and desired
+// state, the agent, the intent, the steps, the change-fact snapshot, the
+// envelope version and the policy context. Apply commits exactly that
+// proposal, and replaying it reproduces the same verdict.
 message Proposal {
   string id = 1;
   uint64 base_revision = 2;
@@ -34,6 +36,22 @@ message Proposal {
   repeated string next = 10;
   string envelope_version = 11;
   ChangeFacts change_facts = 12;
+  // The agent the proposal was judged for.
+  string agent = 13;
+  // Content hash of the application's desired state the plan starts from.
+  string base_spec_hash = 14;
+  PolicyContext context = 15;
+  // Why the plan can't be undone; empty when it can.
+  repeated string irreversible = 16;
+}
+
+// PolicyContext is the recent activity a verdict depended on, recorded so a
+// stored proposal can be re-judged exactly.
+message PolicyContext {
+  bool paused = 1;
+  int32 failed_applies_last_hour = 2;
+  int32 releases_last_hour = 3;
+  int32 memory_budget_mib = 4;
 }
 
 enum StepKind {
