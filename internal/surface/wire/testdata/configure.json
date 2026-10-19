@@ -1,0 +1,12 @@
+{
+  "application": "shop",
+  "configure": {
+    "component": "api",
+    "set_env": {
+      "FEATURE_X": "on",
+      "LOG_LEVEL": "info"
+    },
+    "memory_limit_mib": 128,
+    "cpu_millis": 0
+  }
+}

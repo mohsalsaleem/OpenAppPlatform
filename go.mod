@@ -3,9 +3,12 @@ module github.com/mohsalsaleem/OpenAppPlatform
 go 1.26.0
 
 require (
+	connectrpc.com/connect v1.21.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/riverqueue/river v0.49.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.49.0
+	golang.org/x/sys v0.36.0
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
@@ -20,6 +23,5 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.36.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 )

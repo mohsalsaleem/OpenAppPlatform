@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package oap.v1;
+
+import "oap/v1/errors.proto";
+import "oap/v1/intent.proto";
+import "oap/v1/world.proto";
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1";
+
+enum Risk {
+  RISK_UNSPECIFIED = 0;
+  RISK_ROUTINE = 1;
+  RISK_SENSITIVE = 2;
+  RISK_IRREVERSIBLE = 3;
+}
+
+// Proposal is a compiled, policy-checked plan. Its id is a content hash over
+// the base revision, intent, plan, change-fact snapshot and envelope version;
+// Apply commits exactly that proposal.
+message Proposal {
+  string id = 1;
+  uint64 base_revision = 2;
+  Intent intent = 3;
+  Verdict verdict = 4;
+  repeated Reason reasons = 5;
+  // Computed by OAP, never declared by the agent.
+  Risk risk = 6;
+  repeated Step steps = 7;
+  BlastRadius blast_radius = 8;
+  // Absent when the change is irreversible.
+  Intent undo = 9;
+  // Actions the caller may take next, already filtered by policy.
+  repeated string next = 10;
+  string envelope_version = 11;
+  ChangeFacts change_facts = 12;
+}
+
+enum StepKind {
+  STEP_KIND_UNSPECIFIED = 0;
+  STEP_KIND_START_INSTANCE = 1;
+  STEP_KIND_AWAIT_READY = 2;
+  STEP_KIND_ROUTE_ADD = 3;
+  STEP_KIND_ROUTE_REMOVE = 4;
+  // The edge has applied a configuration change.
+  STEP_KIND_EDGE_RELOAD_CONFIRMED = 5;
+  STEP_KIND_DRAIN = 6;
+  STEP_KIND_STOP = 7;
+  STEP_KIND_RUN_JOB = 8;
+  STEP_KIND_SNAPSHOT_VOLUME = 9;
+  STEP_KIND_SWAP_RELEASE = 10;
+  STEP_KIND_DELETE_VOLUME = 11;
+  STEP_KIND_WRITE_DESIRED = 12;
+}
+
+// Step is one typed unit of work. Every operation compiles to steps.
+message Step {
+  StepKind kind = 1;
+  string component = 2;
+  int32 ordinal = 3;
+  string release = 4;
+  string image = 5;
+  string volume = 6;
+  // Indexes of steps that must succeed first.
+  repeated int32 after = 7;
+}
+
+message BlastRadius {
+  repeated string components = 1;
+  // "none-expected", "partial" or "full".
+  string downtime = 2;
+}
+
+// ChangeFacts are facts about the code change, from a code host extension.
+message ChangeFacts {
+  string repository = 1;
+  string commit = 2;
+  repeated string files_changed = 3;
+  bool migrations_changed = 4;
+  bool lockfile_changed = 5;
+  bool docs_only = 6;
+  // "green", "red", "pending" or "unknown".
+  string ci = 7;
+  bool reviewed = 8;
+  bool signed = 9;
+}

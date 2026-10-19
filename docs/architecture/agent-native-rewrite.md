@@ -83,7 +83,7 @@ host
 Every node carries:
 
 - **desired** and **actual** state, and whether they match;
-- **health** with freshness (`observedAt`) and what evidence is missing;
+- **health** with freshness (`observed_at`) and what evidence is missing;
 - **recent changes** (the last few operations that touched it);
 - **affordances**: what *this caller* may do here, as computed by the policy engine.
 
@@ -96,7 +96,7 @@ Seven primitives, identical across REST, MCP and the CLI:
 
 | Primitive | What it does | Replaces today's |
 |---|---|---|
-| **observe(scope)** | Returns the world graph or a slice of it at a revision. Compact by default; drill down on request. `watch(scope, sinceRevision)` streams changes, so agents never poll | `get`, `instances`, `capabilities`, `export-spec`, `diagnostics` |
+| **observe(scope)** | Returns the world graph or a slice of it at a revision. Compact by default; drill down on request. `watch(scope, since_revision)` streams changes, so agents never poll | `get`, `instances`, `capabilities`, `export-spec`, `diagnostics` |
 | **propose(intent)** | The agent states the outcome it wants (a spec patch, "api at 3 healthy instances", "back to release R", "remove worker"). OAP compiles it into a plan: steps, diff, blast radius, computed undo and a **policy verdict** (`allowed`, `needs-approval`, `denied`, each with reasons). Always a dry run | `validate-spec`, `diff-spec`, `action-plan`, `rollback-plan` and the action-specific verbs |
 | **apply(proposal)** | Commits that exact proposal, identified by its content hash. Idempotent. Returns a durable operation | `execute-action`, `rollback`, `deploy` |
 | **await(operation, until)** | Returns an **outcome**, not a status: `achieved`, `not-achieved` (with reasons and suggested next intents) or `uncertain`, plus an evidence bundle (health, declared checks, traffic, intended-vs-actual diff) | `wait`, `verify` |
@@ -108,7 +108,7 @@ Seven primitives, identical across REST, MCP and the CLI:
 
 Every response is built for an agent with limited context:
 
-- **`revision`** on every read, and `expectedRevision` on every write, so stale
+- **`revision`** on every read, and `expected_revision` on every write, so stale
   decisions are rejected.
 - **`next`**: the actions this caller may take from here, already filtered by policy.
 - **`why`**: stable reason codes, so agents can branch on them reliably.
@@ -150,7 +150,7 @@ proposal: prop_7Hq2…            # content hash; apply this exact proposal
 verdict: allowed                # policy engine decision
 risk: routine                   # computed by OAP, never declared by the agent
 steps: [start api-2, start api-3, wait ready, add to route /api]
-blastRadius: { components: [api], downtime: none-expected }
+blast_radius: { components: [api], downtime: none-expected }
 undo: { change: { component: api, instances: 1 } }
 next: [apply]
 ```
@@ -379,7 +379,7 @@ manages, runs `oap login`, and continues.
 - **Transport:** a [Connect](https://connectrpc.com/) service. One handler
   serves gRPC (CLI, extensions), gRPC-Web (a future browser UI) and Connect's
   JSON-over-HTTP protocol, so any agent or script can call
-  `POST /oap.v1.Agent/Propose` with a JSON body. **MCP** exposes the same
+  `POST /oap.v1.AgentService/Propose` with a JSON body. **MCP** exposes the same
   primitives as a handful of tools, generated from the protos, locally (stdio) and
   remotely (HTTPS with device login). **The CLI** is a thin generated client that
   also owns the agent store and device login.

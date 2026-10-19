@@ -34,9 +34,13 @@ python3 scripts/rewrite_frozen_paths.py --base "${REWRITE_BASE:-origin/main}"
 
 step "protos"
 if [ -n "$(find proto -name '*.proto' -print -quit)" ]; then
-  buf lint
-  make gen
-  git diff --exit-code -- gen || { echo "generated code is stale or hand-edited"; exit 1; }
+  make gen >/dev/null
+  .local/bin/buf lint
+  if [ -n "$(git status --porcelain -- gen)" ]; then
+    git status --short -- gen
+    echo "generated code is stale or hand-edited; run make gen and commit"
+    exit 1
+  fi
   echo ok
 else
   echo "no .proto files yet"
