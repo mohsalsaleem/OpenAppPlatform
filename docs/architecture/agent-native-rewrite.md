@@ -20,6 +20,15 @@ The rewrite makes **OAP the choreographer** and gives agents a few powerful
 primitives over a single model of the world. Humans stay in control, but as
 policy setters and exception handlers, not as a step in the normal path.
 
+Prior art shapes two parts of the design. From exe.dev: credentials stay on the
+server and are injected at the edge (section 8). From the [Pi](https://pi.dev/)
+agent harness: a small fixed core with extensions around it, one engine behind
+several interfaces, one event stream, an append-only history you can branch
+from, and context files that agents pick up automatically (sections 5, 9 and 11).
+Pi treats guardrails as optional code that runs with full permissions; OAP must
+not. Here guardrails are enforced by the server, outside anything an agent or
+extension can change.
+
 ## 2. Who it is for
 
 **A one-person startup.** One founder, a few servers, several applications, and
@@ -33,6 +42,9 @@ Goals:
 - The founder decides policy once and is involved only for decisions that are
   genuinely theirs: risky, irreversible or outside the agreed envelope.
 - Small and boring: one binary per server, runs on a 1 GB VPS, nothing to babysit.
+- A small core: the world model, seven primitives, the policy engine and the
+  reconciler are fixed. Everything else is an extension the owner can leave out
+  (section 11).
 - Losing any single store never loses anything that cannot be rebuilt.
 
 Non-goals: a Kubernetes API, multi-tenant fleets, an embedded model, a required
@@ -102,6 +114,22 @@ Every response is built for an agent with limited context:
 - **Compact first**: summaries with links to detail; change feeds instead of re-reading.
 - **Untrusted content is labelled**: logs, commit messages and app output are
   data, never instructions.
+
+### Agent briefing
+
+Agents should not need a custom prompt to operate a server well. `observe`
+can return a **briefing**: a short, generated Markdown document per server and
+per application, in the spirit of `AGENTS.md` files. It covers:
+
+- what runs here, with its components and edges;
+- what this caller may do, from the envelope, and what always needs the owner;
+- open incidents, recent changes and pending `ask` requests;
+- house rules the owner wrote in `briefing.md` next to the application spec.
+
+The briefing is generated from the world model on each read, so it can't
+drift from it. Any harness can load it at the start of a session (it is also served
+at `/.well-known/oap/briefing.md` and as an MCP resource). It is advice for
+the agent; the server never relies on it for enforcement.
 
 ### Example
 
@@ -254,6 +282,7 @@ Four kinds of state on each server, plus the agent's own store:
   host.yaml
   policy/envelope.yaml
   apps/shop/app.yaml
+  apps/shop/briefing.md      # owner's house rules, optional
   apps/blog/app.yaml
 ```
 
@@ -265,6 +294,26 @@ Four kinds of state on each server, plus the agent's own store:
 - This refines [spec ownership](../spec-ownership.md): OAP still owns the spec and
   remains the single writer; the repo is OAP's storage format, not a second
   writable source.
+
+### The operation journal
+
+Alongside the desired-state commits, OAP keeps an **append-only journal** of
+everything agents and the owner did: proposals, verdicts, `ask` requests and
+answers, applies, outcomes and their evidence. Each entry has an ID, points to
+its parent and names the desired-state revision it was based on. Like Pi's
+session tree:
+
+- **Nothing is rewritten.** Undo and rollback add new entries and commits; they
+  never delete history.
+- **You can branch from any point.** A proposal may target an earlier revision
+  ("return to how it was before entry X"). OAP computes the change from the
+  current state, so the result is still a normal, policy-checked proposal.
+- **Compaction adds summary entries** (for example, a daily digest) for agents
+  and the owner. Original entries stay for audit.
+
+`explain`, undo and the owner's digest all read the same journal. It lives in
+the operational SQLite store, and each entry links to the desired-state commit it
+produced, so either store can be checked against the other.
 
 ### Decision: replace OAP's PostgreSQL and River with SQLite
 
@@ -328,12 +377,49 @@ manages, runs `oap login`, and continues.
 - **REST** is the reference transport. **MCP** exposes the same primitives as a
   handful of tools, locally (stdio) and remotely (HTTPS with device login).
   **The CLI** is a thin client that also owns the agent store and device login.
-- **Events:** `watch` streams revisioned changes, including `ask` answers and
-  operation outcomes.
+- **One event stream.** `watch` and `await` share one versioned event format
+  (JSON lines over HTTP, MCP notifications or CLI output): world-model changes,
+  journal entries, operation progress and outcomes, and `ask` answers. `await`
+  is just `watch` filtered to one operation, ending at its outcome.
+- **CLI modes** follow the same engine: human-readable output by default;
+  `--json` for one result; `--events` streams the event format, for scripts and
+  harnesses that drive OAP as a subprocess.
 - **Idempotency** comes from proposal content hashes and operation IDs, not
   client-chosen keys.
 - **Compatibility:** today's API stays available during migration; new features
   land only on the new surface.
+- **Harness packages:** OAP publishes a small package for popular agent harnesses
+  (Claude Code skills, Pi packages, a generic MCP configuration). Each covers
+  device login, the primitives, reading the briefing, and the habit of proposing
+  before applying. OAP is something harnesses operate; it does not ship its own.
+
+### Extensions
+
+The core stays small; optional features are **extensions**:
+
+| Extension point | Examples |
+|---|---|
+| Builders | On-host build queue, off-host builder, registry-only |
+| Change-fact sources | GitHub App; later other code hosts or CI systems |
+| Notification channels | Email, push, Slack, webhooks (for `ask` and digests) |
+| Importers | Compose import, Dockerfile-only apps |
+| Health and evidence checks | HTTP probes, synthetic journeys, custom checks |
+
+Unlike Pi's in-process extensions, OAP extensions **cannot weaken guardrails**:
+
+- They run **out of process**, talking to OAP over a versioned JSON protocol, and
+  declare the capabilities they need. The owner grants these when installing.
+- They supply **facts and side effects**: build results, change facts,
+  notification delivery, check results. They never return policy verdicts.
+  Only the core policy engine decides.
+- They never receive secrets beyond the connection they were granted, and
+  cannot read other extensions' data.
+- Installing, upgrading or removing an extension is itself a proposal, judged by
+  the envelope as `sensitive` by default.
+
+First-party builders, the GitHub App, notifications and Compose import ship as
+extensions from the start. That keeps the contract real and lets a 1 GB host
+leave out what it doesn't need.
 
 ## 12. From today to the rewrite
 
@@ -351,23 +437,27 @@ Much of the machinery exists and is reused:
 
 New: the world graph and `watch`, one intent compiler, the policy engine and
 envelope, outcome-based `await`, `ask`, `login`, computed undo, GitHub change
-facts, the YAML desired-state repo, SQLite operational state and the agent store.
+facts, the YAML desired-state repo, the operation journal, the shared event
+format, the agent briefing, the extension protocol, SQLite operational state, the
+agent store and harness packages.
 
 ## 13. Migration plan
 
 Each phase ships usable value and keeps existing installs working:
 
-1. **Model and storage foundation:** world graph read model and `observe`/`watch`;
-   desired-state Git repo with history; runtime-label rebuild.
+1. **Model and storage foundation:** world graph read model and `observe`/`watch`
+   on the shared event format; desired-state Git repo with history; operation
+   journal; runtime-label rebuild; generated briefing.
 2. **Intent and policy:** intent compiler behind `propose`; envelope YAML and
    policy engine; computed undo; outcome-based `await`; `explain` from the
    incident view.
 3. **People and identity:** `ask` with notifications; device `login`; owner
-   one-time connections; GitHub change facts.
+   one-time connections; the extension protocol, with GitHub change facts and
+   notification channels as its first extensions.
 4. **Storage switch:** SQLite operational store and job table; migration tool from
    PostgreSQL; continuous backup.
 5. **Agent client:** new CLI and MCP over the primitives; Turso agent store;
-   compatibility layer for the old API, then its deprecation.
+   harness packages; compatibility layer for the old API, then its deprecation.
 
 ## 14. Lessons from the v0.1 VPS run
 
@@ -396,6 +486,11 @@ established. For the rewrite this means:
   tooling is proven.
 - **Device login friction** for short-lived agent sessions: mitigated by trusted
   agent identities, at the cost of key custody.
+- **Extensions as a back door:** an extension that can decide policy or read
+  secrets would undo the envelope. The contract allows facts and side effects
+  only, out of process, with granted capabilities.
+- **Briefing treated as authority:** agents may follow the briefing instead of
+  the server's verdict. It is advisory; every apply is still checked by policy.
 
 ## 16. Decisions needed
 
@@ -406,3 +501,5 @@ established. For the rewrite this means:
 3. Agent store sync default: Turso Cloud, or self-hosted libSQL on the owner's server?
 4. Whether to fix the scale-down loss on the current code first, or only within
    the rewrite's reconciler.
+5. Which harness packages to ship first: Claude Code skills and generic MCP, then
+   Pi?
