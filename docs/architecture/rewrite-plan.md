@@ -71,10 +71,10 @@ These hold for every task. Breaking one is a defect, even if all tests pass.
 
 ### Environments
 
-12. **Here (cloud session):** phases 0–4, all against simulation adapters. Push
+12. **Here (cloud session):** phases 0–1 and the simulation parts of phase 2. Push
     every finished task; the container is temporary.
-13. **Owner's machine (local Claude Code):** phase A (real adapters, deferred) and
-    acceptance journeys against real Docker and Caddy.
+13. **Owner's machine (local Claude Code):** adapter contract tests against real
+    Docker and Caddy, and local acceptance journeys.
 14. **Owner's server:** phase 5 deploy and the release journey. On the server, an
     agent touches only resources carrying OAP labels, never builds there unless the
     task says so, never edits databases or Caddy by hand, never prints credentials,
@@ -125,8 +125,7 @@ no I/O imports; the owner reviews the phase pull request.
 
 ## Phase 2: Engine, storage and simulation
 
-Depends on phase 1. Runs entirely here, against simulation adapters. Real
-adapters are deferred to phase A.
+Depends on phase 1. R2.1–R2.8 run here; R2.9–R2.11 need real Docker and Caddy.
 
 | ID | Task | Acceptance |
 |---|---|---|
@@ -135,13 +134,16 @@ adapters are deferred to phase A.
 | R2.3 | Job queue on SQLite: leases, attempts, single dispatch | Randomized test (at least 10,000 seeded runs, `-race`) with concurrent dispatchers and lease expiry: no job runs twice concurrently, none is lost |
 | R2.4 | Step executor: intent before effect, observe before re-dispatch | In simulation, a crash between every pair of steps of every golden plan converges with no duplicate effects (fake runtime counts creations) |
 | R2.5 | Per-application serializer | Concurrent applies on one app run in order; different apps run in parallel; property test over random schedules |
-| R2.6 | Simulation harness: fake Runtime and Edge with a traffic generator, fault injection and seeds; in-memory `DesiredRepo` and `Secrets`; a contract suite per port that the fakes pass (and real adapters must pass in phase A) | The same seed gives an identical trace; faults include reloads that drop in-flight connections, exits during drain, slow readiness and lost responses; every fake passes its port's contract suite |
+| R2.6 | Simulation harness: fake Runtime and Edge with a traffic generator, fault injection and seeds | The same seed gives an identical trace; faults include reloads that drop in-flight connections, exits during drain, slow readiness and lost responses |
 | R2.7 | Observer: runtime events, periodic resync, freshness | In simulation, missed events are healed by resync within one interval; freshness is reported on every node |
 | R2.8 | VPS-H-001: reproduce, then fix | Commit 1: the harness shows lost requests when scaling 3→1 with a naive order (removal without confirmed reload and drain) across seeds. Commit 2: with the planner's ordering rule, 0 failed requests over at least 1,000 seeds. If simulation can't reproduce the loss, stop and report: the root cause lies elsewhere |
+| R2.9 | Docker and Caddy adapters, with one contract suite run against both the fakes and the real systems | The same contract suite passes against the fakes and against real Docker and Caddy (`OAP_TEST_DOCKER=1`); resources are adopted only by OAP labels. **Decision needed first:** keep or drop Coolify |
+| R2.10 | Desired-state Git repository adapter | Commits carry author and message; history, diff and revert work; export to a mirror is one-way |
+| R2.11 | Secret store adapter (format compatible with today's encrypted store, for migration) | Reads a store written by today's code; secrets never appear in journal entries or errors (test) |
 
-**Phase exit:** in simulation, scaling 1→3→1 under continuous traffic shows 0
-failed requests across seeds, including injected faults; every golden plan
-survives a crash between any two steps.
+**Phase exit:** with real Docker and Caddy on the owner's machine, scaling 1→3→1
+under continuous traffic shows 0 failed requests; OAP with SQLite stays under its
+60 MiB footprint budget during that run.
 
 ## Phase 3: API, identity and people
 
@@ -159,9 +161,9 @@ Depends on phase 2.
 | R3.8 | Briefing: generated Markdown per server and app, served by `observe`, at `/.well-known/oap/briefing.md` and as an MCP resource | Golden briefings for the reference apps; owner `briefing.md` content appears labelled as owner-written |
 | R3.9 | Security tests for the whole surface | An agent can't act beyond its scope through any interface; a scan of every response and log in the acceptance run finds no secret values. **Decision needed first:** default autonomy for a fresh install |
 
-**Phase exit:** the journey (create, deploy with a migration, scale, injected
-failure, explain, fix, roll back, verify) passes against simulation adapters,
-driven only through MCP, and again only through the CLI.
+**Phase exit:** the local journey (create, deploy with a migration, scale,
+injected failure, explain, fix, roll back, verify) passes driven only through
+MCP, and again only through the CLI.
 
 ## Phase 4: Extensions
 
@@ -170,27 +172,14 @@ Depends on phase 3.
 | ID | Task | Acceptance |
 |---|---|---|
 | R4.1 | Plugin host (go-plugin): versioned extension protos, capability grants, timeouts, memory caps | A crashing or hanging extension doesn't affect the core; the extension protos have no field that can carry a policy verdict; installing an extension is a `sensitive` proposal |
-| R4.2 | Builders: on-host build queue (one build at a time by default, with memory admission) and registry-only | Against a simulated builder: concurrent build requests are queued one at a time and admission refuses a build that exceeds the memory budget. The real-build check moves to phase A |
+| R4.2 | Builders: on-host build queue (one build at a time by default, with memory admission) and registry-only | Two concurrent build requests on a 1 GB-class memory limit run one after another; the host never runs out of memory in the test |
 | R4.3 | GitHub change facts (read-only GitHub App) | Facts for a recorded fixture repository map to the envelope's risk tiers; CI-not-green is denied |
 | R4.4 | Notifications: webhook and email | Ask and digest delivery with retries; failures surface in `observe` |
 | R4.5 | Compose import | The examples from [Compose import](../compose-import.md) convert to valid applications with the documented warnings |
 
-## Phase A: Real adapters (deferred)
-
-Not started until the owner says so; required before phase 5. Runs on the owner's
-machine. Until then, every phase runs on the simulation adapters from R2.6, so
-the contract suite they define is what the real adapters must later pass.
-
-| ID | Task | Acceptance |
-|---|---|---|
-| RA.1 | Docker and Caddy adapters, with one contract suite run against both the fakes and the real systems | The same contract suite passes against the fakes and against real Docker and Caddy (`OAP_TEST_DOCKER=1`); resources are adopted only by OAP labels. **Decision needed first:** keep or drop Coolify |
-| RA.2 | Desired-state Git repository adapter | Commits carry author and message; history, diff and revert work; export to a mirror is one-way |
-| RA.3 | Secret store adapter (format compatible with today's encrypted store, for migration) | Reads a store written by today's code; secrets never appear in journal entries or errors (test) |
-| RA.4 | Real-system exit check | With real Docker and Caddy, scaling 1→3→1 under continuous traffic shows 0 failed requests; OAP with SQLite stays under its 60 MiB footprint budget; real builds on a 1 GB-class memory limit run one at a time without running out of memory |
-
 ## Phase 5: Cutover
 
-Depends on phases 4 and A. R5.3 runs on the owner's server.
+Depends on phase 4. R5.3 runs on the owner's server.
 
 | ID | Task | Acceptance |
 |---|---|---|
@@ -204,7 +193,7 @@ Depends on phases 4 and A. R5.3 runs on the owner's server.
 
 | Decision (rewrite doc §17) | Needed before | Recommendation |
 |---|---|---|
-| Keep or drop the Coolify adapter | RA.1 | Drop |
+| Keep or drop the Coolify adapter | R2.9 | Drop |
 | Default session approval mode | R3.6 | Approve every session; offer trusted identity at first login |
 | Default autonomy for a fresh install | R3.9 | Routine changes allowed; everything else asks |
 | Turso Cloud or self-hosted libSQL | R5.4 | Self-hosted option first, Cloud as opt-in |
@@ -217,11 +206,10 @@ Depends on phases 4 and A. R5.3 runs on the owner's server.
 |---|---|---|---|
 | R0.1–R0.5 | not started | | |
 | R1.1–R1.7 | not started | | |
-| R2.1–R2.8 | not started | | |
+| R2.1–R2.11 | not started | | |
 | R3.1–R3.9 | not started | | |
 | R4.1–R4.5 | not started | | |
-| RA.1–RA.4 | deferred | | |
 | R5.1–R5.5 | not started | | |
 
-Statuses: `not started`, `deferred`, `in progress`, `blocked (reason)`, `done`. Rows are split
+Statuses: `not started`, `in progress`, `blocked (reason)`, `done`. Rows are split
 per task once work on a phase begins.
