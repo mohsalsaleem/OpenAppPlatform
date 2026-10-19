@@ -18,7 +18,7 @@ func TestProbeIsReadOnly(t *testing.T) {
 	if os.Getenv("OAP_TEST_DOCKER") != "1" {
 		t.Skip("needs Docker; set OAP_TEST_DOCKER=1")
 	}
-	for _, image := range []string{"ubuntu:24.04", "ubuntu:22.04", "debian:12"} {
+	for _, image := range []string{"ubuntu:26.04", "ubuntu:24.04", "ubuntu:22.04", "debian:13", "debian:12"} {
 		t.Run(image, func(t *testing.T) {
 			var out, errb bytes.Buffer
 			cmd := exec.Command("docker", "run", "--rm", "-i", "--read-only", "--network", "none", image, "sh", "-s")

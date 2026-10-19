@@ -107,7 +107,7 @@ Password for root@203.0.113.5 (used once to install a key, never stored): ••
 
 Checking the server (read-only)…
 ✗ Ubuntu 18.04 isn't supported: it no longer gets security updates.
-  Reinstall it with Ubuntu 24.04 from your provider's console, then run `oap` again.
+  Reinstall it with Ubuntu 26.04 from your provider's console, then run `oap` again.
 ! No swap on a 1 GB server. Fix: add a 1 GiB swap file (routine, undoable).
 · Also on this server, left alone: container `tura`, MySQL on 127.0.0.1:3306.
 
@@ -181,7 +181,7 @@ errors.
 
 | Check | Requirement | Example `why` |
 |---|---|---|
-| OS and version | A supported, maintained release (for example Ubuntu 22.04/24.04, Debian 12) | `host.os.unsupported` |
+| OS and version | A supported, maintained release (Ubuntu 22.04, 24.04 or 26.04; Debian 12 or 13) | `host.os.unsupported` |
 | Architecture | amd64 or arm64 | `host.arch.unsupported` |
 | Memory and swap | 1 GB or more; swap on hosts under 2 GB | `host.swap.missing` |
 | Disk | 5 GB free or more | `host.disk.low` |
@@ -271,7 +271,7 @@ After the v0.1 install was torn down, a check would report:
 
 | Finding | Observed | Proposed |
 |---|---|---|
-| `host.os.unsupported` | Ubuntu 18.04.2 LTS (standard support ended May 2023), kernel 4.15 | Stop: reinstall with Ubuntu 24.04 from the provider's console |
+| `host.os.unsupported` | Ubuntu 18.04.2 LTS (standard support ended May 2023), kernel 4.15 | Stop: reinstall with Ubuntu 26.04 from the provider's console |
 | `host.docker.unmanaged` | Docker 27.5.1 from a static tarball in `/opt/docker-27.5.1`, started by a systemd drop-in `oap-test-engine.conf` that v0.1 testing added | After the reinstall, install Docker from the official apt repository (sensitive) |
 | `host.swap.missing` | 985 MiB memory, no swap | Add a 1 GiB swap file (routine; undo removes it) |
 | `host.foreign.present` | `tura` container (stopped), MySQL on 127.0.0.1:3306 | Information only; left alone |
@@ -299,6 +299,8 @@ from the password to the release journey, as its evidence.
 
 ### Decisions (owner, 2026-10-19)
 
-1. **Supported systems:** Ubuntu 22.04 and 24.04, Debian 12.
+1. **Supported systems:** Ubuntu 22.04, 24.04 and 26.04, and Debian 12 and 13.
+   The first list left out Ubuntu 26.04, the current LTS; the first real
+   onboarding run stopped on it, so the owner widened the list the same day.
 2. **OAP installs Docker itself**, as a sensitive fix the owner approves.
 3. **Automatic hostname:** sslip.io by default; the owner's domain when given.

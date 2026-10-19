@@ -7,7 +7,7 @@ exit 4
     "step": "check",
     "by": "owner",
     "why": "The server can't run OAP until something outside OAP changes.",
-    "ask_owner": "Reinstall the server with Ubuntu 24.04 from your provider's console, then run oap again. OAP doesn't upgrade an operating system in place.",
+    "ask_owner": "Reinstall the server with Ubuntu 26.04 from your provider's console, then run oap again. OAP doesn't upgrade an operating system in place.",
     "command": "oap host check root@203.0.113.5",
     "then": "oap --json"
   },
@@ -24,8 +24,8 @@ exit 4
       "why": "host.os.unsupported",
       "severity": "stop",
       "observed": "Ubuntu 18.04.2 LTS",
-      "required": "Ubuntu 22.04 or 24.04, or Debian 12",
-      "remedy": "Reinstall the server with Ubuntu 24.04 from your provider's console, then run oap again. OAP doesn't upgrade an operating system in place."
+      "required": "Ubuntu 22.04, 24.04 or 26.04, or Debian 12 or 13",
+      "remedy": "Reinstall the server with Ubuntu 26.04 from your provider's console, then run oap again. OAP doesn't upgrade an operating system in place."
     },
     {
       "why": "host.swap.missing",

@@ -204,7 +204,7 @@ Decided: Docker is the only runtime operator for the rewrite. The Coolify
 adapter is not carried over; other operators can return later as extensions.
 
 Decided for [onboarding](onboarding.md) (owner, 2026-10-19), needed before
-R3.11–R3.13: supported systems are Ubuntu 22.04 and 24.04 and Debian 12; OAP
+R3.11–R3.13: supported systems are Ubuntu 22.04, 24.04 and 26.04 and Debian 12 and 13 (26.04 and Debian 13 added the same day, after the first real run stopped on 26.04); OAP
 installs Docker itself, as a sensitive fix the owner approves; the automatic
 hostname is sslip.io unless the owner gives a domain.
 

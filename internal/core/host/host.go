@@ -166,8 +166,9 @@ type Finding struct {
 	Fix      *Fix     `json:"fix,omitempty"`
 }
 
-// Supported lists the systems OAP installs on (owner decision, 2026-10-19).
-var Supported = []string{"ubuntu 22.04", "ubuntu 24.04", "debian 12"}
+// Supported lists the systems OAP installs on (owner decision, 2026-10-19,
+// widened the same day to the current Ubuntu LTS and Debian stable).
+var Supported = []string{"ubuntu 22.04", "ubuntu 24.04", "ubuntu 26.04", "debian 12", "debian 13"}
 
 // Requirements.
 const (
@@ -175,7 +176,7 @@ const (
 	SwapBelowMiB     = 2048 // hosts with less memory than this need swap
 	MinDiskFreeMiB   = 5120
 	MinDockerMajor   = 24
-	supportedSummary = "Ubuntu 22.04 or 24.04, or Debian 12"
+	supportedSummary = "Ubuntu 22.04, 24.04 or 26.04, or Debian 12 or 13"
 )
 
 // Check judges facts. Findings come in a fixed order: access, system,
@@ -194,7 +195,7 @@ func Check(f Facts) []Finding {
 			name = strings.TrimSpace(f.OSID + " " + f.OSVersion)
 		}
 		add(Finding{Why: "host.os.unsupported", Severity: Stop, Observed: name, Required: supportedSummary,
-			Remedy: "Reinstall the server with Ubuntu 24.04 from your provider's console, then run oap again. OAP doesn't upgrade an operating system in place."})
+			Remedy: "Reinstall the server with Ubuntu 26.04 from your provider's console, then run oap again. OAP doesn't upgrade an operating system in place."})
 	}
 	switch f.Arch {
 	case "x86_64", "amd64", "aarch64", "arm64":
