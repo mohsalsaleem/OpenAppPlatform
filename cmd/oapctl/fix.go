@@ -68,7 +68,7 @@ func (a *app) fix(ctx context.Context, s *host.Server, proposeOnly bool) int {
 		return host.ExitOwner
 	}
 	if len(batches) == 0 {
-		fmt.Fprintln(a.out, "No fixes to apply.")
+		a.u().Note("No fixes to apply.")
 		return a.check(ctx, s.Address, false)
 	}
 	t, err := a.target(s.Address)
@@ -80,39 +80,42 @@ func (a *app) fix(ctx context.Context, s *host.Server, proposeOnly bool) int {
 	if n != 1 {
 		changes = fmt.Sprintf("%d changes", n)
 	}
-	fmt.Fprintf(a.out, "%s needs %s. Each runs only if you approve it.\n", s.Address, changes)
+	a.u().Note(fmt.Sprintf("%s needs %s. Each runs only if you approve it.", s.Address, changes))
 	for _, b := range batches {
-		fmt.Fprintln(a.out)
+		a.u().Note("")
 		for _, f := range b.Fixes {
 			undo := "can't be undone"
 			if f.CanUndo {
 				undo = fmt.Sprintf("undo with `%s host undo %s`", a.cli, f.ID)
 			}
-			fmt.Fprintf(a.out, "%s (%s; %s)\n  Because: %s.\n  Commands:\n%s\n", f.Summary, f.Tier, undo, f.Observed, indent(f.Script, "    "))
+			a.u().Change(fmt.Sprintf("%s (%s; %s)", f.Summary, f.Tier, undo), f.Observed, f.Script)
 		}
-		prompt := "Apply this? [y/N] "
+		prompt := "Apply this?"
 		if len(b.Fixes) > 1 {
-			prompt = fmt.Sprintf("Apply these %d routine fixes? [y/N] ", len(b.Fixes))
+			prompt = fmt.Sprintf("Apply these %d routine fixes?", len(b.Fixes))
 		}
-		if ans := a.ask(prompt, "n"); !strings.EqualFold(ans, "y") && !strings.EqualFold(ans, "yes") {
-			fmt.Fprintln(a.out, "Not applied.")
+		if !a.u().Confirm(prompt) {
+			a.u().Note("Not applied.")
 			continue
 		}
 		for _, f := range b.Fixes {
-			fmt.Fprintf(a.out, "Applying %s…\n", f.ID)
-			if _, err := a.ssh.Run(ctx, t, f.Script); err != nil {
+			err := a.u().Run("Applying "+f.ID, func(progress func(string)) error {
+				_, err := a.ssh.RunStream(ctx, t, f.Script, progress)
+				return err
+			})
+			if err != nil {
 				return a.fail(fmt.Errorf("fix %s failed: %v", f.ID, err))
 			}
 			if _, err := a.ssh.Run(ctx, t, host.RecordScript(f.ID, "apply", a.now())); err != nil {
 				return a.fail(fmt.Errorf("fix %s was applied but couldn't be recorded in the host manifest: %v", f.ID, err))
 			}
-			fmt.Fprintf(a.out, "✓ %s applied and recorded in %s\n", f.ID, host.ManifestPath)
+			a.u().Success(fmt.Sprintf("%s applied and recorded in %s", f.ID, host.ManifestPath))
 		}
 	}
 	if len(missing) > 0 {
-		fmt.Fprintf(a.out, "No automatic fix yet for: %s\n", strings.Join(missing, ", "))
+		a.u().Warn(fmt.Sprintf("No automatic fix yet for: %s", strings.Join(missing, ", ")))
 	}
-	fmt.Fprintln(a.out)
+	a.u().Note("")
 	return a.check(ctx, s.Address, false)
 }
 
@@ -151,18 +154,22 @@ func (a *app) hostUndo(ctx context.Context, args []string) int {
 	if !applied {
 		return a.fail(fmt.Errorf("the host manifest doesn't show %s as applied by OAP; nothing to undo", id))
 	}
-	fmt.Fprintf(a.out, "Undo %s on %s.\n  Commands:\n%s\n", id, s.Address, indent(sc.Undo, "    "))
-	if ans := a.ask("Undo it? [y/N] ", "n"); !strings.EqualFold(ans, "y") && !strings.EqualFold(ans, "yes") {
-		fmt.Fprintln(a.out, "Not undone.")
+	a.u().Change(fmt.Sprintf("Undo %s on %s", id, s.Address), "the host manifest shows OAP applied it", sc.Undo)
+	if !a.u().Confirm("Undo it?") {
+		a.u().Note("Not undone.")
 		return host.ExitOwner
 	}
-	if _, err := a.ssh.Run(ctx, t, sc.Undo); err != nil {
+	err = a.u().Run("Undoing "+id, func(progress func(string)) error {
+		_, err := a.ssh.RunStream(ctx, t, sc.Undo, progress)
+		return err
+	})
+	if err != nil {
 		return a.fail(fmt.Errorf("undoing %s failed: %v", id, err))
 	}
 	if _, err := a.ssh.Run(ctx, t, host.RecordScript(id, "undo", a.now())); err != nil {
 		return a.fail(fmt.Errorf("%s was undone but couldn't be recorded: %v", id, err))
 	}
-	fmt.Fprintf(a.out, "✓ %s undone\n", id)
+	a.u().Success(id + " undone")
 	return a.check(ctx, s.Address, false)
 }
 

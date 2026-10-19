@@ -147,6 +147,12 @@ device login) carry `"by": "agent"` and a `command`. The exit codes are 0
 without parsing prose. Until R3.12–R3.14 land, a step that isn't built yet
 exits 5 and names the task that delivers it.
 
+On a terminal, `oapctl` draws the journey with Charm's Bubble Tea and Lip
+Gloss: one bordered panel per server, key-press prompts, and a spinner with
+the elapsed time and the last lines of remote output while slow steps run.
+`OAP_PLAIN=1` (or `TERM=dumb`) prints plain lines instead; agents always get
+JSON.
+
 `oapctl` (the CLI's working name) implements this as of R3.0, with
 `host connect` (R3.10) and `host check` (R3.11). The probe is
 `internal/core/host/probe.sh`.

@@ -63,7 +63,10 @@ These hold for every task. Breaking one is a defect, even if all tests pass.
    pure-Go SQLite driver (`modernc.org/sqlite`), one YAML library
    (`gopkg.in/yaml.v3`) and their transitive dependencies. Tools (not linked):
    `buf`, `protoc-gen-go`, `protoc-gen-connect-go`, pinned in `tools/`. Anything else
-   needs owner approval.
+   needs owner approval. Approved for the CLI only (owner, 2026-10-20): Charm's
+   `charm.land/bubbletea/v2`, `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`
+   for `oapctl`'s terminal interface; `tests/arch` keeps them out of `oapd` and
+   `internal/`.
 10. **Generated code is reproducible.** `make gen` on a clean checkout produces no
     diff. Generated files are never edited by hand.
 11. **No secrets anywhere:** not in code, fixtures, logs, test output or evidence.

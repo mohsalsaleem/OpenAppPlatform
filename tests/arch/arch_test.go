@@ -43,7 +43,7 @@ func TestNewTreeImportsFollowLayerRules(t *testing.T) {
 			seen[l] = true
 		}
 	}
-	for _, want := range []string{"core", "ports", "engine", "adapters", "service", "surface", "commands"} {
+	for _, want := range []string{"core", "ports", "engine", "adapters", "service", "surface", "commands", "cli"} {
 		if !seen[want] {
 			t.Errorf("no packages found for layer %q; the check would pass vacuously", want)
 		}
@@ -97,6 +97,8 @@ func TestCheckImportsRejectsViolations(t *testing.T) {
 		{"command imports old tree", pkg("cmd/oapd", local("internal/store")), "frozen old tree"},
 		{"unlisted dependency", pkg("internal/adapters/sqlite", "github.com/mattn/go-sqlite3"), "allowlist"},
 		{"allowlisted but wrong layer", pkg("internal/core", "modernc.org/sqlite"), "not for this layer"},
+		{"terminal UI in the server", pkg("cmd/oapd", "charm.land/bubbletea/v2"), "not for this layer"},
+		{"terminal UI in an adapter", pkg("internal/adapters/sshhost", "charm.land/lipgloss/v2"), "not for this layer"},
 		{"cgo", pkg("internal/adapters/x", "C"), "cgo"},
 		{"adapters import the planner", pkg("internal/adapters/docker", local("internal/core/plan")), "downward only"},
 	}
@@ -121,6 +123,7 @@ func TestCheckImportsAcceptsAllowedImports(t *testing.T) {
 		pkg("internal/service", local("internal/engine"), local("internal/core/policy")),
 		pkg("internal/surface/connect", "net/http", "connectrpc.com/connect", local("internal/service")),
 		pkg("cmd/oapd", "os", local("internal/adapters/docker"), local("internal/surface")),
+		pkg("cmd/oapctl", "charm.land/bubbletea/v2", "charm.land/lipgloss/v2", local("internal/core/host")),
 		pkg("internal/controller", "github.com/jackc/pgx/v5"), // old tree: not checked
 	}
 	if got := CheckImports(ok); len(got) != 0 {

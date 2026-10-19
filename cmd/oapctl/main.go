@@ -28,6 +28,9 @@ func main() {
 	a := &app{cli: filepath.Base(os.Args[0]), in: bufio.NewReader(os.Stdin), out: os.Stdout, errOut: os.Stderr,
 		ssh: sshhost.Client{}, now: time.Now}
 	a.terminal = isTerminal
+	if a.terminal() && os.Getenv("OAP_PLAIN") == "" && os.Getenv("TERM") != "dumb" {
+		a.ui = newTUI(a)
+	}
 	os.Exit(a.run(ctx, os.Args[1:]))
 }
 
@@ -40,6 +43,15 @@ type app struct {
 	terminal    func() bool
 	now         func() time.Time
 	configDir   string // overrides the default, for tests
+	ui          ui     // nil: plain text
+}
+
+// u is the owner's interface: the Charm one when set, else plain text.
+func (a *app) u() ui {
+	if a.ui != nil {
+		return a.ui
+	}
+	return plainUI{a: a, cli: a.cli}
 }
 
 const usage = `Usage:
@@ -87,17 +99,13 @@ func (a *app) frontDoor(ctx context.Context, asJSON bool) int {
 		return st.Exit
 	}
 	if s == nil {
-		fmt.Fprintf(a.out, "OAP runs your apps on your own server, operated by your AI agent.\n"+
-			"You don't have a server connected yet. Setup takes about 10 minutes and needs:\n"+
-			"the server's IP address, its username and its password.\n\n")
-		renderSteps(a.out, host.Status{State: host.StageNew})
-		fmt.Fprintln(a.out)
-		addr := a.ask("Server address: ", "")
+		a.u().Welcome()
+		addr := a.u().Ask("Server address", "")
 		if addr == "" {
 			return a.fail(errors.New("no server address given"))
 		}
 		if !strings.Contains(addr, "@") {
-			addr = a.ask("Username [root]: ", "root") + "@" + addr
+			addr = a.u().Ask("Username", "root") + "@" + addr
 		}
 		if code := a.connect(ctx, addr, "", ""); code != 0 {
 			return code
@@ -118,7 +126,7 @@ func (a *app) frontDoor(ctx context.Context, asJSON bool) int {
 		}
 	}
 	st := host.Plan(s, a.cli)
-	renderStatus(a.out, st, a.cli)
+	a.u().Status(st)
 	return st.Exit
 }
 
@@ -192,8 +200,7 @@ func (a *app) connect(ctx context.Context, addr, identity, fingerprint string) i
 			return a.fail(fmt.Errorf("the server's host key is %s, not %s: refusing to connect", k.Fingerprint, fingerprint))
 		}
 	case a.terminal():
-		ans := a.ask(fmt.Sprintf("Host key: %s\nDoes it match your provider's console? [y/N] ", k.Fingerprint), "n")
-		if !strings.EqualFold(ans, "y") && !strings.EqualFold(ans, "yes") {
+		if !a.u().Confirm(fmt.Sprintf("Host key: %s\nDoes it match your provider's console?", k.Fingerprint)) {
 			return a.fail(errors.New("host key not confirmed; nothing was changed"))
 		}
 	default:
@@ -210,7 +217,7 @@ func (a *app) connect(ctx context.Context, addr, identity, fingerprint string) i
 	if identity != "" {
 		err = a.ssh.InstallKeyWithIdentity(ctx, t, pub, identity)
 	} else {
-		fmt.Fprintf(a.out, "ssh will ask for the password of %s. It is used once to install OAP's key and never stored.\n", t.Address())
+		a.u().Note(fmt.Sprintf("ssh will ask for the password of %s. It is used once to install OAP's key and never stored.", t.Address()))
 		err = a.ssh.InstallKeyWithPassword(ctx, t, pub)
 	}
 	if err != nil {
@@ -222,7 +229,7 @@ func (a *app) connect(ctx context.Context, addr, identity, fingerprint string) i
 	if err := a.update(host.Server{Address: t.Address(), Stage: host.StageConnected}); err != nil {
 		return a.fail(err)
 	}
-	fmt.Fprintf(a.out, "✓ Connected to %s with OAP's bootstrap key. The password is no longer needed.\n", t.Address())
+	a.u().Success(fmt.Sprintf("Connected to %s with OAP's bootstrap key. The password is no longer needed.", t.Address()))
 	return 0
 }
 
@@ -232,10 +239,17 @@ func (a *app) check(ctx context.Context, addr string, asJSON bool) int {
 	if err != nil {
 		return a.fail(err)
 	}
-	if !asJSON {
-		fmt.Fprintln(a.out, "Checking the server (read-only)…")
+	var out string
+	probe := func(func(string)) error {
+		var err error
+		out, err = a.ssh.Run(ctx, t, host.Probe)
+		return err
 	}
-	out, err := a.ssh.Run(ctx, t, host.Probe)
+	if asJSON {
+		err = probe(nil)
+	} else {
+		err = a.u().Run("Checking the server (read-only)", probe)
+	}
 	if err != nil {
 		return a.fail(err)
 	}
@@ -254,7 +268,7 @@ func (a *app) check(ctx context.Context, addr string, asJSON bool) int {
 	if asJSON {
 		a.writeJSON(st)
 	} else {
-		renderStatus(a.out, st, a.cli)
+		a.u().Status(st)
 	}
 	return st.Exit
 }
@@ -270,15 +284,6 @@ func (a *app) target(addr string) (sshhost.Target, error) {
 	}
 	dirName = strings.ReplaceAll(dirName, ":", "_")
 	return sshhost.Target{User: user, Host: h, Port: port, Dir: filepath.Join(a.dir(), "hosts", dirName)}, nil
-}
-
-func (a *app) ask(prompt, def string) string {
-	fmt.Fprint(a.out, prompt)
-	line, _ := a.in.ReadString('\n')
-	if line = strings.TrimSpace(line); line != "" {
-		return line
-	}
-	return def
 }
 
 func (a *app) writeJSON(v any) {

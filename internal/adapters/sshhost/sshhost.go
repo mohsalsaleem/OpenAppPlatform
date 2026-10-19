@@ -6,6 +6,7 @@
 package sshhost
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -236,11 +237,33 @@ func (c Client) InstallKeyWithIdentity(ctx context.Context, t Target, pub, ident
 // Run runs a shell script on the server with the bootstrap key, without
 // prompting, and returns its standard output.
 func (c Client) Run(ctx context.Context, t Target, script string) (string, error) {
+	return c.RunStream(ctx, t, script, nil)
+}
+
+// RunStream is Run that also hands each line of output to line as it
+// arrives, so slow work can show progress. line may be nil.
+func (c Client) RunStream(ctx context.Context, t Target, script string, line func(string)) (string, error) {
 	args := append(baseArgs(t), "-i", t.Key(), "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", t.User+"@"+t.Host, "sh -s")
 	var out, errb bytes.Buffer
 	cmd := c.command(ctx, "ssh", args...)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = strings.NewReader(script), &out, &errb
-	if err := cmd.Run(); err != nil {
+	cmd.Stdin, cmd.Stderr = strings.NewReader(script), &errb
+	pipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("sshhost: running on %s failed: %v", t.Address(), err)
+	}
+	sc := bufio.NewScanner(pipe)
+	sc.Buffer(make([]byte, 64*1024), 1024*1024)
+	for sc.Scan() {
+		out.Write(sc.Bytes())
+		out.WriteByte('\n')
+		if line != nil {
+			line(sc.Text())
+		}
+	}
+	if err := cmd.Wait(); err != nil {
 		return out.String(), fmt.Errorf("sshhost: running on %s failed: %v %s", t.Address(), err, lastLine(errb.String()))
 	}
 	return out.String(), nil
