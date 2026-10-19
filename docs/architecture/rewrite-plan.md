@@ -134,10 +134,10 @@ Depends on phase 1. R2.1–R2.8 run here; R2.9–R2.11 need real Docker and Cadd
 | R2.3 | Job queue on SQLite: leases, attempts, single dispatch | Randomized test (at least 10,000 seeded runs, `-race`) with concurrent dispatchers and lease expiry: no job runs twice concurrently, none is lost |
 | R2.4 | Step executor: intent before effect, observe before re-dispatch | In simulation, a crash between every pair of steps of every golden plan converges with no duplicate effects (fake runtime counts creations) |
 | R2.5 | Per-application serializer | Concurrent applies on one app run in order; different apps run in parallel; property test over random schedules |
-| R2.6 | Simulation harness: fake Runtime and Edge with a traffic generator, fault injection and seeds | The same seed gives an identical trace; faults include reloads that drop in-flight connections, exits during drain, slow readiness and lost responses |
+| R2.6 | Simulation harness: fake Runtime and Edge with a traffic generator, fault injection and seeds; in-memory `DesiredRepo` and `Secrets`; a contract suite per port that both the fakes and the real adapters must pass | The same seed gives an identical trace; faults include reloads that drop in-flight connections, exits during drain, slow readiness and lost responses; every fake passes its port's contract suite |
 | R2.7 | Observer: runtime events, periodic resync, freshness | In simulation, missed events are healed by resync within one interval; freshness is reported on every node |
 | R2.8 | VPS-H-001: reproduce, then fix | Commit 1: the harness shows lost requests when scaling 3→1 with a naive order (removal without confirmed reload and drain) across seeds. Commit 2: with the planner's ordering rule, 0 failed requests over at least 1,000 seeds. If simulation can't reproduce the loss, stop and report: the root cause lies elsewhere |
-| R2.9 | Docker and Caddy adapters, with one contract suite run against both the fakes and the real systems | The same contract suite passes against the fakes and against real Docker and Caddy (`OAP_TEST_DOCKER=1`); resources are adopted only by OAP labels. **Decision needed first:** keep or drop Coolify |
+| R2.9 | Docker runtime and Caddy edge adapters, with one contract suite run against both the fakes and the real systems. Docker is the only runtime operator; Coolify is not carried over | The same contract suite passes against the fakes and against real Docker and Caddy (`OAP_TEST_DOCKER=1`); resources are adopted only by OAP labels |
 | R2.10 | Desired-state Git repository adapter | Commits carry author and message; history, diff and revert work; export to a mirror is one-way |
 | R2.11 | Secret store adapter (format compatible with today's encrypted store, for migration) | Reads a store written by today's code; secrets never appear in journal entries or errors (test) |
 
@@ -191,9 +191,11 @@ Depends on phase 4. R5.3 runs on the owner's server.
 
 ## Decisions by task
 
+Decided: Docker is the only runtime operator for the rewrite. The Coolify
+adapter is not carried over; other operators can return later as extensions.
+
 | Decision (rewrite doc §17) | Needed before | Recommendation |
 |---|---|---|
-| Keep or drop the Coolify adapter | R2.9 | Drop |
 | Default session approval mode | R3.6 | Approve every session; offer trusted identity at first login |
 | Default autonomy for a fresh install | R3.9 | Routine changes allowed; everything else asks |
 | Turso Cloud or self-hosted libSQL | R5.4 | Self-hosted option first, Cloud as opt-in |

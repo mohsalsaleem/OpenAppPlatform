@@ -628,6 +628,9 @@ established. For the rewrite this means:
 
 ## 17. Decisions needed
 
+Decided: Docker is the only runtime operator (with Caddy as the edge). The
+Coolify adapter is not carried over.
+
 1. Default session approval mode (section 8): every session, or trusted identity
    offered at first login?
 2. Default autonomy for a fresh install: routine changes allowed without the
@@ -637,5 +640,3 @@ established. For the rewrite this means:
    installs, given that the rewrite fixes it in the step executor.
 5. Which harness packages to ship first: Claude Code skills and generic MCP, then
    Pi?
-6. Whether the rewrite keeps the Coolify adapter, or targets Docker and Caddy
-   only.
