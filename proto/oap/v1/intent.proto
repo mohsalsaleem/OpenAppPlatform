@@ -35,8 +35,9 @@ message Deploy {
   Source source = 2;
 }
 
-// Rollback returns the application's workloads to an earlier release.
-// Migrations are not re-run and volume data is kept.
+// Rollback returns the application's workloads to the images of an earlier
+// desired-state version, named by its spec hash. Configuration, connections
+// and volumes stay as they are; jobs are not re-run.
 message Rollback {
   string to_release = 1;
 }
@@ -54,6 +55,8 @@ message Configure {
 message AddComponent {
   // The component's spec in the desired-state format, as JSON.
   google.protobuf.Struct spec = 1;
+  // The new component's name.
+  string name = 2;
 }
 
 message RemoveComponent {

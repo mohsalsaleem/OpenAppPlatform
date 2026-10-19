@@ -309,8 +309,9 @@ func (x *Deploy) GetSource() *Source {
 	return nil
 }
 
-// Rollback returns the application's workloads to an earlier release.
-// Migrations are not re-run and volume data is kept.
+// Rollback returns the application's workloads to the images of an earlier
+// desired-state version, named by its spec hash. Configuration, connections
+// and volumes stay as they are; jobs are not re-run.
 type Rollback struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ToRelease     string                 `protobuf:"bytes,1,opt,name=to_release,json=toRelease,proto3" json:"to_release,omitempty"`
@@ -436,7 +437,9 @@ func (x *Configure) GetCpuMillis() int32 {
 type AddComponent struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The component's spec in the desired-state format, as JSON.
-	Spec          *structpb.Struct `protobuf:"bytes,1,opt,name=spec,proto3" json:"spec,omitempty"`
+	Spec *structpb.Struct `protobuf:"bytes,1,opt,name=spec,proto3" json:"spec,omitempty"`
+	// The new component's name.
+	Name          string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -476,6 +479,13 @@ func (x *AddComponent) GetSpec() *structpb.Struct {
 		return x.Spec
 	}
 	return nil
+}
+
+func (x *AddComponent) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
 }
 
 type RemoveComponent struct {
@@ -679,9 +689,10 @@ const file_oap_v1_intent_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x13\n" +
 	"\x11_memory_limit_mibB\r\n" +
-	"\v_cpu_millis\";\n" +
+	"\v_cpu_millis\"O\n" +
 	"\fAddComponent\x12+\n" +
-	"\x04spec\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x04spec\"V\n" +
+	"\x04spec\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x04spec\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"V\n" +
 	"\x0fRemoveComponent\x12\x1c\n" +
 	"\tcomponent\x18\x01 \x01(\tR\tcomponent\x12%\n" +
 	"\x0edelete_volumes\x18\x02 \x01(\bR\rdeleteVolumes\"E\n" +

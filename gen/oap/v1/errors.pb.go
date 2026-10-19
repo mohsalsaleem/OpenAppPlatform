@@ -201,6 +201,7 @@ type Remedy struct {
 	//	*Remedy_Intent
 	//	*Remedy_Ask
 	//	*Remedy_Refresh
+	//	*Remedy_Fix
 	Action        isRemedy_Action `protobuf_oneof:"action"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -270,6 +271,15 @@ func (x *Remedy) GetRefresh() bool {
 	return false
 }
 
+func (x *Remedy) GetFix() *InputFix {
+	if x != nil {
+		if x, ok := x.Action.(*Remedy_Fix); ok {
+			return x.Fix
+		}
+	}
+	return nil
+}
+
 type isRemedy_Action interface {
 	isRemedy_Action()
 }
@@ -289,11 +299,125 @@ type Remedy_Refresh struct {
 	Refresh bool `protobuf:"varint,3,opt,name=refresh,proto3,oneof"`
 }
 
+type Remedy_Fix struct {
+	// Correct the request: the fields named here are wrong or missing.
+	Fix *InputFix `protobuf:"bytes,4,opt,name=fix,proto3,oneof"`
+}
+
 func (*Remedy_Intent) isRemedy_Action() {}
 
 func (*Remedy_Ask) isRemedy_Action() {}
 
 func (*Remedy_Refresh) isRemedy_Action() {}
+
+func (*Remedy_Fix) isRemedy_Action() {}
+
+// InputFix names the fields of a request, or of the spec it would produce, to
+// correct before trying again.
+type InputFix struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Fields        []*FieldProblem        `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InputFix) Reset() {
+	*x = InputFix{}
+	mi := &file_oap_v1_errors_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InputFix) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InputFix) ProtoMessage() {}
+
+func (x *InputFix) ProtoReflect() protoreflect.Message {
+	mi := &file_oap_v1_errors_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InputFix.ProtoReflect.Descriptor instead.
+func (*InputFix) Descriptor() ([]byte, []int) {
+	return file_oap_v1_errors_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *InputFix) GetFields() []*FieldProblem {
+	if x != nil {
+		return x.Fields
+	}
+	return nil
+}
+
+type FieldProblem struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// A dotted path, for example "components.api.instances" or "change".
+	Path          string `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	Why           string `protobuf:"bytes,2,opt,name=why,proto3" json:"why,omitempty"`
+	Message       string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FieldProblem) Reset() {
+	*x = FieldProblem{}
+	mi := &file_oap_v1_errors_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FieldProblem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FieldProblem) ProtoMessage() {}
+
+func (x *FieldProblem) ProtoReflect() protoreflect.Message {
+	mi := &file_oap_v1_errors_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FieldProblem.ProtoReflect.Descriptor instead.
+func (*FieldProblem) Descriptor() ([]byte, []int) {
+	return file_oap_v1_errors_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *FieldProblem) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *FieldProblem) GetWhy() string {
+	if x != nil {
+		return x.Why
+	}
+	return ""
+}
+
+func (x *FieldProblem) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
 
 // AskRequest is an agent's structured way to involve the owner.
 type AskRequest struct {
@@ -315,7 +439,7 @@ type AskRequest struct {
 
 func (x *AskRequest) Reset() {
 	*x = AskRequest{}
-	mi := &file_oap_v1_errors_proto_msgTypes[3]
+	mi := &file_oap_v1_errors_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -327,7 +451,7 @@ func (x *AskRequest) String() string {
 func (*AskRequest) ProtoMessage() {}
 
 func (x *AskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_oap_v1_errors_proto_msgTypes[3]
+	mi := &file_oap_v1_errors_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -340,7 +464,7 @@ func (x *AskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AskRequest.ProtoReflect.Descriptor instead.
 func (*AskRequest) Descriptor() ([]byte, []int) {
-	return file_oap_v1_errors_proto_rawDescGZIP(), []int{3}
+	return file_oap_v1_errors_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *AskRequest) GetKind() AskKind {
@@ -396,12 +520,19 @@ const file_oap_v1_errors_proto_rawDesc = "" +
 	"\vErrorDetail\x12\x10\n" +
 	"\x03why\x18\x01 \x01(\tR\x03why\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12&\n" +
-	"\x06remedy\x18\x03 \x01(\v2\x0e.oap.v1.RemedyR\x06remedy\"\x80\x01\n" +
+	"\x06remedy\x18\x03 \x01(\v2\x0e.oap.v1.RemedyR\x06remedy\"\xa6\x01\n" +
 	"\x06Remedy\x12(\n" +
 	"\x06intent\x18\x01 \x01(\v2\x0e.oap.v1.IntentH\x00R\x06intent\x12&\n" +
 	"\x03ask\x18\x02 \x01(\v2\x12.oap.v1.AskRequestH\x00R\x03ask\x12\x1a\n" +
-	"\arefresh\x18\x03 \x01(\bH\x00R\arefreshB\b\n" +
-	"\x06action\"\xd5\x01\n" +
+	"\arefresh\x18\x03 \x01(\bH\x00R\arefresh\x12$\n" +
+	"\x03fix\x18\x04 \x01(\v2\x10.oap.v1.InputFixH\x00R\x03fixB\b\n" +
+	"\x06action\"8\n" +
+	"\bInputFix\x12,\n" +
+	"\x06fields\x18\x01 \x03(\v2\x14.oap.v1.FieldProblemR\x06fields\"N\n" +
+	"\fFieldProblem\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x10\n" +
+	"\x03why\x18\x02 \x01(\tR\x03why\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\xd5\x01\n" +
 	"\n" +
 	"AskRequest\x12#\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x0f.oap.v1.AskKindR\x04kind\x12\x1a\n" +
@@ -432,25 +563,29 @@ func file_oap_v1_errors_proto_rawDescGZIP() []byte {
 }
 
 var file_oap_v1_errors_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_oap_v1_errors_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_oap_v1_errors_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_oap_v1_errors_proto_goTypes = []any{
-	(AskKind)(0),        // 0: oap.v1.AskKind
-	(*Reason)(nil),      // 1: oap.v1.Reason
-	(*ErrorDetail)(nil), // 2: oap.v1.ErrorDetail
-	(*Remedy)(nil),      // 3: oap.v1.Remedy
-	(*AskRequest)(nil),  // 4: oap.v1.AskRequest
-	(*Intent)(nil),      // 5: oap.v1.Intent
+	(AskKind)(0),         // 0: oap.v1.AskKind
+	(*Reason)(nil),       // 1: oap.v1.Reason
+	(*ErrorDetail)(nil),  // 2: oap.v1.ErrorDetail
+	(*Remedy)(nil),       // 3: oap.v1.Remedy
+	(*InputFix)(nil),     // 4: oap.v1.InputFix
+	(*FieldProblem)(nil), // 5: oap.v1.FieldProblem
+	(*AskRequest)(nil),   // 6: oap.v1.AskRequest
+	(*Intent)(nil),       // 7: oap.v1.Intent
 }
 var file_oap_v1_errors_proto_depIdxs = []int32{
 	3, // 0: oap.v1.ErrorDetail.remedy:type_name -> oap.v1.Remedy
-	5, // 1: oap.v1.Remedy.intent:type_name -> oap.v1.Intent
-	4, // 2: oap.v1.Remedy.ask:type_name -> oap.v1.AskRequest
-	0, // 3: oap.v1.AskRequest.kind:type_name -> oap.v1.AskKind
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	7, // 1: oap.v1.Remedy.intent:type_name -> oap.v1.Intent
+	6, // 2: oap.v1.Remedy.ask:type_name -> oap.v1.AskRequest
+	4, // 3: oap.v1.Remedy.fix:type_name -> oap.v1.InputFix
+	5, // 4: oap.v1.InputFix.fields:type_name -> oap.v1.FieldProblem
+	0, // 5: oap.v1.AskRequest.kind:type_name -> oap.v1.AskKind
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_oap_v1_errors_proto_init() }
@@ -463,6 +598,7 @@ func file_oap_v1_errors_proto_init() {
 		(*Remedy_Intent)(nil),
 		(*Remedy_Ask)(nil),
 		(*Remedy_Refresh)(nil),
+		(*Remedy_Fix)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -470,7 +606,7 @@ func file_oap_v1_errors_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_oap_v1_errors_proto_rawDesc), len(file_oap_v1_errors_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -31,7 +31,22 @@ message Remedy {
     AskRequest ask = 2;
     // Re-read state and retry, for example after a revision conflict.
     bool refresh = 3;
+    // Correct the request: the fields named here are wrong or missing.
+    InputFix fix = 4;
   }
+}
+
+// InputFix names the fields of a request, or of the spec it would produce, to
+// correct before trying again.
+message InputFix {
+  repeated FieldProblem fields = 1;
+}
+
+message FieldProblem {
+  // A dotted path, for example "components.api.instances" or "change".
+  string path = 1;
+  string why = 2;
+  string message = 3;
 }
 
 enum AskKind {
