@@ -11,11 +11,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Target is a server and OAP's directory for it on this machine.
@@ -243,10 +245,16 @@ func (c Client) Run(ctx context.Context, t Target, script string) (string, error
 // RunStream is Run that also hands each line of output to line as it
 // arrives, so slow work can show progress. line may be nil.
 func (c Client) RunStream(ctx context.Context, t Target, script string, line func(string)) (string, error) {
-	args := append(baseArgs(t), "-i", t.Key(), "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", t.User+"@"+t.Host, "sh -s")
+	return c.Remote(ctx, t, "sh -s", strings.NewReader(script), line)
+}
+
+// Remote runs a remote command with the bootstrap key, feeding it stdin,
+// and returns its output, handing each line to line as it arrives.
+func (c Client) Remote(ctx context.Context, t Target, remote string, stdin io.Reader, line func(string)) (string, error) {
+	args := append(baseArgs(t), "-i", t.Key(), "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", t.User+"@"+t.Host, remote)
 	var out, errb bytes.Buffer
 	cmd := c.command(ctx, "ssh", args...)
-	cmd.Stdin, cmd.Stderr = strings.NewReader(script), &errb
+	cmd.Stdin, cmd.Stderr = stdin, &errb
 	pipe, err := cmd.StdoutPipe()
 	if err != nil {
 		return "", err
@@ -267,6 +275,36 @@ func (c Client) RunStream(ctx context.Context, t Target, script string, line fun
 		return out.String(), fmt.Errorf("sshhost: running on %s failed: %v %s", t.Address(), err, lastLine(errb.String()))
 	}
 	return out.String(), nil
+}
+
+// Forward forwards a local unix socket to one on the server until ctx
+// ends. It returns once the forward is ready.
+func (c Client) Forward(ctx context.Context, t Target, local, remote string) (*exec.Cmd, error) {
+	os.Remove(local)
+	args := append(baseArgs(t), "-i", t.Key(), "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes",
+		"-o", "ExitOnForwardFailure=yes", "-o", "StreamLocalBindUnlink=yes", "-N", "-L", local+":"+remote, t.User+"@"+t.Host)
+	cmd := c.command(ctx, "ssh", args...)
+	var errb bytes.Buffer
+	cmd.Stderr = &errb
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	for i := 0; i < 150; i++ {
+		if st, err := os.Stat(local); err == nil && st.Mode()&os.ModeSocket != 0 {
+			return cmd, nil
+		}
+		if cmd.ProcessState != nil {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	cmd.Process.Kill()
+	cmd.Wait()
+	return nil, fmt.Errorf("sshhost: couldn't forward %s to %s on %s: %s", local, remote, t.Address(), lastLine(errb.String()))
 }
 
 // lastLine keeps an error short and drops OpenSSH's advisory warnings.

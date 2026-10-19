@@ -28,6 +28,8 @@ type Server struct {
 	Stage    Stage     `json:"stage"`
 	Summary  string    `json:"summary,omitempty"`
 	Findings []Finding `json:"findings,omitempty"`
+	// Install is the installation id once OAP is installed.
+	Install string `json:"install,omitempty"`
 }
 
 // Who does a step.
@@ -95,7 +97,12 @@ func Plan(s *Server, cli string) Status {
 		st.Next = Next{Step: "check", By: ByAgent, Why: "The check only reads the server, so an agent may run it.",
 			Command: fmt.Sprintf("%s host check %s", cli, s.Address), Then: then}
 		st.Exit = ExitOK
-	case StageChecked, StageReady:
+	case StageReady:
+		st.Findings = s.Findings
+		st.Next = Next{Step: "install", By: ByAgent, Why: "The server meets every requirement; installing runs oapd and Caddy as containers.",
+			Command: fmt.Sprintf("%s host install %s", cli, s.Address), Then: then}
+		st.Exit = ExitOK
+	case StageChecked:
 		st.Findings = s.Findings
 		blocked, stopped := Blocking(s.Findings)
 		switch {
@@ -119,8 +126,9 @@ func Plan(s *Server, cli string) Status {
 			st.Exit = ExitOwner
 		default:
 			st.State = StageReady
-			st.Next = Next{Step: "install", By: ByAgent, Why: "The server meets every requirement.", Task: "R3.13", Then: then}
-			st.Exit = ExitNotBuiltYet
+			st.Next = Next{Step: "install", By: ByAgent, Why: "The server meets every requirement; installing runs oapd and Caddy as containers.",
+				Command: fmt.Sprintf("%s host install %s", cli, s.Address), Then: then}
+			st.Exit = ExitOK
 		}
 	case StageInstalled:
 		st.Next = Next{Step: "owner", By: ByOwner, Why: "Only the owner creates the owner account.", Task: "R3.6", Then: then}

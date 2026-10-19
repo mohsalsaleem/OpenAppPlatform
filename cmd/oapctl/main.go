@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
@@ -44,6 +45,7 @@ type app struct {
 	now         func() time.Time
 	configDir   string // overrides the default, for tests
 	ui          ui     // nil: plain text
+	docker      func(ctx context.Context, args ...string) *exec.Cmd
 }
 
 // u is the owner's interface: the Charm one when set, else plain text.
@@ -63,6 +65,8 @@ const usage = `Usage:
   %[1]s host check [ADDR]   read-only check of the server [--json]
   %[1]s host fix [ADDR]     apply the fixes the check proposes, each approved by you [--json: show them]
   %[1]s host undo FIX [ADDR] undo a fix OAP applied
+  %[1]s host install [ADDR] --image IMAGE   install oapd and Caddy on the server
+  %[1]s app apply FILE [ADDR]               create or update an application from its oap.yaml
 `
 
 func (a *app) run(ctx context.Context, args []string) int {
@@ -81,6 +85,10 @@ func (a *app) run(ctx context.Context, args []string) int {
 		return a.hostFix(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "host" && args[1] == "undo":
 		return a.hostUndo(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "host" && args[1] == "install":
+		return a.hostInstall(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "app" && args[1] == "apply":
+		return a.appApply(ctx, args[2:])
 	}
 	fmt.Fprintf(a.errOut, "%s: unknown command %q\n\n"+usage, a.cli, strings.Join(args, " "), a.cli)
 	return 2

@@ -136,7 +136,7 @@ func TestFrontDoorGolden(t *testing.T) {
 			Findings: findings(t, "vultr-oap-2026-10-19.txt")}, host.ExitStopped},
 		{"checked-fixes", &host.Server{Address: "root@203.0.113.5", Stage: host.StageChecked, Summary: "Ubuntu 24.04.5 LTS, aarch64, 12 CPUs, 7836 MiB memory, 46.6 GiB disk free",
 			Findings: findings(t, "container-ubuntu-24-04.txt")}, host.ExitOwner},
-		{"ready", &host.Server{Address: "root@203.0.113.5", Stage: host.StageReady, Summary: "Debian GNU/Linux 12 (bookworm), aarch64, 2 CPUs, 3931 MiB memory, 28.6 GiB disk free"}, host.ExitNotBuiltYet},
+		{"ready", &host.Server{Address: "root@203.0.113.5", Stage: host.StageReady, Summary: "Debian GNU/Linux 12 (bookworm), aarch64, 2 CPUs, 3931 MiB memory, 28.6 GiB disk free"}, host.ExitOK},
 		{"installed", &host.Server{Address: "root@203.0.113.5", Stage: host.StageInstalled}, host.ExitNotBuiltYet},
 		{"owned", &host.Server{Address: "root@203.0.113.5", Stage: host.StageOwned}, host.ExitNotBuiltYet},
 		{"handed-off", &host.Server{Address: "root@203.0.113.5", Stage: host.StageHandedOff}, host.ExitOK},

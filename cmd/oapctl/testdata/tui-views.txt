@@ -51,7 +51,7 @@
 │                                                                              │
 │ ✓ connect   ✓ check   ✓ fix   ● install   ○ owner   ○ hand off               │
 │                                                                              │
-│ Next install · by the agent · not built yet (R3.13)                          │
+│ Next install · run oapctl host install root@139.180.132.23                   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 == change
 ╭──────────────────────────────────────────────────────────────────────────────╮
