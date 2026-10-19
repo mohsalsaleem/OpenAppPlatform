@@ -142,7 +142,7 @@ Depends on phase 1. R2.1–R2.8 run here; R2.9–R2.11 need real Docker and Cadd
 | R2.8 | VPS-H-001: reproduce, then fix | Commit 1: the harness shows lost requests when scaling 3→1 with a naive order (removal without confirmed reload and drain) across seeds. Commit 2: with the planner's ordering rule, 0 failed requests over at least 1,000 seeds. If simulation can't reproduce the loss, stop and report: the root cause lies elsewhere |
 | R2.9 | Docker runtime and Caddy edge adapters, with one contract suite run against both the fakes and the real systems. Docker is the only runtime operator; Coolify is not carried over | The same contract suite passes against the fakes and against real Docker and Caddy (`OAP_TEST_DOCKER=1`); resources are adopted only by OAP labels |
 | R2.10 | Desired-state Git repository adapter | Commits carry author and message; history, diff and revert work; export to a mirror is one-way |
-| R2.11 | Secret store adapter (format compatible with today's encrypted store, for migration) | Reads a store written by today's code; secrets never appear in journal entries or errors (test) |
+| R2.11 | Secret store adapter: encrypted file store, key held separately | Secrets round-trip through the store and a reopened store; a wrong key fails closed; secrets never appear in journal entries or errors (test). Compatibility with today's store was dropped with migration (owner, 2026-10-19) |
 
 **Phase exit:** with real Docker and Caddy on the owner's machine, scaling 1→3→1
 under continuous traffic shows 0 failed requests; OAP with SQLite stays under its
@@ -192,7 +192,7 @@ Depends on phase 4. R5.3 runs on the owner's server.
 
 | ID | Task | Acceptance |
 |---|---|---|
-| R5.1 | `oap migrate`: one-way move of an install made by today's code | On an install created from `main`, migration completes with apps continuously serving (probe shows 0 failures), the old database left untouched, and every spec, grant and release accounted for |
+| R5.1 | ~~`oap migrate`~~ **Dropped** (owner, 2026-10-19): no install runs today's code, so nothing is migrated; apps are deployed fresh from their specs | — |
 | R5.2 | Port the acceptance journeys (`tests/env`) and the VPS release journey to the new interfaces | All ported journeys pass locally |
 | R5.3 | Deploy to the owner's server and run the release journey over CLI, Connect and MCP | The journey passes on a 1 GB host with the evidence pack (receipts, monitor summary, findings) committed under `docs/evidence/` |
 | R5.4 | Agent store (Turso/libSQL) and harness packages | A fresh machine syncs the store, logs in and resumes managing a server with no credentials synced. **Decisions needed first:** sync default; which harnesses first |
@@ -219,7 +219,7 @@ the password from the terminal.
 | Default autonomy for a fresh install | R3.9 | Routine changes allowed; everything else asks |
 | Turso Cloud or self-hosted libSQL | R5.4 | Self-hosted option first, Cloud as opt-in |
 | Harness packages first | R5.4 | Claude Code skills and generic MCP |
-| Patch VPS-H-001 on today's code | Any time | Only if real installs need it before cutover |
+| Patch VPS-H-001 on today's code | — | Not needed: no install runs today's code (owner, 2026-10-19) |
 
 ## Status
 
@@ -253,7 +253,8 @@ the password from the terminal.
 | R3.11 | done | `fb49c6e` | Golden findings for 9 probe outputs: `vultr_oap` (old OS, no swap, unmanaged Docker, other software, SSH passwords), read-only Ubuntu 24.04 and Debian 12 containers, and synthetic hosts (port busy, Docker missing, earlier OAP install, not root, old Docker, low disk). Gated `OAP_TEST_DOCKER=1` (skipped otherwise): the probe runs on read-only Ubuntu 22.04/24.04 and Debian 12 and `docker diff` shows no change; a planted hidden write is caught (not committed) |
 | R3.1–R3.9, R3.12–R3.14 | not started | | |
 | R4.1–R4.5 | not started | | |
-| R5.1–R5.5 | not started | | |
+| R5.1 | dropped | | Owner decision, 2026-10-19: no install runs today's code |
+| R5.2–R5.5 | not started | | |
 
 Statuses: `not started`, `in progress`, `blocked (reason)`, `done`. Rows are split
 per task once work on a phase begins.

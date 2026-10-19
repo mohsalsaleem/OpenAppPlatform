@@ -333,8 +333,8 @@ services.
   recovery after a crash.
 - **Backups:** continuous replication of SQLite changes (Litestream or similar)
   to object storage or another machine, plus periodic snapshots.
-- **Consequences:** a smaller footprint and simpler operations; a real migration
-  (schema, queue semantics, tests) with tooling to move an existing install; SQLite
+- **Consequences:** a smaller footprint and simpler operations; new schema and
+  queue semantics, proven by tests (no install is migrated; section 14); SQLite
   limits OAP to one writer process per server, which matches the one-binary design.
 
 ### Runtime labels
@@ -393,8 +393,8 @@ manages, runs `oap login`, and continues.
   harnesses that drive OAP as a subprocess.
 - **Idempotency** comes from proposal content hashes and operation IDs, not
   client-chosen keys.
-- **No wire compatibility** with today's REST API. Existing installs move with a
-  one-way migration tool (section 14).
+- **No wire compatibility** with today's REST API, and no migration: no install
+  runs today's code (owner decision, 2026-10-19; section 14).
 - **Harness packages:** OAP publishes a small package for popular agent harnesses
   (Claude Code skills, Pi packages, a generic MCP configuration). Each covers
   device login, the primitives, reading the briefing, and the habit of proposing
@@ -579,14 +579,12 @@ acceptance checks and guardrails are in the [rewrite plan](rewrite-plan.md).
    briefing.
 4. **Extensions:** the plugin host, then the builders, GitHub change facts,
    notifications and Compose import as first-party extensions.
-5. **Cutover:** `oap migrate` moves an existing install in one direction. It
-   reads specs, grants and history from today's PostgreSQL, adopts running
-   resources by their labels, and writes the desired-state repo and SQLite store.
-   Then the ported acceptance journeys, including the 1 GB VPS release journey
+5. **Cutover:** no install runs today's code (owner decision, 2026-10-19), so
+   nothing is migrated: apps are deployed fresh from their specs, and the
+   rewrite replaces the old tree. First the ported acceptance journeys, including the 1 GB VPS release journey
    over the new CLI, Connect and MCP. Finally, the agent store and harness packages.
 
-The current code stays as is for existing installs until cutover. It gets
-security fixes only.
+The current code stays frozen until cutover, then is removed.
 
 ## 15. Lessons from the v0.1 VPS run
 
@@ -612,9 +610,9 @@ established. For the rewrite this means:
   explicit opt-in.
 - **Second-system effect:** a full rewrite tempts scope growth. The ported
   acceptance journeys define done; anything beyond them waits.
-- **Storage migration:** SQLite queue semantics must match today's durability
-  guarantees, proven in simulation and acceptance, before `oap migrate` moves
-  any install.
+- **Storage change:** SQLite queue semantics must match today's durability
+  guarantees, proven in simulation and acceptance, before the rewrite replaces
+  the old tree.
 - **Protobuf JSON quirks** (int64 as strings, enum and presence rules) can confuse
   agents. JSON conventions are fixed in section 12 and checked by tests on the
   generated MCP schemas.
@@ -629,7 +627,8 @@ established. For the rewrite this means:
 ## 17. Decisions needed
 
 Decided: Docker is the only runtime operator (with Caddy as the edge). The
-Coolify adapter is not carried over.
+Coolify adapter is not carried over. No install is migrated from today's code,
+which settles question 4 below: there is nothing to patch (owner, 2026-10-19).
 
 1. Default session approval mode (section 8): every session, or trusted identity
    offered at first login?
