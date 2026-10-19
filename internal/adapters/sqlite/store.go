@@ -35,9 +35,19 @@ var migrations = []string{
 		data      BLOB
 	)`,
 	`CREATE INDEX journal_operation ON journal (operation, revision)`,
+	`CREATE TABLE queue (
+		seq        INTEGER PRIMARY KEY AUTOINCREMENT,
+		key        TEXT    NOT NULL UNIQUE,
+		kind       TEXT    NOT NULL,
+		payload    BLOB,
+		attempts   INTEGER NOT NULL DEFAULT 0,
+		leased_by  TEXT    NOT NULL DEFAULT '',
+		lease_ends INTEGER NOT NULL DEFAULT 0
+	)`,
 }
 
 // Open opens or creates the store at path and applies pending migrations.
+// The path ":memory:" opens a private in-memory database, for tests.
 func Open(ctx context.Context, path string) (*Store, error) {
 	q := url.Values{}
 	for _, p := range []string{"journal_mode(WAL)", "synchronous(FULL)", "busy_timeout(5000)", "foreign_keys(ON)"} {

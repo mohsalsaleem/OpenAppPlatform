@@ -65,15 +65,21 @@ type OpStore interface {
 	Head(ctx context.Context) (revision uint64, err error)
 }
 
-// Queue holds durable work. A job is leased to one worker at a time; a lease
-// that expires makes the job available again.
+// Queue holds durable work. A job is leased to one worker at a time, until a
+// given time. Only the current holder of an unexpired lease may renew or
+// complete it, so a worker that falls behind is fenced off as soon as its
+// lease expires or another worker takes the job. Callers pass the time from
+// their Clock.
 type Queue interface {
 	// Enqueue adds a job unless one with the same key exists.
 	Enqueue(ctx context.Context, job ops.Job) (added bool, err error)
-	// Lease returns the next available job, or nil if there is none.
-	Lease(ctx context.Context, worker string, until time.Time) (*ops.Job, error)
-	// Complete removes a job the worker still holds.
-	Complete(ctx context.Context, key, worker string) error
+	// Lease returns the oldest job that is not leased or whose lease ended by
+	// now, leased to worker until the given time; nil if there is none.
+	Lease(ctx context.Context, worker string, now, until time.Time) (*ops.Job, error)
+	// Heartbeat extends a lease the worker still holds and that hasn't ended.
+	Heartbeat(ctx context.Context, key, worker string, now, until time.Time) error
+	// Complete removes a job the worker still holds under an unexpired lease.
+	Complete(ctx context.Context, key, worker string, now time.Time) error
 	// Release returns a job the worker holds to the queue.
 	Release(ctx context.Context, key, worker string) error
 }
