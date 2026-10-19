@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -125,13 +126,39 @@ func (a *app) appApply(ctx context.Context, args []string) int {
 	}
 	in := &oapv1.Intent{Application: app.Name, Because: "apply " + filepath.Base(file),
 		Change: &oapv1.Intent_SpecPatch{SpecPatch: &oapv1.SpecPatch{MergePatch: st}}}
-	res, err := client.Propose(ctx, connect.NewRequest(&oapv1.ProposeRequest{Intent: in}))
-	if whyOf(err) == "intent.no_change" {
+	opID, code := a.runIntent(ctx, client, s, in, *yes)
+	if code == noChange {
 		a.u().Success(fmt.Sprintf("%s is already as %s describes.", app.Name, file))
 		return host.ExitOK
 	}
+	if code != host.ExitOK {
+		return code
+	}
+	where := ""
+	if app.Ingress != nil && app.Ingress.Domain != "" {
+		scheme := "https"
+		if !app.Ingress.HTTPS {
+			scheme = "http"
+		}
+		where = fmt.Sprintf(" at %s://%s", scheme, app.Ingress.Domain)
+	}
+	a.u().Success(fmt.Sprintf("%s is live%s (operation %s).", app.Name, where, opID))
+	return host.ExitOK
+}
+
+// noChange is runIntent's result when the intent changes nothing.
+const noChange = -1
+
+// runIntent proposes an intent, shows the plan, asks the owner (or takes
+// yes without a terminal), applies it and follows it to its outcome. It
+// returns the operation id and an exit code.
+func (a *app) runIntent(ctx context.Context, client oapv1connect.AgentServiceClient, s *host.Server, in *oapv1.Intent, yes bool) (string, int) {
+	res, err := client.Propose(ctx, connect.NewRequest(&oapv1.ProposeRequest{Intent: in}))
+	if whyOf(err) == "intent.no_change" {
+		return "", noChange
+	}
 	if err != nil {
-		return a.fail(fmt.Errorf("propose: %v", err))
+		return "", a.fail(fmt.Errorf("propose: %v", err))
 	}
 	p := res.Msg.Proposal
 	var lines []string
@@ -151,26 +178,26 @@ func (a *app) appApply(ctx context.Context, args []string) int {
 	if len(why) > 0 {
 		because += "; " + strings.Join(why, "; ")
 	}
-	a.u().Change(fmt.Sprintf("Plan for %s on %s (%d steps)", app.Name, s.Address, len(p.Steps)), because, strings.Join(lines, "\n"))
+	a.u().Change(fmt.Sprintf("Plan for %s on %s (%d steps)", in.Application, s.Address, len(p.Steps)), because, strings.Join(lines, "\n"))
 	if p.Verdict == oapv1.Verdict_VERDICT_DENIED {
-		return a.fail(errors.New("the envelope denies this change"))
+		return "", a.fail(errors.New("the envelope denies this change"))
 	}
 	switch {
 	case a.terminal():
 		if !a.u().Confirm("Apply this plan?") {
 			a.u().Note("Not applied.")
-			return host.ExitOwner
+			return "", host.ExitOwner
 		}
-	case !*yes:
+	case !yes:
 		a.writeJSON(p)
-		return host.ExitOwner
+		return "", host.ExitOwner
 	}
 	applied, err := client.Apply(ctx, connect.NewRequest(&oapv1.ApplyRequest{ProposalId: p.Id}))
 	if err != nil {
-		return a.fail(fmt.Errorf("apply: %v", err))
+		return "", a.fail(fmt.Errorf("apply: %v", err))
 	}
 	var outcome *oapv1.Outcome
-	err = a.u().Run("Applying "+app.Name, func(progress func(string)) error {
+	err = a.u().Run("Applying to "+in.Application, func(progress func(string)) error {
 		stream, err := client.Await(ctx, connect.NewRequest(&oapv1.AwaitRequest{OperationId: applied.Msg.OperationId, TimeoutSeconds: 900}))
 		if err != nil {
 			return err
@@ -197,16 +224,56 @@ func (a *app) appApply(ctx context.Context, args []string) int {
 		return nil
 	})
 	if err != nil {
+		return applied.Msg.OperationId, a.fail(err)
+	}
+	return applied.Msg.OperationId, host.ExitOK
+}
+
+// appScale scales one component: app scale APP COMPONENT N [ADDR].
+func (a *app) appScale(ctx context.Context, args []string) int {
+	fs := flag.NewFlagSet("app scale", flag.ContinueOnError)
+	fs.SetOutput(a.errOut)
+	yes := fs.Bool("yes", false, "apply without asking, when not at a terminal")
+	var pos []string
+	for len(args) > 0 {
+		if strings.HasPrefix(args[0], "-") {
+			if err := fs.Parse(args); err != nil {
+				return 2
+			}
+			args = fs.Args()
+			continue
+		}
+		pos, args = append(pos, args[0]), args[1:]
+	}
+	if len(pos) < 3 {
+		return a.fail(errors.New("usage: app scale APP COMPONENT INSTANCES [ADDR]"))
+	}
+	n, err := strconv.Atoi(pos[2])
+	if err != nil || n < 0 {
+		return a.fail(fmt.Errorf("%q isn't a number of instances", pos[2]))
+	}
+	addr := ""
+	if len(pos) > 3 {
+		addr = pos[3]
+	}
+	s, err := a.server(addr)
+	if err != nil {
 		return a.fail(err)
 	}
-	where := ""
-	if app.Ingress != nil && app.Ingress.Domain != "" {
-		scheme := "https"
-		if !app.Ingress.HTTPS {
-			scheme = "http"
-		}
-		where = fmt.Sprintf(" at %s://%s", scheme, app.Ingress.Domain)
+	client, stop, err := a.agentClient(ctx, s)
+	if err != nil {
+		return a.fail(err)
 	}
-	a.u().Success(fmt.Sprintf("%s is live%s (operation %s).", app.Name, where, applied.Msg.OperationId))
-	return host.ExitOK
+	defer stop()
+	in := &oapv1.Intent{Application: pos[0], Because: fmt.Sprintf("scale %s to %d", pos[1], n),
+		Change: &oapv1.Intent_Scale{Scale: &oapv1.Scale{Component: pos[1], Instances: int32(n)}}}
+	opID, code := a.runIntent(ctx, client, s, in, *yes)
+	switch code {
+	case noChange:
+		a.u().Success(fmt.Sprintf("%s/%s already runs %d instances.", pos[0], pos[1], n))
+		return host.ExitOK
+	case host.ExitOK:
+		a.u().Success(fmt.Sprintf("%s/%s runs %d instances (operation %s).", pos[0], pos[1], n, opID))
+	}
+	return code
 }

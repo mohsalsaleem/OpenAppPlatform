@@ -31,7 +31,7 @@ var ctx = context.Background()
 func server(t *testing.T) (*httptest.Server, *http.Client) {
 	t.Helper()
 	clock := sim.NewClock(time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC))
-	rt, edge, journal, desired := sim.NewRuntime(clock, model.HostObservation{Name: "sim"}), sim.NewEdge(), &sim.Journal{}, sim.NewDesired()
+	rt, edge, journal, desired := sim.NewRuntime(clock, model.HostObservation{Name: "sim", MemoryTotalMiB: 950}), sim.NewEdge(), &sim.Journal{}, sim.NewDesired()
 	env, _ := spec.FromJSON([]byte(`{"agents": {"owner": {"scope": {"applications": ["*"]}, "may": ["scale", "spec-patch"]}}}`))
 	desired.SetEnvelope(env)
 	svc := &service.Service{Desired: desired, Journal: journal, Clock: clock, Observer: &engine.Observer{Runtime: rt, Clock: clock},
@@ -117,6 +117,11 @@ func TestSameResultOverEveryProtocol(t *testing.T) {
 	}
 	if !proto.Equal(first, &viaCurl) {
 		t.Fatal("curl result differs")
+	}
+	// JSON follows OAP's conventions: field names as written, enums as strings.
+	if !bytes.Contains(raw, []byte(`"memory_total_mib"`)) || bytes.Contains(raw, []byte(`"memoryTotalMib"`)) ||
+		!bytes.Contains(raw, []byte(`"HEALTH_STATUS_HEALTHY"`)) {
+		t.Fatalf("JSON conventions: %s", raw)
 	}
 	resp, _ = http.Post(ts.URL+oapv1connect.AgentServiceObserveProcedure, "application/json", bytes.NewReader([]byte(`{"application": "nope"}`)))
 	raw, _ = io.ReadAll(resp.Body)
