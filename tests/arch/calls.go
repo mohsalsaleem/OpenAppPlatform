@@ -1,0 +1,61 @@
+package arch
+
+import (
+	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"path"
+	"sort"
+	"strconv"
+)
+
+// CheckCalls parses Go source and returns one violation per call to a function
+// in ForbiddenCalls, or per dot import, which would hide such calls.
+func CheckCalls(filename string, src any) ([]string, error) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, filename, src, parser.SkipObjectResolution)
+	if err != nil {
+		return nil, err
+	}
+	names := map[string]string{} // local name -> import path
+	var out []string
+	for _, imp := range file.Imports {
+		p, _ := strconv.Unquote(imp.Path.Value)
+		if _, watched := ForbiddenCalls[p]; !watched {
+			continue
+		}
+		name := path.Base(p)
+		if imp.Name != nil {
+			name = imp.Name.Name
+		}
+		if name == "." {
+			out = append(out, fmt.Sprintf("%s: dot import of %s is not allowed in core", fset.Position(imp.Pos()), p))
+			continue
+		}
+		names[name] = p
+	}
+	ast.Inspect(file, func(n ast.Node) bool {
+		sel, ok := n.(*ast.SelectorExpr)
+		if !ok {
+			return true
+		}
+		id, ok := sel.X.(*ast.Ident)
+		if !ok {
+			return true
+		}
+		p, ok := names[id.Name]
+		if !ok {
+			return true
+		}
+		for _, f := range ForbiddenCalls[p] {
+			if sel.Sel.Name == f {
+				out = append(out, fmt.Sprintf("%s: %s.%s is not allowed in core (no clock or console I/O)",
+					fset.Position(sel.Pos()), p, f))
+			}
+		}
+		return true
+	})
+	sort.Strings(out)
+	return out, nil
+}
