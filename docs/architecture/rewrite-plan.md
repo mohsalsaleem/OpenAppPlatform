@@ -154,6 +154,7 @@ Depends on phase 2.
 
 | ID | Task | Acceptance |
 |---|---|---|
+| R3.0 | First launch: `oap` with no arguments shows the onboarding journey and its next step, guided on a TTY and as JSON for agents ([onboarding](onboarding.md#first-launch)) | Golden output for each journey state in both modes; owner-only steps say why and what to ask; exit codes 0, 3, 4 and 5 as documented; state survives an interrupted run |
 | R3.1 | Service layer: the seven primitives over core and engine | Service tests for each primitive using simulation adapters |
 | R3.2 | Connect server in `cmd/oapd`; errors with typed `why` and remedy | The same request works over gRPC, gRPC-Web and Connect JSON (curl), with identical results |
 | R3.3 | `watch` and `await` as server streams, resumable from a revision | A client that disconnects and resumes from its last revision misses no event and sees none twice |
@@ -206,6 +207,11 @@ Decided for [onboarding](onboarding.md) (owner, 2026-10-19), needed before
 R3.11–R3.13: supported systems are Ubuntu 22.04 and 24.04 and Debian 12; OAP
 installs Docker itself, as a sensitive fix the owner approves; the automatic
 hostname is sslip.io unless the owner gives a domain.
+
+Decided (owner, 2026-10-19): R3.0, R3.10 and R3.11 run ahead of R3.1, because
+they need only SSH, not `oapd`. OAP uses the system OpenSSH client (`ssh`,
+`ssh-keygen`, `ssh-keyscan`), so no SSH library is added and `ssh` itself reads
+the password from the terminal.
 
 | Decision (rewrite doc §17) | Needed before | Recommendation |
 |---|---|---|

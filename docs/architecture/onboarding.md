@@ -57,6 +57,95 @@ owner + agent (laptop)                      server
 6 hand off  bootstrap key removed and verified gone; agent signs in with device login
 ```
 
+## First launch
+
+`oap` with no arguments never prints a usage dump. It answers two questions:
+**where am I in the journey, and what happens next, by whom?** The same
+journey serves two kinds of caller:
+
+- **The owner at a terminal** (stdin and stdout are a TTY) gets a guided,
+  resumable walkthrough.
+- **An agent** (no TTY, or `--json`) gets the same state as JSON, including
+  which steps only the owner can do and exactly what to ask them.
+
+### The journey state
+
+The journey lives on the laptop in `~/.config/oap/journey.json` (0600, in a
+0700 directory), one entry per server. Every step is idempotent, so running
+`oap` again resumes where the journey stopped, whether after a crash, a
+reinstall or the next day.
+
+| State | Reached when | Next step | Who |
+|---|---|---|---|
+| `new` | No server known | Connect a server | Owner (password, fingerprint) |
+| `connected` | Bootstrap key works | Check the server | Agent or owner |
+| `checked` | Check has run | Approve fixes, or reinstall the server if a check is a stop | Owner approves, agent proposes |
+| `ready` | No blocking findings | Install OAP | Agent or owner |
+| `installed` | `oapd` and Caddy healthy | Create the owner account | Owner |
+| `owned` | Owner account exists | Connect an agent (device login) | Agent starts, owner approves |
+| `handed-off` | Bootstrap key removed and verified | Deploy a first app | Agent |
+
+Once every server is `handed-off`, `oap` with no arguments shows the day-to-day
+digest instead: servers, apps, pending asks and anything stale.
+
+### The owner's first launch
+
+```
+$ oap
+OAP runs your apps on your own server, operated by your AI agent.
+You don't have a server connected yet. Setup takes about 10 minutes and needs:
+the server's IP address, its username and its password.
+
+  1 connect   ← you are here
+  2 check     3 fix   4 install   5 owner account   6 hand off
+
+Server address: 203.0.113.5
+Username [root]:
+Host key: ED25519 SHA256:3f9c…a1  Does it match your provider's console? [y/N] y
+Password for root@203.0.113.5 (used once to install a key, never stored): ••••
+✓ Connected with an OAP bootstrap key (your password is no longer needed)
+
+Checking the server (read-only)…
+✗ Ubuntu 18.04 isn't supported: it no longer gets security updates.
+  Reinstall it with Ubuntu 24.04 from your provider's console, then run `oap` again.
+! No swap on a 1 GB server. Fix: add a 1 GiB swap file (routine, undoable).
+· Also on this server, left alone: container `tura`, MySQL on 127.0.0.1:3306.
+
+Stopped at step 2: the server needs a reinstall. Run `oap` again afterwards.
+```
+
+The rules behind it:
+
+- **One question at a time, with a default** where one is safe.
+- **Each owner-only step says why** it is owner-only ("your password",
+  "this deletes data").
+- **Stops are explicit.** A stop explains what blocks the journey, what the
+  owner needs to do outside OAP, and that `oap` resumes afterwards.
+- **Nothing is lost** if the owner presses Ctrl-C: the journey keeps
+  the last completed step.
+
+### An agent's first launch
+
+Usually the owner tells their agent "host this app on my server". The agent
+installs `oap` and runs it:
+
+```
+$ oap --json
+{"state": "new",
+ "next": {"step": "connect", "by": "owner",
+          "why": "Connecting needs the server password, which agents must not handle.",
+          "ask_owner": "Please run `oap` in a terminal on this machine and follow the steps. Tell me when it says Connected.",
+          "then": "oap --json"},
+ "journey": ["connect", "check", "fix", "install", "owner", "hand-off"]}
+```
+
+The agent relays `ask_owner` and runs `oap --json` again later. Steps the agent
+may run itself (`check`, `install` once fixes are approved, and starting the
+device login) carry `"by": "agent"` and a `command`. The exit codes are 0
+(done), 3 (waiting for the owner) and 4 (stopped: something outside OAP must
+change first), so an agent can branch without parsing prose. Until R3.12–R3.14 land, a step
+that isn't built yet exits 5 and names the task that delivers it.
+
 ### 1. Connect
 
 `oap host connect root@IP` creates a bootstrap key pair in OAP's own
@@ -65,10 +154,10 @@ directory on the laptop (`~/.config/oap/hosts/<ip>/`), not in `~/.ssh`.
 - **Host key:** the first connection shows the server's fingerprint and asks
   the owner to compare it with the provider's console. OAP pins it in its own
   `known_hosts`, never in the user's.
-- **Password:** `oap` reads it from the controlling terminal (`/dev/tty`) with
-  echo off. It isn't read from stdin, an environment variable or an argument,
-  so an agent driving `oap` can't supply it and never sees it. One SSH session
-  appends the bootstrap public key to `authorized_keys`, tagged
+- **Password:** `oap` never reads it. It runs the system `ssh` client, which
+  asks for the password on the controlling terminal (`/dev/tty`), and
+  `connect` refuses to start without a terminal. An agent driving `oap` can't
+  supply the password and never sees it. One SSH session appends the bootstrap public key to `authorized_keys`, tagged
   `oap-bootstrap <date>`, and then closes. The password isn't stored.
 - **No `~/.ssh/config` edits.** v0.1 added a `Host` entry without an
   `IdentityFile`. The agent's first SSH attempt on 2026-10-19 failed on it.
