@@ -49,6 +49,7 @@ type Component struct {
 	Instances          int               `json:"instances,omitempty"`
 	Env                map[string]string `json:"env,omitempty"`
 	Secrets            map[string]string `json:"secrets,omitempty"`
+	After              []string          `json:"after,omitempty"`
 	Uses               map[string]Use    `json:"uses,omitempty"`
 	Volumes            map[string]string `json:"volumes,omitempty"`
 	Resources          *Resources        `json:"resources,omitempty"`
@@ -217,12 +218,24 @@ func (a *Application) check() []Problem {
 		if s := c.Security; s != nil && s.AllowPrivilegeEscalation && s.ExceptionReason == "" {
 			add(Join(Join(at, "security"), "exception_reason"), WhyRequired, "privilege escalation needs an exception reason")
 		}
+		seen := map[string]bool{}
+		for i, dep := range c.After {
+			at := Index(Join(at, "after"), i)
+			if _, ok := a.Components[dep]; !ok || dep == name {
+				add(at, WhyUnknownComponent, "must name another component of this application")
+			} else if seen[dep] {
+				add(at, WhyConflict, "%s is listed twice", dep)
+			} else if _, connected := c.Uses[dep]; connected {
+				add(at, WhyConflict, "%s is already ordered by uses", dep)
+			}
+			seen[dep] = true
+		}
 		out = append(out, a.checkVariables(name, c)...)
 		out = append(out, a.checkUses(name, c)...)
 	}
 	out = append(out, a.checkIngress()...)
 	if cycle := a.cycle(); cycle != nil {
-		add("components", WhyCycle, "components use each other in a cycle: %s", strings.Join(cycle, " → "))
+		add("components", WhyCycle, "components depend on each other in a cycle: %s", strings.Join(cycle, " → "))
 	}
 	Sort(out)
 	return out
@@ -314,7 +327,28 @@ func (a *Application) checkIngress() []Problem {
 	return out
 }
 
-// cycle returns one dependency cycle through uses, or nil.
+// Dependencies returns the components n must follow: those it uses and those
+// it lists in after, sorted and limited to components that exist.
+func (a *Application) Dependencies(n string) []string {
+	c := a.Components[n]
+	set := map[string]bool{}
+	for dep := range c.Uses {
+		set[dep] = true
+	}
+	for _, dep := range c.After {
+		set[dep] = true
+	}
+	var out []string
+	for dep := range set {
+		if _, ok := a.Components[dep]; ok && dep != n {
+			out = append(out, dep)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// cycle returns one dependency cycle through uses and after, or nil.
 func (a *Application) cycle() []string {
 	const (
 		unvisited = iota
@@ -328,10 +362,7 @@ func (a *Application) cycle() []string {
 	visit = func(n string) bool {
 		state[n] = visiting
 		stack = append(stack, n)
-		for _, next := range sortedKeys(a.Components[n].Uses) {
-			if _, ok := a.Components[next]; !ok {
-				continue
-			}
+		for _, next := range a.Dependencies(n) {
 			switch state[next] {
 			case visiting:
 				for i, s := range stack {
@@ -358,8 +389,8 @@ func (a *Application) cycle() []string {
 	return nil
 }
 
-// Order returns component names so that every component comes after the
-// components it uses. Among components that are ready, the first by name goes
+// Order returns component names so that every component comes after its
+// dependencies. Among components that are ready, the first by name goes
 // next.
 func (a *Application) Order() []string {
 	var out []string
@@ -382,8 +413,8 @@ func (a *Application) Order() []string {
 }
 
 func (a *Application) usesPlaced(n string, placed map[string]bool) bool {
-	for dep := range a.Components[n].Uses {
-		if _, ok := a.Components[dep]; ok && !placed[dep] {
+	for _, dep := range a.Dependencies(n) {
+		if !placed[dep] {
 			return false
 		}
 	}

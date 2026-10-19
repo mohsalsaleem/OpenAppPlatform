@@ -172,3 +172,28 @@ name: shop
 		t.Fatalf("canonical form differs from a canonically written document:\n%s", out)
 	}
 }
+
+// The pre-deploy job pattern from examples/pre-deploy-jobs/README.md: the API
+// depends on a migration job. dependsOn is ordering, so it becomes after.
+func TestConvertLegacyPreDeployJob(t *testing.T) {
+	tree, _, problems := spec.ConvertLegacy([]byte(`{"name":"shop","environment":"staging","targetId":"local-docker",
+		"components":[
+		  {"name":"migrate","kind":"job","image":"registry.example/migrations@sha256:` + strings.Repeat("a", 64) + `",
+		   "instances":1,"secretRefs":{"DATABASE_URL":"database-url"},"readiness":{"timeoutSeconds":120}},
+		  {"name":"api","kind":"web","image":"registry.example/api:1","port":8080,"dependsOn":["migrate"]},
+		  {"name":"web","kind":"web","image":"registry.example/web:1","port":8080,"dependsOn":["api"],"services":{"API_URL":"api"}}]}`))
+	if len(problems) > 0 {
+		t.Fatal(problems)
+	}
+	app, probs := spec.ParseApplication(tree)
+	if len(probs) > 0 {
+		t.Fatal(probs)
+	}
+	api, web := app.Components["api"], app.Components["web"]
+	if len(api.After) != 1 || api.After[0] != "migrate" || len(api.Uses) != 0 {
+		t.Fatalf("api: %+v", api)
+	}
+	if len(web.After) != 0 || web.Uses["api"].Env != "API_URL" {
+		t.Fatalf("web: %+v", web)
+	}
+}

@@ -89,10 +89,6 @@ func ConvertLegacy(b []byte) (tree any, notes, problems []Problem) {
 		notes = append(notes, Problem{Path: "targetId", Why: "convert.dropped",
 			Message: "targets are gone; an OAP server manages its own host"})
 	}
-	byName := map[string]legacyComponent{}
-	for _, c := range m.Components {
-		byName[c.Name] = c
-	}
 	components := map[string]any{}
 	for i, c := range m.Components {
 		at := Index("components", i)
@@ -100,7 +96,7 @@ func ConvertLegacy(b []byte) (tree any, notes, problems []Problem) {
 			problems = append(problems, Problem{Path: at, Why: WhyDuplicateKey, Message: "component " + c.Name + " appears twice"})
 			continue
 		}
-		out, ps := convertComponent(c, byName, at)
+		out, ps := convertComponent(c, at)
 		problems = append(problems, ps...)
 		components[c.Name] = out
 	}
@@ -163,7 +159,7 @@ func decodeLegacy(b []byte) (*legacyManifest, []Problem) {
 	return &m, nil
 }
 
-func convertComponent(c legacyComponent, byName map[string]legacyComponent, at string) (map[string]any, []Problem) {
+func convertComponent(c legacyComponent, at string) (map[string]any, []Problem) {
 	var problems []Problem
 	unsupported := func(field, format string, args ...any) {
 		problems = append(problems, Problem{Path: Join(at, field), Why: WhyLegacyUnsupported, Message: fmt.Sprintf(format, args...)})
@@ -219,16 +215,16 @@ func convertComponent(c legacyComponent, byName map[string]legacyComponent, at s
 		}
 		uses[target] = use
 	}
+	// dependsOn is ordering; it becomes a connection only where services
+	// already connect to the same component.
+	var after []any
 	for _, dep := range c.DependsOn {
-		if _, done := uses[dep]; done {
-			continue
+		if _, connected := uses[dep]; !connected {
+			after = append(after, dep)
 		}
-		switch byName[dep].Kind {
-		case "", KindWeb:
-			uses[dep] = map[string]any{"type": "http"}
-		default:
-			unsupported("dependsOn", "dependency on %s (%s) has no connection type in the new format", dep, byName[dep].Kind)
-		}
+	}
+	if len(after) > 0 {
+		out["after"] = after
 	}
 	if len(uses) > 0 {
 		out["uses"] = uses

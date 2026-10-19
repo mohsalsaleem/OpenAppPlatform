@@ -87,11 +87,11 @@ const full = `{
             "health": {"mode": "http", "path": "/healthz"}},
     "api": {"kind": "web", "image": "ghcr.io/acme/api:1.4", "port": 9000,
             "env": {"LOG_LEVEL": "info"}, "secrets": {"DATABASE_URL": "db-url"},
-            "uses": {"db": {"type": "database"}, "jobs": {"type": "queue"}},
+            "uses": {"db": {"type": "database"}, "jobs": {"type": "queue"}}, "after": ["migrate"],
             "resources": {"memory_mib": 256, "cpu_millis": 500},
             "readiness": {"require_healthy": true, "timeout_seconds": 120}},
     "worker": {"kind": "worker", "image": "ghcr.io/acme/api:1.4", "uses": {"jobs": {"type": "queue"}}},
-    "migrate": {"kind": "job", "image": "ghcr.io/acme/api:1.4", "secrets": {"DATABASE_URL": "db-url"}},
+    "migrate": {"kind": "job", "image": "ghcr.io/acme/api:1.4", "secrets": {"DATABASE_URL": "db-url"}, "after": ["db"]},
     "db": {"kind": "data", "image": "postgres:17-alpine", "port": 5432, "volumes": {"pgdata": "/var/lib/postgresql/data"}},
     "jobs": {"kind": "data", "image": "redis:7-alpine", "port": 6379, "volumes": {"redis": "/data"}}
   }
@@ -112,7 +112,7 @@ func TestParseApplicationAppliesDefaults(t *testing.T) {
 		t.Errorf("http health defaults: %+v", h)
 	}
 	order := strings.Join(app.Order(), ",")
-	if order != "db,jobs,api,migrate,web,worker" {
+	if order != "db,jobs,migrate,api,web,worker" {
 		t.Errorf("order: %s", order)
 	}
 }
@@ -170,6 +170,10 @@ func TestParseApplicationRejections(t *testing.T) {
 		{"image health with path", "components.worker.health", obj(t, `{"mode": "image", "path": "/x"}`), "components.worker.health", WhyConflict},
 		{"escalation without reason", "components.api.security", obj(t, `{"allow_privilege_escalation": true}`), "components.api.security.exception_reason", WhyRequired},
 		{"bad digest", "components.api.image", "ghcr.io/acme/api@sha256:abc", "components.api.image", WhyPattern},
+		{"after unknown", "components.web.after", []any{"nope"}, "components.web.after[0]", WhyUnknownComponent},
+		{"after twice", "components.web.after", []any{"db", "db"}, "components.web.after[1]", WhyConflict},
+		{"after and uses", "components.web.after", []any{"api"}, "components.web.after[0]", WhyConflict},
+		{"after cycle", "components.db.after", []any{"migrate"}, "components", WhyCycle},
 		{"cycle", "components.db.uses", obj(t, `{"api": {"type": "http"}}`), "components", WhyCycle},
 	}
 	for _, c := range cases {

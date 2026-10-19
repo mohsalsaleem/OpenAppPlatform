@@ -73,6 +73,12 @@
           "propertyNames": {"$ref": "#/$defs/env_name"},
           "additionalProperties": {"$ref": "#/$defs/slug"}
         },
+        "after": {
+          "description": "Components that must be ready (or, for jobs, succeed) before this one starts. Ordering only; use uses for connections.",
+          "type": "array",
+          "maxItems": 16,
+          "items": {"$ref": "#/$defs/slug"}
+        },
         "uses": {
           "description": "Typed connections to other components, by component name.",
           "type": "object",
