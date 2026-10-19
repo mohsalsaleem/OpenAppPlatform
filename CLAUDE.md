@@ -14,7 +14,9 @@ is the short version.
 - Never skip, disable, weaken or delete a test or acceptance check to get green.
   Bug fixes start with a failing test.
 - Keep the layer rules: `internal/core` has no I/O, time or randomness;
-  dependencies point downward only. `make rewrite-check` must pass.
+  dependencies point downward only. `tests/arch` enforces them.
+- Run `make rewrite-check` before every push; it must pass. Set `REWRITE_BASE`
+  if the base branch isn't `origin/main`.
 - No new dependencies outside the plan's allowlist without owner approval.
 - Never commit, log or print secrets or credentials.
 - Record each task's acceptance evidence in the plan's status table, and report

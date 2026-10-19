@@ -206,7 +206,11 @@ adapter is not carried over; other operators can return later as extensions.
 
 | ID | Status | Commit | Evidence |
 |---|---|---|---|
-| R0.1–R0.5 | not started | | |
+| R0.1 | done | `a0cf59e` | `go build ./...` and `go test ./...` pass, unchanged from `main` |
+| R0.2 | done | `6bb1d38` | `tests/arch` passes; self-tests reject 15 kinds of violation; a trial `import "os"` in `internal/core` failed the check (not committed) |
+| R0.3 | done | `5faf302` | 8 unit tests pass; a trial edit to `internal/controller` failed the check (not committed) |
+| R0.4 | in progress | | `make rewrite-check` passes. The CI workflow awaits owner approval |
+| R0.5 | done | | `CLAUDE.md` points to this plan and names `make rewrite-check` |
 | R1.1–R1.7 | not started | | |
 | R2.1–R2.11 | not started | | |
 | R3.1–R3.9 | not started | | |
