@@ -59,3 +59,35 @@ func CheckCalls(filename string, src any) ([]string, error) {
 	sort.Strings(out)
 	return out, nil
 }
+
+// CheckInterfacesOnly parses Go source and returns one violation per
+// declaration that is not an interface type. Ports hold interfaces only.
+func CheckInterfacesOnly(filename string, src any) ([]string, error) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, filename, src, parser.SkipObjectResolution)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, decl := range file.Decls {
+		switch d := decl.(type) {
+		case *ast.FuncDecl:
+			out = append(out, fmt.Sprintf("%s: func %s; ports declare interfaces only", fset.Position(d.Pos()), d.Name.Name))
+		case *ast.GenDecl:
+			if d.Tok == token.IMPORT {
+				continue
+			}
+			for _, spec := range d.Specs {
+				ts, ok := spec.(*ast.TypeSpec)
+				if !ok {
+					out = append(out, fmt.Sprintf("%s: %s declaration; ports declare interfaces only", fset.Position(spec.Pos()), d.Tok))
+					continue
+				}
+				if _, iface := ts.Type.(*ast.InterfaceType); !iface {
+					out = append(out, fmt.Sprintf("%s: type %s is not an interface; put data types in internal/core/ops", fset.Position(ts.Pos()), ts.Name.Name))
+				}
+			}
+		}
+	}
+	return out, nil
+}
