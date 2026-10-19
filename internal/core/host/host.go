@@ -37,6 +37,7 @@ type Facts struct {
 	DockerPodman            bool   // the docker command is Podman
 	DockerPackage           string // package that owns it, "" if unmanaged
 	DockerVersion           string
+	Install                 string // this server's OAP installation id, if installed
 	DockerDropins           []string
 	Containers              []Container
 }
@@ -52,6 +53,7 @@ type Listener struct {
 type Container struct {
 	Name, State string
 	OAP         bool
+	Install     string // the installation label, if any
 }
 
 // ParseProbe reads the probe's key=value output. Output that doesn't end
@@ -120,9 +122,15 @@ func ParseProbe(out string) (Facts, error) {
 			f.DockerDropins = append(f.DockerDropins, val)
 		case "container":
 			parts := strings.Split(val, "\t")
-			if len(parts) == 3 {
-				f.Containers = append(f.Containers, Container{Name: parts[0], State: parts[1], OAP: parts[2] == "oap"})
+			if len(parts) >= 3 {
+				c := Container{Name: parts[0], State: parts[1], OAP: parts[2] == "oap"}
+				if len(parts) >= 4 {
+					c.Install = parts[3]
+				}
+				f.Containers = append(f.Containers, c)
 			}
+		case "oap.install":
+			f.Install = val
 		}
 	}
 	if !done {
@@ -281,6 +289,9 @@ func Check(f Facts) []Finding {
 
 	var oap, other []string
 	for _, c := range f.Containers {
+		if c.OAP && f.Install != "" && c.Install == f.Install {
+			continue // this installation's own containers
+		}
 		if c.OAP {
 			oap = append(oap, c.Name)
 		} else {

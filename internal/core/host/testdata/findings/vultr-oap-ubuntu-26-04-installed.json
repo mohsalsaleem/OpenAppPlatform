@@ -17,12 +17,6 @@
       }
     },
     {
-      "why": "host.oap.present",
-      "severity": "info",
-      "observed": "2 OAP containers from an earlier install: oap-4ofro33n8i-caddy, oap-4ofro33n8i-oapd",
-      "remedy": "Remove the earlier install with oap host uninstall, or keep it running alongside."
-    },
-    {
       "why": "host.ssh.password_login",
       "severity": "advice",
       "observed": "SSH accepts passwords, including for root",

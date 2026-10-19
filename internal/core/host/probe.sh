@@ -63,7 +63,8 @@ if has docker; then
   docker --version 2>/dev/null | grep -qi podman && kv docker.podman 1
   kv docker.version "$(docker version --format '{{.Server.Version}}' 2>/dev/null)"
   # Names and states only; labels are reduced to whether OAP made it.
-  docker ps -a --format '{{.Names}}	{{.State}}	{{.Labels}}' 2>/dev/null |
-    awk -F '\t' '{ print "container=" $1 "\t" $2 "\t" (index($3, "io.openappplatform.") ? "oap" : "other") }'
+  docker ps -a --format '{{.Names}}	{{.State}}	{{.Labels}}	{{.Label "io.openappplatform.install"}}' 2>/dev/null |
+    awk -F '\t' '{ print "container=" $1 "\t" $2 "\t" (index($3, "io.openappplatform.") ? "oap" : "other") "\t" $4 }'
 fi
+[ -r /var/lib/oap/install-id ] && kv oap.install "$(cat /var/lib/oap/install-id)"
 kv probe.done 1
