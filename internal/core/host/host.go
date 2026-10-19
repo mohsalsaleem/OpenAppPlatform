@@ -30,6 +30,9 @@ type Facts struct {
 	SSHRootLogin            string
 	Listeners               []Listener
 	DockerDaemon            string // path of the running dockerd, "" if none
+	DockerDaemonUser        string // user dockerd runs as
+	DockerClient            string // path of the docker command
+	DockerPodman            bool   // the docker command is Podman
 	DockerPackage           string // package that owns it, "" if unmanaged
 	DockerVersion           string
 	DockerDropins           []string
@@ -97,6 +100,12 @@ func ParseProbe(out string) (Facts, error) {
 			f.Listeners = append(f.Listeners, l)
 		case "docker.daemon":
 			f.DockerDaemon = val
+		case "docker.daemon_user":
+			f.DockerDaemonUser = val
+		case "docker.client":
+			f.DockerClient = val
+		case "docker.podman":
+			f.DockerPodman = val == "1"
 		case "docker.package":
 			f.DockerPackage = val
 		case "docker.version":
@@ -217,23 +226,8 @@ func Check(f Facts) []Finding {
 			Required: "5 GiB free", Remedy: "Free disk space or resize the disk, then run oap again."})
 	}
 
-	switch {
-	case f.DockerDaemon == "" && f.DockerVersion == "":
-		add(Finding{Why: "host.docker.missing", Severity: NeedsFix, Observed: "Docker isn't running", Required: fmt.Sprintf("Docker Engine %d or later", MinDockerMajor),
-			Remedy: "Install Docker Engine from Docker's official package repository.",
-			Fix:    &Fix{ID: "install-docker", Tier: Sensitive, Summary: "Install Docker Engine from Docker's apt repository and start it"}})
-	case f.DockerPackage == "":
-		obs := "Docker runs from " + orUnknown(f.DockerDaemon) + ", which no package manages"
-		if len(f.DockerDropins) > 0 {
-			obs += "; systemd drop-ins: " + strings.Join(f.DockerDropins, ", ")
-		}
-		add(Finding{Why: "host.docker.unmanaged", Severity: NeedsFix, Observed: obs, Required: "Docker Engine installed from a package, so it gets security updates",
-			Remedy: "Replace it with Docker Engine from Docker's official package repository. Its containers restart.",
-			Fix:    &Fix{ID: "install-docker", Tier: Sensitive, Summary: "Install Docker Engine from Docker's apt repository in place of the unmanaged one; running containers restart"}})
-	case dockerMajor(f.DockerVersion) < MinDockerMajor:
-		add(Finding{Why: "host.docker.old", Severity: NeedsFix, Observed: "Docker " + orUnknown(f.DockerVersion), Required: fmt.Sprintf("Docker Engine %d or later", MinDockerMajor),
-			Remedy: "Upgrade Docker Engine. Its containers restart.",
-			Fix:    &Fix{ID: "upgrade-docker", Tier: Sensitive, Summary: "Upgrade Docker Engine from Docker's apt repository; running containers restart"}})
+	for _, fd := range checkDocker(f) {
+		add(fd)
 	}
 
 	oapRunning := false
@@ -349,4 +343,64 @@ func orUnknown(s string) string {
 		return "unknown"
 	}
 	return s
+}
+
+// checkDocker applies the Docker policy (owner decision, 2026-10-19): OAP
+// installs Docker where there is none and upgrades a packaged one through
+// its own package source with the restarts shown; it works with an
+// unmanaged Docker that is new enough, with a warning; and it stops on
+// setups it can't work with, saying why.
+func checkDocker(f Facts) []Finding {
+	required := fmt.Sprintf("Docker Engine %d or later", MinDockerMajor)
+	switch {
+	case f.DockerPodman:
+		return []Finding{{Why: "host.docker.podman", Severity: Stop, Observed: "the docker command is Podman (" + orUnknown(f.DockerClient) + ")", Required: required,
+			Remedy: "Remove podman-docker and install Docker Engine. Podman's Docker compatibility differs in volumes, health checks and events, which OAP relies on."}}
+	case strings.Contains(f.DockerDaemon, "/snap/"):
+		return []Finding{{Why: "host.docker.snap", Severity: Stop, Observed: "Docker is the snap package (" + f.DockerDaemon + ")", Required: required + " from a deb package",
+			Remedy: "Remove it (snap remove docker) and run oap again to install Docker Engine. The snap's confinement blocks the shared socket OAP's Caddy uses."}}
+	case f.DockerDaemon != "" && f.DockerDaemonUser != "" && f.DockerDaemonUser != "root":
+		return []Finding{{Why: "host.docker.rootless", Severity: Stop, Observed: "Docker runs rootless, as " + f.DockerDaemonUser, Required: required + ", running as root",
+			Remedy: "Run Docker Engine as root. Rootless Docker can't publish ports 80 and 443 for OAP's Caddy."}}
+	case f.DockerDaemon == "" && f.DockerVersion == "":
+		return []Finding{{Why: "host.docker.missing", Severity: NeedsFix, Observed: "Docker isn't running", Required: required,
+			Remedy: "Install Docker Engine from Docker's official package repository.",
+			Fix:    &Fix{ID: "install-docker", Tier: Sensitive, Summary: "Install Docker Engine from Docker's apt repository and start it"}}}
+	case f.DockerVersion == "":
+		return []Finding{{Why: "host.docker.unreachable", Severity: Stop, Observed: "dockerd runs (" + orUnknown(f.DockerDaemon) + ") but doesn't answer", Required: required,
+			Remedy: "Check the daemon with systemctl status docker and docker info, then run oap again."}}
+	case dockerMajor(f.DockerVersion) < MinDockerMajor && f.DockerPackage != "":
+		var restarting []string
+		other := 0
+		for _, c := range f.Containers {
+			if c.State == "running" {
+				restarting = append(restarting, c.Name)
+				if !c.OAP {
+					other++
+				}
+			}
+		}
+		tier, restarts := Sensitive, "no running containers restart"
+		if len(restarting) > 0 {
+			restarts = fmt.Sprintf("%d running containers restart: %s", len(restarting), strings.Join(restarting, ", "))
+		}
+		if other > 0 {
+			tier = Destructive
+			restarts += fmt.Sprintf(" (%d of them not OAP's)", other)
+		}
+		return []Finding{{Why: "host.docker.old", Severity: NeedsFix, Observed: fmt.Sprintf("Docker %s from package %s", f.DockerVersion, f.DockerPackage), Required: required,
+			Remedy: "Upgrade Docker Engine through the package source it came from.",
+			Fix:    &Fix{ID: "upgrade-docker", Tier: tier, Summary: "Upgrade " + f.DockerPackage + " with apt; " + restarts}}}
+	case dockerMajor(f.DockerVersion) < MinDockerMajor:
+		return []Finding{{Why: "host.docker.old", Severity: Stop, Observed: "Docker " + f.DockerVersion + " from " + orUnknown(f.DockerDaemon) + ", which no package manages", Required: required,
+			Remedy: "Upgrade it the way it was installed, or remove it and run oap again to install Docker Engine. OAP doesn't replace a Docker it didn't install."}}
+	case f.DockerPackage == "":
+		obs := "Docker " + f.DockerVersion + " runs from " + orUnknown(f.DockerDaemon) + ", which no package manages"
+		if len(f.DockerDropins) > 0 {
+			obs += "; systemd drop-ins: " + strings.Join(f.DockerDropins, ", ")
+		}
+		return []Finding{{Why: "host.docker.unmanaged", Severity: Advice, Observed: obs,
+			Remedy: "OAP works with it, but it gets no security updates. Consider Docker Engine from Docker's package repository."}}
+	}
+	return nil
 }

@@ -25,16 +25,9 @@
     },
     {
       "why": "host.docker.unmanaged",
-      "severity": "fix",
-      "observed": "Docker runs from /opt/docker-27.5.1/docker/dockerd, which no package manages; systemd drop-ins: oap-test-engine.conf",
-      "required": "Docker Engine installed from a package, so it gets security updates",
-      "remedy": "Replace it with Docker Engine from Docker's official package repository. Its containers restart.",
-      "fix": {
-        "id": "install-docker",
-        "tier": "sensitive",
-        "summary": "Install Docker Engine from Docker's apt repository in place of the unmanaged one; running containers restart",
-        "undoable": false
-      }
+      "severity": "advice",
+      "observed": "Docker 27.5.1 runs from /opt/docker-27.5.1/docker/dockerd, which no package manages; systemd drop-ins: oap-test-engine.conf",
+      "remedy": "OAP works with it, but it gets no security updates. Consider Docker Engine from Docker's package repository."
     },
     {
       "why": "host.foreign.present",

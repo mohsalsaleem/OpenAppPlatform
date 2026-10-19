@@ -174,6 +174,8 @@ func renderStatus(w io.Writer, st host.Status, cli string) {
 		fmt.Fprintf(w, "Next: %s, by the %s. %s\nThis step isn't built yet (task %s).\n", n.Step, n.By, n.Why, n.Task)
 	case n.Step == "done":
 		fmt.Fprintln(w, "Onboarding is complete.")
+	case n.By == host.ByOwner:
+		fmt.Fprintf(w, "Next: %s, by you. %s\nRun `%s` to continue.\n", n.Step, n.Why, cli)
 	case n.Command != "":
 		fmt.Fprintf(w, "Next: %s. Run `%s`.\n", n.Step, n.Command)
 	default:

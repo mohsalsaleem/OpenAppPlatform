@@ -216,6 +216,32 @@ needs a reinstall or a new server, and OAP doesn't upgrade an OS in place.
 Approvals use the same owner-present TTY as the password, so an agent can
 propose fixes but can't approve them.
 
+`oap host fix` runs each approved fix over the bootstrap key, appends it to
+the host manifest (`/var/lib/oap/host-manifest.jsonl`) and checks the server
+again. `oap host undo FIX` reverses a fix the manifest shows OAP applied.
+`oap host fix --json` shows an agent the proposal, with every command, and
+applies nothing.
+
+#### Docker on servers that already have it
+
+Real servers often have Docker already, installed in ways OAP didn't
+choose. OAP judges Docker by what it needs: Docker Engine 24 or later,
+running as root, answering its API, with Docker's own volume, health-check
+and event behavior. It changes Docker only through the package manager
+that owns it (owner decision, 2026-10-19).
+
+| Found | OAP does |
+|---|---|
+| No Docker | Proposes installing Docker Engine from Docker's apt repository (sensitive) |
+| Docker from a package (`docker-ce` or the distribution's `docker.io`), 24 or later | Uses it |
+| Docker from a package, older than 24 | Proposes upgrading it through the same package (`apt-get install --only-upgrade`). The fix lists every running container that restarts; if any isn't OAP's, the fix is destructive and approved on its own |
+| Docker no package manages (a static binary or a custom build), 24 or later | Uses it, with advice that it gets no security updates. Never replaced automatically |
+| The same, older than 24 | Stop: upgrade it the way it was installed, or remove it so OAP can install Docker Engine |
+| Snap Docker | Stop: the snap's confinement blocks the socket OAP's Caddy shares |
+| Podman's `docker` command | Stop: its compatibility differs in volumes, health checks and events |
+| Rootless Docker | Stop: it can't publish ports 80 and 443 for Caddy |
+| A daemon that doesn't answer | Stop, with the commands to diagnose it |
+
 ### 4. Install
 
 `oap host install` uses Docker only:
@@ -302,5 +328,6 @@ from the password to the release journey, as its evidence.
 1. **Supported systems:** Ubuntu 22.04, 24.04 and 26.04, and Debian 12 and 13.
    The first list left out Ubuntu 26.04, the current LTS; the first real
    onboarding run stopped on it, so the owner widened the list the same day.
-2. **OAP installs Docker itself**, as a sensitive fix the owner approves.
+2. **OAP installs Docker itself**, as a sensitive fix the owner approves, and
+   handles Docker it finds as in "Docker on servers that already have it".
 3. **Automatic hostname:** sslip.io by default; the owner's domain when given.

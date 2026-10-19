@@ -28,6 +28,22 @@ type fakeSSH struct {
 	probe     string
 	failProbe bool
 	calls     []string
+	dir       string   // where scripts sent over ssh are saved, in order
+	scripts   []string // their paths
+	manifest  string   // what the host manifest holds, for undo
+}
+
+// ran returns every script the fake server received.
+func (f *fakeSSH) ran(t *testing.T) []string {
+	var out []string
+	for _, p := range f.scripts {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, string(b))
+	}
+	return out
 }
 
 func (f *fakeSSH) command(ctx context.Context, name string, args ...string) *exec.Cmd {
@@ -44,12 +60,20 @@ func (f *fakeSSH) command(ctx context.Context, name string, args ...string) *exe
 	case name == "ssh-keygen":
 		return exec.CommandContext(ctx, name, args...) // a real key, in the test's directory
 	case name == "ssh" && last == "sh -s":
-		// The script arrives on stdin: "true" checks the login, anything
-		// else is the probe.
+		// The script arrives on stdin and is saved. The probe gets the
+		// fixture, a manifest read gets the manifest, anything else succeeds.
+		path := filepath.Join(f.dir, fmt.Sprintf("script-%03d.sh", len(f.scripts)))
+		f.scripts = append(f.scripts, path)
+		probeOut := "cat " + f.probe
 		if f.failProbe {
-			return exec.Command("sh", "-c", `[ "$(cat)" = true ] || exit 255`)
+			probeOut = "exit 255"
 		}
-		return exec.Command("sh", "-c", `[ "$(cat)" = true ] || cat `+f.probe)
+		manifest := filepath.Join(f.dir, "manifest")
+		os.WriteFile(manifest, []byte(f.manifest), 0o600)
+		return exec.Command("sh", "-c", `cat > "$1"
+if grep -q 'kv probe.done' "$1"; then `+probeOut+`
+elif grep -q '^cat /var/lib/oap' "$1"; then cat "$2"
+fi`, "sh", path, manifest)
 	}
 	return exec.Command("true")
 }
@@ -61,7 +85,7 @@ type harness struct {
 }
 
 func newHarness(t *testing.T, terminal bool, input, probe string) *harness {
-	h := &harness{ssh: &fakeSSH{probe: probe}}
+	h := &harness{ssh: &fakeSSH{probe: probe, dir: t.TempDir()}}
 	h.a = &app{cli: "oap", in: bufio.NewReader(strings.NewReader(input)), out: &h.out, errOut: &h.out,
 		terminal: func() bool { return terminal }, now: func() time.Time { return time.Date(2026, 10, 19, 14, 0, 0, 0, time.UTC) },
 		configDir: t.TempDir()}
@@ -111,7 +135,7 @@ func TestFrontDoorGolden(t *testing.T) {
 		{"checked-stopped", &host.Server{Address: "root@203.0.113.5", Stage: host.StageChecked, Summary: "Ubuntu 18.04.2 LTS, x86_64, 1 CPU, 985 MiB memory, 12.1 GiB disk free",
 			Findings: findings(t, "vultr-oap-2026-10-19.txt")}, host.ExitStopped},
 		{"checked-fixes", &host.Server{Address: "root@203.0.113.5", Stage: host.StageChecked, Summary: "Ubuntu 24.04.5 LTS, aarch64, 12 CPUs, 7836 MiB memory, 46.6 GiB disk free",
-			Findings: findings(t, "container-ubuntu-24-04.txt")}, host.ExitNotBuiltYet},
+			Findings: findings(t, "container-ubuntu-24-04.txt")}, host.ExitOwner},
 		{"ready", &host.Server{Address: "root@203.0.113.5", Stage: host.StageReady, Summary: "Debian GNU/Linux 12 (bookworm), aarch64, 2 CPUs, 3931 MiB memory, 28.6 GiB disk free"}, host.ExitNotBuiltYet},
 		{"installed", &host.Server{Address: "root@203.0.113.5", Stage: host.StageInstalled}, host.ExitNotBuiltYet},
 		{"owned", &host.Server{Address: "root@203.0.113.5", Stage: host.StageOwned}, host.ExitNotBuiltYet},
@@ -129,10 +153,10 @@ func TestFrontDoorGolden(t *testing.T) {
 				var code int
 				if mode == "json" {
 					code = h.run("--json")
-				} else if s.server != nil && s.server.Stage != host.StageNew && s.server.Stage != host.StageConnected {
+				} else if s.server != nil && s.server.Stage != host.StageNew && s.server.Stage != host.StageConnected && s.name != "checked-fixes" {
 					code = h.run()
 				} else {
-					continue // on a terminal these start connecting or checking: TestFirstRunOnTerminal
+					continue // on a terminal these start connecting, checking or fixing: TestFirstRunOnTerminal, fix_test.go
 				}
 				if code != s.exit {
 					t.Fatalf("%s: exit %d, want %d\n%s", mode, code, s.exit, h.out.String())

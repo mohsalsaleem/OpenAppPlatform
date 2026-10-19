@@ -1,4 +1,4 @@
-exit 5
+exit 3
 {
   "state": "checked",
   "server": "root@203.0.113.5",
@@ -7,7 +7,8 @@ exit 5
     "step": "fix",
     "by": "owner",
     "why": "Fixes change the server, so the owner approves each one.",
-    "task": "R3.12",
+    "ask_owner": "Please run `oap host fix` in a terminal on this machine and approve the fixes it shows. Tell me when it's done.",
+    "command": "oap host fix root@203.0.113.5 --json",
     "then": "oap --json"
   },
   "journey": [

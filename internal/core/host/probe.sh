@@ -42,6 +42,7 @@ dockerd_pid="$(pidof dockerd 2>/dev/null | awk '{print $1}')"
 if [ -n "$dockerd_pid" ]; then
   exe="$(readlink -f /proc/"$dockerd_pid"/exe 2>/dev/null)"
   kv docker.daemon "$exe"
+  kv docker.daemon_user "$(ps -o user= -p "$dockerd_pid" 2>/dev/null | tr -d ' ')"
   if has dpkg-query; then
     kv docker.package "$(dpkg -S "$exe" 2>/dev/null | cut -d: -f1)"
   elif has rpm; then
@@ -52,6 +53,8 @@ if [ -d /etc/systemd/system/docker.service.d ]; then
   for f in /etc/systemd/system/docker.service.d/*; do [ -e "$f" ] && kv docker.dropin "${f##*/}"; done
 fi
 if has docker; then
+  kv docker.client "$(readlink -f "$(command -v docker)" 2>/dev/null)"
+  docker --version 2>/dev/null | grep -qi podman && kv docker.podman 1
   kv docker.version "$(docker version --format '{{.Server.Version}}' 2>/dev/null)"
   # Names and states only; labels are reduced to whether OAP made it.
   docker ps -a --format '{{.Names}}	{{.State}}	{{.Labels}}' 2>/dev/null |

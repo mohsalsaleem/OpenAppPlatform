@@ -20,13 +20,13 @@
     {
       "why": "host.docker.old",
       "severity": "fix",
-      "observed": "Docker 20.10.21",
+      "observed": "Docker 20.10.21 from package docker.io",
       "required": "Docker Engine 24 or later",
-      "remedy": "Upgrade Docker Engine. Its containers restart.",
+      "remedy": "Upgrade Docker Engine through the package source it came from.",
       "fix": {
         "id": "upgrade-docker",
         "tier": "sensitive",
-        "summary": "Upgrade Docker Engine from Docker's apt repository; running containers restart",
+        "summary": "Upgrade docker.io with apt; no running containers restart",
         "undoable": false
       }
     }

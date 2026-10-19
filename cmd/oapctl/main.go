@@ -49,6 +49,8 @@ const usage = `Usage:
         [--identity FILE]  use a key you already have instead of the password
         [--fingerprint FP] accept the host key without asking, if it matches FP
   %[1]s host check [ADDR]   read-only check of the server [--json]
+  %[1]s host fix [ADDR]     apply the fixes the check proposes, each approved by you [--json: show them]
+  %[1]s host undo FIX [ADDR] undo a fix OAP applied
 `
 
 func (a *app) run(ctx context.Context, args []string) int {
@@ -63,6 +65,10 @@ func (a *app) run(ctx context.Context, args []string) int {
 		return a.hostConnect(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "host" && args[1] == "check":
 		return a.hostCheck(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "host" && args[1] == "fix":
+		return a.hostFix(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "host" && args[1] == "undo":
+		return a.hostUndo(ctx, args[2:])
 	}
 	fmt.Fprintf(a.errOut, "%s: unknown command %q\n\n"+usage, a.cli, strings.Join(args, " "), a.cli)
 	return 2
@@ -106,6 +112,10 @@ func (a *app) frontDoor(ctx context.Context, asJSON bool) int {
 		return a.check(ctx, s.Address, false)
 	case host.StageConnected:
 		return a.check(ctx, s.Address, false)
+	case host.StageChecked:
+		if blocked, stopped := host.Blocking(s.Findings); blocked && !stopped {
+			return a.fix(ctx, s, false)
+		}
 	}
 	st := host.Plan(s, a.cli)
 	renderStatus(a.out, st, a.cli)

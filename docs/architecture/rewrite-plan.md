@@ -205,7 +205,10 @@ adapter is not carried over; other operators can return later as extensions.
 
 Decided for [onboarding](onboarding.md) (owner, 2026-10-19), needed before
 R3.11–R3.13: supported systems are Ubuntu 22.04, 24.04 and 26.04 and Debian 12 and 13 (26.04 and Debian 13 added the same day, after the first real run stopped on 26.04); OAP
-installs Docker itself, as a sensitive fix the owner approves; the automatic
+installs Docker itself, as a sensitive fix the owner approves, upgrades a
+packaged Docker only through its own package with the restarting containers
+listed, works with an unmanaged Docker 24 or later with a warning, and stops on
+snap, Podman, rootless or unreachable Docker ([onboarding](onboarding.md#docker-on-servers-that-already-have-it)); the automatic
 hostname is sslip.io unless the owner gives a domain.
 
 Decided (owner, 2026-10-19): R3.0, R3.10 and R3.11 run ahead of R3.1, because

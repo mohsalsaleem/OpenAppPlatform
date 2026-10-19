@@ -113,9 +113,10 @@ func Plan(s *Server, cli string) Status {
 			st.Exit = ExitStopped
 		case blocked:
 			st.Next = Next{Step: "fix", By: ByOwner,
-				Why:  "Fixes change the server, so the owner approves each one.",
-				Task: "R3.12", Then: then}
-			st.Exit = ExitNotBuiltYet
+				Why:      "Fixes change the server, so the owner approves each one.",
+				AskOwner: fmt.Sprintf("Please run `%s host fix` in a terminal on this machine and approve the fixes it shows. Tell me when it's done.", cli),
+				Command:  fmt.Sprintf("%s host fix %s --json", cli, s.Address), Then: then}
+			st.Exit = ExitOwner
 		default:
 			st.State = StageReady
 			st.Next = Next{Step: "install", By: ByAgent, Why: "The server meets every requirement.", Task: "R3.13", Then: then}

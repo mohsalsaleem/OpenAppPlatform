@@ -1,0 +1,14 @@
+{
+  "summary": "Ubuntu 24.04.3 LTS, x86_64, 2 CPUs, 3931 MiB memory, 38.1 GiB disk free",
+  "blocked": true,
+  "stopped": true,
+  "findings": [
+    {
+      "why": "host.docker.podman",
+      "severity": "stop",
+      "observed": "the docker command is Podman (/usr/bin/podman)",
+      "required": "Docker Engine 24 or later",
+      "remedy": "Remove podman-docker and install Docker Engine. Podman's Docker compatibility differs in volumes, health checks and events, which OAP relies on."
+    }
+  ]
+}

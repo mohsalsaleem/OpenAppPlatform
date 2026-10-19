@@ -16,9 +16,8 @@ Server root@203.0.113.5: Ubuntu 18.04.2 LTS, x86_64, 1 CPU, 985 MiB memory, 12.1
 ! 985 MiB memory, no swap: needs swap on servers under 2 GB.
   Add a 1 GiB swap file so a memory spike slows the server instead of stopping apps.
   Fix (routine): Create /swapfile (1 GiB), enable it and add it to /etc/fstab.
-! Docker runs from /opt/docker-27.5.1/docker/dockerd, which no package manages; systemd drop-ins: oap-test-engine.conf: needs Docker Engine installed from a package, so it gets security updates.
-  Replace it with Docker Engine from Docker's official package repository. Its containers restart.
-  Fix (sensitive): Install Docker Engine from Docker's apt repository in place of the unmanaged one; running containers restart.
+~ Docker 27.5.1 runs from /opt/docker-27.5.1/docker/dockerd, which no package manages; systemd drop-ins: oap-test-engine.conf.
+  OAP works with it, but it gets no security updates. Consider Docker Engine from Docker's package repository.
 · Container tura (exited); mysqld on 127.0.0.1:3306.
   Nothing to do. OAP leaves software it didn't install alone.
 ~ SSH accepts passwords, including for root.
