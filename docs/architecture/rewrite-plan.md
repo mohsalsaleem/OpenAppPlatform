@@ -211,7 +211,9 @@ adapter is not carried over; other operators can return later as extensions.
 | R0.3 | done | `5faf302` | 8 unit tests pass; a trial edit to `internal/controller` failed the check (not committed) |
 | R0.4 | in progress | | `make rewrite-check` passes. The CI workflow awaits owner approval |
 | R0.5 | done | | `CLAUDE.md` points to this plan and names `make rewrite-check` |
-| R1.1–R1.7 | not started | | |
+| R1.1 | done | `00e35fe` | `buf lint` clean; `make gen` reproducible (checked by `make rewrite-check`); `internal/surface/wire` golden tests pin field names, enum strings, presence, unknown-field errors and the 7 documented 64-bit revision fields |
+| R1.2 | blocked (owner approval) | `5eaefb0` | Round-trip property test over 3,000 seeded random trees passes; 27 strict-subset rejections with why codes and line numbers; 26 schema and semantic rejection cases. 14 of 17 example specs convert and validate (goldens in `internal/adapters/desiredyaml/testdata/examples`). The other 3 adopt existing resources, which only the Coolify operator supported, and fail with `convert.unsupported`. Proposed acceptance wording: "every example spec converts and validates, except those that depend on Coolify-only resource adoption, which fail with `convert.unsupported`" |
+| R1.3–R1.7 | not started | | |
 | R2.1–R2.11 | not started | | |
 | R3.1–R3.9 | not started | | |
 | R4.1–R4.5 | not started | | |
