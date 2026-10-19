@@ -28,8 +28,9 @@ echo ok
 step "go test -race (new tree, architecture rules)"
 go test -race -count=1 "${NEW_TREE[@]}"
 
-step "queue randomized test, full count without the race detector"
+step "queue randomized test, full counts without the race detector"
 go test -count=1 -run '^TestQueueRandomized$' ./internal/adapters/sqlite
+go test -count=1 -run '^TestObserver' ./internal/engine
 
 step "frozen paths"
 python3 -m unittest discover -s scripts -p 'test_rewrite_*.py' 2>&1 | tail -1

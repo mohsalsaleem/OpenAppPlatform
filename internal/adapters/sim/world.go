@@ -34,6 +34,8 @@ type Faults struct {
 	// LostResponse is the chance that a mutating call takes effect but
 	// returns ErrLostResponse.
 	LostResponse float64
+	// MissedEvents is the chance that a runtime event is never delivered.
+	MissedEvents float64
 }
 
 // ErrLostResponse is returned when a call's effect happened but its response
@@ -79,6 +81,8 @@ type World struct {
 	gens      map[uint64]generation
 	effective uint64 // generation currently routing traffic
 	readyAt   map[ops.InstanceRef]time.Time
+	announced map[ops.InstanceRef]bool // health event sent
+	listeners []chan ops.RuntimeEvent
 
 	traffic   []Traffic
 	nextSend  []time.Time
@@ -96,7 +100,8 @@ func NewWorld(seed uint64, start time.Time, faults Faults) *World {
 	clock := NewClock(start)
 	w := &World{clock: clock, rng: rand.New(rand.NewPCG(seed, 0x0a9)), faults: faults,
 		runtime: NewRuntime(clock, model.HostObservation{Name: "sim", MemoryTotalMiB: 985, CPUMillisTotal: 1000}),
-		edge:    NewEdge(), gens: map[uint64]generation{0: {}}, readyAt: map[ops.InstanceRef]time.Time{}, rr: map[string]int{}}
+		edge:    NewEdge(), gens: map[uint64]generation{0: {}}, readyAt: map[ops.InstanceRef]time.Time{},
+		announced: map[ops.InstanceRef]bool{}, rr: map[string]int{}}
 	return w
 }
 
@@ -155,6 +160,14 @@ func refName(r ops.InstanceRef) string {
 func (w *World) step() {
 	w.clock.Advance(Tick)
 	now := w.clock.Now()
+	for _, ref := range w.sortedReady() {
+		if !now.Before(w.readyAt[ref]) && !w.announced[ref] {
+			w.announced[ref] = true
+			if in, ok := w.runtime.instances[ref]; ok && in.health == model.HealthHealthy {
+				w.emit(ops.RuntimeEvent{Instance: ref, ID: in.id, Kind: ops.EventHealth, Health: model.HealthHealthy})
+			}
+		}
+	}
 	for g := w.effective + 1; ; g++ {
 		gen, ok := w.gens[g]
 		if !ok || now.Before(gen.effective) {
@@ -232,6 +245,32 @@ func (w *World) dropRequests(ref ops.InstanceRef, reason string) {
 	w.inFlight = kept
 }
 
+// emit delivers a runtime event to every listener, unless the MissedEvents
+// fault drops it.
+func (w *World) emit(e ops.RuntimeEvent) {
+	e.At = w.clock.Now()
+	if w.faults.MissedEvents > 0 && w.rng.Float64() < w.faults.MissedEvents {
+		w.log("event %d for %s missed", e.Kind, refName(e.Instance))
+		return
+	}
+	for _, l := range w.listeners {
+		select {
+		case l <- e:
+		default:
+			w.log("event %d for %s dropped: listener full", e.Kind, refName(e.Instance))
+		}
+	}
+}
+
+func (w *World) sortedReady() []ops.InstanceRef {
+	refs := make([]ops.InstanceRef, 0, len(w.readyAt))
+	for r := range w.readyAt {
+		refs = append(refs, r)
+	}
+	sort.Slice(refs, func(i, j int) bool { return refName(refs[i]) < refName(refs[j]) })
+	return refs
+}
+
 func (w *World) lostResponse(call string) error {
 	if w.faults.LostResponse > 0 && w.rng.Float64() < w.faults.LostResponse {
 		w.log("%s: response lost", call)
@@ -267,16 +306,19 @@ func (r worldRuntime) Start(ctx context.Context, s ops.InstanceSpec) (string, er
 			delay = time.Duration(w.rng.Int64N(int64(w.faults.SlowReadiness)))
 		}
 		w.readyAt[s.Ref] = w.clock.Now().Add(delay)
+		delete(w.announced, s.Ref)
 		w.log("started %s (ready in %s)", refName(s.Ref), delay)
+		w.emit(ops.RuntimeEvent{Instance: s.Ref, ID: id, Kind: ops.EventStarted, Health: model.HealthStarting})
 	}
 	return id, w.lostResponse("start " + refName(s.Ref))
 }
 
 func (r worldRuntime) Stop(ctx context.Context, ref ops.InstanceRef) error {
 	w := r.w
-	if _, running := w.runtime.instances[ref]; running {
+	if in, running := w.runtime.instances[ref]; running {
 		w.dropRequests(ref, "connection reset: instance stopped")
 		w.log("stopped %s", refName(ref))
+		w.emit(ops.RuntimeEvent{Instance: ref, ID: in.id, Kind: ops.EventStopped})
 	}
 	if err := w.runtime.Stop(ctx, ref); err != nil {
 		return err
@@ -289,6 +331,7 @@ func (r worldRuntime) RunJob(ctx context.Context, s ops.JobSpec) error {
 		return err
 	}
 	r.w.log("job %s ran", refName(s.Ref))
+	r.w.emit(ops.RuntimeEvent{Instance: s.Ref, Kind: ops.EventJobFinished})
 	return r.w.lostResponse("run job " + refName(s.Ref))
 }
 
@@ -303,8 +346,12 @@ func (r worldRuntime) Observe(ctx context.Context) (model.Observation, error) {
 	return obs, err
 }
 
+// Events returns a buffered channel that receives events while the world
+// runs. The world is single-threaded, so readers drain it between steps.
 func (r worldRuntime) Events(ctx context.Context) (<-chan ops.RuntimeEvent, error) {
-	return r.w.runtime.Events(ctx)
+	ch := make(chan ops.RuntimeEvent, 1024)
+	r.w.listeners = append(r.w.listeners, ch)
+	return ch, nil
 }
 
 func (r worldRuntime) SnapshotVolume(ctx context.Context, key, app, component, volume string) (string, error) {
@@ -371,6 +418,7 @@ func (e worldEdge) InFlight(ctx context.Context, ref ops.InstanceRef) (int, erro
 	if n > 0 && w.faults.ExitDuringDrain > 0 && w.rng.Float64() < w.faults.ExitDuringDrain {
 		w.log("%s exited while draining", refName(ref))
 		w.dropRequests(ref, "connection reset: instance exited during drain")
+		w.emit(ops.RuntimeEvent{Instance: ref, ID: w.runtime.instances[ref].id, Kind: ops.EventStopped})
 		delete(w.runtime.instances, ref)
 		return 0, nil
 	}
