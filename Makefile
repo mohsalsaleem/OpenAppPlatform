@@ -29,3 +29,7 @@ generate:
 	python3 scripts/generate.py
 check-generated:
 	python3 scripts/generate.py --check
+
+.PHONY: rewrite-check
+rewrite-check:
+	scripts/rewrite-check.sh
