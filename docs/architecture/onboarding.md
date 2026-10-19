@@ -193,7 +193,7 @@ errors.
 | Disk | 5 GB free or more | `host.disk.low` |
 | Docker Engine | Installed through a supported package source, version ≥ the minimum, daemon running, cgroup v2 preferred | `host.docker.missing`, `host.docker.unmanaged` |
 | Ports | 80 and 443 free, or held by OAP's own Caddy | `host.port.busy` (names the process) |
-| Firewall | 22, 80 and 443 reachable; reported, not changed by default | `host.firewall.blocks` |
+| Firewall | 22, 80 and 443 reachable. ufw blocking 80 or 443 (Vultr's Ubuntu image allows only SSH) gets a sensitive, undoable fix, `open-web-ports` | `host.firewall.blocks` |
 | Time | Clock synchronized (TLS and token expiry depend on it) | `host.time.unsynced` |
 | Existing OAP | A previous install, by labels and manifest | `host.oap.present` |
 | Other workloads | Containers and services OAP didn't create, listed | `host.foreign.present` (information only) |
