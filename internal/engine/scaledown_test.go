@@ -135,3 +135,24 @@ func TestScaleDownNaiveOrderLosesRequests(t *testing.T) {
 			lost, seeds, refused, reset)
 	}
 }
+
+// TestScaleDownPlannerOrderLosesNothing is the fix for VPS-H-001: with the
+// planner's traffic-safety rule (route-remove → edge-reload-confirmed →
+// drain → stop), the same scale-down loses no request on any seed.
+func TestScaleDownPlannerOrderLosesNothing(t *testing.T) {
+	sc := scaleThreeToOne(t)
+	seeds := uint64(1000)
+	if raceBuild {
+		seeds = 50
+	}
+	requests := 0
+	for seed := uint64(1); seed <= seeds; seed++ {
+		w := scaleDown(t, sc, seed, sc.op.Steps)
+		requests += w.Requests
+		if len(w.Failures) > 0 {
+			t.Fatalf("seed %d (reload lag %s, a request every %s): %d of %d requests failed: %v\n%s", seed,
+				scaleDownFaults(seed).ReloadLag, scaleDownEvery(seed), len(w.Failures), w.Requests, w.FailureReasons(), w.Trace())
+		}
+	}
+	t.Logf("planner order: 0 of %d requests failed over %d seeds", requests, seeds)
+}
