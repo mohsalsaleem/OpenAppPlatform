@@ -224,8 +224,11 @@ func OpStore(t *testing.T, newStore func(t *testing.T) ports.OpStore) {
 func Desired(t *testing.T, newRepo func(t *testing.T) ports.DesiredRepo, app func(image string) any) {
 	t.Run("commit, get and look up earlier versions", func(t *testing.T) {
 		d := newRepo(t)
-		if _, _, err := d.Get(ctx, "contract"); err == nil {
-			t.Fatal("a missing application must be an error")
+		if _, _, err := d.Get(ctx, "contract"); !errors.Is(err, ops.ErrNoApplication) {
+			t.Fatalf("a missing application must be ops.ErrNoApplication, got %v", err)
+		}
+		if apps, err := d.Applications(ctx); err != nil || len(apps) != 0 {
+			t.Fatalf("applications before any commit: %v %v", apps, err)
 		}
 		v1, v2 := app("contract/web:1"), app("contract/web:2")
 		h1, err := d.Commit(ctx, "contract", v1, "owner", "first")
@@ -236,6 +239,9 @@ func Desired(t *testing.T, newRepo func(t *testing.T) ports.DesiredRepo, app fun
 			t.Fatal("committing the same tree must keep its hash")
 		}
 		h2, _ := d.Commit(ctx, "contract", v2, "agent:x", "second")
+		if apps, err := d.Applications(ctx); err != nil || len(apps) != 1 || apps[0] != "contract" {
+			t.Fatalf("applications: %v %v", apps, err)
+		}
 		_, cur, err := d.Get(ctx, "contract")
 		if err != nil || cur != h2 || h1 == h2 {
 			t.Fatalf("get: %s, want %s", cur, h2)

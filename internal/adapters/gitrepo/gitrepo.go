@@ -20,11 +20,12 @@ import (
 	"time"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/desiredyaml"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/ops"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/spec"
 )
 
 // ErrNotFound is returned for an application with no desired state.
-var ErrNotFound = errors.New("gitrepo: no such application")
+var ErrNotFound = ops.ErrNoApplication
 
 // DefaultEnvelope is the envelope of a fresh install, until the owner
 // commits one: the owner may do anything, no agent may do anything yet,

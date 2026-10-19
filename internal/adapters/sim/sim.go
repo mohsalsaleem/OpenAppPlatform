@@ -295,7 +295,7 @@ func (d *Desired) Get(ctx context.Context, app string) (any, string, error) {
 	defer d.mu.Unlock()
 	t, ok := d.current[app]
 	if !ok {
-		return nil, "", fmt.Errorf("sim: no application %q", app)
+		return nil, "", fmt.Errorf("sim: %w: %q", ops.ErrNoApplication, app)
 	}
 	h, err := spec.Hash(t)
 	return spec.Clone(t), h, err
@@ -329,6 +329,17 @@ func (d *Desired) Envelope(ctx context.Context) (any, string, error) {
 	defer d.mu.Unlock()
 	h, err := spec.Hash(d.envelope)
 	return d.envelope, h, err
+}
+
+func (d *Desired) Applications(ctx context.Context) ([]string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	out := make([]string, 0, len(d.current))
+	for a := range d.current {
+		out = append(out, a)
+	}
+	sort.Strings(out)
+	return out, nil
 }
 
 // SetEnvelope stores the envelope tree.

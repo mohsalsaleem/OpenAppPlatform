@@ -58,6 +58,8 @@ type DesiredRepo interface {
 	ByHash(ctx context.Context, hash string) (tree any, ok bool, err error)
 	Commit(ctx context.Context, application string, tree any, author, message string) (commit string, err error)
 	Envelope(ctx context.Context) (tree any, version string, err error)
+	// Applications lists the applications that have desired state.
+	Applications(ctx context.Context) ([]string, error)
 }
 
 // OpStore is the operational journal: append-only entries with monotonic

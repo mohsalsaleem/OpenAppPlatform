@@ -4,10 +4,15 @@
 package ops
 
 import (
+	"errors"
 	"time"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/model"
 )
+
+// ErrNoApplication is what a DesiredRepo returns for an application with
+// no desired state.
+var ErrNoApplication = errors.New("no such application")
 
 // InstanceRef identifies an instance by the labels OAP puts on it. Two
 // instances with the same ref are the same instance.

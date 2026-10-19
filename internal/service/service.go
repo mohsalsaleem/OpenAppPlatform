@@ -1,0 +1,626 @@
+// Package service implements the agent primitives (docs/architecture/
+// agent-native-rewrite.md, section 5) over the core and the engine:
+// observe, propose, apply, await and explain. Ask and login need identity
+// and notifications (R3.6, R3.7) and report that they aren't available yet.
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	oapv1 "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/intent"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/model"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/ops"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/policy"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/proposal"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/spec"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/engine"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/ports"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
+)
+
+// Journal entry kinds the service writes, besides the executor's "step".
+const (
+	KindProposal = "proposal"
+	KindApply    = "apply"
+	KindOutcome  = "outcome"
+)
+
+// Code classifies an error for the surface.
+type Code int
+
+const (
+	InvalidArgument Code = iota + 1
+	NotFound
+	FailedPrecondition
+	PermissionDenied
+	Unimplemented
+	Internal
+)
+
+// Error is a service error with a typed detail: a why code and a remedy.
+type Error struct {
+	Code   Code
+	Detail *oapv1.ErrorDetail
+}
+
+func (e *Error) Error() string { return e.Detail.GetWhy() + ": " + e.Detail.GetMessage() }
+
+func fail(code Code, why, format string, args ...any) *Error {
+	return &Error{Code: code, Detail: &oapv1.ErrorDetail{Why: why, Message: fmt.Sprintf(format, args...)}}
+}
+
+var refresh = &oapv1.Remedy{Action: &oapv1.Remedy_Refresh{Refresh: true}}
+
+// Why codes the service adds to the core's.
+const (
+	WhyStaleRevision   = "service.stale_revision"
+	WhyStaleBase       = "service.stale_base"
+	WhyUnknownProposal = "service.unknown_proposal"
+	WhyUnknownApp      = "service.unknown_application"
+	WhyNotAllowed      = "service.not_allowed"
+	WhyNotAvailable    = "service.not_available"
+	WhyUnknownOp       = "service.unknown_operation"
+)
+
+// Caller is who is asking. Before identity (R3.6) exists, only the owner
+// reaches the service, through the server's local socket over SSH.
+type Caller struct {
+	Owner bool
+	Agent string // the name policy judges; "owner" for the owner
+}
+
+// Owner is the caller on the local socket.
+var Owner = Caller{Owner: true, Agent: "owner"}
+
+// Service runs the primitives.
+type Service struct {
+	Desired  ports.DesiredRepo
+	Journal  ports.OpStore
+	Clock    ports.Clock
+	Observer *engine.Observer
+	Executor *engine.Executor
+	// MaxAge is how old an observation may be before it is stale.
+	MaxAge time.Duration
+
+	serializer *engine.Serializer
+	runCtx     context.Context
+	mu         sync.Mutex // orders appends that read the journal first
+}
+
+// Start begins accepting applies, running operations under ctx, and
+// resumes operations a crash interrupted: applied with no outcome.
+func (s *Service) Start(ctx context.Context) error {
+	if s.MaxAge == 0 {
+		s.MaxAge = 2 * time.Minute
+	}
+	s.runCtx = ctx
+	s.serializer = engine.NewSerializer(s.Executor.Run)
+	entries, err := s.entries(ctx, 0)
+	if err != nil {
+		return err
+	}
+	done := map[string]bool{}
+	for _, e := range entries {
+		if e.Kind == KindOutcome {
+			done[e.Operation] = true
+		}
+	}
+	for _, e := range entries {
+		if e.Kind != KindApply || done[e.Operation] {
+			continue
+		}
+		je, err := decode(e.Data)
+		if err != nil {
+			return err
+		}
+		p, err := s.proposal(ctx, je.GetParentId())
+		if err != nil {
+			return err
+		}
+		op, err := s.operation(ctx, e.Operation, p, false)
+		if err != nil {
+			s.outcome(op.ID, err)
+			continue
+		}
+		s.submit(op)
+	}
+	return nil
+}
+
+func (s *Service) entries(ctx context.Context, after uint64) ([]ops.Entry, error) {
+	var out []ops.Entry
+	for {
+		page, err := s.Journal.Since(ctx, after, 500)
+		if err != nil {
+			return nil, err
+		}
+		if len(page) == 0 {
+			return out, nil
+		}
+		out = append(out, page...)
+		after = page[len(page)-1].Revision
+	}
+}
+
+var marshal = protojson.MarshalOptions{UseProtoNames: true}
+
+func decode(b []byte) (*oapv1.JournalEntry, error) {
+	var je oapv1.JournalEntry
+	if err := protojson.Unmarshal(b, &je); err != nil {
+		return nil, fmt.Errorf("service: damaged journal entry: %w", err)
+	}
+	return &je, nil
+}
+
+func actor(c Caller) *oapv1.Actor {
+	if c.Owner {
+		return &oapv1.Actor{Who: &oapv1.Actor_Owner{Owner: "owner"}}
+	}
+	return &oapv1.Actor{Who: &oapv1.Actor_Agent{Agent: c.Agent}}
+}
+
+func (s *Service) append(ctx context.Context, kind, operation string, je *oapv1.JournalEntry) (uint64, error) {
+	data, err := marshal.Marshal(je)
+	if err != nil {
+		return 0, err
+	}
+	return s.Journal.Append(ctx, ops.Entry{At: s.Clock.Now(), Kind: kind, Operation: operation, Data: data})
+}
+
+// Observe returns the world model at the journal's head revision.
+func (s *Service) Observe(ctx context.Context, c Caller, req *oapv1.ObserveRequest) (*oapv1.ObserveResponse, error) {
+	w, err := s.world(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if app := req.GetApplication(); app != "" {
+		var keep []*oapv1.Application
+		for _, a := range w.Applications {
+			if a.Name == app {
+				keep = append(keep, a)
+			}
+		}
+		if len(keep) == 0 {
+			return nil, fail(NotFound, WhyUnknownApp, "no application %q", app)
+		}
+		w.Applications = keep
+	}
+	if !req.GetDetail() {
+		for _, a := range w.Applications {
+			for _, comp := range a.Components {
+				comp.Instances = nil
+			}
+		}
+	}
+	if env, err := s.envelope(ctx); err == nil {
+		policy.Affordances(env, c.Agent, w)
+	}
+	return &oapv1.ObserveResponse{World: w}, nil
+}
+
+func (s *Service) world(ctx context.Context) (*oapv1.World, error) {
+	head, err := s.Journal.Head(ctx)
+	if err != nil {
+		return nil, err
+	}
+	names, err := s.Desired.Applications(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var desired []model.Desired
+	for _, n := range names {
+		tree, hash, err := s.Desired.Get(ctx, n)
+		if err != nil {
+			return nil, err
+		}
+		app, probs := spec.ParseApplication(tree)
+		if len(probs) > 0 {
+			return nil, fail(Internal, probs[0].Why, "stored desired state of %s is invalid: %s", n, probs[0].Message)
+		}
+		desired = append(desired, model.Desired{App: app, Hash: hash})
+	}
+	var obs *model.Observation
+	if s.Observer != nil {
+		snap := s.Observer.Snapshot()
+		if !snap.At.IsZero() {
+			obs = &snap
+		}
+	}
+	if obs != nil && s.Executor != nil && s.Executor.Edge != nil {
+		// The runtime doesn't know routes; the edge does.
+		cfg, _, err := s.Executor.Edge.Config(ctx)
+		if err != nil {
+			return nil, err
+		}
+		insts := make([]model.ObservedInstance, len(obs.Instances))
+		copy(insts, obs.Instances)
+		for i, in := range insts {
+			insts[i].Routed = ops.HasInstance(cfg, ops.InstanceRef{Application: in.Application, Component: in.Component, Ordinal: int(in.Ordinal), Release: in.Release})
+		}
+		o := *obs
+		o.Instances = insts
+		obs = &o
+	}
+	return model.Build(head, desired, obs, model.Options{Now: s.Clock.Now(), MaxAge: s.MaxAge}), nil
+}
+
+func (s *Service) envelope(ctx context.Context) (*oapv1.Envelope, error) {
+	tree, version, err := s.Desired.Envelope(ctx)
+	if err != nil {
+		return nil, err
+	}
+	env, probs := policy.ParseEnvelope(tree)
+	if len(probs) > 0 {
+		return nil, fail(Internal, probs[0].Why, "the envelope is invalid: %s", probs[0].Message)
+	}
+	env.Version = version
+	return env, nil
+}
+
+// newBase is the desired state an application starts from before its
+// first change: nothing but its name. Creating an application is a
+// spec_patch from it.
+func newBase(app string) map[string]any {
+	return map[string]any{"api_version": "oap.dev/v1", "kind": "Application", "name": app,
+		"environment": "production", "components": map[string]any{}}
+}
+
+// current returns an application's desired state, or the base of a new
+// application when the intent may create it.
+func (s *Service) current(ctx context.Context, app string, creating bool) (any, error) {
+	tree, _, err := s.Desired.Get(ctx, app)
+	switch {
+	case err == nil:
+		return tree, nil
+	case errors.Is(err, ops.ErrNoApplication) && creating:
+		return newBase(app), nil
+	case errors.Is(err, ops.ErrNoApplication):
+		e := fail(NotFound, WhyUnknownApp, "no application %q; create it with a spec_patch holding its whole spec", app)
+		return nil, e
+	}
+	return nil, err
+}
+
+func creates(in *oapv1.Intent) bool {
+	_, ok := in.GetChange().(*oapv1.Intent_SpecPatch)
+	return ok
+}
+
+// Propose compiles, plans and judges an intent, records the proposal in
+// the journal and returns it. It changes nothing else.
+func (s *Service) Propose(ctx context.Context, c Caller, req *oapv1.ProposeRequest) (*oapv1.ProposeResponse, error) {
+	in := req.GetIntent()
+	if in.GetApplication() == "" {
+		return nil, fail(InvalidArgument, intent.WhyIncomplete, "the intent names no application")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	head, err := s.Journal.Head(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if exp := req.GetExpectedRevision(); exp != 0 && exp != head {
+		e := fail(FailedPrecondition, WhyStaleRevision, "decided at revision %d, but the world is at %d", exp, head)
+		e.Detail.Remedy = refresh
+		return nil, e
+	}
+	tree, err := s.current(ctx, in.GetApplication(), creates(in))
+	if err != nil {
+		return nil, err
+	}
+	env, err := s.envelope(ctx)
+	if err != nil {
+		return nil, err
+	}
+	p, ierr := proposal.Propose(proposal.Inputs{Agent: c.Agent, BaseRevision: head, Tree: tree,
+		History: func(h string) (any, bool) { t, ok, _ := s.Desired.ByHash(ctx, h); return t, ok },
+		Intent:  in, Envelope: env})
+	if ierr != nil {
+		return nil, &Error{Code: InvalidArgument, Detail: ierr.Detail()}
+	}
+	if _, err := s.append(ctx, KindProposal, "", &oapv1.JournalEntry{Id: p.Id, Kind: oapv1.EntryKind_ENTRY_KIND_PROPOSAL,
+		Actor: actor(c), BaseRevision: head, Summary: summary(in), Detail: &oapv1.JournalEntry_Proposal{Proposal: p}}); err != nil {
+		return nil, err
+	}
+	return &oapv1.ProposeResponse{Proposal: p}, nil
+}
+
+func summary(in *oapv1.Intent) string {
+	if b := strings.TrimSpace(in.GetBecause()); b != "" {
+		return b
+	}
+	return fmt.Sprintf("%s %s", intent.KindOf(in), in.GetApplication())
+}
+
+func (s *Service) proposal(ctx context.Context, id string) (*oapv1.Proposal, error) {
+	entries, err := s.entries(ctx, 0)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range entries {
+		if e.Kind != KindProposal {
+			continue
+		}
+		je, err := decode(e.Data)
+		if err != nil {
+			return nil, err
+		}
+		if je.GetId() == id {
+			return je.GetProposal(), nil
+		}
+	}
+	return nil, fail(NotFound, WhyUnknownProposal, "no proposal %q; propose again", id)
+}
+
+// operation rebuilds the operation a proposal applies. The application's
+// desired state must still be the proposal's base unless the operation
+// already wrote it (resume after a crash).
+func (s *Service) operation(ctx context.Context, id string, p *oapv1.Proposal, fresh bool) (engine.Operation, error) {
+	in := p.GetIntent()
+	app := in.GetApplication()
+	op := engine.Operation{ID: id, Application: app, Steps: p.GetSteps(), Author: p.GetAgent(), Message: summary(in)}
+	base, err := s.current(ctx, app, creates(in))
+	if err != nil {
+		return op, err
+	}
+	if h, _ := spec.Hash(base); h != p.GetBaseSpecHash() {
+		if fresh {
+			e := fail(FailedPrecondition, WhyStaleBase, "%s changed since this proposal was made; propose again", app)
+			e.Detail.Remedy = refresh
+			return op, e
+		}
+		// Resuming: the operation may already have written its new state;
+		// start from the proposal's base instead.
+		t, ok, _ := s.Desired.ByHash(ctx, p.GetBaseSpecHash())
+		if !ok {
+			t = newBase(app)
+		}
+		base = t
+	}
+	res, ierr := intent.Compile(intent.Current{Tree: base, History: func(h string) (any, bool) {
+		t, ok, _ := s.Desired.ByHash(ctx, h)
+		return t, ok
+	}}, in)
+	if ierr != nil {
+		return op, &Error{Code: FailedPrecondition, Detail: ierr.Detail()}
+	}
+	op.Old, _ = spec.ParseApplication(base)
+	op.New, op.NewTree = res.App, res.Tree
+	return op, nil
+}
+
+func opID(proposalID string) string { return "op_" + strings.TrimPrefix(proposalID, "prop_") }
+
+// Apply runs exactly the proposal with this id. A proposal the envelope
+// allows may be applied by its agent; one that needs approval only by the
+// owner; a denied one never. Applying the same proposal again returns the
+// same operation.
+func (s *Service) Apply(ctx context.Context, c Caller, req *oapv1.ApplyRequest) (*oapv1.ApplyResponse, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, err := s.proposal(ctx, req.GetProposalId())
+	if err != nil {
+		return nil, err
+	}
+	id := opID(p.GetId())
+	entries, err := s.entries(ctx, 0)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range entries {
+		if e.Kind == KindApply && e.Operation == id {
+			je, _ := decode(e.Data)
+			return &oapv1.ApplyResponse{OperationId: id, EntryId: je.GetId()}, nil
+		}
+	}
+	switch v := p.GetVerdict(); {
+	case v == oapv1.Verdict_VERDICT_ALLOWED && (c.Owner || c.Agent == p.GetAgent()):
+	case v == oapv1.Verdict_VERDICT_NEEDS_APPROVAL && c.Owner:
+	case v == oapv1.Verdict_VERDICT_NEEDS_APPROVAL:
+		return nil, fail(PermissionDenied, WhyNotAllowed, "this proposal needs the owner's approval")
+	default:
+		return nil, fail(PermissionDenied, WhyNotAllowed, "the envelope denies this proposal: %s", reasons(p))
+	}
+	op, err := s.operation(ctx, id, p, true)
+	if err != nil {
+		return nil, err
+	}
+	entryID := "apply_" + strings.TrimPrefix(id, "op_")
+	head, _ := s.Journal.Head(ctx)
+	if _, err := s.append(ctx, KindApply, id, &oapv1.JournalEntry{Id: entryID, ParentId: p.GetId(), Kind: oapv1.EntryKind_ENTRY_KIND_APPLY,
+		Actor: actor(c), BaseRevision: head, Summary: op.Message, Detail: &oapv1.JournalEntry_OperationId{OperationId: id}}); err != nil {
+		return nil, err
+	}
+	s.submit(op)
+	return &oapv1.ApplyResponse{OperationId: id, EntryId: entryID}, nil
+}
+
+func reasons(p *oapv1.Proposal) string {
+	var out []string
+	for _, r := range p.GetReasons() {
+		out = append(out, r.GetMessage())
+	}
+	return strings.Join(out, "; ")
+}
+
+func (s *Service) submit(op engine.Operation) {
+	done := s.serializer.Submit(s.runCtx, op)
+	go func() { s.outcome(op.ID, <-done) }()
+}
+
+func (s *Service) outcome(id string, runErr error) {
+	o := &oapv1.Outcome{OperationId: id, Status: oapv1.OutcomeStatus_OUTCOME_STATUS_ACHIEVED}
+	var se *engine.StepError
+	switch {
+	case runErr == nil:
+	case errors.As(runErr, &se):
+		o.Status = oapv1.OutcomeStatus_OUTCOME_STATUS_NOT_ACHIEVED
+		o.Reasons = []*oapv1.Reason{{Why: "engine.step_failed", Message: se.Error()}}
+	default:
+		o.Status = oapv1.OutcomeStatus_OUTCOME_STATUS_UNCERTAIN
+		o.Reasons = []*oapv1.Reason{{Why: "engine.interrupted", Message: runErr.Error()}}
+	}
+	ctx := context.WithoutCancel(s.runCtx)
+	s.append(ctx, KindOutcome, id, &oapv1.JournalEntry{Id: "outcome_" + strings.TrimPrefix(id, "op_"), Kind: oapv1.EntryKind_ENTRY_KIND_OUTCOME,
+		Actor: &oapv1.Actor{Who: &oapv1.Actor_System{System: true}}, Summary: o.Status.String(), Detail: &oapv1.JournalEntry_Outcome{Outcome: o}})
+}
+
+// Await sends an operation's progress, step by step, and ends with its
+// outcome; after timeout it ends with an uncertain outcome.
+func (s *Service) Await(ctx context.Context, c Caller, req *oapv1.AwaitRequest, send func(*oapv1.Event) error) error {
+	id := req.GetOperationId()
+	timeout := time.Duration(req.GetTimeoutSeconds()) * time.Second
+	if timeout <= 0 {
+		timeout = 10 * time.Minute
+	}
+	if _, err := s.entriesFor(ctx, id); err != nil {
+		return err
+	}
+	deadline := s.Clock.Now().Add(timeout)
+	var steps []*oapv1.Step
+	var after uint64
+	for {
+		page, err := s.entries(ctx, after)
+		if err != nil {
+			return err
+		}
+		for _, e := range page {
+			after = e.Revision
+			if e.Operation != id {
+				continue
+			}
+			ev := &oapv1.Event{Revision: e.Revision, At: timestamppb.New(e.At)}
+			switch e.Kind {
+			case KindApply:
+				je, err := decode(e.Data)
+				if err != nil {
+					return err
+				}
+				if p, err := s.proposal(ctx, je.GetParentId()); err == nil {
+					steps = p.GetSteps()
+				}
+				continue
+			case engine.KindStep:
+				prog := &oapv1.OperationProgress{OperationId: id, StepIndex: int32(e.Step), State: stepState(e.State)}
+				if e.Step < len(steps) {
+					prog.Step = proto.Clone(steps[e.Step]).(*oapv1.Step)
+				}
+				ev.Kind = &oapv1.Event_OperationProgress{OperationProgress: prog}
+			case KindOutcome:
+				je, err := decode(e.Data)
+				if err != nil {
+					return err
+				}
+				ev.Kind = &oapv1.Event_Outcome{Outcome: je.GetOutcome()}
+				return send(ev)
+			default:
+				continue
+			}
+			if err := send(ev); err != nil {
+				return err
+			}
+		}
+		if !s.Clock.Now().Before(deadline) {
+			return send(&oapv1.Event{Revision: after, At: timestamppb.New(s.Clock.Now()), Kind: &oapv1.Event_Outcome{Outcome: &oapv1.Outcome{
+				OperationId: id, Status: oapv1.OutcomeStatus_OUTCOME_STATUS_UNCERTAIN,
+				Reasons: []*oapv1.Reason{{Why: "service.await_timeout", Message: fmt.Sprintf("no outcome within %s; await again", timeout)}}}}})
+		}
+		if err := s.Clock.Sleep(ctx, 200*time.Millisecond); err != nil {
+			return err
+		}
+	}
+}
+
+// entriesFor fails when no apply entry exists for an operation.
+func (s *Service) entriesFor(ctx context.Context, id string) ([]ops.Entry, error) {
+	entries, err := s.entries(ctx, 0)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range entries {
+		if e.Kind == KindApply && e.Operation == id {
+			return entries, nil
+		}
+	}
+	return nil, fail(NotFound, WhyUnknownOp, "no operation %q", id)
+}
+
+func stepState(s string) oapv1.StepState {
+	switch s {
+	case engine.StateStarted:
+		return oapv1.StepState_STEP_STATE_STARTED
+	case engine.StateSucceeded:
+		return oapv1.StepState_STEP_STATE_SUCCEEDED
+	case engine.StateFailed:
+		return oapv1.StepState_STEP_STATE_FAILED
+	}
+	return oapv1.StepState_STEP_STATE_UNCERTAIN
+}
+
+// Explain answers why an application's actual state isn't its desired
+// state, from the world model.
+func (s *Service) Explain(ctx context.Context, c Caller, req *oapv1.ExplainRequest) (*oapv1.ExplainResponse, error) {
+	w, err := s.world(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := &oapv1.ExplainResponse{Revision: w.GetRevision()}
+	var app *oapv1.Application
+	for _, a := range w.Applications {
+		if a.Name == req.GetApplication() {
+			app = a
+		}
+	}
+	if app == nil {
+		return nil, fail(NotFound, WhyUnknownApp, "no application %q", req.GetApplication())
+	}
+	for _, comp := range app.Components {
+		if req.GetComponent() != "" && comp.Name != req.GetComponent() {
+			continue
+		}
+		path := "applications." + app.Name + ".components." + comp.Name
+		if comp.GetHealth().GetFreshness().GetStale() {
+			out.Causes = append(out.Causes, &oapv1.Cause{Why: "explain.stale", Summary: comp.Name + ": the last observation is too old to judge", Confidence: 60})
+		}
+		if comp.Converged {
+			continue
+		}
+		out.Gaps = append(out.Gaps, path)
+		d, a := comp.GetDesired(), comp.GetActual()
+		switch {
+		case a == nil:
+			out.Causes = append(out.Causes, &oapv1.Cause{Why: "explain.never_observed", Summary: comp.Name + ": never observed running", Confidence: 70,
+				Evidence: comp.GetHealth().GetMissingEvidence()})
+		case a.GetInstances() < d.GetInstances():
+			out.Causes = append(out.Causes, &oapv1.Cause{Why: "explain.missing_instances", Confidence: 90,
+				Summary: fmt.Sprintf("%s: %d of %d instances running", comp.Name, a.GetInstances(), d.GetInstances())})
+		case a.GetRelease() != d.GetRelease():
+			out.Causes = append(out.Causes, &oapv1.Cause{Why: "explain.old_release", Confidence: 90,
+				Summary: fmt.Sprintf("%s: running release %s, desired %s", comp.Name, a.GetRelease(), d.GetRelease())})
+		default:
+			out.Causes = append(out.Causes, &oapv1.Cause{Why: "explain.unhealthy", Confidence: 50,
+				Summary: fmt.Sprintf("%s: %s", comp.Name, strings.TrimPrefix(comp.GetHealth().GetStatus().String(), "HEALTH_STATUS_"))})
+		}
+	}
+	sort.Strings(out.Gaps)
+	return out, nil
+}
+
+// Ask needs notifications (R3.7).
+func (s *Service) Ask(ctx context.Context, c Caller, req *oapv1.AskRequest) (*oapv1.AskResponse, error) {
+	return nil, fail(Unimplemented, WhyNotAvailable, "ask isn't available yet (task R3.7)")
+}
+
+// Login needs identity (R3.6).
+func (s *Service) Login(ctx context.Context, req *oapv1.LoginRequest, send func(*oapv1.LoginResponse) error) error {
+	return fail(Unimplemented, WhyNotAvailable, "device login isn't available yet (task R3.6); the owner reaches OAP over SSH until then")
+}
