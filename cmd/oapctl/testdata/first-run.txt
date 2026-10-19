@@ -1,0 +1,28 @@
+OAP runs your apps on your own server, operated by your AI agent.
+You don't have a server connected yet. Setup takes about 10 minutes and needs:
+the server's IP address, its username and its password.
+
+  → connect   · check   · fix   · install   · owner account   · hand off
+
+Server address: Username [root]: Host key: ED25519 SHA256:testfingerprint
+Does it match your provider's console? [y/N] ssh will ask for the password of root@203.0.113.5. It is used once to install OAP's key and never stored.
+✓ Connected to root@203.0.113.5 with OAP's bootstrap key. The password is no longer needed.
+Checking the server (read-only)…
+Server root@203.0.113.5: Ubuntu 18.04.2 LTS, x86_64, 1 CPU, 985 MiB memory, 12.1 GiB disk free
+  ✓ connect   → check   · fix   · install   · owner account   · hand off
+
+✗ Ubuntu 18.04.2 LTS: needs Ubuntu 22.04 or 24.04, or Debian 12.
+  Reinstall the server with Ubuntu 24.04 from your provider's console, then run oap again. OAP doesn't upgrade an operating system in place.
+! 985 MiB memory, no swap: needs swap on servers under 2 GB.
+  Add a 1 GiB swap file so a memory spike slows the server instead of stopping apps.
+  Fix (routine): Create /swapfile (1 GiB), enable it and add it to /etc/fstab.
+! Docker runs from /opt/docker-27.5.1/docker/dockerd, which no package manages; systemd drop-ins: oap-test-engine.conf: needs Docker Engine installed from a package, so it gets security updates.
+  Replace it with Docker Engine from Docker's official package repository. Its containers restart.
+  Fix (sensitive): Install Docker Engine from Docker's apt repository in place of the unmanaged one; running containers restart.
+· Container tura (exited); mysqld on 127.0.0.1:3306.
+  Nothing to do. OAP leaves software it didn't install alone.
+~ SSH accepts passwords, including for root.
+  At hand-off, OAP offers to turn off password login once your own key works.
+
+Stopped: the server needs a change outside OAP (marked ✗ above).
+Run `oap` again afterwards.

@@ -142,9 +142,14 @@ $ oap --json
 The agent relays `ask_owner` and runs `oap --json` again later. Steps the agent
 may run itself (`check`, `install` once fixes are approved, and starting the
 device login) carry `"by": "agent"` and a `command`. The exit codes are 0
-(done), 3 (waiting for the owner) and 4 (stopped: something outside OAP must
-change first), so an agent can branch without parsing prose. Until R3.12–R3.14 land, a step
-that isn't built yet exits 5 and names the task that delivers it.
+(done, or the next step is the agent's), 3 (waiting for the owner) and 4
+(stopped: something outside OAP must change first), so an agent can branch
+without parsing prose. Until R3.12–R3.14 land, a step that isn't built yet
+exits 5 and names the task that delivers it.
+
+`oapctl` (the CLI's working name) implements this as of R3.0, with
+`host connect` (R3.10) and `host check` (R3.11). The probe is
+`internal/core/host/probe.sh`.
 
 ### 1. Connect
 

@@ -1,0 +1,19 @@
+exit 3
+{
+  "state": "new",
+  "next": {
+    "step": "connect",
+    "by": "owner",
+    "why": "Connecting needs the server password, which agents must not handle.",
+    "ask_owner": "Please run `oap` in a terminal on this machine and follow the steps. Tell me when it says Connected.",
+    "then": "oap --json"
+  },
+  "journey": [
+    "connect",
+    "check",
+    "fix",
+    "install",
+    "owner",
+    "hand-off"
+  ]
+}

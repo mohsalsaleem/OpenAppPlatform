@@ -1,0 +1,18 @@
+exit 0
+{
+  "state": "handed-off",
+  "server": "root@203.0.113.5",
+  "next": {
+    "step": "done",
+    "by": "agent",
+    "why": "Onboarding is complete; the agent works through OAP from here."
+  },
+  "journey": [
+    "connect",
+    "check",
+    "fix",
+    "install",
+    "owner",
+    "hand-off"
+  ]
+}

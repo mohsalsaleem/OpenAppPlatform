@@ -1,0 +1,6 @@
+exit 5
+Server root@203.0.113.5: Debian GNU/Linux 12 (bookworm), aarch64, 2 CPUs, 3931 MiB memory, 28.6 GiB disk free
+  ✓ connect   ✓ check   ✓ fix   → install   · owner account   · hand off
+
+Next: install, by the agent. The server meets every requirement.
+This step isn't built yet (task R3.13).

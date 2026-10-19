@@ -1,0 +1,5 @@
+exit 0
+Server root@203.0.113.5
+  ✓ connect   ✓ check   ✓ fix   ✓ install   ✓ owner account   ✓ hand off
+
+Onboarding is complete.

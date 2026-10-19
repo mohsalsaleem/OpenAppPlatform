@@ -1,0 +1,20 @@
+exit 5
+{
+  "state": "installed",
+  "server": "root@203.0.113.5",
+  "next": {
+    "step": "owner",
+    "by": "owner",
+    "why": "Only the owner creates the owner account.",
+    "task": "R3.6",
+    "then": "oap --json"
+  },
+  "journey": [
+    "connect",
+    "check",
+    "fix",
+    "install",
+    "owner",
+    "hand-off"
+  ]
+}

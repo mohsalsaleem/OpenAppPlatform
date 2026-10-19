@@ -1,0 +1,21 @@
+exit 5
+{
+  "state": "ready",
+  "server": "root@203.0.113.5",
+  "summary": "Debian GNU/Linux 12 (bookworm), aarch64, 2 CPUs, 3931 MiB memory, 28.6 GiB disk free",
+  "next": {
+    "step": "install",
+    "by": "agent",
+    "why": "The server meets every requirement.",
+    "task": "R3.13",
+    "then": "oap --json"
+  },
+  "journey": [
+    "connect",
+    "check",
+    "fix",
+    "install",
+    "owner",
+    "hand-off"
+  ]
+}
