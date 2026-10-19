@@ -226,7 +226,8 @@ adapter is not carried over; other operators can return later as extensions.
 | R2.5 | done | `rewrite-phase-2` | 300 random schedules under `-race`: no overlap, submission order per application; parallel applications proven; a non-serializing version fails |
 | R2.6 | done | `rewrite-phase-2` | Same seed, identical trace (20 seeds); each fault produces its failure; fakes pass the per-port contract suites; SQLite passes the journal suite |
 | R2.7 | done | `80d18c9` | With half of all events dropped, the observer's picture is never wrong for longer than one 5 s interval (20 seeds; 4 under `-race`); without drops it is exact after every poll; freshness on every node |
-| R2.8–R2.11 | not started | | |
+| R2.8 | done | `3396c09`, `8b28c4d` | The real executor scales 3→1 under traffic on two routes; each seed draws a reload lag (0–1 s) and a request rate (one every 20–500 ms). `3396c09`: with the naive order (route-remove then stop), all 1,000 seeds lose requests (11,107 of 109,962: 8,532 refused, 2,575 reset), matching the VPS run's URLError and RemoteDisconnected. `8b28c4d`: with the planner's plan, 0 of 144,683 requests fail over 1,000 seeds (50 under `-race`; `make rewrite-check` runs the full count). No production change was needed: the rule (R1.5) and the executor's confirm and drain (R2.4) already existed. Failing first: the same test run against the naive order fails on seed 1. Each safety step matters (not committed): without the confirmed reload 669 of 1,000 seeds lose requests, without the drain 970. Not covered, because no ordering can prevent them: reloads that reset in-flight connections, instances exiting during drain, and requests longer than the drain timeout. Whether real Caddy resets connections on reload is for R2.9's contract suite |
+| R2.9–R2.11 | not started | | |
 | R3.1–R3.9 | not started | | |
 | R4.1–R4.5 | not started | | |
 | R5.1–R5.5 | not started | | |
