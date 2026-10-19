@@ -22,14 +22,14 @@ var (
 func TestContracts(t *testing.T) {
 	t.Run("runtime", func(t *testing.T) {
 		var clock *Clock
-		contract.Runtime(t, func(t *testing.T) ports.Runtime {
+		contract.Runtime(t, contract.FakeImages, func(t *testing.T) ports.Runtime {
 			clock = NewClock(t0)
 			return NewRuntime(clock, model.HostObservation{})
 		}, func(d time.Duration) { clock.Advance(d) })
 	})
 	t.Run("world runtime with faults off", func(t *testing.T) {
 		var w *World
-		contract.Runtime(t, func(t *testing.T) ports.Runtime { w = NewWorld(1, t0, Faults{}); return w.Runtime() },
+		contract.Runtime(t, contract.FakeImages, func(t *testing.T) ports.Runtime { w = NewWorld(1, t0, Faults{}); return w.Runtime() },
 			func(d time.Duration) { w.Run(d) })
 	})
 	t.Run("edge", func(t *testing.T) {
