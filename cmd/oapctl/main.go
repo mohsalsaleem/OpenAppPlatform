@@ -266,8 +266,16 @@ func (a *app) check(ctx context.Context, addr string, asJSON bool) int {
 		return a.fail(err)
 	}
 	s := host.Server{Address: t.Address(), Stage: host.StageChecked, Summary: host.Summary(facts), Findings: host.Check(facts)}
+	prev, _ := a.server(t.Address())
+	if prev != nil {
+		s.Install = prev.Install
+	}
 	if blocked, _ := host.Blocking(s.Findings); !blocked {
 		s.Stage = host.StageReady
+		// A check never moves a server back past steps it has done.
+		if prev != nil && later(prev.Stage, host.StageReady) {
+			s.Stage = prev.Stage
+		}
 	}
 	if err := a.update(s); err != nil {
 		return a.fail(err)
@@ -279,6 +287,21 @@ func (a *app) check(ctx context.Context, addr string, asJSON bool) int {
 		a.u().Status(st)
 	}
 	return st.Exit
+}
+
+// later reports whether stage a comes after stage b in the journey.
+func later(a, b host.Stage) bool {
+	order := []host.Stage{host.StageNew, host.StageConnected, host.StageChecked, host.StageReady, host.StageInstalled, host.StageOwned, host.StageHandedOff}
+	ia, ib := -1, -1
+	for i, s := range order {
+		if s == a {
+			ia = i
+		}
+		if s == b {
+			ib = i
+		}
+	}
+	return ia > ib
 }
 
 func (a *app) target(addr string) (sshhost.Target, error) {

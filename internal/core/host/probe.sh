@@ -27,6 +27,12 @@ if has timedatectl; then
   kv time.synced "$synced"
 fi
 
+if has ufw; then
+  kv firewall.ufw "$(ufw status 2>/dev/null | awk 'NR == 1 {print $2}')"
+  # "22/tcp  ALLOW  Anywhere"; IPv6 rules repeat with "(v6)" and are skipped.
+  ufw status 2>/dev/null | awk '$2 == "ALLOW" {print "firewall.allow=" $1}'
+fi
+
 if has sshd; then
   sshd -T 2>/dev/null | awk '$1 == "passwordauthentication" || $1 == "permitrootlogin" {print "ssh." $1 "=" $2}'
 fi

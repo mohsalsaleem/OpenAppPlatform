@@ -39,6 +39,16 @@ grep -vxF '` + swapLine + `' /etc/fstab > /etc/fstab.oap-tmp || true
 cat /etc/fstab.oap-tmp > /etc/fstab
 rm -f /etc/fstab.oap-tmp /swapfile`,
 	},
+	"open-web-ports": {
+		Apply: `set -eu
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 443/udp`,
+		Undo: `set -eu
+ufw delete allow 80/tcp
+ufw delete allow 443/tcp
+ufw delete allow 443/udp`,
+	},
 	"time-sync": {
 		Apply: `set -eu
 timedatectl set-ntp true`,

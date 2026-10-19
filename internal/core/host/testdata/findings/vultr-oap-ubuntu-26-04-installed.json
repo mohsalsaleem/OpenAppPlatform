@@ -1,0 +1,32 @@
+{
+  "summary": "Ubuntu 26.04.1 LTS, x86_64, 1 CPU, 950 MiB memory, 15.1 GiB disk free",
+  "blocked": true,
+  "stopped": false,
+  "findings": [
+    {
+      "why": "host.firewall.blocks",
+      "severity": "fix",
+      "observed": "ufw blocks 80/tcp and 443/tcp",
+      "required": "ports 80 and 443 open for web traffic and certificates",
+      "remedy": "Allow ports 80 and 443 in ufw so the web can reach OAP's Caddy.",
+      "fix": {
+        "id": "open-web-ports",
+        "tier": "sensitive",
+        "summary": "Allow 80/tcp, 443/tcp and 443/udp in ufw",
+        "undoable": true
+      }
+    },
+    {
+      "why": "host.oap.present",
+      "severity": "info",
+      "observed": "2 OAP containers from an earlier install: oap-4ofro33n8i-caddy, oap-4ofro33n8i-oapd",
+      "remedy": "Remove the earlier install with oap host uninstall, or keep it running alongside."
+    },
+    {
+      "why": "host.ssh.password_login",
+      "severity": "advice",
+      "observed": "SSH accepts passwords, including for root",
+      "remedy": "At hand-off, OAP offers to turn off password login once your own key works."
+    }
+  ]
+}

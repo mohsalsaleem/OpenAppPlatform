@@ -106,3 +106,22 @@ func TestUndoNeedsManifestAndApproval(t *testing.T) {
 		t.Fatalf("undo didn't run or wasn't recorded\n%s", h.out.String())
 	}
 }
+
+// TestCheckKeepsProgress: checking an installed server again keeps its
+// installation id, and its stage when nothing blocks.
+func TestCheckKeepsProgress(t *testing.T) {
+	h := newHarness(t, false, "", probeFixture+"synthetic-ufw-web-open.txt")
+	h.a.update(host.Server{Address: "root@203.0.113.5", Stage: host.StageInstalled, Install: "abc123def0"})
+	h.run("host", "check")
+	s, _ := h.a.server("root@203.0.113.5")
+	if s.Stage != host.StageInstalled || s.Install != "abc123def0" {
+		t.Fatalf("after check: %+v", s)
+	}
+	h = newHarness(t, false, "", freshUbuntu)
+	h.a.update(host.Server{Address: "root@203.0.113.5", Stage: host.StageInstalled, Install: "abc123def0"})
+	h.run("host", "check")
+	s, _ = h.a.server("root@203.0.113.5")
+	if s.Stage != host.StageChecked || s.Install != "abc123def0" {
+		t.Fatalf("a blocking finding should need fixing again, keeping the id: %+v", s)
+	}
+}

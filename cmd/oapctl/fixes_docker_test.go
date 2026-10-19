@@ -25,8 +25,9 @@ func TestFixApplyThenUndoRestoresHost(t *testing.T) {
 	// time-sync only changes systemd's setting, seen in the stubbed calls.
 	changesFiles := map[string]bool{"swap-file": true}
 	stubs := map[string]string{
-		"swap-file": "swapon /swapfile\nswapoff /swapfile\n",
-		"time-sync": "timedatectl set-ntp true\ntimedatectl set-ntp false\n",
+		"swap-file":      "swapon /swapfile\nswapoff /swapfile\n",
+		"time-sync":      "timedatectl set-ntp true\ntimedatectl set-ntp false\n",
+		"open-web-ports": "ufw allow 80/tcp\nufw allow 443/tcp\nufw allow 443/udp\nufw delete allow 80/tcp\nufw delete allow 443/tcp\nufw delete allow 443/udp\n",
 	}
 	for _, image := range []string{"ubuntu:26.04", "debian:13"} {
 		for id, sc := range host.Scripts {
@@ -36,7 +37,7 @@ func TestFixApplyThenUndoRestoresHost(t *testing.T) {
 			t.Run(image+"/"+id, func(t *testing.T) {
 				driver := fmt.Sprintf(`set -eu
 mkdir -p /tmp/stubs
-for c in swapon swapoff timedatectl; do printf '#!/bin/sh\necho "%%s $*" >> /tmp/calls\n' "$c" > /tmp/stubs/$c; chmod +x /tmp/stubs/$c; done
+for c in swapon swapoff timedatectl ufw; do printf '#!/bin/sh\necho "%%s $*" >> /tmp/calls\n' "$c" > /tmp/stubs/$c; chmod +x /tmp/stubs/$c; done
 : > /tmp/calls
 export PATH=/tmp/stubs:$PATH
 snap() {

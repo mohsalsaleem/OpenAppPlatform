@@ -25,8 +25,10 @@ type Facts struct {
 	CPUs                    int
 	MemoryMiB, SwapMiB      int
 	DiskFreeMiB             int
-	TimeSynced              string // "yes", "no", or "" when unknown
-	SSHPasswordLogin        string // "yes", "no", or ""
+	FirewallUFW             string   // "active", "inactive", or "" without ufw
+	FirewallAllow           []string // ufw rules allowing incoming traffic, for example "80/tcp"
+	TimeSynced              string   // "yes", "no", or "" when unknown
+	SSHPasswordLogin        string   // "yes", "no", or ""
 	SSHRootLogin            string
 	Listeners               []Listener
 	DockerDaemon            string // path of the running dockerd, "" if none
@@ -85,6 +87,10 @@ func ParseProbe(out string) (Facts, error) {
 			f.SwapMiB = atoi(val, 0) / 1024
 		case "disk.free_kib":
 			f.DiskFreeMiB = atoi(val, 0) / 1024
+		case "firewall.ufw":
+			f.FirewallUFW = val
+		case "firewall.allow":
+			f.FirewallAllow = append(f.FirewallAllow, val)
 		case "time.synced":
 			f.TimeSynced = val
 		case "ssh.passwordauthentication":
@@ -248,6 +254,21 @@ func Check(f Facts) []Finding {
 		}
 	}
 
+	if f.FirewallUFW == "active" {
+		var closed []string
+		for _, p := range []string{"80/tcp", "443/tcp"} {
+			if !allows(f.FirewallAllow, p) {
+				closed = append(closed, p)
+			}
+		}
+		if len(closed) > 0 {
+			add(Finding{Why: "host.firewall.blocks", Severity: NeedsFix, Observed: "ufw blocks " + strings.Join(closed, " and "),
+				Required: "ports 80 and 443 open for web traffic and certificates",
+				Remedy:   "Allow ports 80 and 443 in ufw so the web can reach OAP's Caddy.",
+				Fix:      &Fix{ID: "open-web-ports", Tier: Sensitive, Summary: "Allow 80/tcp, 443/tcp and 443/udp in ufw", Undoable: true}})
+		}
+	}
+
 	switch f.TimeSynced {
 	case "no":
 		add(Finding{Why: "host.time.unsynced", Severity: NeedsFix, Observed: "the clock isn't synchronized", Required: "a synchronized clock (certificates and tokens depend on it)",
@@ -322,6 +343,29 @@ func Summary(f Facts) string {
 		cpus = fmt.Sprintf("%d CPUs", f.CPUs)
 	}
 	return fmt.Sprintf("%s, %s, %s, %d MiB memory, %.1f GiB disk free", orUnknown(name), orUnknown(f.Arch), cpus, f.MemoryMiB, float64(f.DiskFreeMiB)/1024)
+}
+
+// allows reports whether ufw rules allow a port, written as "80/tcp".
+func allows(rules []string, port string) bool {
+	num, proto, _ := strings.Cut(port, "/")
+	for _, r := range rules {
+		if r == port || r == num || r == "Anywhere" {
+			return true
+		}
+		// "80,443/tcp" and "WWW Full" style rules
+		if p, rp, ok := strings.Cut(r, "/"); ok && rp == proto {
+			for _, n := range strings.Split(p, ",") {
+				if n == num {
+					return true
+				}
+			}
+		}
+		if r == "WWW Full" || (r == "WWW" && num == "80") || (r == "WWW Secure" && num == "443") ||
+			(r == "Nginx Full" || r == "Apache Full") || (r == "Nginx HTTP" && num == "80") || (r == "Nginx HTTPS" && num == "443") {
+			return true
+		}
+	}
+	return false
 }
 
 func supported(id, version string) bool {

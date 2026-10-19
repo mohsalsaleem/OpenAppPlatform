@@ -32,17 +32,28 @@ func newInstallID() string {
 	return string(b)
 }
 
-// localImage returns a local image's id and architecture.
+// contentFormat identifies an image by its content: its layers' digests
+// and how it starts. Image ids differ between Docker's classic and
+// containerd image stores for the same image; these don't.
+const contentFormat = "{{json .RootFS.Layers}}{{json .Config.Entrypoint}}{{json .Config.Cmd}}"
+
+// localImage returns a local image's content identity and architecture.
 func (a *app) localImage(ctx context.Context, image string) (id, arch string, err error) {
-	out, err := a.dockerCmd(ctx, "image", "inspect", "-f", "{{.Id}} {{.Architecture}}", image).Output()
+	out, err := a.dockerCmd(ctx, "image", "inspect", "-f", contentFormat+" {{.Architecture}}", image).Output()
 	if err != nil {
 		return "", "", fmt.Errorf("image %s isn't on this machine", image)
 	}
-	f := strings.Fields(string(out))
-	if len(f) != 2 {
+	line := strings.TrimSpace(string(out))
+	i := strings.LastIndex(line, " ")
+	if i < 0 {
 		return "", "", fmt.Errorf("unexpected docker output for %s", image)
 	}
-	return f[0], f[1], nil
+	return line[:i], line[i+1:], nil
+}
+
+func (a *app) remoteImage(ctx context.Context, t sshhost.Target, image string) (string, error) {
+	out, err := a.ssh.Run(ctx, t, fmt.Sprintf("docker image inspect -f '%s' '%s' 2>/dev/null || true", contentFormat, image))
+	return strings.TrimSpace(out), err
 }
 
 // shipImage copies a local image to the server unless the server already
@@ -53,15 +64,11 @@ func (a *app) shipImage(ctx context.Context, t sshhost.Target, image string) err
 	if err != nil {
 		return err
 	}
-	remote, err := a.ssh.Run(ctx, t, fmt.Sprintf("docker image inspect -f '{{.Id}}' '%s' 2>/dev/null || true; dpkg --print-architecture 2>/dev/null || uname -m", image))
+	archOut, err := a.ssh.Run(ctx, t, "dpkg --print-architecture 2>/dev/null || uname -m")
 	if err != nil {
 		return err
 	}
-	lines := strings.Fields(remote)
-	serverArch := ""
-	if len(lines) > 0 {
-		serverArch = lines[len(lines)-1]
-	}
+	serverArch := strings.TrimSpace(archOut)
 	if serverArch == "x86_64" {
 		serverArch = "amd64"
 	} else if serverArch == "aarch64" {
@@ -70,7 +77,9 @@ func (a *app) shipImage(ctx context.Context, t sshhost.Target, image string) err
 	if serverArch != "" && serverArch != arch {
 		return fmt.Errorf("image %s is %s but the server is %s; build it for linux/%s", image, arch, serverArch, serverArch)
 	}
-	if len(lines) == 2 && lines[0] == id {
+	if cur, err := a.remoteImage(ctx, t, image); err != nil {
+		return err
+	} else if cur == id {
 		a.u().Note(fmt.Sprintf("Image %s is already on the server.", image))
 		return nil
 	}
@@ -92,9 +101,9 @@ func (a *app) shipImage(ctx context.Context, t sshhost.Target, image string) err
 		if rerr != nil {
 			return rerr
 		}
-		got, err := a.ssh.Run(ctx, t, fmt.Sprintf("docker image inspect -f '{{.Id}}' '%s'", image))
-		if err != nil || strings.TrimSpace(got) != id {
-			return fmt.Errorf("image %s arrived as %q, want %s", image, strings.TrimSpace(got), id)
+		got, err := a.remoteImage(ctx, t, image)
+		if err != nil || got != id {
+			return fmt.Errorf("image %s arrived with different content: %q, want %q", image, got, id)
 		}
 		return nil
 	})
