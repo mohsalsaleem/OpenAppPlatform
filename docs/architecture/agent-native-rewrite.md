@@ -4,6 +4,8 @@ Status: **proposed, for owner review.** This document describes the target
 architecture for rethinking OAP's interface, operating model, guardrails and
 state. It does not change what is built today; the current system is described in
 [system design](system-design.md). v0.1 may be delayed to adopt this direction.
+This is a **full rewrite**: new internals and a new API, carrying over proven
+behavior and tests rather than code structure or wire compatibility.
 
 ![Agent-native OAP target architecture](../images/rewrite-c4.svg)
 
@@ -373,12 +375,17 @@ manages, runs `oap login`, and continues.
 ## 11. Interfaces
 
 - **One semantic API** (the world model and seven primitives), versioned and
-  described by a single schema.
-- **REST** is the reference transport. **MCP** exposes the same primitives as a
-  handful of tools, locally (stdio) and remotely (HTTPS with device login).
-  **The CLI** is a thin client that also owns the agent store and device login.
+  defined once in Protobuf (section 12).
+- **Transport:** a [Connect](https://connectrpc.com/) service. One handler
+  serves gRPC (CLI, extensions), gRPC-Web (a future browser UI) and Connect's
+  JSON-over-HTTP protocol, so any agent or script can call
+  `POST /oap.v1.Agent/Propose` with a JSON body. **MCP** exposes the same
+  primitives as a handful of tools, generated from the protos, locally (stdio) and
+  remotely (HTTPS with device login). **The CLI** is a thin generated client that
+  also owns the agent store and device login.
 - **One event stream.** `watch` and `await` share one versioned event format
-  (JSON lines over HTTP, MCP notifications or CLI output): world-model changes,
+  (a server stream; JSON lines over HTTP, MCP notifications or CLI output):
+  world-model changes,
   journal entries, operation progress and outcomes, and `ask` answers. `await`
   is just `watch` filtered to one operation, ending at its outcome.
 - **CLI modes** follow the same engine: human-readable output by default;
@@ -386,8 +393,8 @@ manages, runs `oap login`, and continues.
   harnesses that drive OAP as a subprocess.
 - **Idempotency** comes from proposal content hashes and operation IDs, not
   client-chosen keys.
-- **Compatibility:** today's API stays available during migration; new features
-  land only on the new surface.
+- **No wire compatibility** with today's REST API. Existing installs move with a
+  one-way migration tool (section 14).
 - **Harness packages:** OAP publishes a small package for popular agent harnesses
   (Claude Code skills, Pi packages, a generic MCP configuration). Each covers
   device login, the primitives, reading the briefing, and the habit of proposing
@@ -407,8 +414,10 @@ The core stays small; optional features are **extensions**:
 
 Unlike Pi's in-process extensions, OAP extensions **cannot weaken guardrails**:
 
-- They run **out of process**, talking to OAP over a versioned JSON protocol, and
+- They run **out of process** as gRPC plugins (the HashiCorp go-plugin model used
+  by Terraform and Vault), with versioned protos per extension point, and
   declare the capabilities they need. The owner grants these when installing.
+  The host enforces timeouts and memory caps sized for a small server.
 - They supply **facts and side effects**: build results, change facts,
   notification delivery, check results. They never return policy verdicts.
   Only the core policy engine decides.
@@ -421,9 +430,120 @@ First-party builders, the GitHub App, notifications and Compose import ship as
 extensions from the start. That keeps the contract real and lets a 1 GB host
 leave out what it doesn't need.
 
-## 12. From today to the rewrite
+## 12. Inside OAP
 
-Much of the machinery exists and is reused:
+Today the controller (27 files, about 6,400 lines) mixes business rules,
+transactions and queueing: it holds the PostgreSQL store and the River client
+directly, and 15 of its files import River or pgx. Rules can't be tested without
+a database, storage can't be swapped, and every new verb adds a handler, a
+controller method and a store method. The rewrite separates **decisions** from
+**effects**.
+
+### Layers
+
+```
+ surface    Connect (gRPC · gRPC-Web · JSON) · MCP · CLI   generated, no logic
+    │
+ service    observe · propose · apply · await · explain · ask · login
+    │
+ core       world model · intent compiler · policy engine · planner · undo
+ (pure)     deterministic: inputs in, plan or verdict out, no I/O
+    │
+ engine     step executor · journal · job queue · per-application serializer
+    │       observer (runtime events + resync) · event log for watch
+    │
+ ports      Runtime · Edge · Builder · DesiredRepo · OpStore · Secrets
+            FactSource · Notifier · Clock
+    │
+ adapters   docker · caddy · git · sqlite · extension host (gRPC plugins)
+```
+
+Dependencies point downward only. The core imports nothing but its own types;
+adapters never import the service or the core's internals.
+
+### The core decides
+
+- The **intent compiler** turns an intent and the world model into a plan.
+- The **policy engine** turns a proposal, its change facts and the envelope into a
+  verdict with reasons.
+- The **planner** turns desired versus actual state into steps, and computes undo.
+
+All three are pure functions. The proposal's content hash covers the base
+revision and a snapshot of the change facts, so any verdict can be replayed exactly
+("why was this allowed?").
+
+### Steps
+
+Every operation compiles to a small, typed step vocabulary: `start-instance`,
+`await-ready`, `route-add`, `route-remove`, `edge-reload-confirmed`, `drain`,
+`stop`, `run-job`, `snapshot-volume`, `swap-release`. The planner enforces
+ordering rules for all operations. In particular, **traffic safety** is one rule
+rather than per-verb code: `route-remove` → confirmed reload → `drain` →
+`stop`. That's where the scale-down request loss (section 15) is fixed, once, for
+every operation that removes an instance.
+
+### The engine acts
+
+- **Intent before effect:** each step is written to the journal before it runs.
+  After a crash, the engine **observes before re-dispatching**, using runtime
+  labels, keeping today's dispatch-once guarantee.
+- **One serializer per application:** operations on one application run in
+  order; different applications run in parallel. This replaces release claims and
+  fits SQLite's single writer.
+- **Job queue:** a SQLite table with leases and attempt counts, drained by one
+  dispatcher. It covers what River provides today.
+- **Observer:** subscribes to runtime events and resyncs periodically, stamping
+  freshness on everything it reports.
+- **Event log:** the journal is the record. The world graph, incident view and
+  digest are projections of the journal plus fresh observation. `watch` reads from
+  a revision (a SQLite sequence); `await` is `watch` filtered to one operation.
+
+### Schema and code layout
+
+Protobuf is the single source of truth for the API, the world model, events,
+the envelope's typed form and the extension contracts. `buf` lints it and
+rejects breaking changes. JSON conventions are fixed up front so agents see clean
+JSON: field names as written, enums as strings, explicit presence for optional
+fields, int64 values only where needed. Errors use gRPC rich error details to
+carry the `why` code and remedy as typed fields.
+
+```
+proto/oap/v1/        agent.proto (primitives), world.proto, journal.proto,
+                     envelope.proto, extension/{builder,facts,notifier}.proto
+gen/                 connect-go server and clients; JSON Schema for MCP tools
+internal/core/       model, intent, policy, plan, undo (pure)
+internal/engine/     executor, journal, queue, serializer, observer
+internal/ports/      interfaces only
+internal/adapters/   docker, caddy, git, sqlite, secrets, exthost
+internal/service/    primitives over core and engine
+internal/surface/    connect, mcp
+cmd/oapd             server: Connect + MCP + extension host, one process
+cmd/oap              CLI: generated client, device login, agent store
+```
+
+### Testing
+
+- **Core:** golden tests for plans, verdicts and undo; property tests for
+  invariants (for example, "no plan stops an instance that is still a route member").
+- **Simulation:** the real core and engine run against fake Runtime and Edge
+  adapters that inject faults: a reload that drops in-flight connections, a
+  container that exits during drain, a crash between two steps. Seeded schedules
+  make failures reproducible in CI, so bugs like the VPS scale-down loss are caught
+  before a VPS run.
+- **Adapters:** contract tests against real Docker and Caddy.
+- **Acceptance:** today's journeys (`tests/env`, the VPS release journey) are
+  ported to the new surface. The rewrite is done when they pass.
+
+### Footprint budget
+
+One process and no database server. Target: OAP and SQLite under 60 MiB resident
+on a 1 GB host (today: OAP 24.8 MiB plus its PostgreSQL 70.7 MiB). Extensions
+are budgeted separately and only run when installed.
+
+## 13. What carries over
+
+The rewrite keeps proven behavior and tests, not code structure. These concepts
+carry over:
 
 | Today | Becomes |
 |---|---|
@@ -439,27 +559,34 @@ New: the world graph and `watch`, one intent compiler, the policy engine and
 envelope, outcome-based `await`, `ask`, `login`, computed undo, GitHub change
 facts, the YAML desired-state repo, the operation journal, the shared event
 format, the agent briefing, the extension protocol, SQLite operational state, the
-agent store and harness packages.
+agent store and harness packages, all inside the layered design of section 12.
 
-## 13. Migration plan
+## 14. Migration plan
 
-Each phase ships usable value and keeps existing installs working:
+A full rewrite, built in phases that each end with something testable:
 
-1. **Model and storage foundation:** world graph read model and `observe`/`watch`
-   on the shared event format; desired-state Git repo with history; operation
-   journal; runtime-label rebuild; generated briefing.
-2. **Intent and policy:** intent compiler behind `propose`; envelope YAML and
-   policy engine; computed undo; outcome-based `await`; `explain` from the
-   incident view.
-3. **People and identity:** `ask` with notifications; device `login`; owner
-   one-time connections; the extension protocol, with GitHub change facts and
-   notification channels as its first extensions.
-4. **Storage switch:** SQLite operational store and job table; migration tool from
-   PostgreSQL; continuous backup.
-5. **Agent client:** new CLI and MCP over the primitives; Turso agent store;
-   harness packages; compatibility layer for the old API, then its deprecation.
+1. **Schema and core:** the protos, the world model, and the pure intent
+   compiler, policy engine, planner and undo, with golden and property tests. The
+   simulation harness with fake Runtime and Edge.
+2. **Engine and storage:** the step executor, journal, SQLite operational store,
+   job queue, per-application serializer and observer; Docker and Caddy adapters.
+   Reproduce the scale-down loss in simulation, then prove the traffic-safety rule
+   fixes it.
+3. **Surface and identity:** the Connect service, generated MCP tools and CLI;
+   device `login`; `ask` with notifications; the desired-state Git repo; the
+   briefing.
+4. **Extensions:** the plugin host, then the builders, GitHub change facts,
+   notifications and Compose import as first-party extensions.
+5. **Cutover:** `oap migrate` moves an existing install in one direction. It
+   reads specs, grants and history from today's PostgreSQL, adopts running
+   resources by their labels, and writes the desired-state repo and SQLite store.
+   Then the ported acceptance journeys, including the 1 GB VPS release journey
+   over the new CLI, Connect and MCP. Finally, the agent store and harness packages.
 
-## 14. Lessons from the v0.1 VPS run
+The current code stays as is for existing installs until cutover. It gets
+security fixes only.
+
+## 15. Lessons from the v0.1 VPS run
 
 The 15 October run ([evidence](../evidence/release-journey/2026-10-15-11d5b85/README.md))
 passed everything up to scale-down on a 1 GB host, but **2 of 277 requests failed
@@ -473,7 +600,7 @@ established. For the rewrite this means:
 - Footprint data from the same run (OAP 24.8, PostgreSQL 70.7, Caddy 27.0 MiB
   peaks) is the baseline for the SQLite decision.
 
-## 15. Risks
+## 16. Risks
 
 - **Hiding mechanics:** if OAP only says "done", agents cannot learn or diagnose.
   Proposals always list their steps; outcomes always carry evidence.
@@ -481,9 +608,14 @@ established. For the rewrite this means:
   invariants and risk mappings, not a general language.
 - **Reconciliation complexity:** start on demand; continuous convergence only by
   explicit opt-in.
+- **Second-system effect:** a full rewrite tempts scope growth. The ported
+  acceptance journeys define done; anything beyond them waits.
 - **Storage migration:** SQLite queue semantics must match today's durability
-  guarantees before any install is moved; keep PostgreSQL support until migration
-  tooling is proven.
+  guarantees, proven in simulation and acceptance, before `oap migrate` moves
+  any install.
+- **Protobuf JSON quirks** (int64 as strings, enum and presence rules) can confuse
+  agents. JSON conventions are fixed in section 12 and checked by tests on the
+  generated MCP schemas.
 - **Device login friction** for short-lived agent sessions: mitigated by trusted
   agent identities, at the cost of key custody.
 - **Extensions as a back door:** an extension that can decide policy or read
@@ -492,14 +624,16 @@ established. For the rewrite this means:
 - **Briefing treated as authority:** agents may follow the briefing instead of
   the server's verdict. It is advisory; every apply is still checked by policy.
 
-## 16. Decisions needed
+## 17. Decisions needed
 
 1. Default session approval mode (section 8): every session, or trusted identity
    offered at first login?
 2. Default autonomy for a fresh install: routine changes allowed without the
    owner, or everything gated until the owner relaxes the envelope?
 3. Agent store sync default: Turso Cloud, or self-hosted libSQL on the owner's server?
-4. Whether to fix the scale-down loss on the current code first, or only within
-   the rewrite's reconciler.
+4. Whether to patch the scale-down loss on the current code for existing
+   installs, given that the rewrite fixes it in the step executor.
 5. Which harness packages to ship first: Claude Code skills and generic MCP, then
    Pi?
+6. Whether the rewrite keeps the Coolify adapter, or targets Docker and Caddy
+   only.
