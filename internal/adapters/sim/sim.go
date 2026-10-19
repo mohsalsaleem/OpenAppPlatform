@@ -337,3 +337,18 @@ func (d *Desired) SetEnvelope(tree any) {
 	defer d.mu.Unlock()
 	d.envelope = tree
 }
+
+// Secrets is an in-memory secret store.
+type Secrets map[string]string
+
+func (s Secrets) Resolve(ctx context.Context, refs map[string]string) (map[string]string, error) {
+	out := map[string]string{}
+	for variable, ref := range refs {
+		v, ok := s[ref]
+		if !ok {
+			return nil, fmt.Errorf("sim: no secret %q", ref)
+		}
+		out[variable] = v
+	}
+	return out, nil
+}
