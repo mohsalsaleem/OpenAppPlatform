@@ -94,6 +94,40 @@ type Service struct {
 	serializer *engine.Serializer
 	runCtx     context.Context
 	mu         sync.Mutex // orders appends that read the journal first
+
+	nmu    sync.Mutex
+	notify chan struct{} // closed and replaced on every journal append
+}
+
+// notifyingJournal wakes Await whenever anything is appended, including
+// the executor's step entries.
+type notifyingJournal struct {
+	ports.OpStore
+	wake func()
+}
+
+func (j notifyingJournal) Append(ctx context.Context, entries ...ops.Entry) (uint64, error) {
+	rev, err := j.OpStore.Append(ctx, entries...)
+	j.wake()
+	return rev, err
+}
+
+func (s *Service) changed() <-chan struct{} {
+	s.nmu.Lock()
+	defer s.nmu.Unlock()
+	if s.notify == nil {
+		s.notify = make(chan struct{})
+	}
+	return s.notify
+}
+
+func (s *Service) wake() {
+	s.nmu.Lock()
+	defer s.nmu.Unlock()
+	if s.notify != nil {
+		close(s.notify)
+	}
+	s.notify = make(chan struct{})
 }
 
 // Start begins accepting applies, running operations under ctx, and
@@ -103,6 +137,12 @@ func (s *Service) Start(ctx context.Context) error {
 		s.MaxAge = 2 * time.Minute
 	}
 	s.runCtx = ctx
+	if _, ok := s.Journal.(notifyingJournal); !ok {
+		s.Journal = notifyingJournal{OpStore: s.Journal, wake: s.wake}
+	}
+	if _, ok := s.Executor.Journal.(notifyingJournal); !ok {
+		s.Executor.Journal = notifyingJournal{OpStore: s.Executor.Journal, wake: s.wake}
+	}
 	s.serializer = engine.NewSerializer(s.Executor.Run)
 	entries, err := s.entries(ctx, 0)
 	if err != nil {
@@ -489,6 +529,7 @@ func (s *Service) Await(ctx context.Context, c Caller, req *oapv1.AwaitRequest, 
 	var steps []*oapv1.Step
 	var after uint64
 	for {
+		changed := s.changed() // before reading, so no append is missed
 		page, err := s.entries(ctx, after)
 		if err != nil {
 			return err
@@ -534,8 +575,13 @@ func (s *Service) Await(ctx context.Context, c Caller, req *oapv1.AwaitRequest, 
 				OperationId: id, Status: oapv1.OutcomeStatus_OUTCOME_STATUS_UNCERTAIN,
 				Reasons: []*oapv1.Reason{{Why: "service.await_timeout", Message: fmt.Sprintf("no outcome within %s; await again", timeout)}}}}})
 		}
-		if err := s.Clock.Sleep(ctx, 200*time.Millisecond); err != nil {
-			return err
+		// Wait for the journal to change. The periodic wake-up re-checks the
+		// deadline, which is measured on the service's clock.
+		select {
+		case <-changed:
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Second):
 		}
 	}
 }
