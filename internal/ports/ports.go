@@ -28,13 +28,18 @@ type Runtime interface {
 	// Events streams changes until ctx ends. Events can be missed; Observe
 	// is the source of truth.
 	Events(ctx context.Context) (<-chan ops.RuntimeEvent, error)
-	SnapshotVolume(ctx context.Context, application, component, volume string) (snapshot string, err error)
+	// SnapshotVolume is idempotent by key: a second call with the same key
+	// returns the first snapshot.
+	SnapshotVolume(ctx context.Context, key, application, component, volume string) (snapshot string, err error)
 	DeleteVolume(ctx context.Context, application, component, volume string) error
 }
 
 // Edge routes traffic. Apply replaces the whole configuration and returns its
-// generation; Confirmed returns once that generation is in effect.
+// generation; Confirmed returns once that generation is in effect. Applying
+// the configuration already in place returns its generation unchanged.
 type Edge interface {
+	// Config returns the configuration last applied and its generation.
+	Config(ctx context.Context) (cfg ops.EdgeConfig, generation uint64, err error)
 	Apply(ctx context.Context, cfg ops.EdgeConfig) (generation uint64, err error)
 	Confirmed(ctx context.Context, generation uint64) error
 	// InFlight returns the requests the edge is still serving on an instance.
