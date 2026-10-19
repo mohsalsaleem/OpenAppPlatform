@@ -33,3 +33,9 @@ check-generated:
 .PHONY: rewrite-check
 rewrite-check:
 	scripts/rewrite-check.sh
+
+.PHONY: gen
+gen:
+	tools/install.sh >/dev/null
+	rm -rf gen/oap
+	.local/bin/buf generate

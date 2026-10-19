@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package oap.v1;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1";
+
+// Intent is the outcome an agent wants. OAP compiles it into a plan.
+message Intent {
+  string application = 1;
+  // Why the agent wants this; recorded in the journal.
+  string because = 2;
+  oneof change {
+    Scale scale = 10;
+    Deploy deploy = 11;
+    Rollback rollback = 12;
+    Configure configure = 13;
+    AddComponent add_component = 14;
+    RemoveComponent remove_component = 15;
+    SpecPatch spec_patch = 16;
+  }
+}
+
+message Scale {
+  string component = 1;
+  int32 instances = 2;
+}
+
+// Deploy rolls out a new release of one or more components.
+message Deploy {
+  // Component name to image reference (digest preferred).
+  map<string, string> images = 1;
+  // Where the images were built from; enables change facts.
+  Source source = 2;
+}
+
+// Rollback returns the application's workloads to the images of an earlier
+// desired-state version, named by its spec hash. Configuration, connections
+// and volumes stay as they are; jobs are not re-run.
+message Rollback {
+  string to_release = 1;
+}
+
+message Configure {
+  string component = 1;
+  // Environment variables to set. Secret values are never passed here; use
+  // secret references.
+  map<string, string> set_env = 2;
+  repeated string unset_env = 3;
+  optional int32 memory_limit_mib = 4;
+  optional int32 cpu_millis = 5;
+}
+
+message AddComponent {
+  // The component's spec in the desired-state format, as JSON.
+  google.protobuf.Struct spec = 1;
+  // The new component's name.
+  string name = 2;
+}
+
+message RemoveComponent {
+  string component = 1;
+  // Also delete the component's volumes. Irreversible; always needs the owner.
+  bool delete_volumes = 2;
+}
+
+// SpecPatch applies a JSON merge patch (RFC 7386) to the application's
+// desired spec.
+message SpecPatch {
+  google.protobuf.Struct merge_patch = 1;
+}
+
+message Source {
+  // owner/name on the code host.
+  string repository = 1;
+  string commit = 2;
+  optional int32 pull_request = 3;
+}

@@ -1,0 +1,4 @@
+ 0 write-desired         
+ 1 stop                   worker#1 @old after [0]
+blast radius: [worker], downtime none-expected
+undo: {"SpecPatch":{"merge_patch":{"components":{"worker":{"image":"reg/api:7","kind":"worker","uses":{"db":{"type":"database"}}}}}}}

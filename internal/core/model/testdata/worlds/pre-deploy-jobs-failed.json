@@ -1,0 +1,183 @@
+{
+  "revision": "57",
+  "host": {
+    "name": "vps-1",
+    "capacity": {
+      "memory_total_mib": 985,
+      "memory_available_mib": 412,
+      "memory_reserved_mib": 448,
+      "cpu_millis_total": 1000
+    },
+    "freshness": {
+      "observed_at": "2026-10-19T14:04:57Z"
+    }
+  },
+  "applications": [
+    {
+      "name": "shop",
+      "spec_hash": "sha256:809defc820e7cb40bb17f315abfd492499952117f1d5e7e607f49d0d964daedc",
+      "health": {
+        "status": "HEALTH_STATUS_UNHEALTHY",
+        "freshness": {
+          "observed_at": "2026-10-19T14:04:57Z"
+        }
+      },
+      "components": [
+        {
+          "name": "api",
+          "kind": "COMPONENT_KIND_WEB",
+          "desired": {
+            "image": "registry.example/api:7",
+            "release": "r-da75621909af",
+            "instances": 2,
+            "routes": [
+              {
+                "host": "shop.example.com",
+                "path_prefix": "/",
+                "port": 8080
+              }
+            ]
+          },
+          "actual": {
+            "image": "registry.example/api:6",
+            "release": "r-old",
+            "instances": 2
+          },
+          "health": {
+            "status": "HEALTH_STATUS_HEALTHY",
+            "freshness": {
+              "observed_at": "2026-10-19T14:04:57Z"
+            }
+          },
+          "instances": [
+            {
+              "id": "c-api-1",
+              "ordinal": 1,
+              "release": "r-old",
+              "health": {
+                "status": "HEALTH_STATUS_HEALTHY",
+                "freshness": {
+                  "observed_at": "2026-10-19T14:04:57Z"
+                }
+              },
+              "routed": true
+            },
+            {
+              "id": "c-api-2",
+              "ordinal": 2,
+              "release": "r-old",
+              "health": {
+                "status": "HEALTH_STATUS_HEALTHY",
+                "freshness": {
+                  "observed_at": "2026-10-19T14:04:57Z"
+                }
+              },
+              "routed": true
+            }
+          ]
+        },
+        {
+          "name": "db",
+          "kind": "COMPONENT_KIND_DATA",
+          "desired": {
+            "image": "postgres:17-alpine",
+            "release": "r-849738db5547",
+            "instances": 1,
+            "resources": {
+              "memory_limit_mib": 256,
+              "cpu_millis": 500
+            },
+            "volumes": [
+              {
+                "name": "pgdata",
+                "mount_path": "/var/lib/postgresql/data"
+              }
+            ]
+          },
+          "actual": {
+            "image": "postgres:17-alpine",
+            "release": "r-849738db5547",
+            "instances": 1
+          },
+          "converged": true,
+          "health": {
+            "status": "HEALTH_STATUS_HEALTHY",
+            "freshness": {
+              "observed_at": "2026-10-19T14:04:57Z"
+            }
+          },
+          "instances": [
+            {
+              "id": "c-db-1",
+              "ordinal": 1,
+              "release": "r-849738db5547",
+              "health": {
+                "status": "HEALTH_STATUS_HEALTHY",
+                "freshness": {
+                  "observed_at": "2026-10-19T14:04:57Z"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "migrate",
+          "kind": "COMPONENT_KIND_JOB",
+          "desired": {
+            "image": "registry.example/migrations:7",
+            "release": "r-8c8a3934f6c8",
+            "instances": 1
+          },
+          "actual": {
+            "release": "r-8c8a3934f6c8"
+          },
+          "health": {
+            "status": "HEALTH_STATUS_UNHEALTHY",
+            "freshness": {
+              "observed_at": "2026-10-19T14:04:57Z"
+            }
+          }
+        },
+        {
+          "name": "legacy-worker",
+          "actual": {
+            "image": "registry.example/legacy:1",
+            "release": "r-gone",
+            "instances": 1
+          },
+          "health": {
+            "status": "HEALTH_STATUS_UNHEALTHY",
+            "freshness": {
+              "observed_at": "2026-10-19T14:04:57Z"
+            }
+          },
+          "instances": [
+            {
+              "id": "c-legacy-1",
+              "ordinal": 1,
+              "release": "r-gone",
+              "health": {
+                "status": "HEALTH_STATUS_UNHEALTHY",
+                "freshness": {
+                  "observed_at": "2026-10-19T14:04:57Z"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "edges": [
+        {
+          "from": "api",
+          "to": "db",
+          "type": "EDGE_TYPE_DATABASE"
+        },
+        {
+          "from": "edge",
+          "to": "api",
+          "type": "EDGE_TYPE_ROUTE"
+        }
+      ]
+    }
+  ]
+}

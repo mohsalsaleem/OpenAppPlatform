@@ -115,6 +115,7 @@ func TestCheckImportsAcceptsAllowedImports(t *testing.T) {
 		pkg("internal/ports", "context", local("internal/core/model")),
 		pkg("internal/engine", local("internal/core"), local("internal/ports")),
 		pkg("internal/adapters/sqlite", "database/sql", "modernc.org/sqlite", local("internal/ports"), local("internal/core/model")),
+		pkg("internal/adapters/desiredyaml", "gopkg.in/yaml.v3", local("internal/core/spec")),
 		pkg("internal/service", local("internal/engine"), local("internal/core/policy")),
 		pkg("internal/surface/connect", "net/http", "connectrpc.com/connect", local("internal/service")),
 		pkg("cmd/oapd", "os", local("internal/adapters/docker"), local("internal/surface")),

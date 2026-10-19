@@ -1,0 +1,25 @@
+api_version: oap.dev/v1
+components:
+  api:
+    env:
+      VERSION: api-v1
+    image: oap-hello-api:dev
+    instances: 1
+    kind: web
+    port: 8080
+    readiness:
+      require_healthy: true
+      timeout_seconds: 120
+  frontend:
+    host_port: 8792
+    image: oap-hello-api:dev
+    instances: 1
+    kind: web
+    port: 8080
+    uses:
+      api:
+        env: UPSTREAM_URL
+        type: http
+environment: staging
+kind: Application
+name: docker-connected

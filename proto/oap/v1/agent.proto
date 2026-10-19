@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+package oap.v1;
+
+import "oap/v1/errors.proto";
+import "oap/v1/intent.proto";
+import "oap/v1/journal.proto";
+import "oap/v1/plan.proto";
+import "oap/v1/world.proto";
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1";
+
+// AgentService is the agent API: the seven primitives of the rewrite doc, section 5.
+// Observe has a streaming form, Watch. Every write takes the revision the
+// caller based its decision on, so stale decisions are rejected.
+service AgentService {
+  // Observe returns the world model, or a slice of it, at a revision.
+  rpc Observe(ObserveRequest) returns (ObserveResponse);
+  // Watch streams events after a revision. Resuming from the last revision
+  // seen misses nothing and repeats nothing.
+  rpc Watch(WatchRequest) returns (stream WatchResponse);
+  // Propose compiles an intent into a policy-checked plan. Always a dry run.
+  rpc Propose(ProposeRequest) returns (ProposeResponse);
+  // Apply commits exactly the proposal with this id. Idempotent.
+  rpc Apply(ApplyRequest) returns (ApplyResponse);
+  // Await streams an operation's progress and ends with its outcome.
+  rpc Await(AwaitRequest) returns (stream AwaitResponse);
+  // Explain answers why actual state is not desired state.
+  rpc Explain(ExplainRequest) returns (ExplainResponse);
+  // Ask involves the owner. The answer arrives through Watch.
+  rpc Ask(AskRequest) returns (AskResponse);
+  // Login runs a device login. The first event carries the code to show the
+  // owner; the last carries the token, or the reason it was refused.
+  rpc Login(LoginRequest) returns (stream LoginResponse);
+}
+
+message ObserveRequest {
+  // Empty for the whole world; otherwise an application name.
+  string application = 1;
+  // Include instances and full evidence. Compact by default.
+  bool detail = 2;
+  // Include the generated briefing for this scope.
+  bool briefing = 3;
+}
+
+message ObserveResponse {
+  World world = 1;
+  // Markdown, when requested.
+  string briefing = 2;
+}
+
+message WatchRequest {
+  // Events after this revision. 0 starts from now.
+  uint64 since_revision = 1;
+  string application = 2;
+}
+
+message ProposeRequest {
+  Intent intent = 1;
+  uint64 expected_revision = 2;
+}
+
+message ProposeResponse {
+  Proposal proposal = 1;
+}
+
+message ApplyRequest {
+  string proposal_id = 1;
+}
+
+message ApplyResponse {
+  string operation_id = 1;
+  // The journal entry recording the apply.
+  string entry_id = 2;
+}
+
+message WatchResponse {
+  Event event = 1;
+}
+
+message AwaitRequest {
+  string operation_id = 1;
+  // Give up after this many seconds and return an uncertain outcome.
+  int32 timeout_seconds = 2;
+}
+
+message AwaitResponse {
+  Event event = 1;
+}
+
+message ExplainRequest {
+  string application = 1;
+  string component = 2;
+}
+
+message ExplainResponse {
+  uint64 revision = 1;
+  // Paths where actual differs from desired.
+  repeated string gaps = 2;
+  repeated Cause causes = 3;
+  repeated Intent suggested = 4;
+}
+
+message Cause {
+  string why = 1;
+  string summary = 2;
+  // 0 to 100.
+  int32 confidence = 3;
+  repeated string evidence = 4;
+}
+
+message AskResponse {
+  string ask_id = 1;
+}
+
+message LoginRequest {
+  // The name the agent asks to be approved as, for example "claude-laptop".
+  string agent = 1;
+  // Public key for trusted agent identity, if the agent holds one.
+  string public_key = 2;
+}
+
+message LoginResponse {
+  oneof state {
+    LoginPending pending = 1;
+    LoginApproved approved = 2;
+    Reason refused = 3;
+  }
+}
+
+message LoginPending {
+  string user_code = 1;
+  string verification_url = 2;
+  int32 expires_in_seconds = 3;
+}
+
+message LoginApproved {
+  string token = 1;
+  int32 expires_in_seconds = 2;
+  string refresh_token = 3;
+  // The agent's scope as the owner approved it.
+  AgentScopeSummary scope = 4;
+}
+
+message AgentScopeSummary {
+  repeated string applications = 1;
+  repeated string components = 2;
+  repeated string may = 3;
+}

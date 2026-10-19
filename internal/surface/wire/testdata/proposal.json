@@ -1,0 +1,53 @@
+{
+  "id": "prop_7Hq2",
+  "base_revision": "42",
+  "intent": {
+    "application": "shop",
+    "because": "p95 latency above target since 14:05",
+    "scale": {
+      "component": "api",
+      "instances": 3
+    }
+  },
+  "verdict": "VERDICT_ALLOWED",
+  "risk": "RISK_ROUTINE",
+  "steps": [
+    {
+      "kind": "STEP_KIND_START_INSTANCE",
+      "component": "api",
+      "ordinal": 2
+    },
+    {
+      "kind": "STEP_KIND_AWAIT_READY",
+      "component": "api",
+      "ordinal": 2,
+      "after": [
+        0
+      ]
+    },
+    {
+      "kind": "STEP_KIND_ROUTE_ADD",
+      "component": "api",
+      "ordinal": 2,
+      "after": [
+        1
+      ]
+    }
+  ],
+  "blast_radius": {
+    "components": [
+      "api"
+    ],
+    "downtime": "none-expected"
+  },
+  "undo": {
+    "application": "shop",
+    "scale": {
+      "component": "api",
+      "instances": 1
+    }
+  },
+  "next": [
+    "apply"
+  ]
+}

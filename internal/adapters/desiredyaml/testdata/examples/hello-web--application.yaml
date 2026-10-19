@@ -1,0 +1,10 @@
+api_version: oap.dev/v1
+components:
+  web:
+    image: nginx:1.27-alpine
+    instances: 1
+    kind: web
+    port: 80
+environment: staging
+kind: Application
+name: hello-web

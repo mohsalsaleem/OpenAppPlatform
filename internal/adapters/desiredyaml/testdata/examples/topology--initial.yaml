@@ -1,0 +1,11 @@
+api_version: oap.dev/v1
+components:
+  web:
+    host_port: 8080
+    image: example/web:replace-with-immutable-image
+    instances: 1
+    kind: web
+    port: 8080
+environment: staging
+kind: Application
+name: topology-example

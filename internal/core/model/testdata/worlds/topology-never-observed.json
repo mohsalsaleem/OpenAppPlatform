@@ -1,0 +1,58 @@
+{
+  "revision": "1",
+  "host": {
+    "freshness": {
+      "stale": true
+    }
+  },
+  "applications": [
+    {
+      "name": "topology-example",
+      "spec_hash": "sha256:566c4be0399012dd1b4625ae7d41fd02862e51fd7bdff7fc86617d798010ea81",
+      "health": {
+        "status": "HEALTH_STATUS_UNKNOWN",
+        "freshness": {
+          "stale": true
+        }
+      },
+      "components": [
+        {
+          "name": "web",
+          "kind": "COMPONENT_KIND_WEB",
+          "desired": {
+            "image": "example/web:2",
+            "release": "r-bb461c12ea14",
+            "instances": 1
+          },
+          "health": {
+            "status": "HEALTH_STATUS_UNKNOWN",
+            "freshness": {
+              "stale": true
+            },
+            "missing_evidence": [
+              "observation"
+            ]
+          }
+        },
+        {
+          "name": "worker",
+          "kind": "COMPONENT_KIND_WORKER",
+          "desired": {
+            "image": "example/worker:2",
+            "release": "r-b50a2ccf5e34",
+            "instances": 1
+          },
+          "health": {
+            "status": "HEALTH_STATUS_UNKNOWN",
+            "freshness": {
+              "stale": true
+            },
+            "missing_evidence": [
+              "observation"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

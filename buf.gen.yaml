@@ -1,0 +1,10 @@
+version: v2
+managed:
+  enabled: false
+plugins:
+  - local: .local/bin/protoc-gen-go
+    out: gen
+    opt: paths=source_relative
+  - local: .local/bin/protoc-gen-connect-go
+    out: gen
+    opt: paths=source_relative

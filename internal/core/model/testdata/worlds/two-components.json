@@ -1,0 +1,97 @@
+{
+  "revision": "42",
+  "host": {
+    "name": "vps-1",
+    "capacity": {
+      "memory_total_mib": 985,
+      "memory_available_mib": 412,
+      "memory_reserved_mib": 448,
+      "cpu_millis_total": 1000
+    },
+    "freshness": {
+      "observed_at": "2026-10-19T14:04:50Z"
+    }
+  },
+  "applications": [
+    {
+      "name": "two-components",
+      "spec_hash": "sha256:16538edcb988569fe71aa968a4dfa2c07ff5150ef2101a0b08647a98b6bc64ff",
+      "health": {
+        "status": "HEALTH_STATUS_HEALTHY",
+        "freshness": {
+          "observed_at": "2026-10-19T14:04:50Z"
+        }
+      },
+      "components": [
+        {
+          "name": "api",
+          "kind": "COMPONENT_KIND_WEB",
+          "desired": {
+            "image": "nginx:1.27-alpine",
+            "release": "r-0f14102c7145",
+            "instances": 1
+          },
+          "actual": {
+            "image": "nginx:1.27-alpine",
+            "release": "r-0f14102c7145",
+            "instances": 1
+          },
+          "converged": true,
+          "health": {
+            "status": "HEALTH_STATUS_HEALTHY",
+            "freshness": {
+              "observed_at": "2026-10-19T14:04:50Z"
+            }
+          },
+          "instances": [
+            {
+              "id": "c-api-1",
+              "ordinal": 1,
+              "release": "r-0f14102c7145",
+              "health": {
+                "status": "HEALTH_STATUS_HEALTHY",
+                "freshness": {
+                  "observed_at": "2026-10-19T14:04:50Z"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "frontend",
+          "kind": "COMPONENT_KIND_WEB",
+          "desired": {
+            "image": "nginx:1.27-alpine",
+            "release": "r-0f14102c7145",
+            "instances": 1
+          },
+          "actual": {
+            "image": "nginx:1.27-alpine",
+            "release": "r-0f14102c7145",
+            "instances": 1
+          },
+          "converged": true,
+          "health": {
+            "status": "HEALTH_STATUS_HEALTHY",
+            "freshness": {
+              "observed_at": "2026-10-19T14:04:50Z"
+            }
+          },
+          "instances": [
+            {
+              "id": "c-fe-1",
+              "ordinal": 1,
+              "release": "r-0f14102c7145",
+              "health": {
+                "status": "HEALTH_STATUS_HEALTHY",
+                "freshness": {
+                  "observed_at": "2026-10-19T14:04:50Z"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

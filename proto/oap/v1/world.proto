@@ -1,0 +1,166 @@
+syntax = "proto3";
+
+package oap.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1";
+
+// World is the world model: one typed graph that every interface returns and
+// every guardrail reasons about (rewrite doc, section 4). Revisions are uint64
+// and appear in JSON as decimal strings.
+message World {
+  uint64 revision = 1;
+  Host host = 2;
+  repeated Application applications = 3;
+}
+
+// Host is the C4 context: the server and its capacity.
+message Host {
+  string name = 1;
+  Capacity capacity = 2;
+  Freshness freshness = 3;
+}
+
+message Capacity {
+  // Memory in MiB.
+  int32 memory_total_mib = 1;
+  int32 memory_available_mib = 2;
+  int32 memory_reserved_mib = 3;
+  int32 cpu_millis_total = 4;
+}
+
+// Application is the system boundary (C4 container level holds its components).
+message Application {
+  string name = 1;
+  // Content hash of the desired spec this node reflects.
+  string spec_hash = 2;
+  Health health = 3;
+  repeated Component components = 4;
+  repeated Edge edges = 5;
+  repeated ChangeRef recent_changes = 6;
+  repeated Affordance affordances = 7;
+}
+
+enum ComponentKind {
+  COMPONENT_KIND_UNSPECIFIED = 0;
+  // Serves HTTP traffic through the edge.
+  COMPONENT_KIND_WEB = 1;
+  // Long-running, not routed.
+  COMPONENT_KIND_WORKER = 2;
+  // Runs to completion, for example a pre-deploy migration.
+  COMPONENT_KIND_JOB = 3;
+  // An owned data service with a volume.
+  COMPONENT_KIND_DATA = 4;
+}
+
+message Component {
+  string name = 1;
+  ComponentKind kind = 2;
+  ComponentState desired = 3;
+  // Absent when the component has never been observed.
+  ComponentState actual = 4;
+  // True when actual matches desired.
+  bool converged = 5;
+  Health health = 6;
+  repeated Instance instances = 7;
+  repeated Affordance affordances = 8;
+}
+
+message ComponentState {
+  string image = 1;
+  string release = 2;
+  int32 instances = 3;
+  Resources resources = 4;
+  repeated Route routes = 5;
+  repeated Volume volumes = 6;
+}
+
+message Resources {
+  int32 memory_limit_mib = 1;
+  int32 cpu_millis = 2;
+}
+
+message Route {
+  string host = 1;
+  string path_prefix = 2;
+  int32 port = 3;
+}
+
+message Volume {
+  string name = 1;
+  string mount_path = 2;
+}
+
+message Instance {
+  // Runtime identity (for example, a container ID).
+  string id = 1;
+  int32 ordinal = 2;
+  string release = 3;
+  Health health = 4;
+  // True while the instance is a member of its component's routes.
+  bool routed = 5;
+}
+
+enum HealthStatus {
+  HEALTH_STATUS_UNSPECIFIED = 0;
+  HEALTH_STATUS_HEALTHY = 1;
+  HEALTH_STATUS_DEGRADED = 2;
+  HEALTH_STATUS_UNHEALTHY = 3;
+  // Not enough fresh evidence to tell.
+  HEALTH_STATUS_UNKNOWN = 4;
+}
+
+message Health {
+  HealthStatus status = 1;
+  Freshness freshness = 2;
+  // Evidence that would be needed to report a definite status.
+  repeated string missing_evidence = 3;
+}
+
+message Freshness {
+  google.protobuf.Timestamp observed_at = 1;
+  bool stale = 2;
+}
+
+enum EdgeType {
+  EDGE_TYPE_UNSPECIFIED = 0;
+  // One component calls another over HTTP.
+  EDGE_TYPE_HTTP = 1;
+  EDGE_TYPE_DATABASE = 2;
+  EDGE_TYPE_QUEUE = 3;
+  // Shared or owned storage.
+  EDGE_TYPE_VOLUME = 4;
+  // From the edge to a component.
+  EDGE_TYPE_ROUTE = 5;
+}
+
+// Edge is a typed connection between components. Edges are declared, not
+// inferred: they drive dependency order, blast radius and diagnosis.
+message Edge {
+  string from = 1;
+  string to = 2;
+  EdgeType type = 3;
+}
+
+// ChangeRef points to a journal entry that touched a node.
+message ChangeRef {
+  string entry_id = 1;
+  string summary = 2;
+  google.protobuf.Timestamp at = 3;
+}
+
+// Affordance is an action this caller may take on a node, as computed by the
+// policy engine.
+message Affordance {
+  // An intent kind, for example "scale" or "rollback".
+  string action = 1;
+  Verdict verdict = 2;
+}
+
+enum Verdict {
+  VERDICT_UNSPECIFIED = 0;
+  VERDICT_ALLOWED = 1;
+  VERDICT_NEEDS_APPROVAL = 2;
+  VERDICT_DENIED = 3;
+}

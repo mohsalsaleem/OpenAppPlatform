@@ -1,0 +1,20 @@
+api_version: oap.dev/v1
+components:
+  web:
+    health:
+      mode: image
+    image: your-registry/persistent-web:preview
+    instances: 1
+    kind: web
+    port: 8080
+    readiness:
+      require_healthy: true
+      timeout_seconds: 120
+    resources:
+      cpu_millis: 250
+      memory_mib: 128
+    volumes:
+      data: /data
+environment: staging
+kind: Application
+name: persistent-preview

@@ -1,0 +1,27 @@
+api_version: oap.dev/v1
+components:
+  api:
+    image: example/api@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    instances: 1
+    kind: web
+    port: 8080
+    secrets:
+      DATABASE_URL: database-v1
+  frontend:
+    image: example/frontend@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    instances: 1
+    kind: web
+    port: 8080
+    uses:
+      api:
+        env: API_URL
+        type: http
+  worker:
+    image: example/worker@sha256:0000000000000000000000000000000000000000000000000000000000000000
+    instances: 1
+    kind: worker
+    secrets:
+      DATABASE_URL: database-v1
+environment: staging
+kind: Application
+name: portable-demo

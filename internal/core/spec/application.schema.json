@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oap.dev/schemas/v1/application.json",
+  "title": "OAP application",
+  "description": "An application and its components: OAP's desired-state format, stored as YAML in apps/<name>/app.yaml.",
+  "type": "object",
+  "required": ["api_version", "kind", "name", "environment", "components"],
+  "additionalProperties": false,
+  "properties": {
+    "api_version": {"type": "string", "enum": ["oap.dev/v1"]},
+    "kind": {"type": "string", "enum": ["Application"]},
+    "name": {"$ref": "#/$defs/slug"},
+    "environment": {"$ref": "#/$defs/slug"},
+    "ingress": {"$ref": "#/$defs/ingress"},
+    "components": {
+      "description": "Components by name.",
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 16,
+      "propertyNames": {"$ref": "#/$defs/slug"},
+      "additionalProperties": {"$ref": "#/$defs/component"}
+    }
+  },
+  "$defs": {
+    "slug": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,47}$"},
+    "env_name": {"type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"},
+    "ingress": {
+      "type": "object",
+      "required": ["domain", "routes"],
+      "additionalProperties": false,
+      "properties": {
+        "domain": {"type": "string", "maxLength": 253, "pattern": "^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"},
+        "https": {"type": "boolean"},
+        "routes": {
+          "description": "Routes by path prefix.",
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 16,
+          "propertyNames": {"type": "string", "maxLength": 256, "pattern": "^/(?:[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*)?$"},
+          "additionalProperties": {
+            "type": "object",
+            "required": ["component"],
+            "additionalProperties": false,
+            "properties": {
+              "component": {"$ref": "#/$defs/slug"},
+              "strip_prefix": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    },
+    "component": {
+      "type": "object",
+      "required": ["kind", "image"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"type": "string", "enum": ["web", "worker", "job", "data"]},
+        "image": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9/._:@-]+$"},
+        "registry_credential": {"$ref": "#/$defs/slug"},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "host_port": {"type": "integer", "minimum": 1024, "maximum": 65535},
+        "instances": {"type": "integer", "minimum": 1, "maximum": 4},
+        "env": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {"$ref": "#/$defs/env_name"},
+          "additionalProperties": {"type": "string", "maxLength": 4096}
+        },
+        "secrets": {
+          "description": "Environment variables filled from secret references. Values never appear in specs.",
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {"$ref": "#/$defs/env_name"},
+          "additionalProperties": {"$ref": "#/$defs/slug"}
+        },
+        "destructive": {
+          "description": "Jobs only: runs change data in ways a rollback can't undo, so plans that run this job are irreversible and need the owner.",
+          "type": "boolean"
+        },
+        "after": {
+          "description": "Components that must be ready (or, for jobs, succeed) before this one starts. Ordering only; use uses for connections.",
+          "type": "array",
+          "maxItems": 16,
+          "items": {"$ref": "#/$defs/slug"}
+        },
+        "uses": {
+          "description": "Typed connections to other components, by component name.",
+          "type": "object",
+          "maxProperties": 16,
+          "propertyNames": {"$ref": "#/$defs/slug"},
+          "additionalProperties": {
+            "type": "object",
+            "required": ["type"],
+            "additionalProperties": false,
+            "properties": {
+              "type": {"type": "string", "enum": ["http", "database", "queue"]},
+              "env": {"$ref": "#/$defs/env_name"},
+              "endpoint": {"type": "string", "maxLength": 2048, "pattern": "^https?://[^@?#\\s]+$"}
+            }
+          }
+        },
+        "volumes": {
+          "description": "Mount paths by volume name.",
+          "type": "object",
+          "maxProperties": 8,
+          "propertyNames": {"$ref": "#/$defs/slug"},
+          "additionalProperties": {"type": "string", "maxLength": 256, "pattern": "^/[a-zA-Z0-9._/-]+$"}
+        },
+        "resources": {
+          "type": "object",
+          "required": ["memory_mib", "cpu_millis"],
+          "additionalProperties": false,
+          "properties": {
+            "memory_mib": {"type": "integer", "minimum": 64, "maximum": 65536},
+            "cpu_millis": {"type": "integer", "minimum": 50, "maximum": 64000}
+          }
+        },
+        "health": {
+          "type": "object",
+          "required": ["mode"],
+          "additionalProperties": false,
+          "properties": {
+            "mode": {"type": "string", "enum": ["http", "image"]},
+            "path": {"type": "string", "maxLength": 256, "pattern": "^/[A-Za-z0-9/_~.\\-]*$"},
+            "interval_seconds": {"type": "integer", "minimum": 1, "maximum": 300},
+            "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 30},
+            "retries": {"type": "integer", "minimum": 1, "maximum": 20},
+            "start_period_seconds": {"type": "integer", "minimum": 0, "maximum": 600}
+          }
+        },
+        "readiness": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "require_healthy": {"type": "boolean"},
+            "timeout_seconds": {"type": "integer", "minimum": 30, "maximum": 1800}
+          }
+        },
+        "security": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allow_privilege_escalation": {"type": "boolean"},
+            "exception_reason": {"type": "string", "minLength": 12, "maxLength": 240, "pattern": "^[^\\n\\r\\x00]*$"}
+          }
+        }
+      }
+    }
+  }
+}

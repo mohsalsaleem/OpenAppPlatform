@@ -1,0 +1,8 @@
+{
+  "application": "shop",
+  "spec_patch": {
+    "merge_patch": {
+      "replicas": 2
+    }
+  }
+}

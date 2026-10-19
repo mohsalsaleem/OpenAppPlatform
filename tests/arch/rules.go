@@ -62,7 +62,7 @@ var layers = []layer{
 		[]string{local("internal/core"), local("internal/ports"), local("gen")},
 		[]string{"google.golang.org/protobuf"}},
 	{"adapters", []string{local("internal/adapters")},
-		[]string{local("internal/ports"), local("internal/core/model"), local("gen")},
+		[]string{local("internal/ports"), local("internal/core/model"), local("internal/core/spec"), local("gen")},
 		ThirdParty},
 	{"service", []string{local("internal/service")},
 		[]string{local("internal/core"), local("internal/engine"), local("internal/ports"), local("gen")},

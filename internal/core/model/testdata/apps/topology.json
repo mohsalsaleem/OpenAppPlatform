@@ -1,0 +1,10 @@
+{
+  "api_version": "oap.dev/v1",
+  "kind": "Application",
+  "name": "topology-example",
+  "environment": "staging",
+  "components": {
+    "web": {"kind": "web", "image": "example/web:2", "port": 8080, "host_port": 8080},
+    "worker": {"kind": "worker", "image": "example/worker:2"}
+  }
+}
