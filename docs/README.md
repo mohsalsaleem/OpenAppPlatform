@@ -55,6 +55,7 @@ use this index.
 
 ## Architecture
 
+- [Agent-native rewrite](architecture/agent-native-rewrite.md) (proposed): primitives, autonomy envelope, YAML desired state, SQLite, agent store
 - [System design](architecture/system-design.md)
 - [Low-level design](architecture/low-level-design.md)
 - [Alignment audit](architecture/alignment-audit.md)

@@ -1,0 +1,168 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 624" width="1000" height="624" role="img" aria-labelledby="title desc">
+  <title id="title">Agent-native OAP target architecture</title>
+  <desc id="desc">Owner and AI agent outside the server; the agent keeps a synced store without credentials. On the server, the OAP control plane exposes observe, propose, apply, await, explain, ask and login; an intent compiler, policy engine and reconciler sit over a Git repo of YAML desired state, SQLite operational state and an encrypted secret store. OAP drives the Docker runtime: a Caddy edge and one application of web, api, worker, job and data components. GitHub supplies change facts, the registry images, DNS and ACME certificates, and users send HTTPS traffic.</desc>
+  <style>
+    .bg { fill: #ffffff; }
+    .surface { fill: #f6f8fa; stroke: #d0d7de; }
+    .card { fill: #ffffff; stroke: #d0d7de; }
+    .oap { fill: #ddf4ff; stroke: #0969da; }
+    .agent { fill: #fbefff; stroke: #8250df; }
+    .owner { fill: #fff8c5; stroke: #9a6700; }
+    .app { fill: none; stroke: #0969da; stroke-width: 2; }
+    .inst { fill: #dafbe1; stroke: #1a7f37; }
+    .db { fill: #ffffff; stroke: #59636e; }
+    .planned { fill: #fff8c5; stroke: #9a6700; stroke-dasharray: 6 4; }
+    .line { stroke: #59636e; stroke-width: 1.6; fill: none; }
+    .line-accent { stroke: #0969da; stroke-width: 1.8; fill: none; }
+    .arrow { fill: #59636e; }
+    .arrow-accent { fill: #0969da; }
+    text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #1f2328; }
+    .h { font-size: 15px; font-weight: 600; }
+    .b { font-size: 13px; }
+    .s { font-size: 12px; fill: #59636e; }
+    .label { font-size: 12px; font-weight: 600; fill: #0969da; }
+    .warn { font-size: 12px; font-weight: 600; fill: #9a6700; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0d1117; }
+      .surface { fill: #161b22; stroke: #30363d; }
+      .card { fill: #0d1117; stroke: #30363d; }
+      .oap { fill: #0c2d6b; stroke: #4493f8; }
+      .agent { fill: #2d1f4d; stroke: #ab7df8; }
+      .owner { fill: #3b2e0a; stroke: #d29922; }
+      .app { stroke: #4493f8; }
+      .inst { fill: #0f2d1a; stroke: #3fb950; }
+      .db { fill: #0d1117; stroke: #9198a1; }
+      .planned { fill: #3b2e0a; stroke: #d29922; }
+      .line { stroke: #9198a1; }
+      .line-accent { stroke: #4493f8; }
+      .arrow { fill: #9198a1; }
+      .arrow-accent { fill: #4493f8; }
+      text { fill: #e6edf3; }
+      .s { fill: #9198a1; }
+      .label { fill: #4493f8; }
+      .warn { fill: #d29922; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-accent" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+
+  <style>
+    .parked { fill: none; stroke: #8c959f; stroke-dasharray: 5 4; }
+    .step { fill: #ffffff; stroke: #d0d7de; }
+    .num { font-size: 12px; font-weight: 700; fill: #ffffff; }
+    .numdot { fill: #0969da; }
+    .axis { stroke: #8c959f; stroke-width: 1.2; }
+    .grid { stroke: #d0d7de; stroke-width: 1; stroke-dasharray: 3 4; }
+    .dot { fill: #59636e; }
+    .dot-hosted { fill: #ffffff; stroke: #59636e; stroke-width: 2; }
+    .dot-oap { fill: #0969da; }
+    .drain { fill: #fff1e5; stroke: #bc4c00; stroke-dasharray: 5 3; }
+    .bad { font-size: 12px; font-weight: 600; fill: #bc4c00; }
+    @media (prefers-color-scheme: dark) {
+      .parked { stroke: #6e7681; }
+      .step { fill: #0d1117; stroke: #30363d; }
+      .num { fill: #0d1117; }
+      .numdot { fill: #4493f8; }
+      .axis { stroke: #6e7681; }
+      .grid { stroke: #30363d; }
+      .dot { fill: #9198a1; }
+      .dot-hosted { fill: #0d1117; stroke: #9198a1; }
+      .dot-oap { fill: #4493f8; }
+      .drain { fill: #3d1d0a; stroke: #f0883e; }
+      .bad { fill: #f0883e; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow" d="M0,0 L10,5 L0,10 z"/></marker>
+    <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="arrow-accent" d="M0,0 L10,5 L0,10 z"/></marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1000" height="624" rx="12"/>
+  <text class="h" x="14" y="26">Agent-native OAP (target architecture)</text><text class="warn" x="300" y="26">proposed</text>
+  <rect class="owner" x="14" y="70" width="180" height="86" rx="8"/>
+  <text class="h" x="28" y="94">Owner</text>
+  <text class="b" x="28" y="114">Sets the envelope</text>
+  <text class="b" x="28" y="132">Answers ask requests</text>
+  <text class="b" x="28" y="150">Approves agent logins</text>
+  <rect class="agent" x="14" y="196" width="180" height="96" rx="8"/>
+  <text class="h" x="28" y="220">AI agent</text>
+  <text class="b" x="28" y="240">observe → propose →</text>
+  <text class="b" x="28" y="258">apply → await</text>
+  <text class="s" x="28" y="276">token via device login</text>
+  <rect class="card" x="14" y="318" width="180" height="96" rx="8"/>
+  <text class="h" x="28" y="342">Agent store</text>
+  <text class="s" x="28" y="362">Turso / SQLite, synced</text>
+  <text class="s" x="28" y="380">servers · projects · memory</text>
+  <text class="s" x="28" y="398">no credentials</text>
+  <path class="line" d="M104,292 L104,316"/>
+  <rect class="surface" x="220" y="40" width="766" height="470" rx="14"/>
+  <text class="h" x="238" y="64">Your server</text>
+  <rect class="oap" x="236" y="76" width="440" height="300" rx="12"/>
+  <text class="h" x="252" y="98">OAP control plane</text><text class="s" x="390" y="98">one Go binary</text>
+  <rect class="card" x="252" y="108" width="408" height="48" rx="8"/>
+  <text class="h" x="266" y="132">Agent API  ·  REST · MCP · CLI</text>
+  <text class="s" x="266" y="152">observe · watch · propose · apply · await · explain · ask · login</text>
+  <rect class="card" x="252" y="166" width="130" height="74" rx="8"/>
+  <text class="h" x="266" y="190">Intent compiler</text>
+  <text class="s" x="266" y="210">intent → plan</text>
+  <text class="s" x="266" y="228">steps, undo</text>
+  <rect class="card" x="391" y="166" width="130" height="74" rx="8"/>
+  <text class="h" x="405" y="190">Policy engine</text>
+  <text class="s" x="405" y="210">envelope rules</text>
+  <text class="s" x="405" y="228">risk, verdict</text>
+  <rect class="card" x="530" y="166" width="130" height="74" rx="8"/>
+  <text class="h" x="544" y="190">Reconciler</text>
+  <text class="s" x="544" y="210">desired vs actual</text>
+  <text class="s" x="544" y="228">durable ops</text>
+  <rect class="db" x="252" y="252" width="130" height="74" rx="8"/>
+  <text class="h" x="266" y="276">Desired state</text>
+  <text class="s" x="266" y="296">Git repo of YAML</text>
+  <text class="s" x="266" y="314">specs · envelope</text>
+  <rect class="db" x="391" y="252" width="130" height="74" rx="8"/>
+  <text class="h" x="405" y="276">Operational</text>
+  <text class="s" x="405" y="296">SQLite (WAL)</text>
+  <text class="s" x="405" y="314">releases · audit</text>
+  <rect class="db" x="530" y="252" width="130" height="74" rx="8"/>
+  <text class="h" x="544" y="276">Secrets</text>
+  <text class="s" x="544" y="296">encrypted store</text>
+  <text class="s" x="544" y="314">never to agents</text>
+  <text class="s" x="252" y="350">Apps keep running if OAP is down; actual state is</text>
+  <text class="s" x="252" y="366">re-observed from runtime labels.</text>
+  <path class="line" d="M194,113 C224,113 226,128 250,128" marker-end="url(#a)"/>
+  <path class="line-accent" d="M194,236 C228,236 226,140 250,140" marker-end="url(#aa)"/>
+  <rect class="card" x="690" y="76" width="282" height="420" rx="12"/>
+  <text class="h" x="706" y="98">Docker runtime</text>
+  <rect class="inst" x="706" y="110" width="250" height="38" rx="8"/>
+  <text class="h" x="718" y="134">Caddy edge · HTTPS routes</text>
+  <rect class="app" x="706" y="160" width="250" height="322" rx="10"/>
+  <text class="label" x="718" y="180">APPLICATION · ONE SPEC</text>
+  <rect class="inst" x="720" y="194" width="102" height="44" rx="7"/><text class="h" x="732" y="221">web</text>
+  <rect class="inst" x="842" y="194" width="102" height="44" rx="7"/><text class="h" x="854" y="221">api</text>
+  <rect class="inst" x="720" y="268" width="102" height="44" rx="7"/><text class="h" x="732" y="295">worker</text>
+  <rect class="inst" x="842" y="268" width="102" height="44" rx="7"/><text class="h" x="854" y="295">job</text>
+  <rect class="db" x="760" y="370" width="150" height="48" rx="7"/><text class="h" x="776" y="399">data (Postgres…)</text>
+  <path class="line" d="M822,216 L840,216" marker-end="url(#a)"/>
+  <path class="line" d="M944,216 L950,216 L950,394 L912,394" marker-end="url(#a)"/>
+  <path class="line" d="M771,312 L805,368" marker-end="url(#a)"/>
+  <path class="line" d="M893,312 L880,368" marker-end="url(#a)"/>
+  <text class="s" x="718" y="452">edges: http · database · queue · volume</text>
+  <text class="s" x="718" y="470">components = C4 containers</text>
+  <path class="line-accent" d="M676,226 L704,226" marker-end="url(#aa)"/>
+  <rect class="parked" x="236" y="546" width="170" height="60" rx="8"/>
+  <text class="h" x="250" y="570">GitHub</text>
+  <text class="s" x="250" y="590">change facts</text>
+  <rect class="parked" x="424" y="546" width="170" height="60" rx="8"/>
+  <text class="h" x="438" y="570">Registry</text>
+  <text class="s" x="438" y="590">images</text>
+  <rect class="parked" x="612" y="546" width="170" height="60" rx="8"/>
+  <text class="h" x="626" y="570">DNS / ACME</text>
+  <text class="s" x="626" y="590">certificates</text>
+  <rect class="parked" x="800" y="546" width="170" height="60" rx="8"/>
+  <text class="h" x="814" y="570">Users</text>
+  <text class="s" x="814" y="590">HTTPS traffic</text>
+  <path class="line" d="M321,546 L321,378" marker-end="url(#a)" style="stroke-dasharray:4 4"/>
+  <text class="s" x="328" y="530">read-only GitHub App</text>
+  <path class="line" d="M885,546 L885,496" marker-end="url(#a)"/>
+</svg>
