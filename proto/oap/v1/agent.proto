@@ -82,6 +82,9 @@ message AwaitRequest {
   string operation_id = 1;
   // Give up after this many seconds and return an uncertain outcome.
   int32 timeout_seconds = 2;
+  // Resume after this revision: events at or before it were already seen.
+  // 0 streams the operation from its start.
+  uint64 since_revision = 3;
 }
 
 message AwaitResponse {

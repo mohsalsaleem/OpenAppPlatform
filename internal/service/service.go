@@ -549,7 +549,9 @@ func (s *Service) outcome(id string, runErr error) {
 }
 
 // Await sends an operation's progress, step by step, and ends with its
-// outcome; after timeout it ends with an uncertain outcome.
+// outcome; after timeout it ends with an uncertain outcome. A caller that
+// lost the stream resumes with since_revision set to the last revision it
+// saw, and gets every later event exactly once.
 func (s *Service) Await(ctx context.Context, c Caller, req *oapv1.AwaitRequest, send func(*oapv1.Event) error) error {
 	id := req.GetOperationId()
 	timeout := time.Duration(req.GetTimeoutSeconds()) * time.Second
@@ -560,8 +562,80 @@ func (s *Service) Await(ctx context.Context, c Caller, req *oapv1.AwaitRequest, 
 		return err
 	}
 	deadline := s.Clock.Now().Add(timeout)
-	var steps []*oapv1.Step
-	var after uint64
+	var last uint64
+	err := s.stream(ctx, req.GetSinceRevision(), func(op, app string) bool { return op == id }, deadline, func(e *oapv1.Event) (bool, error) {
+		last = e.Revision
+		if e.GetJournalEntry() != nil {
+			return false, nil // await reports progress and the outcome only
+		}
+		if err := send(e); err != nil {
+			return true, err
+		}
+		return e.GetOutcome() != nil, nil
+	})
+	if errors.Is(err, errDeadline) {
+		return send(&oapv1.Event{Revision: last, At: timestamppb.New(s.Clock.Now()), Kind: &oapv1.Event_Outcome{Outcome: &oapv1.Outcome{
+			OperationId: id, Status: oapv1.OutcomeStatus_OUTCOME_STATUS_UNCERTAIN,
+			Reasons: []*oapv1.Reason{{Why: "service.await_timeout", Message: fmt.Sprintf("no outcome within %s; await again from revision %d", timeout, last)}}}}})
+	}
+	return err
+}
+
+// Watch streams the journal's events after a revision (0: from now) until
+// the caller goes away, optionally for one application. A caller that
+// reconnects with the last revision it saw misses nothing and sees nothing
+// twice: every event carries its journal revision, in order.
+func (s *Service) Watch(ctx context.Context, c Caller, req *oapv1.WatchRequest, send func(*oapv1.Event) error) error {
+	after := req.GetSinceRevision()
+	if after == 0 {
+		head, err := s.Journal.Head(ctx)
+		if err != nil {
+			return err
+		}
+		after = head
+	}
+	app := req.GetApplication()
+	return s.stream(ctx, after, func(_, a string) bool { return app == "" || a == app }, time.Time{}, func(e *oapv1.Event) (bool, error) {
+		return false, send(e)
+	})
+}
+
+var errDeadline = errors.New("service: deadline")
+
+// stream sends the events of journal entries after a revision that match,
+// waiting for new ones, until emit says stop, ctx ends or the deadline
+// (if not zero) passes. match gets the entry's operation and application.
+func (s *Service) stream(ctx context.Context, after uint64, match func(op, app string) bool, deadline time.Time,
+	emit func(*oapv1.Event) (stop bool, err error)) error {
+	apps := map[string]string{}         // operation -> application
+	steps := map[string][]*oapv1.Step{} // operation -> its steps
+	index := func(e ops.Entry) {
+		if e.Kind != KindApply {
+			return
+		}
+		je, err := decode(e.Data)
+		if err != nil {
+			return
+		}
+		if p, err := s.proposal(ctx, je.GetParentId()); err == nil {
+			apps[e.Operation] = p.GetIntent().GetApplication()
+			steps[e.Operation] = p.GetSteps()
+		}
+	}
+	// Index operations recorded before the start, so their later events
+	// can be matched by application.
+	if after > 0 {
+		earlier, err := s.entries(ctx, 0)
+		if err != nil {
+			return err
+		}
+		for _, e := range earlier {
+			if e.Revision > after {
+				break
+			}
+			index(e)
+		}
+	}
 	for {
 		changed := s.changed() // before reading, so no append is missed
 		page, err := s.entries(ctx, after)
@@ -570,54 +644,55 @@ func (s *Service) Await(ctx context.Context, c Caller, req *oapv1.AwaitRequest, 
 		}
 		for _, e := range page {
 			after = e.Revision
-			if e.Operation != id {
+			index(e)
+			ev, app := s.event(e, apps, steps)
+			if ev == nil || !match(e.Operation, app) {
 				continue
 			}
-			ev := &oapv1.Event{Revision: e.Revision, At: timestamppb.New(e.At)}
-			switch e.Kind {
-			case KindApply:
-				je, err := decode(e.Data)
-				if err != nil {
-					return err
-				}
-				if p, err := s.proposal(ctx, je.GetParentId()); err == nil {
-					steps = p.GetSteps()
-				}
-				continue
-			case engine.KindStep:
-				prog := &oapv1.OperationProgress{OperationId: id, StepIndex: int32(e.Step), State: stepState(e.State)}
-				if e.Step < len(steps) {
-					prog.Step = proto.Clone(steps[e.Step]).(*oapv1.Step)
-				}
-				ev.Kind = &oapv1.Event_OperationProgress{OperationProgress: prog}
-			case KindOutcome:
-				je, err := decode(e.Data)
-				if err != nil {
-					return err
-				}
-				ev.Kind = &oapv1.Event_Outcome{Outcome: je.GetOutcome()}
-				return send(ev)
-			default:
-				continue
-			}
-			if err := send(ev); err != nil {
+			stop, err := emit(ev)
+			if err != nil || stop {
 				return err
 			}
 		}
-		if !s.Clock.Now().Before(deadline) {
-			return send(&oapv1.Event{Revision: after, At: timestamppb.New(s.Clock.Now()), Kind: &oapv1.Event_Outcome{Outcome: &oapv1.Outcome{
-				OperationId: id, Status: oapv1.OutcomeStatus_OUTCOME_STATUS_UNCERTAIN,
-				Reasons: []*oapv1.Reason{{Why: "service.await_timeout", Message: fmt.Sprintf("no outcome within %s; await again", timeout)}}}}})
+		if !deadline.IsZero() && !s.Clock.Now().Before(deadline) {
+			return errDeadline
 		}
-		// Wait for the journal to change. The periodic wake-up re-checks the
-		// deadline, which is measured on the service's clock.
 		select {
 		case <-changed:
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(time.Second):
+		case <-time.After(time.Second): // re-check the deadline
 		}
 	}
+}
+
+// event turns a journal entry into an API event and names its application.
+func (s *Service) event(e ops.Entry, apps map[string]string, steps map[string][]*oapv1.Step) (*oapv1.Event, string) {
+	ev := &oapv1.Event{Revision: e.Revision, At: timestamppb.New(e.At)}
+	switch e.Kind {
+	case engine.KindStep:
+		prog := &oapv1.OperationProgress{OperationId: e.Operation, StepIndex: int32(e.Step), State: stepState(e.State)}
+		if st := steps[e.Operation]; e.Step < len(st) {
+			prog.Step = proto.Clone(st[e.Step]).(*oapv1.Step)
+		}
+		ev.Kind = &oapv1.Event_OperationProgress{OperationProgress: prog}
+		return ev, apps[e.Operation]
+	case KindProposal, KindApply, KindOutcome:
+		je, err := decode(e.Data)
+		if err != nil {
+			return nil, ""
+		}
+		if e.Kind == KindOutcome {
+			ev.Kind = &oapv1.Event_Outcome{Outcome: je.GetOutcome()}
+			return ev, apps[e.Operation]
+		}
+		ev.Kind = &oapv1.Event_JournalEntry{JournalEntry: je}
+		if e.Kind == KindProposal {
+			return ev, je.GetProposal().GetIntent().GetApplication()
+		}
+		return ev, apps[e.Operation]
+	}
+	return nil, ""
 }
 
 // entriesFor fails when no apply entry exists for an operation.

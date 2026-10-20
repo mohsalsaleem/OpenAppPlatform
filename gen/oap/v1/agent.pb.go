@@ -432,8 +432,11 @@ type AwaitRequest struct {
 	OperationId string                 `protobuf:"bytes,1,opt,name=operation_id,json=operationId,proto3" json:"operation_id,omitempty"`
 	// Give up after this many seconds and return an uncertain outcome.
 	TimeoutSeconds int32 `protobuf:"varint,2,opt,name=timeout_seconds,json=timeoutSeconds,proto3" json:"timeout_seconds,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// Resume after this revision: events at or before it were already seen.
+	// 0 streams the operation from its start.
+	SinceRevision uint64 `protobuf:"varint,3,opt,name=since_revision,json=sinceRevision,proto3" json:"since_revision,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AwaitRequest) Reset() {
@@ -476,6 +479,13 @@ func (x *AwaitRequest) GetOperationId() string {
 func (x *AwaitRequest) GetTimeoutSeconds() int32 {
 	if x != nil {
 		return x.TimeoutSeconds
+	}
+	return 0
+}
+
+func (x *AwaitRequest) GetSinceRevision() uint64 {
+	if x != nil {
+		return x.SinceRevision
 	}
 	return 0
 }
@@ -1126,10 +1136,11 @@ const file_oap_v1_agent_proto_rawDesc = "" +
 	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12\x19\n" +
 	"\bentry_id\x18\x02 \x01(\tR\aentryId\"4\n" +
 	"\rWatchResponse\x12#\n" +
-	"\x05event\x18\x01 \x01(\v2\r.oap.v1.EventR\x05event\"Z\n" +
+	"\x05event\x18\x01 \x01(\v2\r.oap.v1.EventR\x05event\"\x81\x01\n" +
 	"\fAwaitRequest\x12!\n" +
 	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12'\n" +
-	"\x0ftimeout_seconds\x18\x02 \x01(\x05R\x0etimeoutSeconds\"4\n" +
+	"\x0ftimeout_seconds\x18\x02 \x01(\x05R\x0etimeoutSeconds\x12%\n" +
+	"\x0esince_revision\x18\x03 \x01(\x04R\rsinceRevision\"4\n" +
 	"\rAwaitResponse\x12#\n" +
 	"\x05event\x18\x01 \x01(\v2\r.oap.v1.EventR\x05event\"P\n" +
 	"\x0eExplainRequest\x12 \n" +

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -141,21 +142,40 @@ func TestSameResultOverEveryProtocol(t *testing.T) {
 	}
 }
 
-// TestUnavailablePrimitivesSayWhy: watch and ask report Unimplemented,
-// over a gRPC stream and a unary call.
-func TestUnavailablePrimitivesSayWhy(t *testing.T) {
+// TestAskSaysWhyItIsUnavailable: ask reports Unimplemented with a reason.
+func TestAskSaysWhyItIsUnavailable(t *testing.T) {
 	ts, h2 := server(t)
 	c := oapv1connect.NewAgentServiceClient(h2, ts.URL, connect.WithGRPC())
-	stream, err := c.Watch(ctx, connect.NewRequest(&oapv1.WatchRequest{}))
-	if err == nil {
-		for stream.Receive() {
-		}
-		err = stream.Err()
-	}
-	if connect.CodeOf(err) != connect.CodeUnimplemented {
-		t.Fatalf("watch: %v", err)
-	}
 	if _, err := c.Ask(ctx, connect.NewRequest(&oapv1.AskRequest{})); connect.CodeOf(err) != connect.CodeUnimplemented {
 		t.Fatalf("ask: %v", err)
+	}
+}
+
+// TestWatchResumesOverGRPC: a gRPC watch dropped by the client and resumed
+// from its last revision continues exactly where it stopped.
+func TestWatchResumesOverGRPC(t *testing.T) {
+	ts, h2 := server(t)
+	for name, opt := range map[string]connect.ClientOption{"grpc": connect.WithGRPC(), "grpc-web": connect.WithGRPCWeb(), "connect": connect.WithProtoJSON()} {
+		c := oapv1connect.NewAgentServiceClient(h2, ts.URL, opt)
+		read := func(since uint64, n int) []uint64 {
+			cctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+			stream, err := c.Watch(cctx, connect.NewRequest(&oapv1.WatchRequest{SinceRevision: since}))
+			if err != nil {
+				t.Fatalf("%s: %v", name, err)
+			}
+			var revs []uint64
+			for len(revs) < n && stream.Receive() {
+				revs = append(revs, stream.Msg().Event.Revision)
+			}
+			stream.Close() // the client goes away
+			return revs
+		}
+		all := read(1, 6)
+		first := read(1, 2)
+		rest := read(first[len(first)-1], 4)
+		if got := append(first, rest...); fmt.Sprint(got) != fmt.Sprint(all) || len(all) != 6 {
+			t.Fatalf("%s: resumed %v, want %v", name, got, all)
+		}
 	}
 }

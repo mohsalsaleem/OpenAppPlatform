@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/model"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/spec"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/engine"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -392,5 +395,166 @@ func TestWrongHostAtTheEdgeIsAGap(t *testing.T) {
 	}
 	if len(x.Gaps) != 1 || len(x.Causes) == 0 || x.Causes[0].Why != "explain.routes" {
 		t.Fatalf("explain: %v", x)
+	}
+}
+
+var errEnough = errors.New("test: enough events")
+
+// collect streams with watch from a revision until it has seen the event at
+// revision until, or stops after limit events (a disconnect).
+func collect(t *testing.T, r *rig, since uint64, app string, until uint64, limit int) []*oapv1.Event {
+	t.Helper()
+	var evs []*oapv1.Event
+	cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	err := r.svc.Watch(cctx, Owner, &oapv1.WatchRequest{SinceRevision: since, Application: app}, func(e *oapv1.Event) error {
+		evs = append(evs, e)
+		if e.Revision >= until || len(evs) == limit {
+			return errEnough
+		}
+		return nil
+	})
+	if !errors.Is(err, errEnough) {
+		t.Fatalf("watch ended: %v", err)
+	}
+	return evs
+}
+
+func revisions(evs []*oapv1.Event) []uint64 {
+	var out []uint64
+	for _, e := range evs {
+		out = append(out, e.Revision)
+	}
+	return out
+}
+
+// TestWatchResumesWithoutGapsOrRepeats: cutting the stream after every
+// possible event and resuming from the last revision seen yields exactly
+// the uninterrupted stream.
+func TestWatchResumesWithoutGapsOrRepeats(t *testing.T) {
+	r := newRig(t)
+	seed(t, r)
+	start, _ := r.journal.Head(ctx)
+	r.create(t)
+	p, _ := r.svc.Propose(ctx, Owner, &oapv1.ProposeRequest{Intent: scale("site", 2)})
+	a, _ := r.svc.Apply(ctx, Owner, &oapv1.ApplyRequest{ProposalId: p.Proposal.Id})
+	r.await(t, a.OperationId)
+	end, _ := r.journal.Head(ctx)
+	full := collect(t, r, start, "", end, 0)
+	if len(full) < 10 || full[len(full)-1].Revision != end {
+		t.Fatalf("full stream: %v", revisions(full))
+	}
+	for i := 1; i < len(full); i++ {
+		if full[i].Revision != full[i-1].Revision+1 {
+			t.Fatalf("gap in the full stream: %v", revisions(full))
+		}
+	}
+	for cut := 1; cut < len(full); cut++ {
+		first := collect(t, r, start, "", end, cut)
+		rest := collect(t, r, first[len(first)-1].Revision, "", end, 0)
+		got := append(first, rest...)
+		if fmt.Sprint(revisions(got)) != fmt.Sprint(revisions(full)) {
+			t.Fatalf("cut after %d: %v, want %v", cut, revisions(got), revisions(full))
+		}
+		for i := range got {
+			if !proto.Equal(got[i], full[i]) {
+				t.Fatalf("cut after %d: event %d differs", cut, i)
+			}
+		}
+	}
+	// Live: a watcher started now sees the next operation as it happens.
+	head, _ := r.journal.Head(ctx)
+	done := make(chan []*oapv1.Event, 1)
+	go func() {
+		var evs []*oapv1.Event
+		r.svc.Watch(ctx, Owner, &oapv1.WatchRequest{Application: "site"}, func(e *oapv1.Event) error {
+			evs = append(evs, e)
+			if e.GetOutcome() != nil {
+				done <- evs
+				return errEnough
+			}
+			return nil
+		})
+	}()
+	time.Sleep(50 * time.Millisecond)
+	p, _ = r.svc.Propose(ctx, Owner, &oapv1.ProposeRequest{Intent: scale("site", 1)})
+	a, _ = r.svc.Apply(ctx, Owner, &oapv1.ApplyRequest{ProposalId: p.Proposal.Id})
+	select {
+	case evs := <-done:
+		if evs[0].Revision != head+1 || evs[0].GetJournalEntry().GetProposal() == nil {
+			t.Fatalf("live watch began with %v", evs[0])
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("live watch saw no outcome")
+	}
+}
+
+func TestWatchFiltersByApplication(t *testing.T) {
+	r := newRig(t)
+	seed(t, r)
+	start, _ := r.journal.Head(ctx)
+	r.create(t)
+	other := strings.Replace(siteJSON, `"name": "site"`, `"name": "blog"`, 1)
+	other = strings.Replace(other, "site.example.com", "blog.example.com", 1)
+	p, err := r.svc.Propose(ctx, Owner, &oapv1.ProposeRequest{Intent: patch(t, "blog", other)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, _ := r.svc.Apply(ctx, Owner, &oapv1.ApplyRequest{ProposalId: p.Proposal.Id})
+	r.await(t, a.OperationId)
+	end, _ := r.journal.Head(ctx)
+	all := collect(t, r, start, "", end, 0)
+	cctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	var blog []*oapv1.Event
+	r.svc.Watch(cctx, Owner, &oapv1.WatchRequest{SinceRevision: start, Application: "blog"}, func(e *oapv1.Event) error {
+		blog = append(blog, e)
+		if e.Revision >= end {
+			return errEnough
+		}
+		return nil
+	})
+	if len(blog) == 0 || len(blog) >= len(all) {
+		t.Fatalf("blog events %d of %d", len(blog), len(all))
+	}
+	for _, e := range blog {
+		if id := e.GetOperationProgress().GetOperationId(); id != "" && id != a.OperationId {
+			t.Fatalf("site's event in blog's stream: %v", e)
+		}
+	}
+}
+
+// TestAwaitResumes: an await cut after any event and resumed from the
+// last revision seen ends with the same events as one uninterrupted.
+func TestAwaitResumes(t *testing.T) {
+	r := newRig(t)
+	op := r.create(t)
+	var full []*oapv1.Event
+	r.svc.Await(ctx, Owner, &oapv1.AwaitRequest{OperationId: op}, func(e *oapv1.Event) error { full = append(full, e); return nil })
+	for cut := 1; cut < len(full); cut++ {
+		var got []*oapv1.Event
+		r.svc.Await(ctx, Owner, &oapv1.AwaitRequest{OperationId: op}, func(e *oapv1.Event) error {
+			got = append(got, e)
+			if len(got) == cut {
+				return errEnough
+			}
+			return nil
+		})
+		r.svc.Await(ctx, Owner, &oapv1.AwaitRequest{OperationId: op, SinceRevision: got[len(got)-1].Revision}, func(e *oapv1.Event) error {
+			got = append(got, e)
+			return nil
+		})
+		if fmt.Sprint(revisions(got)) != fmt.Sprint(revisions(full)) {
+			t.Fatalf("cut after %d: %v, want %v", cut, revisions(got), revisions(full))
+		}
+	}
+}
+
+// seed writes one journal entry, so a test's starting revision isn't 0,
+// which Watch reads as "from now".
+func seed(t *testing.T, r *rig) {
+	t.Helper()
+	if _, err := r.svc.Propose(ctx, Owner, &oapv1.ProposeRequest{Intent: patch(t, "seed", strings.Replace(siteJSON, "site.example.com", "seed.example.com", 1))}); err != nil {
+		t.Fatal(err)
 	}
 }

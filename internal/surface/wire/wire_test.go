@@ -175,6 +175,7 @@ var documented64 = map[string]bool{
 	"oap.v1.JournalEntry.base_revision":       true,
 	"oap.v1.Proposal.base_revision":           true,
 	"oap.v1.WatchRequest.since_revision":      true,
+	"oap.v1.AwaitRequest.since_revision":      true,
 	"oap.v1.ProposeRequest.expected_revision": true,
 	"oap.v1.ExplainResponse.revision":         true,
 }

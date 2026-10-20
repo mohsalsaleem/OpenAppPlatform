@@ -94,7 +94,9 @@ func (s *Server) Observe(ctx context.Context, req *connect.Request[oapv1.Observe
 }
 
 func (s *Server) Watch(ctx context.Context, req *connect.Request[oapv1.WatchRequest], stream *connect.ServerStream[oapv1.WatchResponse]) error {
-	return toConnect(&service.Error{Code: service.Unimplemented, Detail: &oapv1.ErrorDetail{Why: service.WhyNotAvailable, Message: "watch isn't available yet (task R3.3); use await for an operation"}})
+	return toConnect(s.Service.Watch(ctx, s.Caller, req.Msg, func(e *oapv1.Event) error {
+		return stream.Send(&oapv1.WatchResponse{Event: e})
+	}))
 }
 
 func (s *Server) Propose(ctx context.Context, req *connect.Request[oapv1.ProposeRequest]) (*connect.Response[oapv1.ProposeResponse], error) {
