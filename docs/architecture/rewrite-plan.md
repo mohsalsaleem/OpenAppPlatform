@@ -223,7 +223,7 @@ the password from the terminal.
 
 | Decision (rewrite doc §17) | Needed before | Recommendation |
 |---|---|---|
-| Default session approval mode | R3.6 | Approve every session; offer trusted identity at first login |
+| Default session approval mode | R3.6 | **Decided** (owner, 2026-10-20): trusted agent identity. The owner approves an agent's identity once (bound to a key the agent holds); its later sessions sign in automatically and the owner is notified. Approving every session stays available as a setting |
 | Default autonomy for a fresh install | R3.9 | Routine changes allowed; everything else asks |
 | Turso Cloud or self-hosted libSQL | R5.4 | Self-hosted option first, Cloud as opt-in |
 | Harness packages first | R5.4 | Claude Code skills and generic MCP |
