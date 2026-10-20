@@ -193,8 +193,48 @@ func (b *builder) component(name string, deps []int) int {
 				last = b.add(step(oapv1.StepKind_STEP_KIND_EDGE_RELOAD_CONFIRMED, name, 0, "", ""), routes...)
 			}
 		}
+		// Same release, still routed, different routes (a new domain or
+		// path): route-add sets each instance's routes to the desired ones
+		// in one edge change, then the reload is confirmed. Nothing stops.
+		if isRouted && wasRouted && routesChanged(b.in.Old, b.in.New, name) {
+			var routes []int
+			for i := 1; i <= min(n, o); i++ {
+				routes = append(routes, b.add(step(oapv1.StepKind_STEP_KIND_ROUTE_ADD, name, i, newRel, ""), prev...))
+			}
+			if len(routes) > 0 {
+				last = b.add(step(oapv1.StepKind_STEP_KIND_EDGE_RELOAD_CONFIRMED, name, 0, "", ""), routes...)
+			}
+		}
 	}
 	return last
+}
+
+// routeKeys lists a component's routes as domain, path and prefix handling.
+func routeKeys(app *spec.Application, name string) []string {
+	if app == nil || app.Ingress == nil {
+		return nil
+	}
+	var keys []string
+	for path, r := range app.Ingress.Routes {
+		if r.Component == name {
+			keys = append(keys, fmt.Sprintf("%s|%s|%t", app.Ingress.Domain, path, r.StripPrefix))
+		}
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func routesChanged(old, new *spec.Application, name string) bool {
+	a, b := routeKeys(old, name), routeKeys(new, name)
+	if len(a) != len(b) {
+		return true
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return true
+		}
+	}
+	return false
 }
 
 // startInstance starts an instance, waits for it and routes it if needed.

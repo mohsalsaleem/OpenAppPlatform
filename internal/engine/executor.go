@@ -258,7 +258,9 @@ func (x *Executor) step(ctx context.Context, op Operation, i int, s *oapv1.Step)
 			return stepDetail{}, err
 		}
 		if s.Kind == oapv1.StepKind_STEP_KIND_ROUTE_ADD {
-			cfg = ops.WithMembers(cfg, ops.Members(op.New, r)...)
+			// Set the instance's routes to the desired ones: adding a new
+			// instance, or moving one to a new domain or path, in one change.
+			cfg = ops.WithMembers(ops.WithoutInstance(cfg, r), ops.Members(op.New, r)...)
 		} else {
 			cfg = ops.WithoutInstance(cfg, r)
 		}

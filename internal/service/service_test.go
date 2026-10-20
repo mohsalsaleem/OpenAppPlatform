@@ -331,3 +331,36 @@ func TestResumeAfterCrash(t *testing.T) {
 		t.Fatalf("%d outcomes for one operation", outcomes)
 	}
 }
+
+// TestDomainChangeMovesRoutes: changing an application's domain, with no
+// new release, moves its routes at the edge: the new host is routed and
+// the old one isn't, and nothing restarts. (Found deploying Nisha Shipping:
+// the plan wrote desired state and changed nothing at the edge.)
+func TestDomainChangeMovesRoutes(t *testing.T) {
+	r := newRig(t)
+	r.create(t)
+	running := r.runtime.Running()
+	p, err := r.svc.Propose(ctx, Owner, &oapv1.ProposeRequest{Intent: patch(t, "site", `{"ingress": {"domain": "www.example.com"}}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := r.svc.Apply(ctx, Owner, &oapv1.ApplyRequest{ProposalId: p.Proposal.Id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	evs := r.await(t, a.OperationId)
+	if evs[len(evs)-1].GetOutcome().GetStatus() != oapv1.OutcomeStatus_OUTCOME_STATUS_ACHIEVED {
+		t.Fatalf("outcome %v", evs[len(evs)-1])
+	}
+	cfg, _, _ := r.edge.Config(ctx)
+	hosts := map[string]bool{}
+	for _, m := range cfg.Members {
+		hosts[m.Host] = true
+	}
+	if !hosts["www.example.com"] || hosts["site.example.com"] || len(hosts) != 1 {
+		t.Fatalf("edge hosts after the domain change: %v (plan: %v)", hosts, p.Proposal.Steps)
+	}
+	if now := r.runtime.Running(); len(now) != len(running) || now[0] != running[0] {
+		t.Fatalf("instances changed: %v -> %v", running, now)
+	}
+}
