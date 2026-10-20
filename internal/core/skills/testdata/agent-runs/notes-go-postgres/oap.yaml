@@ -1,0 +1,46 @@
+api_version: oap.dev/v1
+kind: Application
+name: notes
+environment: production
+ingress:
+  domain: notes.139-180-132-23.sslip.io
+  routes:
+    /:
+      component: web
+components:
+  db:
+    kind: data
+    image: postgres:16.4-alpine
+    instances: 1
+    volumes:
+      data: /var/lib/postgresql/data
+    env:
+      POSTGRES_USER: notes
+      POSTGRES_DB: notes
+    secrets:
+      POSTGRES_PASSWORD: notes-db-password
+    resources: {memory_mib: 256, cpu_millis: 400}
+  migrate:
+    kind: job
+    image: ghcr.io/example/notes-migrate:1.3.0
+    uses:
+      db: {type: database}
+    secrets:
+      DATABASE_URL: notes-database-url
+    resources: {memory_mib: 64, cpu_millis: 100}
+  web:
+    kind: web
+    image: ghcr.io/example/notes:1.3.0
+    port: 8080
+    instances: 1
+    health: {mode: http, path: /healthz}
+    after: [migrate]
+    uses:
+      db: {type: database}
+    env:
+      PORT: "8080"
+      LOG_LEVEL: info
+    secrets:
+      DATABASE_URL: notes-database-url
+      SESSION_SECRET: notes-session-secret
+    resources: {memory_mib: 128, cpu_millis: 300}

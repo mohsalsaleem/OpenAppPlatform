@@ -1,0 +1,48 @@
+api_version: oap.dev/v1
+kind: Application
+name: shop
+environment: production
+ingress:
+  domain: shop.example.com
+  routes:
+    /:
+      component: web
+components:
+  redis:
+    kind: data
+    image: redis:7.4-alpine
+    port: 6379
+    instances: 1
+    volumes:
+      data: /data
+    resources: {memory_mib: 128, cpu_millis: 200}
+  web:
+    kind: web
+    image: ghcr.io/example/shop:2.1.0
+    port: 3000
+    instances: 1
+    health: {mode: http, path: /health}
+    uses:
+      redis: {type: queue}
+    env:
+      PORT: "3000"
+      PUBLIC_BASE_URL: https://shop.example.com
+      REDIS_URL: redis://redis.shop.oap.internal:6379
+    secrets:
+      STRIPE_SECRET_KEY: shop-stripe-secret-key
+    resources: {memory_mib: 256, cpu_millis: 400}
+  worker:
+    kind: worker
+    image: ghcr.io/example/shop:2.1.0
+    instances: 1
+    health: {mode: image}
+    uses:
+      redis: {type: queue}
+    env:
+      ROLE: worker
+      REDIS_URL: redis://redis.shop.oap.internal:6379
+      SMTP_HOST: smtp.mailprovider.example
+      SMTP_USER: shop@example.com
+    secrets:
+      SMTP_PASSWORD: shop-smtp-password
+    resources: {memory_mib: 192, cpu_millis: 300}
