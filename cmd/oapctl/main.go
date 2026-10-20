@@ -70,6 +70,8 @@ const usage = `Usage:
   %[1]s host fix [ADDR]     apply the fixes the check proposes, each approved by you [--json: show them]
   %[1]s host undo FIX [ADDR] undo a fix OAP applied
   %[1]s host install [ADDR] --image IMAGE   install oapd and Caddy on the server
+  %[1]s host handoff [ADDR]                 remove OAP's SSH key once an owner key works; agents then work only through OAP
+  %[1]s host uninstall [ADDR] [--keep-access]   reverse everything OAP did on the server, each step approved by you
   %[1]s app apply FILE [ADDR]               create or update an application from its oap.yaml
   %[1]s app scale APP COMPONENT N [ADDR]    run N instances of a component
   %[1]s mcp [ADDR]                          serve OAP's tools over MCP on stdin and stdout
@@ -79,7 +81,7 @@ const usage = `Usage:
   %[1]s login URL --agent NAME             sign an agent in; the owner approves it once
   %[1]s briefing [APP]                      the briefing for agents: what runs, what you may do, house rules
   %[1]s ask QUESTION [--kind K] [--option O]... [--wait]   involve the owner (as an agent)
-  %[1]s owner logins|approve|deny|agents|revoke|pause|resume|mode|asks|answer|briefing   the owner's control over agents
+  %[1]s owner enroll|keys|logins|approve|deny|agents|revoke|pause|resume|mode|asks|answer|briefing   the owner's control over agents
   With OAP_AGENT=NAME, agent API commands run as that signed-in agent.
   Agent API commands take --json (the result as JSON) or --events (each event as a JSON line).
 `
@@ -102,6 +104,10 @@ func (a *app) run(ctx context.Context, args []string) int {
 		return a.hostUndo(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "host" && args[1] == "install":
 		return a.hostInstall(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "host" && args[1] == "handoff":
+		return a.hostHandoff(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "host" && args[1] == "uninstall":
+		return a.hostUninstall(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "app" && args[1] == "apply":
 		return a.appApply(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "app" && args[1] == "scale":
@@ -167,6 +173,20 @@ func (a *app) frontDoor(ctx context.Context, asJSON bool) int {
 		}
 	case host.StageInstalled:
 		if code := a.ownerEnroll(ctx, "", false); code != 0 {
+			return code
+		}
+		next, err := a.server(s.Address)
+		if err != nil {
+			return a.fail(err)
+		}
+		s = next
+	case host.StageOwned:
+		a.u().Status(host.Plan(s, a.cli))
+		if !a.u().Confirm(fmt.Sprintf("Remove OAP's SSH key from %s now?", s.Address)) {
+			a.u().Note("Not handed off yet.")
+			return host.ExitOK
+		}
+		if code := a.hostHandoff(ctx, []string{s.Address}); code != 0 {
 			return code
 		}
 		next, err := a.server(s.Address)

@@ -31,6 +31,9 @@ type fakeSSH struct {
 	dir       string   // where scripts sent over ssh are saved, in order
 	scripts   []string // their paths
 	manifest  string   // what the host manifest holds, for undo
+	// keyElsewhere keeps the key working after a script removes it from
+	// authorized_keys, as when it is also authorized somewhere else.
+	keyElsewhere bool
 }
 
 // ran returns every script the fake server received.
@@ -70,10 +73,14 @@ func (f *fakeSSH) command(ctx context.Context, name string, args ...string) *exe
 		}
 		manifest := filepath.Join(f.dir, "manifest")
 		os.WriteFile(manifest, []byte(f.manifest), 0o600)
+		// Once a script removes OAP's key, the server refuses it.
+		gone, keep := filepath.Join(f.dir, "key-removed"), fmt.Sprint(f.keyElsewhere)
 		return exec.Command("sh", "-c", `cat > "$1"
-if grep -q 'kv probe.done' "$1"; then `+probeOut+`
+if [ -f "$3" ]; then echo "root@203.0.113.5: Permission denied (publickey)." >&2; exit 255; fi
+if grep -q 'n=$(grep -cF' "$1"; then [ "$4" = true ] || touch "$3"; echo 1
+elif grep -q 'kv probe.done' "$1"; then `+probeOut+`
 elif grep -q '^cat /var/lib/oap' "$1"; then cat "$2"
-fi`, "sh", path, manifest)
+fi`, "sh", path, manifest, gone, keep)
 	}
 	return exec.Command("true")
 }
@@ -138,7 +145,7 @@ func TestFrontDoorGolden(t *testing.T) {
 			Findings: findings(t, "container-ubuntu-24-04.txt")}, host.ExitOwner},
 		{"ready", &host.Server{Address: "root@203.0.113.5", Stage: host.StageReady, Summary: "Debian GNU/Linux 12 (bookworm), aarch64, 2 CPUs, 3931 MiB memory, 28.6 GiB disk free"}, host.ExitOK},
 		{"installed", &host.Server{Address: "root@203.0.113.5", Stage: host.StageInstalled}, host.ExitOwner},
-		{"owned", &host.Server{Address: "root@203.0.113.5", Stage: host.StageOwned}, host.ExitNotBuiltYet},
+		{"owned", &host.Server{Address: "root@203.0.113.5", Stage: host.StageOwned}, host.ExitOK},
 		{"handed-off", &host.Server{Address: "root@203.0.113.5", Stage: host.StageHandedOff}, host.ExitOK},
 	}
 	for _, s := range states {
@@ -153,10 +160,10 @@ func TestFrontDoorGolden(t *testing.T) {
 				var code int
 				if mode == "json" {
 					code = h.run("--json")
-				} else if s.server != nil && s.server.Stage != host.StageNew && s.server.Stage != host.StageConnected && s.name != "checked-fixes" && s.server.Stage != host.StageInstalled {
+				} else if s.server != nil && s.server.Stage != host.StageNew && s.server.Stage != host.StageConnected && s.name != "checked-fixes" && s.server.Stage != host.StageInstalled && s.server.Stage != host.StageOwned {
 					code = h.run()
 				} else {
-					continue // on a terminal these start connecting, checking, fixing or enrolling: TestFirstRunOnTerminal, fix_test.go, TestOwnerEnroll
+					continue // on a terminal these start connecting, checking, fixing, enrolling or handing off: TestFirstRunOnTerminal, fix_test.go, TestOwnerEnroll, TestHandoff
 				}
 				if code != s.exit {
 					t.Fatalf("%s: exit %d, want %d\n%s", mode, code, s.exit, h.out.String())

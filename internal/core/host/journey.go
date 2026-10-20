@@ -139,8 +139,10 @@ func Plan(s *Server, cli string) Status {
 			Command:  cli + " owner enroll", Then: then}
 		st.Exit = ExitOwner
 	case StageOwned:
-		st.Next = Next{Step: "hand-off", By: ByAgent, Why: "The agent signs in with a device login and the bootstrap key is removed.", Task: "R3.14", Then: then}
-		st.Exit = ExitNotBuiltYet
+		st.Next = Next{Step: "hand-off", By: ByAgent,
+			Why:     "With the owner key working, OAP's SSH key is removed and proven refused; agents then sign in with a device login and work only through OAP.",
+			Command: fmt.Sprintf("%s host handoff %s", cli, s.Address), Then: then}
+		st.Exit = ExitOK
 	case StageHandedOff:
 		st.Next = Next{Step: "done", By: ByAgent, Why: "Onboarding is complete; the agent works through OAP from here."}
 		st.Exit = ExitOK

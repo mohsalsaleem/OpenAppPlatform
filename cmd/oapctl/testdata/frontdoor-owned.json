@@ -1,12 +1,12 @@
-exit 5
+exit 0
 {
   "state": "owned",
   "server": "root@203.0.113.5",
   "next": {
     "step": "hand-off",
     "by": "agent",
-    "why": "The agent signs in with a device login and the bootstrap key is removed.",
-    "task": "R3.14",
+    "why": "With the owner key working, OAP's SSH key is removed and proven refused; agents then sign in with a device login and work only through OAP.",
+    "command": "oap host handoff root@203.0.113.5",
     "then": "oap --json"
   },
   "journey": [

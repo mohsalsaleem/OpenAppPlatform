@@ -100,7 +100,11 @@ func (a *app) shipImage(ctx context.Context, t sshhost.Target, image string) err
 		if err := save.Start(); err != nil {
 			return err
 		}
-		_, rerr := a.ssh.Remote(ctx, t, "docker load", pipe, progress)
+		load, err := host.LoadImageCommand(image)
+		if err != nil {
+			return err
+		}
+		_, rerr := a.ssh.Remote(ctx, t, load, pipe, progress)
 		if err := save.Wait(); err != nil {
 			return fmt.Errorf("docker save: %v %s", err, errb.String())
 		}

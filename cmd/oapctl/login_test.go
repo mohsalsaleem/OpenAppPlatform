@@ -298,7 +298,7 @@ func TestOwnerEnroll(t *testing.T) {
 	}
 	t.Setenv("OAP_AGENT", "")
 	t.Setenv("OAP_AGENT_URL", local) // the local socket, as SSH would reach it
-	if code := h.run(); code != host.ExitNotBuiltYet || !strings.Contains(h.out.String(), "holds an owner key") {
+	if code := h.run(); code != host.ExitOK || !strings.Contains(h.out.String(), "holds an owner key") || !strings.Contains(h.out.String(), "host handoff") {
 		t.Fatalf("front door at installed: %d %s", code, h.out.String())
 	}
 	if s, _ := h.a.server(""); s.Stage != host.StageOwned {
