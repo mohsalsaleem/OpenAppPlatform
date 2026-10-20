@@ -28,6 +28,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/ports"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/service"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/agentapi"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/mcp"
 )
 
 // Version is set at build time.
@@ -162,6 +163,7 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 
 	mux := http.NewServeMux()
 	mux.Handle((&agentapi.Server{Service: svc, Caller: service.Owner}).Handler())
+	mux.Handle("/mcp", &mcp.Server{Service: svc, Caller: service.Owner})
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
 	if err := os.MkdirAll(filepath.Dir(c.socket), 0o700); err != nil {
 		return err

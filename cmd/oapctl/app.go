@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -25,6 +28,9 @@ import (
 // for its agent API. Until device login (R3.6) this is how the owner's
 // machine reaches OAP; the forward ends with ctx.
 func (a *app) agentClient(ctx context.Context, s *host.Server) (oapv1connect.AgentServiceClient, func(), error) {
+	if u := os.Getenv("OAP_AGENT_URL"); u != "" { // an agent API reached directly, as in tests
+		return oapv1connect.NewAgentServiceClient(http.DefaultClient, u), func() {}, nil
+	}
 	t, err := a.target(s.Address)
 	if err != nil {
 		return nil, nil, err
@@ -89,24 +95,26 @@ func (a *app) appApply(ctx context.Context, args []string) int {
 	if len(probs) > 0 {
 		return a.fail(fmt.Errorf("%s: %s at %s: %s", file, probs[0].Why, probs[0].Path, probs[0].Message))
 	}
-	s, err := a.server(addr)
+	s, err := a.serverFor(addr)
 	if err != nil {
 		return a.fail(err)
 	}
-	if s.Install == "" {
-		return a.fail(fmt.Errorf("OAP isn't installed on %s; run %s host install first", s.Address, a.cli))
-	}
-	t, err := a.target(s.Address)
-	if err != nil {
-		return a.fail(err)
-	}
-	// Images built on this machine are sent to the server; others are
-	// pulled from their registry when they start.
-	for _, name := range app.Names() {
-		img := app.Components[name].Image
-		if _, _, err := a.localImage(ctx, img); err == nil {
-			if err := a.shipImage(ctx, t, img); err != nil {
-				return a.fail(err)
+	if os.Getenv("OAP_AGENT_URL") == "" {
+		if s.Install == "" {
+			return a.fail(fmt.Errorf("OAP isn't installed on %s; run %s host install first", s.Address, a.cli))
+		}
+		t, err := a.target(s.Address)
+		if err != nil {
+			return a.fail(err)
+		}
+		// Images built on this machine are sent to the server; others are
+		// pulled from their registry when they start.
+		for _, name := range app.Names() {
+			img := app.Components[name].Image
+			if _, _, err := a.localImage(ctx, img); err == nil {
+				if err := a.shipImage(ctx, t, img); err != nil {
+					return a.fail(err)
+				}
 			}
 		}
 	}
@@ -256,7 +264,7 @@ func (a *app) appScale(ctx context.Context, args []string) int {
 	if len(pos) > 3 {
 		addr = pos[3]
 	}
-	s, err := a.server(addr)
+	s, err := a.serverFor(addr)
 	if err != nil {
 		return a.fail(err)
 	}
@@ -276,4 +284,59 @@ func (a *app) appScale(ctx context.Context, args []string) int {
 		a.u().Success(fmt.Sprintf("%s/%s runs %d instances (operation %s).", pos[0], pos[1], n, opID))
 	}
 	return code
+}
+
+// serverFor is the server a command acts on; with OAP_AGENT_URL set it is
+// whatever that URL serves.
+func (a *app) serverFor(addr string) (*host.Server, error) {
+	if u := os.Getenv("OAP_AGENT_URL"); u != "" {
+		return &host.Server{Address: u}, nil
+	}
+	return a.server(addr)
+}
+
+// mcpStdio serves MCP on stdin and stdout for an agent on this machine,
+// relaying each message to oapd's MCP endpoint over the SSH forward.
+func (a *app) mcpStdio(ctx context.Context, args []string) int {
+	addr, _ := splitFirst(args)
+	s, err := a.serverFor(addr)
+	if err != nil {
+		return a.fail(err)
+	}
+	endpoint, client := os.Getenv("OAP_AGENT_URL"), http.DefaultClient
+	if endpoint == "" {
+		t, err := a.target(s.Address)
+		if err != nil {
+			return a.fail(err)
+		}
+		sock := filepath.Join(t.Dir, "mcp.sock")
+		fwd, err := a.ssh.Forward(ctx, t, sock, host.OapdSocket)
+		if err != nil {
+			return a.fail(err)
+		}
+		defer func() { fwd.Process.Kill(); fwd.Wait(); os.Remove(sock) }()
+		client = &http.Client{Transport: &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			var d net.Dialer
+			return d.DialContext(ctx, "unix", sock)
+		}}}
+		endpoint = "http://oapd"
+	}
+	sc := bufio.NewScanner(a.in)
+	sc.Buffer(make([]byte, 64*1024), 8*1024*1024)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" {
+			continue
+		}
+		resp, err := client.Post(endpoint+"/mcp", "application/json", strings.NewReader(line))
+		if err != nil {
+			return a.fail(err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			fmt.Fprintf(a.out, "%s\n", bytes.TrimSpace(body))
+		}
+	}
+	return 0
 }

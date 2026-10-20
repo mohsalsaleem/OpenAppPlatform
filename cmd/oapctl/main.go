@@ -68,6 +68,7 @@ const usage = `Usage:
   %[1]s host install [ADDR] --image IMAGE   install oapd and Caddy on the server
   %[1]s app apply FILE [ADDR]               create or update an application from its oap.yaml
   %[1]s app scale APP COMPONENT N [ADDR]    run N instances of a component
+  %[1]s mcp [ADDR]                          serve OAP's tools over MCP on stdin and stdout
 `
 
 func (a *app) run(ctx context.Context, args []string) int {
@@ -92,6 +93,8 @@ func (a *app) run(ctx context.Context, args []string) int {
 		return a.appApply(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "app" && args[1] == "scale":
 		return a.appScale(ctx, args[2:])
+	case args[0] == "mcp":
+		return a.mcpStdio(ctx, args[1:])
 	}
 	fmt.Fprintf(a.errOut, "%s: unknown command %q\n\n"+usage, a.cli, strings.Join(args, " "), a.cli)
 	return 2
