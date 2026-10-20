@@ -26,3 +26,10 @@ the test agent was revoked and forgotten.
   has no `HEALTHCHECK`, so the agent couldn't tell what OAP will judge.
 - There is no ask kind for a notice; the notes agent used `blocker` to
   tell the owner to remove the committed `.env` and rotate its values.
+
+Since then: available memory is read from the host's meminfo and reported
+as unknown (not 0) where it can't be (`TestObserveAvailableMemory`); a
+worker whose image has no `HEALTHCHECK` is healthy once running, also in
+its start event (`TestImageWithoutHealthCheck`,
+`TestStartEventWithoutHealthCheck`), and the guide says so; a `notice` ask
+kind is proposed in the rewrite plan, awaiting the owner.
