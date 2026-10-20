@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/contract"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/model"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/ops"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/ports"
 )
@@ -157,4 +158,29 @@ func TestServiceNamesResolve(t *testing.T) {
 	if exit.StatusCode != 0 {
 		t.Fatalf("%s didn't answer from another container on the network (exit %d)", ops.ServiceURL("site", "web", 80), exit.StatusCode)
 	}
+}
+
+// TestStartEventWithoutHealthCheck: against real Docker, an instance whose
+// image has no HEALTHCHECK is healthy in its start event, not starting.
+func TestStartEventWithoutHealthCheck(t *testing.T) {
+	r := newRuntime(t)
+	ectx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	events, err := r.Events(ectx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := ops.InstanceRef{Application: "shop", Component: "worker", Ordinal: 1, Release: "r-1"}
+	if _, err := r.Start(ctx, ops.InstanceSpec{Ref: ref, Image: images.Web1}); err != nil {
+		t.Fatal(err)
+	}
+	for e := range events {
+		if e.Kind == ops.EventStarted && e.Instance == ref {
+			if e.Health != model.HealthHealthy {
+				t.Fatalf("start event health %v, want healthy", e.Health)
+			}
+			return
+		}
+	}
+	t.Fatal("no start event")
 }

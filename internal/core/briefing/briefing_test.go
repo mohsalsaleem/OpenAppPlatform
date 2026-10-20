@@ -117,3 +117,13 @@ func TestBriefingIsDeterministic(t *testing.T) {
 		}
 	}
 }
+
+// TestAvailableMemoryUnknown: a host that doesn't report available memory
+// is shown as unknown, not as 0 MiB available.
+func TestAvailableMemoryUnknown(t *testing.T) {
+	w := &oapv1.World{Host: &oapv1.Host{Name: "vultr", Capacity: &oapv1.Capacity{MemoryTotalMib: 950, CpuMillisTotal: 1000}}}
+	got := Render(Input{World: w, Caller: "claude", Apps: []string{"*"}})
+	if want := "Host `vultr`: 950 MiB memory (available memory unknown), 1000 CPU millis."; !strings.Contains(got, want) {
+		t.Errorf("briefing doesn't say %q:\n%s", want, got)
+	}
+}

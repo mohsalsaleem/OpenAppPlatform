@@ -102,7 +102,7 @@ Component kinds and their rules (OAP refuses specs that break them):
 | Kind | Use it for | Rules |
 |---|---|---|
 | `web` | Processes that serve HTTP | Needs `port`. Routes point only at web components. `health: {mode: http, path: …}` is recommended, but it runs `wget` inside the container: for images without it (`scratch`, distroless) use `health: {mode: image}` with a `HEALTHCHECK` in the Dockerfile, or none |
-| `worker` | Long-running processes without a port: queue consumers, schedulers | No `port`; must have `health: {mode: image}` |
+| `worker` | Long-running processes without a port: queue consumers, schedulers | No `port`; must have `health: {mode: image}`. OAP then judges the image's `HEALTHCHECK`; if the image has none, the worker counts as healthy (and ready for `after`) as soon as it is running, so a worker that crashes shows as not running. Add a `HEALTHCHECK` to the Dockerfile when running isn't enough |
 | `job` | One-off tasks such as migrations | One instance, no port, volumes or health check. Mark `destructive: true` if a run changes data in a way a rollback can't undo (dropping columns, deleting rows): such plans always need the owner |
 | `data` | Databases and caches run on the server | Exactly one instance; at least one volume (`volumes: {data: /var/lib/postgresql/data}`) |
 
@@ -125,7 +125,11 @@ Other fields you'll need:
   releases. OAP snapshots volumes before changes when the owner's policy
   says so.
 - **`resources: {memory_mib: 256, cpu_millis: 500}`**: set them on small
-  servers. Check the free memory in `observe` (host capacity) first.
+  servers. Check the free memory in `observe` (host capacity) first. If
+  `memory_available_mib` is absent the host doesn't report it (the
+  briefing says "available memory unknown"): size against
+  `memory_total_mib` minus what already runs there, and say so in your
+  summary.
 - `instances` is 1 to 4. Only stateless web and worker components should
   run more than one.
 
@@ -194,4 +198,5 @@ Later changes use the narrow intents: `deploy` (new images), `scale`,
       to keep outside a volume.
 - [ ] The image can be pulled without credentials.
 - [ ] Memory fits: the components' `resources` add up to less than the
-      host's available memory in `observe`.
+      host's available memory in `observe` (or, if that is unknown, its
+      total less what already runs).

@@ -377,10 +377,11 @@ func (x *Host) GetFreshness() *Freshness {
 type Capacity struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Memory in MiB.
-	MemoryTotalMib     int32 `protobuf:"varint,1,opt,name=memory_total_mib,json=memoryTotalMib,proto3" json:"memory_total_mib,omitempty"`
-	MemoryAvailableMib int32 `protobuf:"varint,2,opt,name=memory_available_mib,json=memoryAvailableMib,proto3" json:"memory_available_mib,omitempty"`
-	MemoryReservedMib  int32 `protobuf:"varint,3,opt,name=memory_reserved_mib,json=memoryReservedMib,proto3" json:"memory_reserved_mib,omitempty"`
-	CpuMillisTotal     int32 `protobuf:"varint,4,opt,name=cpu_millis_total,json=cpuMillisTotal,proto3" json:"cpu_millis_total,omitempty"`
+	MemoryTotalMib int32 `protobuf:"varint,1,opt,name=memory_total_mib,json=memoryTotalMib,proto3" json:"memory_total_mib,omitempty"`
+	// Absent when the host doesn't report it (unknown, not 0).
+	MemoryAvailableMib *int32 `protobuf:"varint,2,opt,name=memory_available_mib,json=memoryAvailableMib,proto3,oneof" json:"memory_available_mib,omitempty"`
+	MemoryReservedMib  int32  `protobuf:"varint,3,opt,name=memory_reserved_mib,json=memoryReservedMib,proto3" json:"memory_reserved_mib,omitempty"`
+	CpuMillisTotal     int32  `protobuf:"varint,4,opt,name=cpu_millis_total,json=cpuMillisTotal,proto3" json:"cpu_millis_total,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -423,8 +424,8 @@ func (x *Capacity) GetMemoryTotalMib() int32 {
 }
 
 func (x *Capacity) GetMemoryAvailableMib() int32 {
-	if x != nil {
-		return x.MemoryAvailableMib
+	if x != nil && x.MemoryAvailableMib != nil {
+		return *x.MemoryAvailableMib
 	}
 	return 0
 }
@@ -1268,12 +1269,13 @@ const file_oap_v1_world_proto_rawDesc = "" +
 	"\x04Host\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12,\n" +
 	"\bcapacity\x18\x02 \x01(\v2\x10.oap.v1.CapacityR\bcapacity\x12/\n" +
-	"\tfreshness\x18\x03 \x01(\v2\x11.oap.v1.FreshnessR\tfreshness\"\xc0\x01\n" +
+	"\tfreshness\x18\x03 \x01(\v2\x11.oap.v1.FreshnessR\tfreshness\"\xde\x01\n" +
 	"\bCapacity\x12(\n" +
-	"\x10memory_total_mib\x18\x01 \x01(\x05R\x0ememoryTotalMib\x120\n" +
-	"\x14memory_available_mib\x18\x02 \x01(\x05R\x12memoryAvailableMib\x12.\n" +
+	"\x10memory_total_mib\x18\x01 \x01(\x05R\x0ememoryTotalMib\x125\n" +
+	"\x14memory_available_mib\x18\x02 \x01(\x05H\x00R\x12memoryAvailableMib\x88\x01\x01\x12.\n" +
 	"\x13memory_reserved_mib\x18\x03 \x01(\x05R\x11memoryReservedMib\x12(\n" +
-	"\x10cpu_millis_total\x18\x04 \x01(\x05R\x0ecpuMillisTotal\"\xad\x02\n" +
+	"\x10cpu_millis_total\x18\x04 \x01(\x05R\x0ecpuMillisTotalB\x17\n" +
+	"\x15_memory_available_mib\"\xad\x02\n" +
 	"\vApplication\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1b\n" +
 	"\tspec_hash\x18\x02 \x01(\tR\bspecHash\x12&\n" +
@@ -1438,6 +1440,7 @@ func file_oap_v1_world_proto_init() {
 	if File_oap_v1_world_proto != nil {
 		return
 	}
+	file_oap_v1_world_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

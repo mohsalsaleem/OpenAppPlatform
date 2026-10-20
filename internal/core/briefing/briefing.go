@@ -83,7 +83,11 @@ func Render(in Input) string {
 
 	b.WriteString("## What runs here\n\n")
 	if c := w.GetHost().GetCapacity(); c != nil && in.App == "" {
-		fmt.Fprintf(&b, "Host `%s`: %d MiB memory (%d MiB available), %d CPU millis.", host, c.GetMemoryTotalMib(), c.GetMemoryAvailableMib(), c.GetCpuMillisTotal())
+		available := "available memory unknown"
+		if c.MemoryAvailableMib != nil {
+			available = fmt.Sprintf("%d MiB available", c.GetMemoryAvailableMib())
+		}
+		fmt.Fprintf(&b, "Host `%s`: %d MiB memory (%s), %d CPU millis.", host, c.GetMemoryTotalMib(), available, c.GetCpuMillisTotal())
 		if f := w.GetHost().GetFreshness(); f.GetStale() {
 			b.WriteString(" Last observation is stale.")
 		}
