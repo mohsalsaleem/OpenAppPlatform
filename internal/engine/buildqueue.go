@@ -36,10 +36,14 @@ type BuildQueue struct {
 	mu      sync.Mutex
 	waiting []*ticket
 	running int
+	seq     uint64
 	wake    chan struct{}
 }
 
-type ticket struct{}
+// ticket is a place in the queue. It must not be zero-size: Go may give
+// distinct zero-size values the same address, and tickets are compared by
+// pointer.
+type ticket struct{ n uint64 }
 
 // ErrNoMemory is a build that never got the memory it needs.
 var ErrNoMemory = errors.New("build queue: not enough memory")
@@ -66,7 +70,8 @@ func (q *BuildQueue) defaults() {
 func (q *BuildQueue) Build(ctx context.Context, req ops.BuildRequest) (ops.BuildResult, error) {
 	q.mu.Lock()
 	q.defaults()
-	t := &ticket{}
+	q.seq++
+	t := &ticket{n: q.seq}
 	q.waiting = append(q.waiting, t)
 	q.mu.Unlock()
 
