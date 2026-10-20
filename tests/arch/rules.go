@@ -24,6 +24,11 @@ var ThirdParty = []string{
 	"connectrpc.com/connect",
 	"google.golang.org/protobuf",
 	"github.com/hashicorp/go-plugin",
+	// go-plugin's API uses two of its own dependencies: its gRPC mode hands
+	// plugins *grpc.Server and *grpc.ClientConn, and its client logs through
+	// an hclog.Logger. Only the extension host imports them.
+	"google.golang.org/grpc",
+	"github.com/hashicorp/go-hclog",
 	"modernc.org/sqlite",
 	"gopkg.in/yaml.v3",
 }

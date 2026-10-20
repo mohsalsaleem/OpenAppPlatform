@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package oap.extension.v1;
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/extension/v1;extensionv1";
+
+// The extension contract (R4.1). Extensions run out of process, as
+// go-plugin gRPC plugins started by oapd, and supply facts and side effects
+// only: build results, change facts, notification delivery, check results.
+// No message in this package can carry a policy verdict; only the core
+// policy engine decides. A breaking change is a new package version.
+
+// ExtensionService is what every extension serves, whatever its points.
+service ExtensionService {
+  // Describe returns the extension's manifest. The host calls it first.
+  rpc Describe(DescribeRequest) returns (DescribeResponse);
+  // Configure gives the extension the settings and secrets the owner
+  // granted it, and nothing else. The host calls it after Describe.
+  rpc Configure(ConfigureRequest) returns (ConfigureResponse);
+}
+
+// Point is an extension point: a service the extension also serves.
+enum Point {
+  POINT_UNSPECIFIED = 0;
+  // Notifier delivers messages to the owner (notifier.proto).
+  POINT_NOTIFIER = 1;
+}
+
+message DescribeRequest {
+  // The contract version the host speaks.
+  uint32 contract_version = 1;
+}
+
+message DescribeResponse {
+  Manifest manifest = 1;
+}
+
+// Manifest describes an extension and what it needs.
+message Manifest {
+  string name = 1;
+  string version = 2;
+  string description = 3;
+  repeated Point points = 4;
+  // What it asks for; the owner grants some or all when installing.
+  repeated Capability capabilities = 5;
+}
+
+// Capability is something an extension needs.
+message Capability {
+  oneof kind {
+    // A plain setting by name, for example smtp_host.
+    string setting = 1;
+    // A secret by name, from the owner's secret store.
+    string secret = 2;
+    // A network destination, host:port. Recorded with the grant; not yet
+    // enforced (extensions don't run in their own network namespace yet).
+    string network = 3;
+  }
+  // Why it needs it, shown to the owner.
+  string why = 10;
+}
+
+message ConfigureRequest {
+  // The granted settings, by name.
+  map<string, string> settings = 1;
+  // The granted secrets' values, by name. Only these.
+  map<string, string> secrets = 2;
+}
+
+message ConfigureResponse {}

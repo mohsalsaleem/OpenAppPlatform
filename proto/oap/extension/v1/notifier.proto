@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package oap.extension.v1;
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/extension/v1;extensionv1";
+
+// NotifierService is the notification extension point: it delivers a message to
+// the owner, for asks and digests.
+service NotifierService {
+  rpc Notify(NotifyRequest) returns (NotifyResponse);
+}
+
+message NotifyRequest {
+  // ask, login, owner_key, digest, ...
+  string kind = 1;
+  string subject = 2;
+  string body = 3;
+}
+
+message NotifyResponse {
+  // Whether the channel accepted the message.
+  bool delivered = 1;
+  // What happened, for the journal; never a secret.
+  string detail = 2;
+}
