@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -166,4 +167,94 @@ func diffLines(a, b string) string {
 		}
 	}
 	return strings.Join(out, "\n")
+}
+
+// TestHandoffAgainstSSHD runs `oap host handoff` with the system ssh client
+// against a real sshd in a container: afterwards the server refuses OAP's
+// key, the owner's own key line is untouched, and the manifest records the
+// removal. Gated on OAP_TEST_DOCKER=1.
+func TestHandoffAgainstSSHD(t *testing.T) {
+	if os.Getenv("OAP_TEST_DOCKER") != "1" {
+		t.Skip("needs Docker; set OAP_TEST_DOCKER=1")
+	}
+	run := func(stdin []byte, name string, args ...string) string {
+		t.Helper()
+		cmd := exec.Command(name, args...)
+		if stdin != nil {
+			cmd.Stdin = bytes.NewReader(stdin)
+		}
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("%s %s: %v\n%s", name, strings.Join(args, " "), err, out)
+		}
+		return string(out)
+	}
+	const img = "ubuntu:26.04"
+	run(nil, "env", "DOCKER_CONFIG="+t.TempDir(), "docker", "pull", "-q", img)
+	name := fmt.Sprintf("oap-sshd-test-%d", time.Now().UnixNano())
+	run(nil, "docker", "run", "-d", "--name", name, "-p", "127.0.0.1::22", img, "sh", "-c",
+		"apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq openssh-server >/dev/null && mkdir -p /run/sshd && exec /usr/sbin/sshd -D -e")
+	t.Cleanup(func() { exec.Command("docker", "rm", "-f", name).Run() })
+	port := strings.TrimSpace(run(nil, "docker", "port", name, "22"))
+	port = port[strings.LastIndex(port, ":")+1:]
+	addr := "root@127.0.0.1:" + port
+
+	local, public := twoListeners(t)
+	h := newHarness(t, false, "", "")
+	h.a.now = time.Now
+	h.a.ssh.Command = nil // the system ssh, ssh-keyscan and ssh-keygen
+	dir := filepath.Join(h.a.dir(), "hosts", "127.0.0.1_"+port)
+	os.MkdirAll(dir, 0o700)
+	run(nil, "ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "oap-bootstrap test", "-f", filepath.Join(dir, "bootstrap_ed25519"))
+	pub, _ := os.ReadFile(filepath.Join(dir, "bootstrap_ed25519.pub"))
+	const ownerLine = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOwnersownkey owner@laptop"
+	var keys string
+	for i := 0; i < 120; i++ { // sshd is up once it answers a key scan
+		out, err := exec.Command("ssh-keyscan", "-p", port, "127.0.0.1").Output()
+		if err == nil && len(out) > 0 {
+			keys = string(out)
+			break
+		}
+		time.Sleep(time.Second)
+	}
+	if keys == "" {
+		t.Fatal("sshd never came up")
+	}
+	os.WriteFile(filepath.Join(dir, "known_hosts"), []byte(keys), 0o600)
+	run([]byte(ownerLine+"\n"+string(pub)), "docker", "exec", "-i", name, "sh", "-c",
+		"mkdir -p /root/.ssh && chmod 700 /root/.ssh && cat > /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys")
+
+	tgt, err := h.a.target(addr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.a.ssh.Run(context.Background(), tgt, "true"); err != nil {
+		t.Fatalf("OAP's key doesn't work before hand-off: %v", err)
+	}
+	if err := h.a.update(host.Server{Address: addr, Stage: host.StageOwned, Install: "r314test", API: public}); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("OAP_AGENT", "")
+	t.Setenv("OAP_AGENT_URL", local)
+	if code := h.run("owner", "enroll", "--label", "test"); code != 0 {
+		t.Fatalf("enroll: %s", h.out.String())
+	}
+	t.Setenv("OAP_AGENT_URL", "")
+	h.out.Reset()
+	if code := h.run("host", "handoff", addr); code != 0 {
+		t.Fatalf("hand-off: %s", h.out.String())
+	}
+	if _, err := h.a.ssh.Run(context.Background(), tgt, "true"); !keyRefused(err) {
+		t.Fatalf("OAP's key after hand-off: %v", err)
+	}
+	ak := run(nil, "docker", "exec", name, "cat", "/root/.ssh/authorized_keys")
+	if strings.TrimSpace(ak) != ownerLine {
+		t.Fatalf("authorized_keys after hand-off:\n%s", ak)
+	}
+	if m := run(nil, "docker", "exec", name, "cat", host.ManifestPath); !strings.Contains(m, `"fix":"bootstrap-key","action":"undo"`) {
+		t.Fatalf("manifest: %s", m)
+	}
+	if s, _ := h.a.server(addr); s.Stage != host.StageHandedOff {
+		t.Fatalf("stage %s", s.Stage)
+	}
 }
