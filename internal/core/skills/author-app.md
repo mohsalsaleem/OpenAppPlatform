@@ -101,7 +101,7 @@ Component kinds and their rules (OAP refuses specs that break them):
 
 | Kind | Use it for | Rules |
 |---|---|---|
-| `web` | Processes that serve HTTP | Needs `port`. Routes point only at web components. `health: {mode: http, path: …}` is recommended |
+| `web` | Processes that serve HTTP | Needs `port`. Routes point only at web components. `health: {mode: http, path: …}` is recommended, but it runs `wget` inside the container: for images without it (`scratch`, distroless) use `health: {mode: image}` with a `HEALTHCHECK` in the Dockerfile, or none |
 | `worker` | Long-running processes without a port: queue consumers, schedulers | No `port`; must have `health: {mode: image}` |
 | `job` | One-off tasks such as migrations | One instance, no port, volumes or health check. Mark `destructive: true` if a run changes data in a way a rollback can't undo (dropping columns, deleting rows): such plans always need the owner |
 | `data` | Databases and caches run on the server | Exactly one instance; at least one volume (`volumes: {data: /var/lib/postgresql/data}`) |
