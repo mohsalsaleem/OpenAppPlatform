@@ -63,7 +63,10 @@ These hold for every task. Breaking one is a defect, even if all tests pass.
    pure-Go SQLite driver (`modernc.org/sqlite`), one YAML library
    (`gopkg.in/yaml.v3`) and their transitive dependencies. Tools (not linked):
    `buf`, `protoc-gen-go`, `protoc-gen-connect-go`, pinned in `tools/`. Anything else
-   needs owner approval.
+   needs owner approval. Approved for the CLI only (owner, 2026-10-20): Charm's
+   `charm.land/bubbletea/v2`, `charm.land/lipgloss/v2` and `charm.land/bubbles/v2`
+   for `oapctl`'s terminal interface; `tests/arch` keeps them out of `oapd` and
+   `internal/`.
 10. **Generated code is reproducible.** `make gen` on a clean checkout produces no
     diff. Generated files are never edited by hand.
 11. **No secrets anywhere:** not in code, fixtures, logs, test output or evidence.
@@ -74,7 +77,12 @@ These hold for every task. Breaking one is a defect, even if all tests pass.
 12. **Here (cloud session):** phases 0–1 and the simulation parts of phase 2. Push
     every finished task; the container is temporary.
 13. **Owner's machine (local Claude Code):** adapter contract tests against real
-    Docker and Caddy, and local acceptance journeys.
+    Docker and Caddy, and local acceptance journeys. The owner's test server
+    (`vultr_oap`, reached over SSH from the owner's machine) may also run them
+    (owner decision, 2026-10-19); test binaries are cross-compiled locally, not
+    built there, and the server rules below apply.
+   On 2026-10-20 the owner had `oapd`'s image built on the test server,
+   when local CPU emulation hung.
 14. **Owner's server:** phase 5 deploy and the release journey. On the server, an
     agent touches only resources carrying OAP labels, never builds there unless the
     task says so, never edits databases or Caddy by hand, never prints credentials,
@@ -139,7 +147,7 @@ Depends on phase 1. R2.1–R2.8 run here; R2.9–R2.11 need real Docker and Cadd
 | R2.8 | VPS-H-001: reproduce, then fix | Commit 1: the harness shows lost requests when scaling 3→1 with a naive order (removal without confirmed reload and drain) across seeds. Commit 2: with the planner's ordering rule, 0 failed requests over at least 1,000 seeds. If simulation can't reproduce the loss, stop and report: the root cause lies elsewhere |
 | R2.9 | Docker runtime and Caddy edge adapters, with one contract suite run against both the fakes and the real systems. Docker is the only runtime operator; Coolify is not carried over | The same contract suite passes against the fakes and against real Docker and Caddy (`OAP_TEST_DOCKER=1`); resources are adopted only by OAP labels |
 | R2.10 | Desired-state Git repository adapter | Commits carry author and message; history, diff and revert work; export to a mirror is one-way |
-| R2.11 | Secret store adapter (format compatible with today's encrypted store, for migration) | Reads a store written by today's code; secrets never appear in journal entries or errors (test) |
+| R2.11 | Secret store adapter: encrypted file store, key held separately | Secrets round-trip through the store and a reopened store; a wrong key fails closed; secrets never appear in journal entries or errors (test). Compatibility with today's store was dropped with migration (owner, 2026-10-19) |
 
 **Phase exit:** with real Docker and Caddy on the owner's machine, scaling 1→3→1
 under continuous traffic shows 0 failed requests; OAP with SQLite stays under its
@@ -151,6 +159,7 @@ Depends on phase 2.
 
 | ID | Task | Acceptance |
 |---|---|---|
+| R3.0 | First launch: `oap` with no arguments shows the onboarding journey and its next step, guided on a TTY and as JSON for agents ([onboarding](onboarding.md#first-launch)) | Golden output for each journey state in both modes; owner-only steps say why and what to ask; exit codes 0, 3, 4 and 5 as documented; state survives an interrupted run |
 | R3.1 | Service layer: the seven primitives over core and engine | Service tests for each primitive using simulation adapters |
 | R3.2 | Connect server in `cmd/oapd`; errors with typed `why` and remedy | The same request works over gRPC, gRPC-Web and Connect JSON (curl), with identical results |
 | R3.3 | `watch` and `await` as server streams, resumable from a revision | A client that disconnects and resumes from its last revision misses no event and sees none twice |
@@ -160,6 +169,11 @@ Depends on phase 2.
 | R3.7 | `ask` with a `Notifier` port (log and webhook first) | Ask, answer and expiry flow through `watch`; an expired ask can't be answered |
 | R3.8 | Briefing: generated Markdown per server and app, served by `observe`, at `/.well-known/oap/briefing.md` and as an MCP resource | Golden briefings for the reference apps; owner `briefing.md` content appears labelled as owner-written |
 | R3.9 | Security tests for the whole surface | An agent can't act beyond its scope through any interface; a scan of every response and log in the acceptance run finds no secret values. **Decision needed first:** default autonomy for a fresh install |
+| R3.10 | `oap host connect`: bootstrap key, pinned host key, password from the TTY only, break-glass ([onboarding](onboarding.md)) | A test drives `connect` without a TTY and the password is refused; the key is in `authorized_keys` with its tag; `~/.ssh` is untouched |
+| R3.11 | `oap host check`: read-only probe, typed findings | Golden findings for fixture hosts (supported, old OS, no swap, port busy, foreign workloads, existing OAP); the probe makes no writes (checked by a read-only filesystem in the test) |
+| R3.12 | Host fixes as approved steps, with a manifest and undo | Each fix's apply then undo returns the fixture host to its starting state; an unapproved fix never runs; destructive fixes can't be grouped |
+| R3.13 | `oap host install`: `oapd` and Caddy as containers, idempotent, upgrade by digest | Running install twice changes nothing the second time; Caddy is observed as an OAP system component; a fresh 1 GB host stays inside the footprint budget |
+| R3.14 | Hand-off and uninstall | After hand-off the bootstrap key no longer authenticates; uninstall on a fresh host leaves only what was there before, compared by a host snapshot |
 
 **Phase exit:** the local journey (create, deploy with a migration, scale,
 injected failure, explain, fix, roll back, verify) passes driven only through
@@ -183,7 +197,7 @@ Depends on phase 4. R5.3 runs on the owner's server.
 
 | ID | Task | Acceptance |
 |---|---|---|
-| R5.1 | `oap migrate`: one-way move of an install made by today's code | On an install created from `main`, migration completes with apps continuously serving (probe shows 0 failures), the old database left untouched, and every spec, grant and release accounted for |
+| R5.1 | ~~`oap migrate`~~ **Dropped** (owner, 2026-10-19): no install runs today's code, so nothing is migrated; apps are deployed fresh from their specs | — |
 | R5.2 | Port the acceptance journeys (`tests/env`) and the VPS release journey to the new interfaces | All ported journeys pass locally |
 | R5.3 | Deploy to the owner's server and run the release journey over CLI, Connect and MCP | The journey passes on a 1 GB host with the evidence pack (receipts, monitor summary, findings) committed under `docs/evidence/` |
 | R5.4 | Agent store (Turso/libSQL) and harness packages | A fresh machine syncs the store, logs in and resumes managing a server with no credentials synced. **Decisions needed first:** sync default; which harnesses first |
@@ -194,13 +208,26 @@ Depends on phase 4. R5.3 runs on the owner's server.
 Decided: Docker is the only runtime operator for the rewrite. The Coolify
 adapter is not carried over; other operators can return later as extensions.
 
+Decided for [onboarding](onboarding.md) (owner, 2026-10-19), needed before
+R3.11–R3.13: supported systems are Ubuntu 22.04, 24.04 and 26.04 and Debian 12 and 13 (26.04 and Debian 13 added the same day, after the first real run stopped on 26.04); OAP
+installs Docker itself, as a sensitive fix the owner approves, upgrades a
+packaged Docker only through its own package with the restarting containers
+listed, works with an unmanaged Docker 24 or later with a warning, and stops on
+snap, Podman, rootless or unreachable Docker ([onboarding](onboarding.md#docker-on-servers-that-already-have-it)); the automatic
+hostname is sslip.io unless the owner gives a domain.
+
+Decided (owner, 2026-10-19): R3.0, R3.10 and R3.11 run ahead of R3.1, because
+they need only SSH, not `oapd`. OAP uses the system OpenSSH client (`ssh`,
+`ssh-keygen`, `ssh-keyscan`), so no SSH library is added and `ssh` itself reads
+the password from the terminal.
+
 | Decision (rewrite doc §17) | Needed before | Recommendation |
 |---|---|---|
-| Default session approval mode | R3.6 | Approve every session; offer trusted identity at first login |
+| Default session approval mode | R3.6 | **Decided** (owner, 2026-10-20): trusted agent identity. The owner approves an agent's identity once (bound to a key the agent holds); its later sessions sign in automatically and the owner is notified. Approving every session stays available as a setting |
 | Default autonomy for a fresh install | R3.9 | Routine changes allowed; everything else asks |
 | Turso Cloud or self-hosted libSQL | R5.4 | Self-hosted option first, Cloud as opt-in |
 | Harness packages first | R5.4 | Claude Code skills and generic MCP |
-| Patch VPS-H-001 on today's code | Any time | Only if real installs need it before cutover |
+| Patch VPS-H-001 on today's code | — | Not needed: no install runs today's code (owner, 2026-10-19) |
 
 ## Status
 
@@ -219,10 +246,33 @@ adapter is not carried over; other operators can return later as extensions.
 | R1.6 | done | `248762e` | 16 table cases covering every rule (scope by application and component, allowed actions, four invariants including minimum healthy during the plan, category tiers, change facts, pause, breaker); irreversible plans need the owner even under an envelope that makes everything routine; a proposal claiming routine/allowed is re-judged; 200 shuffled evaluations give identical decisions; 7 envelope rejections; affordances by scope and action. Mutation checks: ignoring irreversibility and leaving reasons unsorted are both caught (the determinism test was strengthened to catch the second) |
 | R1.7 | done | `20ff6a8` | Changing any of 9 inputs (base revision, base desired state, agent, intent fields, change facts, their absence, envelope version, policy context) changes the id; outputs don't. Stored proposals round-tripped through JSON replay to the identical proposal for allowed, needs-approval and denied verdicts, a rollback and a spec patch. Replay reports edited steps or context as tampering, edited verdicts or reasons as not reproduced, and missing base or envelope. Proposal gains `agent`, `base_spec_hash`, `context` and `irreversible` |
 | Phase 1 exit | passed | `20ff6a8` | `make rewrite-check` green; `tests/arch` confirms `internal/core` imports no I/O, clock or randomness (imports: standard library minus I/O, `gen`, protobuf); 203 tests pass across the new tree; core is 3,409 lines with 1,887 lines of tests. Awaiting owner review of `rewrite-phase-1` before merging to `rewrite` |
-| R2.1–R2.11 | not started | | |
-| R3.1–R3.9 | not started | | |
+| R2.1 | done | `rewrite-phase-2` | Ports are interfaces only, checked by a new architecture rule; data types live in `internal/core/ops`. Queue split from OpStore; later tasks refined Queue (caller's time, Heartbeat), Edge (`Config`) and snapshots (idempotency key) |
+| R2.2 | done | `rewrite-phase-2` | 20 SIGKILL crash runs: integrity check passes, acknowledged batches survive, batches whole, revisions gapless and forward-only; injected pre-commit failure leaves nothing; a non-atomic Append is caught |
+| R2.3 | done | `rewrite-phase-2` | 10,000 seeded runs under `-race` passed (2,362 s, one-off evidence run); every check runs 10,000 without race and 500 with race. A fencing mutation is caught on seed 10 |
+| R2.4 | done | `rewrite-phase-2` | 183 crash points across six scenarios resume to the right end state with nothing done twice; with a non-idempotent runtime the executor's observation alone prevents duplicate starts |
+| R2.5 | done | `rewrite-phase-2` | 300 random schedules under `-race`: no overlap, submission order per application; parallel applications proven; a non-serializing version fails |
+| R2.6 | done | `rewrite-phase-2` | Same seed, identical trace (20 seeds); each fault produces its failure; fakes pass the per-port contract suites; SQLite passes the journal suite |
+| R2.7 | done | `80d18c9` | With half of all events dropped, the observer's picture is never wrong for longer than one 5 s interval (20 seeds; 4 under `-race`); without drops it is exact after every poll; freshness on every node |
+| R2.8 | done | `3396c09`, `8b28c4d` | The real executor scales 3→1 under traffic on two routes; each seed draws a reload lag (0–1 s) and a request rate (one every 20–500 ms). `3396c09`: with the naive order (route-remove then stop), all 1,000 seeds lose requests (11,107 of 109,962: 8,532 refused, 2,575 reset), matching the VPS run's URLError and RemoteDisconnected. `8b28c4d`: with the planner's plan, 0 of 144,683 requests fail over 1,000 seeds (50 under `-race`; `make rewrite-check` runs the full count). No production change was needed: the rule (R1.5) and the executor's confirm and drain (R2.4) already existed. Failing first: the same test run against the naive order fails on seed 1. Each safety step matters (not committed): without the confirmed reload 669 of 1,000 seeds lose requests, without the drain 970. Not covered, because no ordering can prevent them: reloads that reset in-flight connections, instances exiting during drain, and requests longer than the drain timeout. Whether real Caddy resets connections on reload is for R2.9's contract suite |
+| R2.9 | done | `1828e0d` | The same Runtime and Edge contract suites pass against the fakes, local Docker 29.2.1 with Caddy 2.10.2 in a container, and `vultr_oap` (Docker 27.5.1, Ubuntu 18.04, 1 GB; cross-compiled test binaries, nothing built there). Labels only: unlabelled, partly labelled and other-installation containers are never observed, adopted or stopped, and a squatted name is refused. Every test resource was removed afterwards, locally and on the server. Real traffic: routes and prefix stripping work, `/apiary` doesn't match `/api`, and a 3 s request survives a reload that removes its instance (graceful). Finding: Caddy's upstream count for a removed instance dropped to 0 at the reload while the request was still running, so drain would have stopped it mid-request. Fixed by parking removed upstreams until idle; with that, 1 in flight before and after the reload. Gated skips (`OAP_TEST_DOCKER=1`): `TestRuntimeContract`, `TestAdoptsOnlyByLabels`, `TestEdgeContract`, `TestTrafficAcrossReload` |
+| R2.10 | done | `48fd514` | DesiredRepo contract suite passes on the system-git repository; commits carry author, message and `Application`/`Spec-Hash` trailers, none for an unchanged tree; history newest first, diff by hash, revert as a new commit (refusing another application's version); export overwrites a bare mirror and never brings its commits back; reopening keeps state. In use on `vultr_oap` |
+| R2.11 | done | `3efb82d` | Secrets contract suite; round trip through a reopened store, 0600 files, no plaintext on disk; wrong key, a value moved to another name, a damaged file and a key overwrite all fail closed; no error carries a value; a deploy using a secret leaves no value in any journal entry |
+| Phase 2 exit | passed | `cf84b00` | On `vultr_oap` (real Docker 29.9.1 and Caddy 2.10.2, 1 GB) with the DNS edge (ADR 0001): scaling 1→3→1 under continuous HTTPS traffic lost 0 of 503 requests, and ten cycles lost 0 of 3,282 with no Caddy reload; the gated real-Caddy test on the owner's machine lost 0 of 348. Before the fix (`7444992`) the same scaling lost 8 of 428, every loss at a Caddy reload: VPS-H-001's root cause, now resolved. Footprint: `oapd` 3.3 MiB, Caddy 11.3 MiB ([evidence](../evidence/vultr-oap-2026-10-20/README.md)) |
+| R3.0 | done | `fb49c6e` | Golden output for all 9 journey states as JSON and on a terminal (`cmd/oapctl/testdata`); every owner step says why and what to ask; exit codes 0, 3, 4 and 5 checked per state; an interrupted check resumes at the check without reconnecting; journey file is 0600 and replaced atomically. Run for real against `vultr_oap`: no server → exit 3, connect → exit 0, check → exit 4 (stopped on Ubuntu 18.04) |
+| R3.10 | done | `fb49c6e` | Acceptance met: without a terminal a password connect is refused before any ssh runs; on `vultr_oap` the key landed in `authorized_keys` tagged `oap-bootstrap` (then removed by hand; it no longer logs in); every connection uses `-F /dev/null` and OAP's own known_hosts, and a test with a temporary HOME shows `~/.ssh` untouched. Break-glass (`host connect --break-glass --hours N`, 1–24 h, `cc43c90`): OAP's key is installed with an `expiry-time` sshd enforces and recorded in the host manifest with its end; on `vultr_oap` (OpenSSH 10.2) the key logged in until its expiry, the manifest recorded `until`, and a key past its expiry was refused. Test keys removed afterwards |
+| R3.11 | done | `fb49c6e` | Golden findings for 9 probe outputs: `vultr_oap` (old OS, no swap, unmanaged Docker, other software, SSH passwords), read-only Ubuntu 24.04 and Debian 12 containers, and synthetic hosts (port busy, Docker missing, earlier OAP install, not root, old Docker, low disk). Gated `OAP_TEST_DOCKER=1` (skipped otherwise): the probe runs on read-only Ubuntu 22.04/24.04 and Debian 12 and `docker diff` shows no change; a planted hidden write is caught (not committed). Later (`048282c`, `80c86a0`): a firewall check (ufw blocking 80/443, found on `vultr_oap`) and recognizing the server's own installation; golden findings for 14 probe outputs |
+| R3.12 | done | `a00dd41` | With `OAP_TEST_DOCKER=1` (skipped otherwise), each undoable fix (swap-file, time-sync) applied then undone on Ubuntu 26.04 and Debian 13 containers leaves every file, symlink and directory as it was, with the stubbed `swapon`/`swapoff`/`timedatectl` calls matched; an undo that forgets its fstab line is caught (not committed). An unapproved fix never runs and writes no manifest; without a terminal only the proposal is shown; only routine fixes share an approval (destructive and sensitive never grouped). Real run on `vultr_oap` (Ubuntu 26.04): the owner approved `install-docker` on the terminal; Docker Engine 29.9.1 from Docker's apt repository is running and enabled, the manifest records the fix, and the re-check moved the journey to `ready` (next: install, R3.13). Docker policy for existing installs is golden-tested on snap, Podman, rootless, unreachable and old packaged Docker. Later (`048282c`): `open-web-ports` (ufw) applied then undone in the same containers restores the host; applied on `vultr_oap` |
+| R3.1 | in progress | `200f5c8`, `ba2a40f` | Observe, propose, apply, await and explain have service tests on the simulation adapters (under `-race`; await 20 runs in a row): create and await, verdict-based apply, owner approval, stale revision and base refused, failed steps, explain, resume after a crash exactly once. Ask and login report that they need R3.7 and R3.6, so the task stays open |
+| R3.2 | done | `acfd75a`, `7444992` | Observe returns the identical world over gRPC, gRPC-Web, Connect and plain JSON (curl), errors carry the same code and `oap.v1.ErrorDetail` over each; JSON uses proto field names. `oapd` serves on a 0600 unix socket only (until R3.6) |
+| R3.13 | done | `bbbf084`, `048282c`, `7444992` | On `vultr_oap`: the second install printed `caddy unchanged` / `oapd unchanged`; upgrading to a newer `oapd` image recreated only `oapd` and kept its data; Caddy runs as an OAP system component (labelled with the installation id, which the check recognizes); footprint `oapd` 3.3 MiB, Caddy 11.3 MiB on a 1 GB host. Images go over SSH, checked by content on arrival |
+| R3.3 | done | `cdefca5` | Cut after every possible event and resumed from the last revision seen, Watch and Await yield exactly the uninterrupted stream (same events, in order, none twice; under `-race`); a live watch sees the next operation from its first entry; the application filter keeps other applications' events out; over gRPC, gRPC-Web and Connect a stream dropped by the client and resumed continues where it stopped. Adds `AwaitRequest.since_revision` (documented 64-bit field) |
+| R3.4 | done | `9e25ea4` | Parity: one scenario (create from `oap.yaml`, scale to 2) through Connect JSON, gRPC, MCP and the CLI leaves byte-identical journals (5 runs under `-race`); a one-word difference in the CLI's intent is caught. Tools and input schemas are generated from `AgentService`'s descriptors (descriptions are one line per tool: the Go descriptors drop proto comments). Transports: stdio (`oapctl mcp`, relaying over SSH) and HTTP at `/mcp` on oapd's socket; HTTPS comes with the public API (R3.6) |
+| R3.5 | done | `3604165` | Golden output (`cmd/oapctl/testdata/cli`, 12 files, stable over 3 runs under `-race`) for `observe`, `explain`, `watch`, `app apply` and `app scale` in human, `--json` and `--events` modes, including an unchanged re-apply and an unapproved change (exit 3 with the proposal as JSON); every command uses the generated Connect client |
+| R3.6 | in progress | `483b07d` | Expired, revoked, unknown and out-of-scope tokens are refused, and pause (one agent or all) takes effect on the next request, under `-race` in the service and end to end through `oapctl` against a token-only listener. Device login: the owner sees the code, approves with a scope written into the envelope, and the agent's token (1 h, stored only as a hash) works inside it. Trusted identity (owner decision): a login proving the trusted Ed25519 key is approved at once, and replayed, stale or forged proofs and other keys are refused; every-session mode and forgetting the identity bring the owner back. State survives restarts. On `vultr_oap` over HTTPS (`oap.139-180-132-23.sslip.io`): the public API refused a request without a token; an agent's login appeared to the owner, was approved for `nisha-shipping` with `scale`, observed over HTTPS and was refused on another application; pause and resume took effect on the next request; a revoked token was refused and the trusted key signed in again without the owner; the test agent was then revoked and forgotten. Not yet: the owner's one-time login for a public owner session (the owner uses oapd's socket over SSH) and notifying the owner of trusted logins (R3.7) |
+| R3.7–R3.9, R3.14 | not started | | |
 | R4.1–R4.5 | not started | | |
-| R5.1–R5.5 | not started | | |
+| R5.1 | dropped | | Owner decision, 2026-10-19: no install runs today's code |
+| R5.2–R5.5 | not started | | |
 
 Statuses: `not started`, `in progress`, `blocked (reason)`, `done`. Rows are split
 per task once work on a phase begins.

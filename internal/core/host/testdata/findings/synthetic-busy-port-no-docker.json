@@ -1,0 +1,53 @@
+{
+  "summary": "Ubuntu 24.04.1 LTS, x86_64, 1 CPU, 984 MiB memory, 19.1 GiB disk free",
+  "blocked": true,
+  "stopped": true,
+  "findings": [
+    {
+      "why": "host.swap.missing",
+      "severity": "fix",
+      "observed": "984 MiB memory, no swap",
+      "required": "swap on servers under 2 GB",
+      "remedy": "Add a 1 GiB swap file so a memory spike slows the server instead of stopping apps.",
+      "fix": {
+        "id": "swap-file",
+        "tier": "routine",
+        "summary": "Create /swapfile (1 GiB), enable it and add it to /etc/fstab",
+        "undoable": true
+      }
+    },
+    {
+      "why": "host.docker.missing",
+      "severity": "fix",
+      "observed": "Docker isn't running",
+      "required": "Docker Engine 24 or later",
+      "remedy": "Install Docker Engine from Docker's official package repository.",
+      "fix": {
+        "id": "install-docker",
+        "tier": "sensitive",
+        "summary": "Install Docker Engine from Docker's apt repository and start it",
+        "undoable": false
+      }
+    },
+    {
+      "why": "host.port.busy",
+      "severity": "stop",
+      "observed": "port 80 is held by nginx (0.0.0.0:80)",
+      "required": "ports 80 and 443 free for OAP's Caddy",
+      "remedy": "Decide what happens to nginx: stop it, move it, or run it behind OAP. OAP doesn't stop software it didn't install."
+    },
+    {
+      "why": "host.time.unsynced",
+      "severity": "fix",
+      "observed": "the clock isn't synchronized",
+      "required": "a synchronized clock (certificates and tokens depend on it)",
+      "remedy": "Turn on network time synchronization.",
+      "fix": {
+        "id": "time-sync",
+        "tier": "routine",
+        "summary": "Enable systemd-timesyncd",
+        "undoable": true
+      }
+    }
+  ]
+}

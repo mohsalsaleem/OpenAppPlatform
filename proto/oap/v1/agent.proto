@@ -82,6 +82,9 @@ message AwaitRequest {
   string operation_id = 1;
   // Give up after this many seconds and return an uncertain outcome.
   int32 timeout_seconds = 2;
+  // Resume after this revision: events at or before it were already seen.
+  // 0 streams the operation from its start.
+  uint64 since_revision = 3;
 }
 
 message AwaitResponse {
@@ -116,8 +119,15 @@ message AskResponse {
 message LoginRequest {
   // The name the agent asks to be approved as, for example "claude-laptop".
   string agent = 1;
-  // Public key for trusted agent identity, if the agent holds one.
+  // Public key for trusted agent identity, if the agent holds one:
+  // "ed25519:" followed by the raw 32-byte key in standard base64.
   string public_key = 2;
+  // Proof that the agent holds the key: an Ed25519 signature over
+  // "oap-login-v1\n{agent}\n{public_key}\n{signed_at}\n{nonce}", made
+  // within two minutes of signed_at (RFC 3339), with a nonce never used before.
+  string signed_at = 3;
+  string nonce = 4;
+  bytes signature = 5;
 }
 
 message LoginResponse {

@@ -1,0 +1,20 @@
+exit 5
+{
+  "state": "owned",
+  "server": "root@203.0.113.5",
+  "next": {
+    "step": "hand-off",
+    "by": "agent",
+    "why": "The agent signs in with a device login and the bootstrap key is removed.",
+    "task": "R3.14",
+    "then": "oap --json"
+  },
+  "journey": [
+    "connect",
+    "check",
+    "fix",
+    "install",
+    "owner",
+    "hand-off"
+  ]
+}

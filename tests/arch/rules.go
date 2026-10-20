@@ -28,6 +28,14 @@ var ThirdParty = []string{
 	"gopkg.in/yaml.v3",
 }
 
+// CLIOnly lists modules only the CLI may import: its terminal interface
+// (owner decision, 2026-10-20). oapd and every internal layer stay without them.
+var CLIOnly = []string{
+	"charm.land/bubbletea/v2",
+	"charm.land/lipgloss/v2",
+	"charm.land/bubbles/v2",
+}
+
 // forbiddenInCore lists standard library packages that perform I/O or bring in
 // nondeterminism. Core may not import them, or anything beneath them.
 var forbiddenInCore = []string{
@@ -62,7 +70,7 @@ var layers = []layer{
 		[]string{local("internal/core"), local("internal/ports"), local("gen")},
 		[]string{"google.golang.org/protobuf"}},
 	{"adapters", []string{local("internal/adapters")},
-		[]string{local("internal/ports"), local("internal/core/model"), local("internal/core/spec"), local("gen")},
+		[]string{local("internal/ports"), local("internal/core/model"), local("internal/core/spec"), local("internal/core/ops"), local("gen")},
 		ThirdParty},
 	{"service", []string{local("internal/service")},
 		[]string{local("internal/core"), local("internal/engine"), local("internal/ports"), local("gen")},
@@ -73,7 +81,11 @@ var layers = []layer{
 	{"gen", []string{local("gen")},
 		nil,
 		[]string{"google.golang.org/protobuf", "connectrpc.com/connect"}},
-	{"commands", []string{local("cmd/oapd"), local("cmd/oapctl")},
+	{"cli", []string{local("cmd/oapctl")},
+		[]string{local("internal/core"), local("internal/engine"), local("internal/ports"),
+			local("internal/adapters"), local("internal/service"), local("internal/surface"), local("gen")},
+		append(append([]string{}, ThirdParty...), CLIOnly...)},
+	{"commands", []string{local("cmd/oapd")},
 		[]string{local("internal/core"), local("internal/engine"), local("internal/ports"),
 			local("internal/adapters"), local("internal/service"), local("internal/surface"), local("gen")},
 		ThirdParty},
@@ -157,7 +169,7 @@ func importViolation(l layer, imp string) string {
 		if underAny(imp, l.thirdParty) {
 			return ""
 		}
-		if underAny(imp, ThirdParty) {
+		if underAny(imp, ThirdParty) || underAny(imp, CLIOnly) {
 			return "allowlisted dependency, but not for this layer"
 		}
 		return "not on the dependency allowlist (rewrite plan, guardrail 9)"

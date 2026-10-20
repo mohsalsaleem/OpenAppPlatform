@@ -28,6 +28,10 @@ echo ok
 step "go test -race (new tree, architecture rules)"
 go test -race -count=1 "${NEW_TREE[@]}"
 
+step "randomized and seeded tests, full counts without the race detector"
+go test -count=1 -run '^TestQueueRandomized$' ./internal/adapters/sqlite
+go test -count=1 -run '^(TestObserver|TestScaleDown)' ./internal/engine
+
 step "frozen paths"
 python3 -m unittest discover -s scripts -p 'test_rewrite_*.py' 2>&1 | tail -1
 python3 scripts/rewrite_frozen_paths.py --base "${REWRITE_BASE:-origin/main}"

@@ -1,0 +1,14 @@
+{
+  "summary": "Ubuntu 24.04.3 LTS, x86_64, 2 CPUs, 3931 MiB memory, 38.1 GiB disk free",
+  "blocked": true,
+  "stopped": true,
+  "findings": [
+    {
+      "why": "host.docker.rootless",
+      "severity": "stop",
+      "observed": "Docker runs rootless, as deploy",
+      "required": "Docker Engine 24 or later, running as root",
+      "remedy": "Run Docker Engine as root. Rootless Docker can't publish ports 80 and 443 for OAP's Caddy."
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "summary": "Ubuntu 24.04.3 LTS, x86_64, 2 CPUs, 3931 MiB memory, 38.1 GiB disk free",
+  "blocked": true,
+  "stopped": false,
+  "findings": [
+    {
+      "why": "host.docker.old",
+      "severity": "fix",
+      "observed": "Docker 23.0.6 from package docker-ce",
+      "required": "Docker Engine 24 or later",
+      "remedy": "Upgrade Docker Engine through the package source it came from.",
+      "fix": {
+        "id": "upgrade-docker",
+        "tier": "destructive",
+        "summary": "Upgrade docker-ce with apt; 2 running containers restart: oap-a1-shop-web-1-r-9, grafana (1 of them not OAP's)",
+        "undoable": false
+      }
+    },
+    {
+      "why": "host.oap.present",
+      "severity": "info",
+      "observed": "1 OAP containers from an earlier install: oap-a1-shop-web-1-r-9",
+      "remedy": "Remove the earlier install with oap host uninstall, or keep it running alongside."
+    },
+    {
+      "why": "host.foreign.present",
+      "severity": "info",
+      "observed": "container grafana (running); container old-backup (exited)",
+      "remedy": "Nothing to do. OAP leaves software it didn't install alone."
+    }
+  ]
+}

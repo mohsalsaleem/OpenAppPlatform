@@ -1,0 +1,34 @@
+{
+  "summary": "Ubuntu 22.04.4 LTS, x86_64, 2 CPUs, 2048 MiB memory, 3.8 GiB disk free",
+  "blocked": true,
+  "stopped": true,
+  "findings": [
+    {
+      "why": "host.access.not_root",
+      "severity": "stop",
+      "observed": "connected as uid 1000",
+      "required": "root",
+      "remedy": "Connect as root. Connecting as a user with sudo isn't supported yet."
+    },
+    {
+      "why": "host.disk.low",
+      "severity": "stop",
+      "observed": "3.8 GiB free",
+      "required": "5 GiB free",
+      "remedy": "Free disk space or resize the disk, then run oap again."
+    },
+    {
+      "why": "host.docker.old",
+      "severity": "fix",
+      "observed": "Docker 20.10.21 from package docker.io",
+      "required": "Docker Engine 24 or later",
+      "remedy": "Upgrade Docker Engine through the package source it came from.",
+      "fix": {
+        "id": "upgrade-docker",
+        "tier": "sensitive",
+        "summary": "Upgrade docker.io with apt; no running containers restart",
+        "undoable": false
+      }
+    }
+  ]
+}

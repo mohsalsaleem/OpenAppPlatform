@@ -1,0 +1,14 @@
+{
+  "summary": "Ubuntu 24.04.3 LTS, x86_64, 2 CPUs, 3931 MiB memory, 38.1 GiB disk free",
+  "blocked": true,
+  "stopped": true,
+  "findings": [
+    {
+      "why": "host.docker.snap",
+      "severity": "stop",
+      "observed": "Docker is the snap package (/snap/docker/3221/bin/dockerd)",
+      "required": "Docker Engine 24 or later from a deb package",
+      "remedy": "Remove it (snap remove docker) and run oap again to install Docker Engine. The snap's confinement blocks the shared socket OAP's Caddy uses."
+    }
+  ]
+}

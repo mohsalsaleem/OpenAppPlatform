@@ -1,0 +1,26 @@
+{
+  "summary": "Debian GNU/Linux 12 (bookworm), aarch64, 12 CPUs, 7836 MiB memory, 46.4 GiB disk free",
+  "blocked": true,
+  "stopped": false,
+  "findings": [
+    {
+      "why": "host.docker.missing",
+      "severity": "fix",
+      "observed": "Docker isn't running",
+      "required": "Docker Engine 24 or later",
+      "remedy": "Install Docker Engine from Docker's official package repository.",
+      "fix": {
+        "id": "install-docker",
+        "tier": "sensitive",
+        "summary": "Install Docker Engine from Docker's apt repository and start it",
+        "undoable": false
+      }
+    },
+    {
+      "why": "host.time.unknown",
+      "severity": "info",
+      "observed": "couldn't tell whether the clock is synchronized",
+      "remedy": "Nothing to do now. Certificates and tokens fail if the clock drifts."
+    }
+  ]
+}

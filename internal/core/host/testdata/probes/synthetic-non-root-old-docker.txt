@@ -1,0 +1,16 @@
+probe.version=1
+uid=1000
+os.id=ubuntu
+os.version=22.04
+os.name=Ubuntu 22.04.4 LTS
+arch=x86_64
+kernel=5.15.0-1-generic
+cpus=2
+mem.total_kib=2097152
+swap.total_kib=0
+disk.free_kib=4000000
+time.synced=yes
+docker.daemon=/usr/bin/dockerd
+docker.package=docker.io
+docker.version=20.10.21
+probe.done=1
