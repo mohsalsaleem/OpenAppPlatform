@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -38,18 +37,8 @@ func TestInstallUninstallRestoresHost(t *testing.T) {
 		return string(out)
 	}
 
-	// oapd's image for this machine's architecture.
-	ctxDir := t.TempDir()
-	build := exec.Command("go", "build", "-trimpath", "-o", filepath.Join(ctxDir, "oapd-linux-"+runtime.GOARCH), "../oapd")
-	build.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+runtime.GOARCH)
-	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("build oapd: %v\n%s", err, out)
-	}
-	df, _ := os.ReadFile("../oapd/Dockerfile")
-	os.WriteFile(filepath.Join(ctxDir, "Dockerfile"), df, 0o644)
 	const image = "oapd:r314-test"
-	run(nil, "docker", "build", "-q", "-t", image, ctxDir)
-	t.Cleanup(func() { exec.Command("docker", "image", "rm", image).Run() })
+	buildOapdImage(t, image)
 
 	// A fresh host with Docker, curl and an owner's own SSH key.
 	name := fmt.Sprintf("oap-host-test-%d", time.Now().UnixNano())

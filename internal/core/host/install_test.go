@@ -36,11 +36,11 @@ func TestUninstallTouchesOnlyTheInstallation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Containers, networks and volumes by the installation label; images
-	// only from OAP's record of the images it brought, and only when no
-	// container uses them.
-	if !strings.Contains(s, `F="--filter label=io.openappplatform.install=$ID"`) || strings.Count(s, "$F") != 3 || strings.Count(s, "docker ") != 8 ||
-		strings.Count(s, "docker image rm") != 1 || !strings.Contains(s, `docker image rm "$img"`) ||
+	// Containers, networks, volumes and built images by the installation
+	// label; other images only from OAP's record of the images it brought,
+	// and only when no container uses them.
+	if !strings.Contains(s, `F="--filter label=io.openappplatform.install=$ID"`) || strings.Count(s, "$F") != 4 || strings.Count(s, "docker ") != 10 ||
+		strings.Count(s, "docker image rm") != 2 || !strings.Contains(s, `docker image rm "$img"`) || !strings.Contains(s, "docker images -q $F |") ||
 		!strings.Contains(s, "done < "+ImagesPath) || !strings.Contains(s, `docker ps -aq --filter "ancestor=$img"`) {
 		t.Fatalf("uninstall must select by the installation label, and images by OAP's record, only:\n%s", s)
 	}

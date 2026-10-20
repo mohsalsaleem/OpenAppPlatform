@@ -19,7 +19,7 @@ type Extension struct {
 }
 
 // ExtensionPoints are the points an extension can be installed for.
-var ExtensionPoints = []string{"notifier"}
+var ExtensionPoints = []string{"builder", "notifier"}
 
 var (
 	extensionName = regexp.MustCompile(`^[a-z][a-z0-9-]{0,47}$`)

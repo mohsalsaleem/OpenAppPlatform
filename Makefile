@@ -38,6 +38,8 @@ rewrite-check:
 oapd-image:
 	mkdir -p .local/oapd-context
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-X main.Version=$$(git rev-parse --short HEAD)" -o .local/oapd-context/oapd-linux-amd64 ./cmd/oapd
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o .local/oapd-context/oap-ext-builder-linux-amd64 ./cmd/oap-ext-builder
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o .local/oapd-context/oap-ext-registry-linux-amd64 ./cmd/oap-ext-registry
 	docker build -q --platform linux/amd64 -f cmd/oapd/Dockerfile -t oapd:$$(git rev-parse --short HEAD) .local/oapd-context
 
 .PHONY: gen

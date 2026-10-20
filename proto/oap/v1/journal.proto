@@ -104,6 +104,8 @@ message Outcome {
   // Suggested next intents when not achieved.
   repeated Intent next = 4;
   Evidence evidence = 5;
+  // Images an operation produced, by component (builds).
+  map<string, string> images = 6;
 }
 
 message Evidence {

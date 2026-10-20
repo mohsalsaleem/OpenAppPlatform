@@ -28,10 +28,11 @@ import (
 
 // Defaults sized for a small server.
 const (
-	DefaultMemoryMiB   = 64
-	DefaultCallTimeout = 10 * time.Second
-	startTimeout       = 10 * time.Second
-	memoryPoll         = 100 * time.Millisecond
+	DefaultMemoryMiB    = 64
+	DefaultCallTimeout  = 10 * time.Second
+	DefaultBuildTimeout = 20 * time.Minute
+	startTimeout        = 10 * time.Second
+	memoryPoll          = 100 * time.Millisecond
 )
 
 // Config is one installed extension: its binary and what the owner granted.
@@ -44,9 +45,11 @@ type Config struct {
 	Points   []extensionv1.Point
 	Settings map[string]string
 	Secrets  []string
-	// MemoryMiB caps its resident memory; CallTimeout bounds each call.
-	MemoryMiB   int
-	CallTimeout time.Duration
+	// MemoryMiB caps its resident memory; CallTimeout bounds each call,
+	// and BuildTimeout each build.
+	MemoryMiB    int
+	CallTimeout  time.Duration
+	BuildTimeout time.Duration
 }
 
 // Error is an extension failure, as the core sees it.
@@ -95,6 +98,9 @@ func (h *Host) Add(cfg Config) {
 	if cfg.CallTimeout <= 0 {
 		cfg.CallTimeout = DefaultCallTimeout
 	}
+	if cfg.BuildTimeout <= 0 {
+		cfg.BuildTimeout = DefaultBuildTimeout
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.exts == nil {
@@ -133,7 +139,7 @@ func (h *Host) Install(ctx context.Context, e spec.Extension, verify bool) error
 }
 
 // points maps desired-state point names to the contract's.
-var points = map[string]extensionv1.Point{"notifier": extensionv1.Point_POINT_NOTIFIER}
+var points = map[string]extensionv1.Point{"notifier": extensionv1.Point_POINT_NOTIFIER, "builder": extensionv1.Point_POINT_BUILDER}
 
 // Remove stops and forgets an extension.
 func (h *Host) Remove(name string) {
@@ -183,9 +189,17 @@ func (h *Host) PID(name string) int {
 // A call that times out stops the extension, so a hung one is replaced on
 // the next use.
 func (h *Host) call(ctx context.Context, name string, point extensionv1.Point, method string, req, res any) error {
+	return h.callWithin(ctx, name, point, method, req, res, 0)
+}
+
+// callWithin is call with its own timeout; zero uses the extension's.
+func (h *Host) callWithin(ctx context.Context, name string, point extensionv1.Point, method string, req, res any, timeout time.Duration) error {
 	r, err := h.get(name)
 	if err != nil {
 		return err
+	}
+	if timeout <= 0 {
+		timeout = r.cfg.CallTimeout
 	}
 	if point != extensionv1.Point_POINT_UNSPECIFIED && !slices.Contains(r.cfg.Points, point) {
 		return &Error{Extension: name, Op: method, Err: fmt.Errorf("%w: point %s", ErrNotGranted, point)}
@@ -194,7 +208,7 @@ func (h *Host) call(ctx context.Context, name string, point extensionv1.Point, m
 	if err != nil {
 		return &Error{Extension: name, Op: "start", Err: err}
 	}
-	cctx, cancel := context.WithTimeout(ctx, r.cfg.CallTimeout)
+	cctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	err = conn.Invoke(cctx, method, req, res)
 	if err == nil {
@@ -473,4 +487,49 @@ func (f Fanout) Notify(ctx context.Context, n ops.Notification) error {
 		}()
 	}
 	return err
+}
+
+// Builder returns the host as the core's builder: each build goes to the
+// builder extension the request names, or to the only one installed.
+func (h *Host) Builder() Builder { return Builder{h: h} }
+
+// Builder builds images through builder extensions.
+type Builder struct{ h *Host }
+
+func (b Builder) Build(ctx context.Context, req ops.BuildRequest) (ops.BuildResult, error) {
+	name := req.Builder
+	if name == "" {
+		b.h.mu.Lock()
+		var found []string
+		for n, r := range b.h.exts {
+			if slices.Contains(r.cfg.Points, extensionv1.Point_POINT_BUILDER) {
+				found = append(found, n)
+			}
+		}
+		b.h.mu.Unlock()
+		slices.Sort(found)
+		switch len(found) {
+		case 0:
+			return ops.BuildResult{}, errors.New("no builder extension is installed; install one with oapctl ext install NAME --point builder")
+		case 1:
+			name = found[0]
+		default:
+			return ops.BuildResult{}, fmt.Errorf("several builders are installed (%s); name one", strings.Join(found, ", "))
+		}
+	}
+	r, err := b.h.get(name)
+	if err != nil {
+		return ops.BuildResult{}, err
+	}
+	var res extensionv1.BuildResponse
+	err = b.h.callWithin(ctx, name, extensionv1.Point_POINT_BUILDER, "/oap.extension.v1.BuilderService/Build", &extensionv1.BuildRequest{
+		Application: req.Application, Component: req.Component, Repository: req.Repository, Commit: req.Commit,
+		Context: req.Context, Dockerfile: req.Dockerfile, Image: req.Image, MemoryMib: int32(req.MemoryMiB)}, &res, r.cfg.BuildTimeout)
+	if err != nil {
+		return ops.BuildResult{}, err
+	}
+	if res.Image == "" {
+		return ops.BuildResult{}, &Error{Extension: name, Op: "build", Err: errors.New("it returned no image")}
+	}
+	return ops.BuildResult{Image: res.Image, Commit: res.Commit, LogTail: res.LogTail}, nil
 }

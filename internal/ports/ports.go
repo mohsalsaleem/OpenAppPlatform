@@ -49,7 +49,7 @@ type Edge interface {
 
 // Builder turns a source commit into an image.
 type Builder interface {
-	Build(ctx context.Context, req ops.BuildRequest) (image string, err error)
+	Build(ctx context.Context, req ops.BuildRequest) (ops.BuildResult, error)
 }
 
 // DesiredRepo stores desired state: one tree per application, the envelope,

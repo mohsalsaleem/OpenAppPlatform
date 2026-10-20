@@ -35,7 +35,7 @@ var DefaultEnvelope = map[string]any{
 		"owner": map[string]any{
 			"scope": map[string]any{"applications": []any{"*"}},
 			"may": []any{"scale", "deploy", "rollback", "configure", "add-component", "remove-component", "spec-patch",
-				"install-extension", "remove-extension"},
+				"install-extension", "remove-extension", "build"},
 		},
 	},
 	"invariants": []any{

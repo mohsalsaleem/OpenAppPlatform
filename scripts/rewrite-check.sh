@@ -5,9 +5,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 NEW_TREE=(./internal/core/... ./internal/engine/... ./internal/ports/... ./internal/adapters/...
-  ./internal/service/... ./internal/surface/... ./cmd/oapd/... ./cmd/oapctl/... ./tests/arch/...)
+  ./internal/service/... ./internal/surface/... ./cmd/oapd/... ./cmd/oapctl/... ./cmd/oap-ext-builder/...
+  ./cmd/oap-ext-registry/... ./tests/arch/...)
 NEW_DIRS=(internal/core internal/engine internal/ports internal/adapters internal/service
-  internal/surface cmd/oapd cmd/oapctl tests/arch)
+  internal/surface cmd/oapd cmd/oapctl cmd/oap-ext-builder cmd/oap-ext-registry tests/arch)
 [ -n "$(find gen -name '*.go' -print -quit)" ] && NEW_TREE+=(./gen/...) && NEW_DIRS+=(gen)
 
 step() { printf '\n== %s\n' "$1"; }

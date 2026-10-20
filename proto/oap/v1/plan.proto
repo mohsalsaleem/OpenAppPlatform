@@ -74,6 +74,8 @@ enum StepKind {
   STEP_KIND_START_EXTENSION = 13;
   // An extension is stopped.
   STEP_KIND_STOP_EXTENSION = 14;
+  // A component's image is built from source through the build queue.
+  STEP_KIND_BUILD = 15;
 }
 
 // Step is one typed unit of work. Every operation compiles to steps.

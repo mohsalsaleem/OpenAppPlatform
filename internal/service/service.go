@@ -125,6 +125,8 @@ type Service struct {
 	SecretStore ports.SecretStore
 	// Extensions runs installed extensions; nil means none can be installed.
 	Extensions ports.Extensions
+	// Builder builds images, through the build queue; nil means no builds.
+	Builder ports.Builder
 
 	serializer *engine.Serializer
 	runCtx     context.Context
@@ -226,6 +228,10 @@ func (s *Service) Start(ctx context.Context) error {
 		}
 		if isExtensionOp(p) {
 			s.runExtension(e.Operation, p)
+			continue
+		}
+		if isBuildOp(p) {
+			s.runBuild(e.Operation, p)
 			continue
 		}
 		op, err := s.operation(ctx, e.Operation, p, false)
@@ -489,6 +495,9 @@ func (s *Service) Propose(ctx context.Context, c Caller, req *oapv1.ProposeReque
 		e.Detail.Remedy = refresh
 		return nil, e
 	}
+	if in.GetBuild() != nil {
+		return s.proposeBuild(ctx, c, in, head)
+	}
 	tree, err := s.current(ctx, in.GetApplication(), creates(in))
 	if err != nil {
 		return nil, err
@@ -619,6 +628,16 @@ func (s *Service) Apply(ctx context.Context, c Caller, req *oapv1.ApplyRequest) 
 	default:
 		return nil, fail(PermissionDenied, WhyNotAllowed, "the envelope denies this proposal: %s", reasons(p))
 	}
+	if isBuildOp(p) {
+		entryID := "apply_" + strings.TrimPrefix(id, "op_")
+		head, _ := s.Journal.Head(ctx)
+		if _, err := s.append(ctx, KindApply, id, &oapv1.JournalEntry{Id: entryID, ParentId: p.GetId(), Kind: oapv1.EntryKind_ENTRY_KIND_APPLY,
+			Actor: actor(c), BaseRevision: head, Summary: summary(p.GetIntent()), Detail: &oapv1.JournalEntry_OperationId{OperationId: id}}); err != nil {
+			return nil, err
+		}
+		s.runBuild(id, p)
+		return &oapv1.ApplyResponse{OperationId: id, EntryId: entryID}, nil
+	}
 	if isExtensionOp(p) {
 		if err := s.checkExtensionBase(ctx, p); err != nil {
 			return nil, err
@@ -659,8 +678,14 @@ func (s *Service) submit(op engine.Operation) {
 	go func() { s.outcome(op.ID, <-done) }()
 }
 
-func (s *Service) outcome(id string, runErr error) {
+func (s *Service) outcome(id string, runErr error) { s.outcomeWith(id, runErr, nil) }
+
+// outcomeWith records an operation's outcome, with the images it built.
+func (s *Service) outcomeWith(id string, runErr error, images map[string]string) {
 	o := &oapv1.Outcome{OperationId: id, Status: oapv1.OutcomeStatus_OUTCOME_STATUS_ACHIEVED}
+	if runErr == nil {
+		o.Images = images
+	}
 	var se *engine.StepError
 	switch {
 	case runErr == nil:

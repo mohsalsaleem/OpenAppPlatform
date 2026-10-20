@@ -294,6 +294,8 @@ var defaultTiers = map[string]oapv1.Risk{
 	"security": oapv1.Risk_RISK_SENSITIVE,
 	// Installing, upgrading or removing an extension (R4.1).
 	"extensions": oapv1.Risk_RISK_SENSITIVE,
+	// Building an image changes nothing that runs (R4.2).
+	"builds": oapv1.Risk_RISK_ROUTINE,
 }
 
 var fieldCategory = map[string]string{
@@ -324,6 +326,8 @@ func Category(c spec.Change) string {
 		return "domains"
 	case parts[0] == "extensions":
 		return "extensions"
+	case parts[0] == "builds":
+		return "builds"
 	}
 	return "other"
 }

@@ -24,6 +24,8 @@ enum Point {
   POINT_UNSPECIFIED = 0;
   // Notifier delivers messages to the owner (notifier.proto).
   POINT_NOTIFIER = 1;
+  // Builder turns source into images (builder.proto).
+  POINT_BUILDER = 2;
 }
 
 message DescribeRequest {

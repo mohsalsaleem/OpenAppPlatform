@@ -11,6 +11,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	oapv1 "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1"
 	"io"
 	"os"
 	"os/exec"
@@ -37,6 +38,8 @@ func main() {
 
 // app holds everything a command touches, so tests can replace it.
 type app struct {
+	// lastOutcome is the outcome of the last operation runIntent followed.
+	lastOutcome *oapv1.Outcome
 	cli         string
 	in          *bufio.Reader
 	out, errOut io.Writer
@@ -75,6 +78,7 @@ const usage = `Usage:
   %[1]s app apply FILE [ADDR]               create or update an application from its oap.yaml
   %[1]s app scale APP COMPONENT N [ADDR]    run N instances of a component
   %[1]s app deploy APP COMPONENT=IMAGE...   roll out new images
+  %[1]s app build APP COMPONENT --repo URL --commit REF   build an image from source on the server
   %[1]s app rollback APP --to SPEC_HASH     return to the images of an earlier desired state
   %[1]s ext install NAME --path P --point notifier [--setting K=V] [--secret S]   install an extension (a sensitive change)
   %[1]s ext remove NAME                     uninstall an extension
@@ -122,6 +126,8 @@ func (a *app) run(ctx context.Context, args []string) int {
 		return a.appDeploy(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "app" && args[1] == "rollback":
 		return a.appRollback(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "app" && args[1] == "build":
+		return a.appBuild(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "ext" && args[1] == "install":
 		return a.extInstall(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "ext" && args[1] == "remove":

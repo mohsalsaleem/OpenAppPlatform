@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -39,6 +40,7 @@ type config struct {
 	data, socket, dockerSocket, install, caddyAdmin string
 	edgeMode, apiHost, publicListen                 string
 	tls                                             bool
+	buildConcurrency                                int
 	observeEvery                                    time.Duration
 }
 
@@ -53,6 +55,7 @@ func main() {
 	flag.StringVar(&c.apiHost, "api-host", env("OAPD_API_HOST", ""), "public host name for the agent API, routed through Caddy; empty keeps it on the local socket only")
 	flag.StringVar(&c.publicListen, "public-listen", env("OAPD_PUBLIC_LISTEN", ":8080"), "address of the token-only public listener, used with --api-host")
 	flag.BoolVar(&c.tls, "tls", env("OAPD_TLS", "true") == "true", "serve routed hosts over HTTPS with automatic certificates")
+	flag.IntVar(&c.buildConcurrency, "build-concurrency", atoi(env("OAPD_BUILD_CONCURRENCY", "1")), "how many builds run at once")
 	flag.DurationVar(&c.observeEvery, "observe-every", 10*time.Second, "how often to re-observe the runtime in full")
 	version := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
@@ -178,9 +181,18 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 	defer extensions.Close()
 	notifier = extension.Fanout{Host: extensions, Base: notifier,
 		Errors: func(err error) { log.Warn("extension notifier", "err", err) }}
+	// Builds go through the queue: one at a time unless the owner says
+	// otherwise, each only when the host has its memory.
+	builds := &engine.BuildQueue{Builder: extensions.Builder(), Clock: clock, Concurrency: c.buildConcurrency,
+		Available: func() (int, bool) {
+			if m := observer.Snapshot().Host.MemoryAvailableMiB; m != nil {
+				return int(*m), true
+			}
+			return 0, false
+		}}
 	svc := &service.Service{Desired: desired, Journal: store, Clock: clock, Observer: observer, Notifier: notifier, SecretStore: secrets,
-		Extensions: extensions,
-		Executor:   &engine.Executor{Runtime: rt, Edge: edge, Journal: store, Desired: desired, Clock: clock}}
+		Extensions: extensions, Builder: builds,
+		Executor: &engine.Executor{Runtime: rt, Edge: edge, Journal: store, Desired: desired, Clock: clock}}
 	if err := svc.Start(ctx); err != nil {
 		return err
 	}
@@ -228,4 +240,9 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 		return err
 	}
 	return ctx.Err()
+}
+
+func atoi(s string) int {
+	n, _ := strconv.Atoi(s)
+	return n
 }

@@ -21,6 +21,7 @@ message Intent {
     SpecPatch spec_patch = 16;
     InstallExtension install_extension = 17;
     RemoveExtension remove_extension = 18;
+    Build build = 19;
   }
 }
 
@@ -92,6 +93,25 @@ message InstallExtension {
   repeated string secrets = 6;
   // Its memory cap; 64 MiB when zero.
   int32 memory_mib = 7;
+}
+
+// Build builds a component's image from a source commit (R4.2), through
+// the server's build queue and a builder extension. It changes no desired
+// state: the operation's outcome names the image, which a deploy then
+// rolls out.
+message Build {
+  string component = 1;
+  // A git repository URL, and the commit, branch or tag to build.
+  string repository = 2;
+  string commit = 3;
+  // The build context's directory in the repository (default "."), and
+  // the Dockerfile in it (default "Dockerfile").
+  string context = 4;
+  string dockerfile = 5;
+  // The memory the build may use, in MiB (default 512).
+  int32 memory_mib = 6;
+  // The builder extension to use; empty when only one is installed.
+  string builder = 7;
 }
 
 // RemoveExtension stops and uninstalls an extension.

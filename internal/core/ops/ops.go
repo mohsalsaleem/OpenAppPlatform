@@ -123,4 +123,23 @@ type BuildRequest struct {
 	Component   string
 	Repository  string
 	Commit      string
+	// Context is the build context's directory in the repository, and
+	// Dockerfile the file in it.
+	Context, Dockerfile string
+	// Image is the name to give the result, without a tag.
+	Image string
+	// MemoryMiB is the memory the build may use.
+	MemoryMiB int
+	// Builder names the builder extension; empty for the only one.
+	Builder string
+	// Started, when set, is called when the build leaves the queue and
+	// starts.
+	Started func()
+}
+
+// BuildResult is what a build produced.
+type BuildResult struct {
+	Image   string // the full reference, with its tag
+	Commit  string // the full commit built
+	LogTail string
 }

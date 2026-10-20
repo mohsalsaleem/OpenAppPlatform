@@ -281,6 +281,7 @@ func (a *app) runIntent(ctx context.Context, client oapv1connect.AgentServiceCli
 			}
 			if o := e.GetOutcome(); o != nil {
 				outcome = o
+				a.lastOutcome = o
 			}
 		}
 		if err := stream.Err(); err != nil {
@@ -585,4 +586,37 @@ func (a *app) extRemove(ctx context.Context, args []string) int {
 	}
 	in := &oapv1.Intent{Because: "remove extension " + pos[0], Change: &oapv1.Intent_RemoveExtension{RemoveExtension: &oapv1.RemoveExtension{Name: pos[0]}}}
 	return a.runAppIntent(ctx, in, yes, "Removed extension "+pos[0])
+}
+
+// appBuild builds a component's image from source on the server:
+// app build APP COMPONENT --repo URL --commit REF [--context DIR]
+// [--dockerfile FILE] [--memory MIB] [--builder NAME] [--yes].
+func (a *app) appBuild(ctx context.Context, args []string) int {
+	defer func() { a.mode = human }()
+	var repo, commit, context_, dockerfile, builder *string
+	var memory *int
+	pos, yes, err := a.intentFlags("app build", args, func(fs *flag.FlagSet) {
+		repo = fs.String("repo", "", "the git repository URL")
+		commit = fs.String("commit", "", "the commit, branch or tag to build")
+		context_ = fs.String("context", "", "the build context in the repository (default .)")
+		dockerfile = fs.String("dockerfile", "", "the Dockerfile in the context (default Dockerfile)")
+		memory = fs.Int("memory", 0, "memory the build may use, in MiB (default 512)")
+		builder = fs.String("builder", "", "the builder extension, when several are installed")
+	})
+	if err != nil {
+		return 2
+	}
+	if len(pos) != 2 || *repo == "" || *commit == "" {
+		return a.fail(errors.New("usage: app build APP COMPONENT --repo URL --commit REF [--context DIR] [--dockerfile FILE] [--memory MIB] [--yes]"))
+	}
+	in := &oapv1.Intent{Application: pos[0], Because: fmt.Sprintf("build %s at %s", pos[1], *commit),
+		Change: &oapv1.Intent_Build{Build: &oapv1.Build{Component: pos[1], Repository: *repo, Commit: *commit,
+			Context: *context_, Dockerfile: *dockerfile, MemoryMib: int32(*memory), Builder: *builder}}}
+	code := a.runAppIntent(ctx, in, yes, "Built "+pos[0]+"/"+pos[1])
+	if code == 0 && a.mode == human {
+		if img := a.lastOutcome.GetImages()[pos[1]]; img != "" {
+			fmt.Fprintf(a.out, "Image: %s\nDeploy it with: %s app deploy %s %s=%s\n", img, a.cli, pos[0], pos[1], img)
+		}
+	}
+	return code
 }

@@ -17,6 +17,8 @@ type Extension struct {
 	Manifest  *extensionv1.Manifest
 	Configure func(ctx context.Context, settings, secrets map[string]string) error
 	Notifier  func(ctx context.Context, req *extensionv1.NotifyRequest) (*extensionv1.NotifyResponse, error)
+	// Builder is set for extensions that serve the builder point.
+	Builder func(ctx context.Context, req *extensionv1.BuildRequest) (*extensionv1.BuildResponse, error)
 }
 
 // Serve runs the extension until the host stops it.
@@ -29,6 +31,15 @@ func Serve(e Extension) {
 			Methods: []grpc.MethodDesc{extension.Unary("Notify",
 				func() *extensionv1.NotifyRequest { return &extensionv1.NotifyRequest{} }, e.Notifier)},
 			Metadata: "oap/extension/v1/notifier.proto",
+		}, Impl: struct{}{}})
+	}
+	if e.Builder != nil {
+		services = append(services, extension.Service{Desc: &grpc.ServiceDesc{
+			ServiceName: "oap.extension.v1.BuilderService",
+			HandlerType: (*any)(nil),
+			Methods: []grpc.MethodDesc{extension.Unary("Build",
+				func() *extensionv1.BuildRequest { return &extensionv1.BuildRequest{} }, e.Builder)},
+			Metadata: "oap/extension/v1/builder.proto",
 		}, Impl: struct{}{}})
 	}
 	extension.Serve(services...)

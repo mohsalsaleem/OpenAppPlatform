@@ -24,7 +24,7 @@ type journeyHost struct {
 	name, api, web string
 }
 
-func newJourneyHost(t *testing.T) *journeyHost {
+func newJourneyHost(t *testing.T, memory ...string) *journeyHost {
 	t.Helper()
 	run := func(stdin []byte, name string, args ...string) string {
 		t.Helper()
@@ -38,21 +38,16 @@ func newJourneyHost(t *testing.T) *journeyHost {
 		}
 		return string(out)
 	}
-	ctxDir := t.TempDir()
-	build := exec.Command("go", "build", "-trimpath", "-o", filepath.Join(ctxDir, "oapd-linux-"+runtime.GOARCH), "../oapd")
-	build.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+runtime.GOARCH)
-	if out, err := build.CombinedOutput(); err != nil {
-		t.Fatalf("build oapd: %v\n%s", err, out)
-	}
-	df, _ := os.ReadFile("../oapd/Dockerfile")
-	os.WriteFile(filepath.Join(ctxDir, "Dockerfile"), df, 0o644)
 	const image = "oapd:journey-test"
-	run(nil, "docker", "build", "-q", "-t", image, ctxDir)
-	t.Cleanup(func() { exec.Command("docker", "image", "rm", image).Run() })
+	buildOapdImage(t, image)
 
 	h := &journeyHost{name: fmt.Sprintf("oap-journey-%d", time.Now().UnixNano())}
 	run(nil, "env", "DOCKER_CONFIG="+t.TempDir(), "docker", "pull", "-q", "docker:27.5.1-dind")
-	run(nil, "docker", "run", "-d", "--privileged", "--name", h.name, "-p", "127.0.0.1::80", "-p", "127.0.0.1::7000", "docker:27.5.1-dind")
+	runArgs := []string{"run", "-d", "--privileged", "--name", h.name, "-p", "127.0.0.1::80", "-p", "127.0.0.1::7000"}
+	if len(memory) > 0 { // the host's whole memory, swap included
+		runArgs = append(runArgs, "--memory", memory[0], "--memory-swap", memory[0])
+	}
+	run(nil, "docker", append(runArgs, "docker:27.5.1-dind")...)
 	t.Cleanup(func() { exec.Command("docker", "rm", "-f", "-v", h.name).Run() })
 	sh := func(script string) string {
 		t.Helper()
@@ -89,6 +84,26 @@ apk add -q --no-cache curl socat`)
 func (h *journeyHost) ps() string {
 	out, _ := exec.Command("docker", "exec", h.name, "docker", "ps", "-a", "--format", "{{.Names}} {{.Image}} {{.Status}}").CombinedOutput()
 	return string(out)
+}
+
+// buildOapdImage builds oapd's image for this machine's architecture,
+// with the first-party extensions, as make oapd-image does for amd64.
+func buildOapdImage(t *testing.T, image string) {
+	t.Helper()
+	ctxDir := t.TempDir()
+	for bin, pkg := range map[string]string{"oapd": "../oapd", "oap-ext-builder": "../oap-ext-builder", "oap-ext-registry": "../oap-ext-registry"} {
+		build := exec.Command("go", "build", "-trimpath", "-o", filepath.Join(ctxDir, bin+"-linux-"+runtime.GOARCH), pkg)
+		build.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+runtime.GOARCH)
+		if out, err := build.CombinedOutput(); err != nil {
+			t.Fatalf("build %s: %v\n%s", bin, err, out)
+		}
+	}
+	df, _ := os.ReadFile("../oapd/Dockerfile")
+	os.WriteFile(filepath.Join(ctxDir, "Dockerfile"), df, 0o644)
+	if out, err := exec.Command("docker", "build", "-q", "-t", image, ctxDir).CombinedOutput(); err != nil {
+		t.Fatalf("docker build: %v\n%s", err, out)
+	}
+	t.Cleanup(func() { exec.Command("docker", "image", "rm", image).Run() })
 }
 
 // get fetches / from an application's domain through Caddy.

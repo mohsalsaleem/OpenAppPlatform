@@ -134,6 +134,8 @@ F="--filter label=io.openappplatform.install=$ID"
 docker ps -aq $F | xargs -r docker rm -f >/dev/null
 docker network ls -q $F | xargs -r docker network rm >/dev/null
 docker volume ls -q $F | xargs -r docker volume rm >/dev/null
+# Images OAP's builder made carry the installation label too.
+docker images -q $F | sort -u | xargs -r docker image rm -f >/dev/null
 # The images OAP brought, unless something else now uses them.
 if [ -f /var/lib/oap/images ]; then
   while read -r img; do

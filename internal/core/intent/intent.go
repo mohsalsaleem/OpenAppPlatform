@@ -118,6 +118,8 @@ func KindOf(in *oapv1.Intent) Kind {
 		return KindInstallExtension
 	case *oapv1.Intent_RemoveExtension:
 		return KindRemoveExtension
+	case *oapv1.Intent_Build:
+		return KindBuild
 	}
 	return ""
 }

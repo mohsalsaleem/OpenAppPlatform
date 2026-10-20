@@ -95,6 +95,8 @@ const (
 	StepKind_STEP_KIND_START_EXTENSION StepKind = 13
 	// An extension is stopped.
 	StepKind_STEP_KIND_STOP_EXTENSION StepKind = 14
+	// A component's image is built from source through the build queue.
+	StepKind_STEP_KIND_BUILD StepKind = 15
 )
 
 // Enum value maps for StepKind.
@@ -115,6 +117,7 @@ var (
 		12: "STEP_KIND_WRITE_DESIRED",
 		13: "STEP_KIND_START_EXTENSION",
 		14: "STEP_KIND_STOP_EXTENSION",
+		15: "STEP_KIND_BUILD",
 	}
 	StepKind_value = map[string]int32{
 		"STEP_KIND_UNSPECIFIED":           0,
@@ -132,6 +135,7 @@ var (
 		"STEP_KIND_WRITE_DESIRED":         12,
 		"STEP_KIND_START_EXTENSION":       13,
 		"STEP_KIND_STOP_EXTENSION":        14,
+		"STEP_KIND_BUILD":                 15,
 	}
 )
 
@@ -721,7 +725,7 @@ const file_oap_v1_plan_proto_rawDesc = "" +
 	"\x10RISK_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fRISK_ROUTINE\x10\x01\x12\x12\n" +
 	"\x0eRISK_SENSITIVE\x10\x02\x12\x15\n" +
-	"\x11RISK_IRREVERSIBLE\x10\x03*\xaa\x03\n" +
+	"\x11RISK_IRREVERSIBLE\x10\x03*\xbf\x03\n" +
 	"\bStepKind\x12\x19\n" +
 	"\x15STEP_KIND_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18STEP_KIND_START_INSTANCE\x10\x01\x12\x19\n" +
@@ -738,7 +742,8 @@ const file_oap_v1_plan_proto_rawDesc = "" +
 	"\x17STEP_KIND_DELETE_VOLUME\x10\v\x12\x1b\n" +
 	"\x17STEP_KIND_WRITE_DESIRED\x10\f\x12\x1d\n" +
 	"\x19STEP_KIND_START_EXTENSION\x10\r\x12\x1c\n" +
-	"\x18STEP_KIND_STOP_EXTENSION\x10\x0eB:Z8github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1b\x06proto3"
+	"\x18STEP_KIND_STOP_EXTENSION\x10\x0e\x12\x13\n" +
+	"\x0fSTEP_KIND_BUILD\x10\x0fB:Z8github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1b\x06proto3"
 
 var (
 	file_oap_v1_plan_proto_rawDescOnce sync.Once

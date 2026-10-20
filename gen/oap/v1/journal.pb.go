@@ -752,8 +752,10 @@ type Outcome struct {
 	Status      OutcomeStatus          `protobuf:"varint,2,opt,name=status,proto3,enum=oap.v1.OutcomeStatus" json:"status,omitempty"`
 	Reasons     []*Reason              `protobuf:"bytes,3,rep,name=reasons,proto3" json:"reasons,omitempty"`
 	// Suggested next intents when not achieved.
-	Next          []*Intent `protobuf:"bytes,4,rep,name=next,proto3" json:"next,omitempty"`
-	Evidence      *Evidence `protobuf:"bytes,5,opt,name=evidence,proto3" json:"evidence,omitempty"`
+	Next     []*Intent `protobuf:"bytes,4,rep,name=next,proto3" json:"next,omitempty"`
+	Evidence *Evidence `protobuf:"bytes,5,opt,name=evidence,proto3" json:"evidence,omitempty"`
+	// Images an operation produced, by component (builds).
+	Images        map[string]string `protobuf:"bytes,6,rep,name=images,proto3" json:"images,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -819,6 +821,13 @@ func (x *Outcome) GetNext() []*Intent {
 func (x *Outcome) GetEvidence() *Evidence {
 	if x != nil {
 		return x.Evidence
+	}
+	return nil
+}
+
+func (x *Outcome) GetImages() map[string]string {
+	if x != nil {
+		return x.Images
 	}
 	return nil
 }
@@ -1193,13 +1202,17 @@ const file_oap_v1_journal_proto_rawDesc = "" +
 	"\n" +
 	"step_index\x18\x02 \x01(\x05R\tstepIndex\x12 \n" +
 	"\x04step\x18\x03 \x01(\v2\f.oap.v1.StepR\x04step\x12'\n" +
-	"\x05state\x18\x04 \x01(\x0e2\x11.oap.v1.StepStateR\x05state\"\xd7\x01\n" +
+	"\x05state\x18\x04 \x01(\x0e2\x11.oap.v1.StepStateR\x05state\"\xc7\x02\n" +
 	"\aOutcome\x12!\n" +
 	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12-\n" +
 	"\x06status\x18\x02 \x01(\x0e2\x15.oap.v1.OutcomeStatusR\x06status\x12(\n" +
 	"\areasons\x18\x03 \x03(\v2\x0e.oap.v1.ReasonR\areasons\x12\"\n" +
 	"\x04next\x18\x04 \x03(\v2\x0e.oap.v1.IntentR\x04next\x12,\n" +
-	"\bevidence\x18\x05 \x01(\v2\x10.oap.v1.EvidenceR\bevidence\"\xb3\x01\n" +
+	"\bevidence\x18\x05 \x01(\v2\x10.oap.v1.EvidenceR\bevidence\x123\n" +
+	"\x06images\x18\x06 \x03(\v2\x1b.oap.v1.Outcome.ImagesEntryR\x06images\x1a9\n" +
+	"\vImagesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb3\x01\n" +
 	"\bEvidence\x12&\n" +
 	"\x06health\x18\x01 \x03(\v2\x0e.oap.v1.HealthR\x06health\x12+\n" +
 	"\x06checks\x18\x02 \x03(\v2\x13.oap.v1.CheckResultR\x06checks\x120\n" +
@@ -1256,7 +1269,7 @@ func file_oap_v1_journal_proto_rawDescGZIP() []byte {
 }
 
 var file_oap_v1_journal_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_oap_v1_journal_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_oap_v1_journal_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_oap_v1_journal_proto_goTypes = []any{
 	(EntryKind)(0),                // 0: oap.v1.EntryKind
 	(StepState)(0),                // 1: oap.v1.StepState
@@ -1272,16 +1285,17 @@ var file_oap_v1_journal_proto_goTypes = []any{
 	(*TrafficSummary)(nil),        // 11: oap.v1.TrafficSummary
 	(*RequestFailure)(nil),        // 12: oap.v1.RequestFailure
 	(*AskAnswered)(nil),           // 13: oap.v1.AskAnswered
-	(*timestamppb.Timestamp)(nil), // 14: google.protobuf.Timestamp
-	(*Proposal)(nil),              // 15: oap.v1.Proposal
-	(*AskRequest)(nil),            // 16: oap.v1.AskRequest
-	(*Step)(nil),                  // 17: oap.v1.Step
-	(*Reason)(nil),                // 18: oap.v1.Reason
-	(*Intent)(nil),                // 19: oap.v1.Intent
-	(*Health)(nil),                // 20: oap.v1.Health
+	nil,                           // 14: oap.v1.Outcome.ImagesEntry
+	(*timestamppb.Timestamp)(nil), // 15: google.protobuf.Timestamp
+	(*Proposal)(nil),              // 16: oap.v1.Proposal
+	(*AskRequest)(nil),            // 17: oap.v1.AskRequest
+	(*Step)(nil),                  // 18: oap.v1.Step
+	(*Reason)(nil),                // 19: oap.v1.Reason
+	(*Intent)(nil),                // 20: oap.v1.Intent
+	(*Health)(nil),                // 21: oap.v1.Health
 }
 var file_oap_v1_journal_proto_depIdxs = []int32{
-	14, // 0: oap.v1.Event.at:type_name -> google.protobuf.Timestamp
+	15, // 0: oap.v1.Event.at:type_name -> google.protobuf.Timestamp
 	4,  // 1: oap.v1.Event.world_changed:type_name -> oap.v1.WorldChanged
 	6,  // 2: oap.v1.Event.journal_entry:type_name -> oap.v1.JournalEntry
 	7,  // 3: oap.v1.Event.operation_progress:type_name -> oap.v1.OperationProgress
@@ -1289,27 +1303,28 @@ var file_oap_v1_journal_proto_depIdxs = []int32{
 	13, // 5: oap.v1.Event.ask_answered:type_name -> oap.v1.AskAnswered
 	0,  // 6: oap.v1.JournalEntry.kind:type_name -> oap.v1.EntryKind
 	5,  // 7: oap.v1.JournalEntry.actor:type_name -> oap.v1.Actor
-	15, // 8: oap.v1.JournalEntry.proposal:type_name -> oap.v1.Proposal
-	16, // 9: oap.v1.JournalEntry.ask:type_name -> oap.v1.AskRequest
+	16, // 8: oap.v1.JournalEntry.proposal:type_name -> oap.v1.Proposal
+	17, // 9: oap.v1.JournalEntry.ask:type_name -> oap.v1.AskRequest
 	8,  // 10: oap.v1.JournalEntry.outcome:type_name -> oap.v1.Outcome
-	17, // 11: oap.v1.OperationProgress.step:type_name -> oap.v1.Step
+	18, // 11: oap.v1.OperationProgress.step:type_name -> oap.v1.Step
 	1,  // 12: oap.v1.OperationProgress.state:type_name -> oap.v1.StepState
 	2,  // 13: oap.v1.Outcome.status:type_name -> oap.v1.OutcomeStatus
-	18, // 14: oap.v1.Outcome.reasons:type_name -> oap.v1.Reason
-	19, // 15: oap.v1.Outcome.next:type_name -> oap.v1.Intent
+	19, // 14: oap.v1.Outcome.reasons:type_name -> oap.v1.Reason
+	20, // 15: oap.v1.Outcome.next:type_name -> oap.v1.Intent
 	9,  // 16: oap.v1.Outcome.evidence:type_name -> oap.v1.Evidence
-	20, // 17: oap.v1.Evidence.health:type_name -> oap.v1.Health
-	10, // 18: oap.v1.Evidence.checks:type_name -> oap.v1.CheckResult
-	11, // 19: oap.v1.Evidence.traffic:type_name -> oap.v1.TrafficSummary
-	14, // 20: oap.v1.CheckResult.at:type_name -> google.protobuf.Timestamp
-	12, // 21: oap.v1.TrafficSummary.failed:type_name -> oap.v1.RequestFailure
-	14, // 22: oap.v1.RequestFailure.at:type_name -> google.protobuf.Timestamp
-	5,  // 23: oap.v1.AskAnswered.by:type_name -> oap.v1.Actor
-	24, // [24:24] is the sub-list for method output_type
-	24, // [24:24] is the sub-list for method input_type
-	24, // [24:24] is the sub-list for extension type_name
-	24, // [24:24] is the sub-list for extension extendee
-	0,  // [0:24] is the sub-list for field type_name
+	14, // 17: oap.v1.Outcome.images:type_name -> oap.v1.Outcome.ImagesEntry
+	21, // 18: oap.v1.Evidence.health:type_name -> oap.v1.Health
+	10, // 19: oap.v1.Evidence.checks:type_name -> oap.v1.CheckResult
+	11, // 20: oap.v1.Evidence.traffic:type_name -> oap.v1.TrafficSummary
+	15, // 21: oap.v1.CheckResult.at:type_name -> google.protobuf.Timestamp
+	12, // 22: oap.v1.TrafficSummary.failed:type_name -> oap.v1.RequestFailure
+	15, // 23: oap.v1.RequestFailure.at:type_name -> google.protobuf.Timestamp
+	5,  // 24: oap.v1.AskAnswered.by:type_name -> oap.v1.Actor
+	25, // [25:25] is the sub-list for method output_type
+	25, // [25:25] is the sub-list for method input_type
+	25, // [25:25] is the sub-list for extension type_name
+	25, // [25:25] is the sub-list for extension extendee
+	0,  // [0:25] is the sub-list for field type_name
 }
 
 func init() { file_oap_v1_journal_proto_init() }
@@ -1346,7 +1361,7 @@ func file_oap_v1_journal_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_oap_v1_journal_proto_rawDesc), len(file_oap_v1_journal_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   11,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

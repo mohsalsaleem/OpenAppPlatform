@@ -15,5 +15,8 @@ FROM ${ALPINE}
 COPY --from=packages /rootfs/ /
 ARG TARGETARCH
 COPY oapd-linux-${TARGETARCH} /usr/local/bin/oapd
+# First-party extensions (R4.2): installed only when the owner approves.
+COPY oap-ext-builder-linux-${TARGETARCH} /usr/local/lib/oap/extensions/builder
+COPY oap-ext-registry-linux-${TARGETARCH} /usr/local/lib/oap/extensions/registry
 VOLUME /var/lib/oapd
 ENTRYPOINT ["/usr/local/bin/oapd"]
