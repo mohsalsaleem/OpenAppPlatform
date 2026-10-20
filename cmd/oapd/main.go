@@ -28,9 +28,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/engine"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/ports"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/service"
-	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/agentapi"
-	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/mcp"
-	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/ownerapi"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/listeners"
 )
 
 // Version is set at build time.
@@ -176,16 +174,7 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 		return err
 	}
 
-	// On the local socket a request without a token is the owner's; with
-	// one it is that agent's. The public listener requires a token for
-	// everything but login, and doesn't serve the owner API.
-	ownerAuth := agentapi.Bearer(svc, &service.Owner)
-	mux := http.NewServeMux()
-	mux.Handle((&agentapi.Server{Service: svc, Caller: &service.Owner}).Handler())
-	mux.Handle((&ownerapi.Server{Service: svc, Auth: ownerAuth}).Handler())
-	mux.Handle("/mcp", &mcp.Server{Service: svc, Caller: service.Owner, Auth: ownerAuth})
-	mux.Handle(agentapi.BriefingPath, agentapi.BriefingHandler(svc, ownerAuth))
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
+	mux := listeners.Socket(svc)
 	if err := os.MkdirAll(filepath.Dir(c.socket), 0o700); err != nil {
 		return err
 	}
@@ -208,11 +197,7 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 		srv.Shutdown(shut)
 	}()
 	if c.apiHost != "" {
-		pub := http.NewServeMux()
-		pub.Handle((&agentapi.Server{Service: svc}).Handler())
-		pub.Handle("/mcp", &mcp.Server{Service: svc, Auth: agentapi.Bearer(svc, nil)})
-		pub.Handle(agentapi.BriefingPath, agentapi.BriefingHandler(svc, agentapi.Bearer(svc, nil)))
-		pub.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
+		pub := listeners.Public(svc)
 		psrv := &http.Server{Addr: c.publicListen, Handler: pub, Protocols: &protocols, ReadHeaderTimeout: 10 * time.Second}
 		go func() {
 			if err := psrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

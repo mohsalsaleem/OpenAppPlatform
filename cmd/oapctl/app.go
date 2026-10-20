@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -346,15 +347,24 @@ func (a *app) serverFor(addr string) (*host.Server, error) {
 }
 
 // mcpStdio serves MCP on stdin and stdout for an agent on this machine,
-// relaying each message to oapd's MCP endpoint over the SSH forward.
+// relaying each message to oapd's MCP endpoint: with the agent's token when
+// OAP_AGENT names one, else as the owner over the SSH forward.
 func (a *app) mcpStdio(ctx context.Context, args []string) int {
 	addr, _ := splitFirst(args)
 	s, err := a.serverFor(addr)
 	if err != nil {
 		return a.fail(err)
 	}
-	endpoint, client := os.Getenv("OAP_AGENT_URL"), http.DefaultClient
-	if endpoint == "" {
+	var client *http.Client
+	var endpoint string
+	if os.Getenv("OAP_AGENT") != "" || os.Getenv("OAP_AGENT_URL") != "" {
+		hc, base, stop, err := a.transport(ctx, s)
+		if err != nil {
+			return a.fail(err)
+		}
+		defer stop()
+		client, endpoint = hc, base
+	} else {
 		t, err := a.target(s.Address)
 		if err != nil {
 			return a.fail(err)
@@ -384,8 +394,10 @@ func (a *app) mcpStdio(ctx context.Context, args []string) int {
 		}
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		if resp.StatusCode == http.StatusOK {
-			fmt.Fprintf(a.out, "%s\n", bytes.TrimSpace(body))
+		// A refusal (401) carries a JSON-RPC error; pass it on so the
+		// agent isn't left waiting.
+		if b := bytes.TrimSpace(body); len(b) > 0 && json.Valid(b) {
+			fmt.Fprintf(a.out, "%s\n", b)
 		}
 	}
 	return 0

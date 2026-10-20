@@ -19,8 +19,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/engine"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/service"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/agentapi"
-	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/mcp"
-	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/ownerapi"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/listeners"
 )
 
 // twoListeners is oapd's pair of listeners on a simulated host: the local
@@ -36,15 +35,7 @@ func twoListeners(t *testing.T) (local, public string) {
 	if err := svc.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	lm := http.NewServeMux()
-	lm.Handle((&agentapi.Server{Service: svc, Caller: &service.Owner}).Handler())
-	lm.Handle((&ownerapi.Server{Service: svc, Auth: agentapi.Bearer(svc, &service.Owner)}).Handler())
-	lm.Handle(agentapi.BriefingPath, agentapi.BriefingHandler(svc, agentapi.Bearer(svc, &service.Owner)))
-	pm := http.NewServeMux()
-	pm.Handle((&agentapi.Server{Service: svc}).Handler())
-	pm.Handle((&ownerapi.Server{Service: svc, Auth: agentapi.Bearer(svc, nil)}).Handler())
-	pm.Handle(agentapi.BriefingPath, agentapi.BriefingHandler(svc, agentapi.Bearer(svc, nil)))
-	pm.Handle("/mcp", &mcp.Server{Service: svc, Auth: agentapi.Bearer(svc, nil)})
+	lm, pm := listeners.Socket(svc), listeners.Public(svc)
 	l, p := httptest.NewServer(lm), httptest.NewServer(pm)
 	t.Cleanup(l.Close)
 	t.Cleanup(p.Close)
@@ -117,7 +108,8 @@ func TestAgentLoginEndToEnd(t *testing.T) {
 	if code, out := cli(t, dir, agent, "app", "scale", "site", "web", "2", "--yes"); code != 0 {
 		t.Fatalf("agent scale: %s", out)
 	}
-	if code, out := cli(t, dir, agent, "owner", "agents"); code == 0 || !strings.Contains(out, "only the owner") {
+	// The public listener doesn't serve the owner API at all.
+	if code, out := cli(t, dir, agent, "owner", "agents"); code == 0 || !strings.Contains(out, "unimplemented") {
 		t.Fatalf("agent used the owner API: %s", out)
 	}
 
