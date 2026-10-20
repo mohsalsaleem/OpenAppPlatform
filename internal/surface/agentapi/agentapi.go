@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"connectrpc.com/connect"
 	oapv1 "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1"
@@ -21,10 +22,29 @@ import (
 // Server adapts the service to the generated handler interface.
 type Server struct {
 	Service *service.Service
-	// Caller is who every request on this handler comes from. Until device
-	// login (R3.6) the handler serves only oapd's local socket, reached by
-	// the owner over SSH.
-	Caller service.Caller
+	// Caller is who a request without a token comes from: the owner on
+	// oapd's local socket. Nil on the public listener, where every request
+	// but a login needs a token.
+	Caller *service.Caller
+}
+
+// Bearer resolves a request's caller: an agent from its bearer token, or
+// the fallback (the owner on the local socket) when there is none.
+func Bearer(svc *service.Service, fallback *service.Caller) func(context.Context, http.Header) (service.Caller, error) {
+	return func(ctx context.Context, h http.Header) (service.Caller, error) {
+		if tok, ok := strings.CutPrefix(h.Get("Authorization"), "Bearer "); ok {
+			return svc.Authenticate(ctx, strings.TrimSpace(tok))
+		}
+		if fallback != nil {
+			return *fallback, nil
+		}
+		return service.Caller{}, &service.Error{Code: service.Unauthenticated,
+			Detail: &oapv1.ErrorDetail{Why: "identity.no_token", Message: "sign in with oapctl login and send the token"}}
+	}
+}
+
+func (s *Server) who(ctx context.Context, h http.Header) (service.Caller, error) {
+	return Bearer(s.Service, s.Caller)(ctx, h)
 }
 
 var _ oapv1connect.AgentServiceHandler = (*Server)(nil)
@@ -33,15 +53,15 @@ var _ oapv1connect.AgentServiceHandler = (*Server)(nil)
 // OAP's wire conventions (field names as written in the protos), not
 // protojson's default lowerCamelCase.
 func (s *Server) Handler() (string, http.Handler) {
-	return oapv1connect.NewAgentServiceHandler(s, connect.WithCodec(jsonCodec{}))
+	return oapv1connect.NewAgentServiceHandler(s, connect.WithCodec(JSONCodec{}))
 }
 
-// jsonCodec is Connect's "json" codec with OAP's JSON conventions.
-type jsonCodec struct{}
+// JSONCodec is Connect's "json" codec with OAP's JSON conventions.
+type JSONCodec struct{}
 
-func (jsonCodec) Name() string { return "json" }
+func (JSONCodec) Name() string { return "json" }
 
-func (jsonCodec) Marshal(v any) ([]byte, error) {
+func (JSONCodec) Marshal(v any) ([]byte, error) {
 	m, ok := v.(proto.Message)
 	if !ok {
 		return nil, fmt.Errorf("agentapi: %T isn't a protobuf message", v)
@@ -49,7 +69,7 @@ func (jsonCodec) Marshal(v any) ([]byte, error) {
 	return wire.Marshal(m)
 }
 
-func (jsonCodec) Unmarshal(b []byte, v any) error {
+func (JSONCodec) Unmarshal(b []byte, v any) error {
 	m, ok := v.(proto.Message)
 	if !ok {
 		return fmt.Errorf("agentapi: %T isn't a protobuf message", v)
@@ -64,10 +84,11 @@ var codes = map[service.Code]connect.Code{
 	service.PermissionDenied:   connect.CodePermissionDenied,
 	service.Unimplemented:      connect.CodeUnimplemented,
 	service.Internal:           connect.CodeInternal,
+	service.Unauthenticated:    connect.CodeUnauthenticated,
 }
 
-// toConnect turns a service error into a Connect error with the ErrorDetail.
-func toConnect(err error) error {
+// ToConnect turns a service error into a Connect error with the ErrorDetail.
+func ToConnect(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -86,57 +107,85 @@ func toConnect(err error) error {
 }
 
 func (s *Server) Observe(ctx context.Context, req *connect.Request[oapv1.ObserveRequest]) (*connect.Response[oapv1.ObserveResponse], error) {
-	out, err := s.Service.Observe(ctx, s.Caller, req.Msg)
+	c, err := s.who(ctx, req.Header())
 	if err != nil {
-		return nil, toConnect(err)
+		return nil, ToConnect(err)
+	}
+	out, err := s.Service.Observe(ctx, c, req.Msg)
+	if err != nil {
+		return nil, ToConnect(err)
 	}
 	return connect.NewResponse(out), nil
 }
 
 func (s *Server) Watch(ctx context.Context, req *connect.Request[oapv1.WatchRequest], stream *connect.ServerStream[oapv1.WatchResponse]) error {
-	return toConnect(s.Service.Watch(ctx, s.Caller, req.Msg, func(e *oapv1.Event) error {
+	c, err := s.who(ctx, req.Header())
+	if err != nil {
+		return ToConnect(err)
+	}
+	return ToConnect(s.Service.Watch(ctx, c, req.Msg, func(e *oapv1.Event) error {
 		return stream.Send(&oapv1.WatchResponse{Event: e})
 	}))
 }
 
 func (s *Server) Propose(ctx context.Context, req *connect.Request[oapv1.ProposeRequest]) (*connect.Response[oapv1.ProposeResponse], error) {
-	out, err := s.Service.Propose(ctx, s.Caller, req.Msg)
+	c, err := s.who(ctx, req.Header())
 	if err != nil {
-		return nil, toConnect(err)
+		return nil, ToConnect(err)
+	}
+	out, err := s.Service.Propose(ctx, c, req.Msg)
+	if err != nil {
+		return nil, ToConnect(err)
 	}
 	return connect.NewResponse(out), nil
 }
 
 func (s *Server) Apply(ctx context.Context, req *connect.Request[oapv1.ApplyRequest]) (*connect.Response[oapv1.ApplyResponse], error) {
-	out, err := s.Service.Apply(ctx, s.Caller, req.Msg)
+	c, err := s.who(ctx, req.Header())
 	if err != nil {
-		return nil, toConnect(err)
+		return nil, ToConnect(err)
+	}
+	out, err := s.Service.Apply(ctx, c, req.Msg)
+	if err != nil {
+		return nil, ToConnect(err)
 	}
 	return connect.NewResponse(out), nil
 }
 
 func (s *Server) Await(ctx context.Context, req *connect.Request[oapv1.AwaitRequest], stream *connect.ServerStream[oapv1.AwaitResponse]) error {
-	return toConnect(s.Service.Await(ctx, s.Caller, req.Msg, func(e *oapv1.Event) error {
+	c, err := s.who(ctx, req.Header())
+	if err != nil {
+		return ToConnect(err)
+	}
+	return ToConnect(s.Service.Await(ctx, c, req.Msg, func(e *oapv1.Event) error {
 		return stream.Send(&oapv1.AwaitResponse{Event: e})
 	}))
 }
 
 func (s *Server) Explain(ctx context.Context, req *connect.Request[oapv1.ExplainRequest]) (*connect.Response[oapv1.ExplainResponse], error) {
-	out, err := s.Service.Explain(ctx, s.Caller, req.Msg)
+	c, err := s.who(ctx, req.Header())
 	if err != nil {
-		return nil, toConnect(err)
+		return nil, ToConnect(err)
+	}
+	out, err := s.Service.Explain(ctx, c, req.Msg)
+	if err != nil {
+		return nil, ToConnect(err)
 	}
 	return connect.NewResponse(out), nil
 }
 
 func (s *Server) Ask(ctx context.Context, req *connect.Request[oapv1.AskRequest]) (*connect.Response[oapv1.AskResponse], error) {
-	out, err := s.Service.Ask(ctx, s.Caller, req.Msg)
+	c, err := s.who(ctx, req.Header())
 	if err != nil {
-		return nil, toConnect(err)
+		return nil, ToConnect(err)
+	}
+	out, err := s.Service.Ask(ctx, c, req.Msg)
+	if err != nil {
+		return nil, ToConnect(err)
 	}
 	return connect.NewResponse(out), nil
 }
 
 func (s *Server) Login(ctx context.Context, req *connect.Request[oapv1.LoginRequest], stream *connect.ServerStream[oapv1.LoginResponse]) error {
-	return toConnect(s.Service.Login(ctx, req.Msg, stream.Send))
+	return ToConnect(s.Service.Login(ctx, req.Msg, stream.Send))
 }

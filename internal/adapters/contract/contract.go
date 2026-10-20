@@ -6,6 +6,7 @@ package contract
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -251,6 +252,15 @@ func Desired(t *testing.T, newRepo func(t *testing.T) ports.DesiredRepo, app fun
 		}
 		if _, ok, _ := d.ByHash(ctx, "sha256:missing"); ok {
 			t.Fatal("unknown hash found")
+		}
+		env := map[string]any{"agents": map[string]any{"a": map[string]any{"may": []any{"scale"}}}}
+		v, err := d.SetEnvelope(ctx, env, "owner", "envelope")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, cur, err := d.Envelope(ctx)
+		if err != nil || cur != v || fmt.Sprint(got) != fmt.Sprint(env) {
+			t.Fatalf("envelope after SetEnvelope: %v %s (want %s) %v", got, cur, v, err)
 		}
 	})
 }

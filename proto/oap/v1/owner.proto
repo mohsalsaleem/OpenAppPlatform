@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package oap.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1";
+
+// OwnerService is the owner's control over agents: approving device
+// logins, trusting identities, and pausing or revoking access. Only the
+// owner may call it.
+service OwnerService {
+  // ListLogins returns device logins waiting for the owner.
+  rpc ListLogins(ListLoginsRequest) returns (ListLoginsResponse);
+  // ApproveLogin approves a waiting login with a scope.
+  rpc ApproveLogin(ApproveLoginRequest) returns (ApproveLoginResponse);
+  // DenyLogin refuses a waiting login.
+  rpc DenyLogin(DenyLoginRequest) returns (DenyLoginResponse);
+  // ListAgents returns approved agents and the approval mode.
+  rpc ListAgents(ListAgentsRequest) returns (ListAgentsResponse);
+  // Revoke ends an agent's tokens, and optionally its trusted identity.
+  rpc Revoke(RevokeRequest) returns (RevokeResponse);
+  // Pause stops an agent, or every agent, from the next request on.
+  rpc Pause(PauseRequest) returns (PauseResponse);
+  // Resume undoes a pause.
+  rpc Resume(ResumeRequest) returns (ResumeResponse);
+  // SetApprovalMode chooses how later sessions are approved.
+  rpc SetApprovalMode(SetApprovalModeRequest) returns (SetApprovalModeResponse);
+}
+
+// ApprovalMode is how an agent's sessions are approved.
+enum ApprovalMode {
+  APPROVAL_MODE_UNSPECIFIED = 0;
+  // An identity the owner trusted signs in without asking; the owner is
+  // notified. The default (owner decision, 2026-10-20).
+  APPROVAL_MODE_TRUSTED_IDENTITY = 1;
+  // Every session waits for the owner.
+  APPROVAL_MODE_EVERY_SESSION = 2;
+}
+
+message PendingLogin {
+  string user_code = 1;
+  string agent = 2;
+  // SHA-256 fingerprint of the agent's public key, if it sent one.
+  string key_fingerprint = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message ListLoginsRequest {}
+
+message ListLoginsResponse {
+  repeated PendingLogin logins = 1;
+}
+
+message ApproveLoginRequest {
+  string user_code = 1;
+  // Applications the agent may act on; "*" for all.
+  repeated string applications = 2;
+  // Intent kinds the agent may propose, for example "scale" and "deploy".
+  repeated string may = 3;
+  // Trust the agent's key, so later sessions sign in without asking.
+  bool trust = 4;
+}
+
+message ApproveLoginResponse {
+  AgentInfo agent = 1;
+}
+
+message DenyLoginRequest {
+  string user_code = 1;
+}
+
+message DenyLoginResponse {}
+
+message AgentInfo {
+  string name = 1;
+  repeated string applications = 2;
+  repeated string may = 3;
+  bool trusted = 4;
+  string key_fingerprint = 5;
+  bool paused = 6;
+  int32 active_tokens = 7;
+}
+
+message ListAgentsRequest {}
+
+message ListAgentsResponse {
+  repeated AgentInfo agents = 1;
+  ApprovalMode mode = 2;
+  bool all_paused = 3;
+}
+
+message RevokeRequest {
+  string agent = 1;
+  // Also forget the trusted identity, so the next login waits for the owner.
+  bool forget_identity = 2;
+}
+
+message RevokeResponse {
+  int32 revoked_tokens = 1;
+}
+
+message PauseRequest {
+  // Empty pauses every agent.
+  string agent = 1;
+}
+
+message PauseResponse {}
+
+message ResumeRequest {
+  // Empty resumes every agent.
+  string agent = 1;
+}
+
+message ResumeResponse {}
+
+message SetApprovalModeRequest {
+  ApprovalMode mode = 1;
+}
+
+message SetApprovalModeResponse {}

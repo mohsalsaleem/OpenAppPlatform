@@ -44,6 +44,7 @@ const (
 	PermissionDenied
 	Unimplemented
 	Internal
+	Unauthenticated
 )
 
 // Error is a service error with a typed detail: a why code and a remedy.
@@ -71,11 +72,34 @@ const (
 	WhyUnknownOp       = "service.unknown_operation"
 )
 
-// Caller is who is asking. Before identity (R3.6) exists, only the owner
-// reaches the service, through the server's local socket over SSH.
+// Caller is who is asking: the owner (on oapd's local socket, reached over
+// SSH) or an agent holding a token.
 type Caller struct {
 	Owner bool
 	Agent string // the name policy judges; "owner" for the owner
+	// Apps are the applications an agent may act on; "*" for all. The
+	// owner may act on everything.
+	Apps []string
+}
+
+// Allows reports whether the caller may act on an application.
+func (c Caller) Allows(app string) bool {
+	if c.Owner {
+		return true
+	}
+	for _, a := range c.Apps {
+		if a == "*" || a == app {
+			return true
+		}
+	}
+	return false
+}
+
+// WhyOutOfScope is the error for an agent acting outside its scope.
+const WhyOutOfScope = "identity.out_of_scope"
+
+func outOfScope(c Caller, app string) error {
+	return fail(PermissionDenied, WhyOutOfScope, "agent %s may not act on %s", c.Agent, app)
 }
 
 // Owner is the caller on the local socket.
@@ -90,6 +114,8 @@ type Service struct {
 	Executor *engine.Executor
 	// MaxAge is how old an observation may be before it is stale.
 	MaxAge time.Duration
+	// LoginTTL is how long a device login waits for the owner.
+	LoginTTL time.Duration
 
 	serializer *engine.Serializer
 	runCtx     context.Context
@@ -97,6 +123,9 @@ type Service struct {
 
 	nmu    sync.Mutex
 	notify chan struct{} // closed and replaced on every journal append
+
+	idOnce sync.Once
+	id     *identity
 }
 
 // notifyingJournal wakes Await whenever anything is appended, including
@@ -148,6 +177,7 @@ func (s *Service) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	s.loadIdentity(entries)
 	done := map[string]bool{}
 	for _, e := range entries {
 		if e.Kind == KindOutcome {
@@ -218,9 +248,21 @@ func (s *Service) append(ctx context.Context, kind, operation string, je *oapv1.
 
 // Observe returns the world model at the journal's head revision.
 func (s *Service) Observe(ctx context.Context, c Caller, req *oapv1.ObserveRequest) (*oapv1.ObserveResponse, error) {
+	if app := req.GetApplication(); app != "" && !c.Allows(app) {
+		return nil, outOfScope(c, app)
+	}
 	w, err := s.world(ctx)
 	if err != nil {
 		return nil, err
+	}
+	if !c.Owner { // an agent sees only its applications
+		var keep []*oapv1.Application
+		for _, a := range w.Applications {
+			if c.Allows(a.Name) {
+				keep = append(keep, a)
+			}
+		}
+		w.Applications = keep
 	}
 	if app := req.GetApplication(); app != "" {
 		var keep []*oapv1.Application
@@ -376,6 +418,9 @@ func (s *Service) Propose(ctx context.Context, c Caller, req *oapv1.ProposeReque
 	if in.GetApplication() == "" {
 		return nil, fail(InvalidArgument, intent.WhyIncomplete, "the intent names no application")
 	}
+	if !c.Allows(in.GetApplication()) {
+		return nil, outOfScope(c, in.GetApplication())
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	head, err := s.Journal.Head(ctx)
@@ -485,6 +530,9 @@ func (s *Service) Apply(ctx context.Context, c Caller, req *oapv1.ApplyRequest) 
 	if err != nil {
 		return nil, err
 	}
+	if !c.Allows(p.GetIntent().GetApplication()) {
+		return nil, outOfScope(c, p.GetIntent().GetApplication())
+	}
 	id := opID(p.GetId())
 	entries, err := s.entries(ctx, 0)
 	if err != nil {
@@ -561,6 +609,11 @@ func (s *Service) Await(ctx context.Context, c Caller, req *oapv1.AwaitRequest, 
 	if _, err := s.entriesFor(ctx, id); err != nil {
 		return err
 	}
+	if !c.Owner {
+		if app := s.operationApp(ctx, id); !c.Allows(app) {
+			return outOfScope(c, app)
+		}
+	}
 	deadline := s.Clock.Now().Add(timeout)
 	var last uint64
 	err := s.stream(ctx, req.GetSinceRevision(), func(op, app string) bool { return op == id }, deadline, func(e *oapv1.Event) (bool, error) {
@@ -595,7 +648,10 @@ func (s *Service) Watch(ctx context.Context, c Caller, req *oapv1.WatchRequest, 
 		after = head
 	}
 	app := req.GetApplication()
-	return s.stream(ctx, after, func(_, a string) bool { return app == "" || a == app }, time.Time{}, func(e *oapv1.Event) (bool, error) {
+	if app != "" && !c.Allows(app) {
+		return outOfScope(c, app)
+	}
+	return s.stream(ctx, after, func(_, a string) bool { return (app == "" || a == app) && (c.Owner || (a != "" && c.Allows(a))) }, time.Time{}, func(e *oapv1.Event) (bool, error) {
 		return false, send(e)
 	})
 }
@@ -695,6 +751,26 @@ func (s *Service) event(e ops.Entry, apps map[string]string, steps map[string][]
 	return nil, ""
 }
 
+// operationApp names an operation's application.
+func (s *Service) operationApp(ctx context.Context, id string) string {
+	entries, err := s.entries(ctx, 0)
+	if err != nil {
+		return ""
+	}
+	for _, e := range entries {
+		if e.Kind == KindApply && e.Operation == id {
+			je, err := decode(e.Data)
+			if err != nil {
+				return ""
+			}
+			if p, err := s.proposal(ctx, je.GetParentId()); err == nil {
+				return p.GetIntent().GetApplication()
+			}
+		}
+	}
+	return ""
+}
+
 // entriesFor fails when no apply entry exists for an operation.
 func (s *Service) entriesFor(ctx context.Context, id string) ([]ops.Entry, error) {
 	entries, err := s.entries(ctx, 0)
@@ -724,6 +800,9 @@ func stepState(s string) oapv1.StepState {
 // Explain answers why an application's actual state isn't its desired
 // state, from the world model.
 func (s *Service) Explain(ctx context.Context, c Caller, req *oapv1.ExplainRequest) (*oapv1.ExplainResponse, error) {
+	if !c.Allows(req.GetApplication()) {
+		return nil, outOfScope(c, req.GetApplication())
+	}
 	w, err := s.world(ctx)
 	if err != nil {
 		return nil, err
@@ -785,9 +864,4 @@ func unrouted(c *oapv1.Component) bool {
 // Ask needs notifications (R3.7).
 func (s *Service) Ask(ctx context.Context, c Caller, req *oapv1.AskRequest) (*oapv1.AskResponse, error) {
 	return nil, fail(Unimplemented, WhyNotAvailable, "ask isn't available yet (task R3.7)")
-}
-
-// Login needs identity (R3.6).
-func (s *Service) Login(ctx context.Context, req *oapv1.LoginRequest, send func(*oapv1.LoginResponse) error) error {
-	return fail(Unimplemented, WhyNotAvailable, "device login isn't available yet (task R3.6); the owner reaches OAP over SSH until then")
 }

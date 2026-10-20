@@ -149,7 +149,20 @@ func TestMembershipChangesDontReload(t *testing.T) {
 	if _, ok := e.Resolve(ctx, name); ok {
 		t.Fatal("the old host's name still resolves")
 	}
-	route := f.config["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)["oap"].(map[string]any)["routes"].([]any)[0]
+	// A fixed route (OAP's API) is added once, ahead of the applications.
+	e.Extra = []StaticRoute{{Host: "oap.site.test", Dial: "oap-t-oapd:8080"}}
+	if err := e.EnsureShape(ctx); err != nil || f.loads != 3 {
+		t.Fatalf("ensure shape: %v, %d loads", err, f.loads)
+	}
+	if err := e.EnsureShape(ctx); err != nil || f.loads != 3 {
+		t.Fatalf("ensure shape again: %v, %d loads", err, f.loads)
+	}
+	first := f.config["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)["oap"].(map[string]any)["routes"].([]any)[0]
+	if b, _ := json.Marshal(first); !strings.Contains(string(b), `"oap.site.test"`) || !strings.Contains(string(b), `"oap-t-oapd:8080"`) {
+		t.Fatalf("first route: %s", b)
+	}
+	routes := f.config["apps"].(map[string]any)["http"].(map[string]any)["servers"].(map[string]any)["oap"].(map[string]any)["routes"].([]any)
+	route := routes[len(routes)-1]
 	b, _ := json.Marshal(route)
 	if !strings.Contains(string(b), `"dynamic_upstreams"`) || !strings.Contains(string(b), `"udp/oap-t-oapd:53"`) || strings.Contains(string(b), "10.0.0") {
 		t.Fatalf("route: %s", b)

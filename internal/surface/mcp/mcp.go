@@ -46,7 +46,11 @@ var descriptions = map[string]string{
 // Server is an MCP server over the service.
 type Server struct {
 	Service *service.Service
-	Caller  service.Caller
+	// Caller is who stdio requests come from.
+	Caller service.Caller
+	// Auth resolves an HTTP request's caller from its headers (a bearer
+	// token); nil means every HTTP request is Caller.
+	Auth func(context.Context, http.Header) (service.Caller, error)
 	// WatchIdle is how long watch waits for a new event before returning.
 	WatchIdle time.Duration
 }
@@ -436,7 +440,21 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	out := s.Handle(r.Context(), body)
+	srv := s
+	if s.Auth != nil {
+		c, err := s.Auth(r.Context(), r.Header)
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write(mustJSON(response{JSONRPC: "2.0", ID: json.RawMessage("null"), Error: &rpcError{Code: -32001, Message: err.Error()}}))
+			return
+		}
+		copy := *s
+		copy.Caller = c
+		srv = &copy
+	}
+	out := srv.Handle(r.Context(), body)
 	if out == nil {
 		w.WriteHeader(http.StatusAccepted)
 		return

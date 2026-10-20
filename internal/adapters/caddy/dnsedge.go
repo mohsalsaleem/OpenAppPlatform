@@ -47,6 +47,9 @@ type DNSEdge struct {
 	Lookup func(ctx context.Context, host string) ([]net.IP, error)
 	// Now is the clock; time.Now when nil.
 	Now func() time.Time
+	// Extra are fixed routes ahead of the applications', such as OAP's own
+	// API: a host and the address Caddy proxies it to.
+	Extra []StaticRoute
 
 	mu     sync.Mutex
 	state  dnsState
@@ -58,6 +61,11 @@ type dnsState struct {
 	Generation uint64            `json:"generation"`
 	Members    []ops.RouteMember `json:"members"`
 	ChangedAt  time.Time         `json:"changed_at"`
+}
+
+// StaticRoute is a host Caddy proxies to one fixed upstream.
+type StaticRoute struct {
+	Host, Dial string
 }
 
 type cached struct {
@@ -189,6 +197,11 @@ func groups(cfg ops.EdgeConfig) []group {
 // server builds Caddy's server for a set of groups. It holds no members.
 func (e *DNSEdge) server(gs []group) map[string]any {
 	routes := []any{}
+	for _, r := range e.Extra {
+		routes = append(routes, map[string]any{"match": []any{map[string]any{"host": []any{r.Host}}}, "terminal": true,
+			"handle": []any{map[string]any{"handler": "reverse_proxy", "upstreams": []any{map[string]any{"dial": r.Dial}},
+				"transport": map[string]any{"protocol": "http", "versions": []any{"h2c", "2"}}}}})
+	}
 	for _, g := range gs {
 		m := map[string]any{"host": []any{g.Host}}
 		if p := strings.TrimSuffix(g.Prefix, "/"); p != "" {
@@ -234,9 +247,34 @@ func (e *DNSEdge) Apply(ctx context.Context, cfg ops.EdgeConfig) (uint64, error)
 	if same(ops.EdgeConfig{Members: e.state.Members}, cfg) && e.state.Generation > 0 {
 		return e.state.Generation, nil
 	}
+	if err := e.ensure(ctx, cfg); err != nil {
+		return 0, err
+	}
+	e.state = dnsState{Generation: e.state.Generation + 1, Members: append([]ops.RouteMember(nil), cfg.Members...), ChangedAt: e.now()}
+	e.cache = nil
+	if err := e.save(); err != nil {
+		return 0, err
+	}
+	return e.state.Generation, nil
+}
+
+// EnsureShape rewrites Caddy's server if it doesn't match the current
+// membership and fixed routes, for example after Extra changed. It changes
+// no membership.
+func (e *DNSEdge) EnsureShape(ctx context.Context) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if err := e.load(ctx); err != nil {
+		return err
+	}
+	return e.ensure(ctx, ops.EdgeConfig{Members: e.state.Members})
+}
+
+// ensure reloads Caddy if its server differs from the one cfg needs.
+func (e *DNSEdge) ensure(ctx context.Context, cfg ops.EdgeConfig) error {
 	var whole map[string]any
 	if err := e.Admin.call(ctx, http.MethodGet, "/config/", nil, &whole); err != nil {
-		return 0, err
+		return err
 	}
 	if whole == nil {
 		whole = map[string]any{}
@@ -247,18 +285,11 @@ func (e *DNSEdge) Apply(ctx context.Context, cfg ops.EdgeConfig) (uint64, error)
 	wantJSON, _ := json.Marshal(want)
 	var wantTree any
 	json.Unmarshal(wantJSON, &wantTree)
-	if !reflect.DeepEqual(servers[e.Admin.Server], wantTree) {
-		servers[e.Admin.Server] = wantTree
-		if err := e.Admin.call(ctx, http.MethodPost, "/load", whole, nil); err != nil {
-			return 0, err
-		}
+	if reflect.DeepEqual(servers[e.Admin.Server], wantTree) {
+		return nil
 	}
-	e.state = dnsState{Generation: e.state.Generation + 1, Members: append([]ops.RouteMember(nil), cfg.Members...), ChangedAt: e.now()}
-	e.cache = nil
-	if err := e.save(); err != nil {
-		return 0, err
-	}
-	return e.state.Generation, nil
+	servers[e.Admin.Server] = wantTree
+	return e.Admin.call(ctx, http.MethodPost, "/load", whole, nil)
 }
 
 // Confirmed returns once Caddy can no longer be using answers from before

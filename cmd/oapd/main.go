@@ -29,6 +29,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/service"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/agentapi"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/mcp"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/ownerapi"
 )
 
 // Version is set at build time.
@@ -36,7 +37,7 @@ var Version = "dev"
 
 type config struct {
 	data, socket, dockerSocket, install, caddyAdmin string
-	edgeMode                                        string
+	edgeMode, apiHost, publicListen                 string
 	tls                                             bool
 	observeEvery                                    time.Duration
 }
@@ -49,6 +50,8 @@ func main() {
 	flag.StringVar(&c.install, "install", env("OAPD_INSTALL", ""), "installation id, on every resource OAP creates")
 	flag.StringVar(&c.caddyAdmin, "caddy-admin", env("OAPD_CADDY_ADMIN", "/run/oap-caddy/admin.sock"), "Caddy admin API socket")
 	flag.StringVar(&c.edgeMode, "edge", env("OAPD_EDGE", "dns"), `"dns": membership through oapd's DNS, no Caddy reload (ADR 0001); "static": reload Caddy on every change`)
+	flag.StringVar(&c.apiHost, "api-host", env("OAPD_API_HOST", ""), "public host name for the agent API, routed through Caddy; empty keeps it on the local socket only")
+	flag.StringVar(&c.publicListen, "public-listen", env("OAPD_PUBLIC_LISTEN", ":8080"), "address of the token-only public listener, used with --api-host")
 	flag.BoolVar(&c.tls, "tls", env("OAPD_TLS", "true") == "true", "serve routed hosts over HTTPS with automatic certificates")
 	flag.DurationVar(&c.observeEvery, "observe-every", 10*time.Second, "how often to re-observe the runtime in full")
 	version := flag.Bool("version", false, "print the version and exit")
@@ -130,6 +133,13 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 	if c.edgeMode == "dns" {
 		dns := &caddy.DNSEdge{Admin: admin, Resolver: "udp/oap-" + c.install + "-oapd:53", Refresh: time.Second,
 			StatePath: filepath.Join(c.data, "edge.json")}
+		if c.apiHost != "" {
+			_, port, _ := net.SplitHostPort(c.publicListen)
+			dns.Extra = []caddy.StaticRoute{{Host: c.apiHost, Dial: "oap-" + c.install + "-oapd:" + port}}
+			if err := dns.EnsureShape(ctx); err != nil {
+				return fmt.Errorf("routing the API host: %w", err)
+			}
+		}
 		conn, err := net.ListenPacket("udp", ":53")
 		if err != nil {
 			return fmt.Errorf("edge DNS: %w", err)
@@ -161,9 +171,14 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 		return err
 	}
 
+	// On the local socket a request without a token is the owner's; with
+	// one it is that agent's. The public listener requires a token for
+	// everything but login, and doesn't serve the owner API.
+	ownerAuth := agentapi.Bearer(svc, &service.Owner)
 	mux := http.NewServeMux()
-	mux.Handle((&agentapi.Server{Service: svc, Caller: service.Owner}).Handler())
-	mux.Handle("/mcp", &mcp.Server{Service: svc, Caller: service.Owner})
+	mux.Handle((&agentapi.Server{Service: svc, Caller: &service.Owner}).Handler())
+	mux.Handle((&ownerapi.Server{Service: svc, Auth: ownerAuth}).Handler())
+	mux.Handle("/mcp", &mcp.Server{Service: svc, Caller: service.Owner, Auth: ownerAuth})
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
 	if err := os.MkdirAll(filepath.Dir(c.socket), 0o700); err != nil {
 		return err
@@ -186,6 +201,25 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 		defer cancel()
 		srv.Shutdown(shut)
 	}()
+	if c.apiHost != "" {
+		pub := http.NewServeMux()
+		pub.Handle((&agentapi.Server{Service: svc}).Handler())
+		pub.Handle("/mcp", &mcp.Server{Service: svc, Auth: agentapi.Bearer(svc, nil)})
+		pub.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
+		psrv := &http.Server{Addr: c.publicListen, Handler: pub, Protocols: &protocols, ReadHeaderTimeout: 10 * time.Second}
+		go func() {
+			if err := psrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Error("public listener", "err", err)
+			}
+		}()
+		go func() {
+			<-ctx.Done()
+			shut, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			psrv.Shutdown(shut)
+		}()
+		log.Info("public agent API", "host", c.apiHost, "listen", c.publicListen)
+	}
 	log.Info("oapd serving", "version", Version, "socket", c.socket, "install", c.install, "tls", c.tls, "edge", c.edgeMode)
 	if err := srv.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
 		return err

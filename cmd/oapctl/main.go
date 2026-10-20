@@ -76,6 +76,9 @@ const usage = `Usage:
   %[1]s observe [APP]                       the world: applications, components, routes
   %[1]s explain APP [COMPONENT]             why an application differs from its desired state
   %[1]s watch [APP] [--since N] [--limit N] events as they happen
+  %[1]s login URL --agent NAME             sign an agent in; the owner approves it once
+  %[1]s owner logins|approve|deny|agents|revoke|pause|resume|mode   the owner's control over agents
+  With OAP_AGENT=NAME, agent API commands run as that signed-in agent.
   Agent API commands take --json (the result as JSON) or --events (each event as a JSON line).
 `
 
@@ -101,6 +104,10 @@ func (a *app) run(ctx context.Context, args []string) int {
 		return a.appApply(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "app" && args[1] == "scale":
 		return a.appScale(ctx, args[2:])
+	case args[0] == "login":
+		return a.loginCmd(ctx, args[1:])
+	case args[0] == "owner":
+		return a.ownerCmd(ctx, args[1:])
 	case args[0] == "observe":
 		return a.observeCmd(ctx, args[1:])
 	case args[0] == "explain":

@@ -16,6 +16,7 @@ const OapdSocket = "/run/oapd/oapd.sock"
 var (
 	installID = regexp.MustCompile(`^[a-z0-9]{6,16}$`)
 	imageRef  = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._/:@-]*$`)
+	apiHost   = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
 )
 
 // Install describes what `oap host install` puts on a server.
@@ -26,6 +27,9 @@ type Install struct {
 	Oapd, Caddy string
 	// TLS gives routed hosts automatic HTTPS certificates.
 	TLS bool
+	// APIHost is the public host name of the agent API; empty keeps the
+	// API on oapd's local socket only.
+	APIHost string
 }
 
 // Script returns the install script: idempotent, so running it again
@@ -35,6 +39,9 @@ type Install struct {
 func (in Install) Script() (string, error) {
 	if !installID.MatchString(in.ID) {
 		return "", fmt.Errorf("host: installation id %q must be 6 to 16 lowercase letters and digits", in.ID)
+	}
+	if in.APIHost != "" && !apiHost.MatchString(in.APIHost) {
+		return "", fmt.Errorf("host: %q isn't a host name", in.APIHost)
 	}
 	for _, img := range []string{in.Oapd, in.Caddy} {
 		if !imageRef.MatchString(img) {
@@ -50,6 +57,7 @@ ID=%s
 OAPD=%s
 CADDY=%s
 TLS=%s
+API=%s
 L="--label io.openappplatform.install=$ID"
 mkdir -p /var/lib/oap /run/oapd
 chmod 700 /var/lib/oap /run/oapd
@@ -83,7 +91,7 @@ else
   echo "caddy started"
 fi
 
-OAPDCONF="oapd-1-tls-$TLS"
+OAPDCONF="oapd-2-tls-$TLS-api-$API"
 if current "oap-$ID-oapd" "$OAPD" "$OAPDCONF"; then
   echo "oapd unchanged"
 else
@@ -93,7 +101,7 @@ else
     --network "oap-$ID" --memory 160m \
     -v /var/run/docker.sock:/var/run/docker.sock -v "oap-$ID-data:/var/lib/oapd" \
     -v "oap-$ID-caddy-admin:/run/oap-caddy" -v /run/oapd:/run/oapd \
-    -e "OAPD_INSTALL=$ID" -e "OAPD_TLS=$TLS" \
+    -e "OAPD_INSTALL=$ID" -e "OAPD_TLS=$TLS" -e "OAPD_API_HOST=$API" \
     "$OAPD" >/dev/null
   echo "oapd started"
 fi
@@ -109,7 +117,7 @@ until [ -S %s ] && curl -sf --unix-socket %s http://oapd/healthz >/dev/null 2>&1
   sleep 1
 done
 echo "oapd ready"
-`, in.ID, in.Oapd, in.Caddy, tls, OapdSocket, OapdSocket)
+`, in.ID, in.Oapd, in.Caddy, tls, in.APIHost, OapdSocket, OapdSocket)
 	return s, nil
 }
 

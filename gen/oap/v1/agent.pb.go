@@ -772,8 +772,15 @@ type LoginRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The name the agent asks to be approved as, for example "claude-laptop".
 	Agent string `protobuf:"bytes,1,opt,name=agent,proto3" json:"agent,omitempty"`
-	// Public key for trusted agent identity, if the agent holds one.
-	PublicKey     string `protobuf:"bytes,2,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	// Public key for trusted agent identity, if the agent holds one:
+	// "ed25519:" followed by the raw 32-byte key in standard base64.
+	PublicKey string `protobuf:"bytes,2,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	// Proof that the agent holds the key: an Ed25519 signature over
+	// "oap-login-v1\n{agent}\n{public_key}\n{signed_at}\n{nonce}", made
+	// within two minutes of signed_at (RFC 3339), with a nonce never used before.
+	SignedAt      string `protobuf:"bytes,3,opt,name=signed_at,json=signedAt,proto3" json:"signed_at,omitempty"`
+	Nonce         string `protobuf:"bytes,4,opt,name=nonce,proto3" json:"nonce,omitempty"`
+	Signature     []byte `protobuf:"bytes,5,opt,name=signature,proto3" json:"signature,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -820,6 +827,27 @@ func (x *LoginRequest) GetPublicKey() string {
 		return x.PublicKey
 	}
 	return ""
+}
+
+func (x *LoginRequest) GetSignedAt() string {
+	if x != nil {
+		return x.SignedAt
+	}
+	return ""
+}
+
+func (x *LoginRequest) GetNonce() string {
+	if x != nil {
+		return x.Nonce
+	}
+	return ""
+}
+
+func (x *LoginRequest) GetSignature() []byte {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
 }
 
 type LoginResponse struct {
@@ -1159,11 +1187,14 @@ const file_oap_v1_agent_proto_rawDesc = "" +
 	"confidence\x12\x1a\n" +
 	"\bevidence\x18\x04 \x03(\tR\bevidence\"$\n" +
 	"\vAskResponse\x12\x15\n" +
-	"\x06ask_id\x18\x01 \x01(\tR\x05askId\"C\n" +
+	"\x06ask_id\x18\x01 \x01(\tR\x05askId\"\x94\x01\n" +
 	"\fLoginRequest\x12\x14\n" +
 	"\x05agent\x18\x01 \x01(\tR\x05agent\x12\x1d\n" +
 	"\n" +
-	"public_key\x18\x02 \x01(\tR\tpublicKey\"\xab\x01\n" +
+	"public_key\x18\x02 \x01(\tR\tpublicKey\x12\x1b\n" +
+	"\tsigned_at\x18\x03 \x01(\tR\bsignedAt\x12\x14\n" +
+	"\x05nonce\x18\x04 \x01(\tR\x05nonce\x12\x1c\n" +
+	"\tsignature\x18\x05 \x01(\fR\tsignature\"\xab\x01\n" +
 	"\rLoginResponse\x120\n" +
 	"\apending\x18\x01 \x01(\v2\x14.oap.v1.LoginPendingH\x00R\apending\x123\n" +
 	"\bapproved\x18\x02 \x01(\v2\x15.oap.v1.LoginApprovedH\x00R\bapproved\x12*\n" +

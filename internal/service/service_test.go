@@ -43,7 +43,7 @@ func newRig(t *testing.T) *rig {
 	r := &rig{runtime: sim.NewRuntime(clock, model.HostObservation{Name: "sim", MemoryTotalMiB: 950, CPUMillisTotal: 1000}),
 		edge: sim.NewEdge(), journal: &sim.Journal{}, desired: sim.NewDesired(), clock: clock}
 	env, _ := spec.FromJSON([]byte(envelopeJSON))
-	r.desired.SetEnvelope(env)
+	r.desired.SetEnvelope(ctx, env, "owner", "test envelope")
 	r.svc = r.service()
 	if err := r.svc.Start(ctx); err != nil {
 		t.Fatal(err)
@@ -204,7 +204,7 @@ func TestProposeRefusals(t *testing.T) {
 func TestApplyFollowsTheVerdict(t *testing.T) {
 	r := newRig(t)
 	r.create(t)
-	claude := Caller{Agent: "claude"}
+	claude := Caller{Agent: "claude", Apps: []string{"site"}}
 	p, err := r.svc.Propose(ctx, claude, &oapv1.ProposeRequest{Intent: scale("site", 2)})
 	if err != nil {
 		t.Fatal(err)
@@ -292,12 +292,9 @@ func TestExplainFindsMissingInstances(t *testing.T) {
 	}
 }
 
-func TestAskAndLoginAreNotAvailableYet(t *testing.T) {
+func TestAskIsNotAvailableYet(t *testing.T) {
 	r := newRig(t)
 	if _, err := r.svc.Ask(ctx, Owner, &oapv1.AskRequest{}); code(err) != Unimplemented {
-		t.Fatal(err)
-	}
-	if err := r.svc.Login(ctx, &oapv1.LoginRequest{}, nil); code(err) != Unimplemented {
 		t.Fatal(err)
 	}
 }

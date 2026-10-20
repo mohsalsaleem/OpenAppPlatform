@@ -28,12 +28,30 @@ import (
 // for its agent API. Until device login (R3.6) this is how the owner's
 // machine reaches OAP; the forward ends with ctx.
 func (a *app) agentClient(ctx context.Context, s *host.Server) (oapv1connect.AgentServiceClient, func(), error) {
-	if u := os.Getenv("OAP_AGENT_URL"); u != "" { // an agent API reached directly, as in tests
-		return oapv1connect.NewAgentServiceClient(http.DefaultClient, u), func() {}, nil
+	hc, base, stop, err := a.transport(ctx, s)
+	if err != nil {
+		return nil, nil, err
+	}
+	return oapv1connect.NewAgentServiceClient(hc, base), stop, nil
+}
+
+// transport reaches oapd's API: as an agent with its saved token when
+// OAP_AGENT names one, directly when OAP_AGENT_URL is set (tests), or as
+// the owner through an SSH-forwarded socket.
+func (a *app) transport(ctx context.Context, s *host.Server) (*http.Client, string, func(), error) {
+	if name := os.Getenv("OAP_AGENT"); name != "" {
+		cr, err := a.credentials(ctx, name)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		return &http.Client{Transport: bearer{token: cr.Token, next: http.DefaultTransport}}, cr.URL, func() {}, nil
+	}
+	if u := os.Getenv("OAP_AGENT_URL"); u != "" {
+		return http.DefaultClient, u, func() {}, nil
 	}
 	t, err := a.target(s.Address)
 	if err != nil {
-		return nil, nil, err
+		return nil, "", nil, err
 	}
 	sock := filepath.Join(t.Dir, "oapd.sock")
 	if len(sock) > 100 { // unix socket paths are short on macOS
@@ -41,7 +59,7 @@ func (a *app) agentClient(ctx context.Context, s *host.Server) (oapv1connect.Age
 	}
 	fwd, err := a.ssh.Forward(ctx, t, sock, host.OapdSocket)
 	if err != nil {
-		return nil, nil, err
+		return nil, "", nil, err
 	}
 	stop := func() {
 		fwd.Process.Kill()
@@ -52,7 +70,19 @@ func (a *app) agentClient(ctx context.Context, s *host.Server) (oapv1connect.Age
 		var d net.Dialer
 		return d.DialContext(ctx, "unix", sock)
 	}}
-	return oapv1connect.NewAgentServiceClient(&http.Client{Transport: tr}, "http://oapd"), stop, nil
+	return &http.Client{Transport: tr}, "http://oapd", stop, nil
+}
+
+// bearer adds an agent's token to every request.
+type bearer struct {
+	token string
+	next  http.RoundTripper
+}
+
+func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	r.Header.Set("Authorization", "Bearer "+b.token)
+	return b.next.RoundTrip(r)
 }
 
 // whyOf returns an API error's why code.
@@ -103,7 +133,7 @@ func (a *app) appApply(ctx context.Context, args []string) int {
 	if err != nil {
 		return a.fail(err)
 	}
-	if os.Getenv("OAP_AGENT_URL") == "" {
+	if os.Getenv("OAP_AGENT_URL") == "" && os.Getenv("OAP_AGENT") == "" { // the owner, over SSH
 		if s.Install == "" {
 			return a.fail(fmt.Errorf("OAP isn't installed on %s; run %s host install first", s.Address, a.cli))
 		}
@@ -308,6 +338,9 @@ func (a *app) appScale(ctx context.Context, args []string) int {
 func (a *app) serverFor(addr string) (*host.Server, error) {
 	if u := os.Getenv("OAP_AGENT_URL"); u != "" {
 		return &host.Server{Address: u}, nil
+	}
+	if name := os.Getenv("OAP_AGENT"); name != "" { // an agent's credentials name its server
+		return &host.Server{Address: "agent " + name}, nil
 	}
 	return a.server(addr)
 }

@@ -34,7 +34,7 @@ func server(t *testing.T) (*httptest.Server, *http.Client) {
 	clock := sim.NewClock(time.Date(2026, 10, 20, 2, 0, 0, 0, time.UTC))
 	rt, edge, journal, desired := sim.NewRuntime(clock, model.HostObservation{Name: "sim", MemoryTotalMiB: 950}), sim.NewEdge(), &sim.Journal{}, sim.NewDesired()
 	env, _ := spec.FromJSON([]byte(`{"agents": {"owner": {"scope": {"applications": ["*"]}, "may": ["scale", "spec-patch"]}}}`))
-	desired.SetEnvelope(env)
+	desired.SetEnvelope(context.Background(), env, "owner", "test envelope")
 	svc := &service.Service{Desired: desired, Journal: journal, Clock: clock, Observer: &engine.Observer{Runtime: rt, Clock: clock},
 		Executor: &engine.Executor{Runtime: rt, Edge: edge, Journal: journal, Desired: desired, Clock: clock}}
 	if err := svc.Start(ctx); err != nil {
@@ -56,7 +56,7 @@ func server(t *testing.T) (*httptest.Server, *http.Client) {
 	svc.Observer.Resync(ctx)
 
 	mux := http.NewServeMux()
-	mux.Handle((&Server{Service: svc, Caller: service.Owner}).Handler())
+	mux.Handle((&Server{Service: svc, Caller: &service.Owner}).Handler())
 	ts := httptest.NewUnstartedServer(mux)
 	var protocols http.Protocols
 	protocols.SetHTTP1(true)

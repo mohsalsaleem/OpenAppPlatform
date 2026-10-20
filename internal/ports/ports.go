@@ -60,6 +60,8 @@ type DesiredRepo interface {
 	Envelope(ctx context.Context) (tree any, version string, err error)
 	// Applications lists the applications that have desired state.
 	Applications(ctx context.Context) ([]string, error)
+	// SetEnvelope stores a new envelope and returns its version.
+	SetEnvelope(ctx context.Context, tree any, author, message string) (version string, err error)
 }
 
 // OpStore is the operational journal: append-only entries with monotonic

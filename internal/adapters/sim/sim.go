@@ -343,10 +343,11 @@ func (d *Desired) Applications(ctx context.Context) ([]string, error) {
 }
 
 // SetEnvelope stores the envelope tree.
-func (d *Desired) SetEnvelope(tree any) {
+func (d *Desired) SetEnvelope(ctx context.Context, tree any, author, message string) (string, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	d.envelope = tree
+	d.envelope = spec.Clone(tree)
+	return spec.Hash(tree)
 }
 
 // Secrets is an in-memory secret store.

@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -119,6 +120,7 @@ func (a *app) hostInstall(ctx context.Context, args []string) int {
 	fs.SetOutput(a.errOut)
 	image := fs.String("image", os.Getenv("OAP_OAPD_IMAGE"), "the oapd image to install, on this machine")
 	noTLS := fs.Bool("no-tls", false, "serve routed hosts over plain HTTP")
+	apiHost := fs.String("api-host", "", "public host name for the agent API (default oap.<ip>.sslip.io; \"none\" keeps it private)")
 	asJSON := fs.Bool("json", false, "")
 	addr, rest := splitFirst(args)
 	if err := fs.Parse(rest); err != nil {
@@ -139,7 +141,13 @@ func (a *app) hostInstall(ctx context.Context, args []string) int {
 		return a.fail(err)
 	}
 	id, _ := a.ssh.Run(ctx, t, "cat /var/lib/oap/install-id 2>/dev/null || true")
-	in := host.Install{ID: strings.TrimSpace(id), Oapd: *image, Caddy: host.CaddyImage, TLS: !*noTLS}
+	in := host.Install{ID: strings.TrimSpace(id), Oapd: *image, Caddy: host.CaddyImage, TLS: !*noTLS, APIHost: *apiHost}
+	switch {
+	case in.APIHost == "none":
+		in.APIHost = ""
+	case in.APIHost == "" && net.ParseIP(t.Host).To4() != nil:
+		in.APIHost = "oap." + strings.ReplaceAll(t.Host, ".", "-") + ".sslip.io"
+	}
 	if in.ID == "" {
 		in.ID = s.Install
 	}
