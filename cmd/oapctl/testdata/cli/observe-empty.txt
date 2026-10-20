@@ -1,0 +1,4 @@
+$ oapctl observe
+exit 0
+revision 0 · host 
+No applications yet.

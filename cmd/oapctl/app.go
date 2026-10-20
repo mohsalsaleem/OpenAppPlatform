@@ -75,10 +75,14 @@ func (a *app) appApply(ctx context.Context, args []string) int {
 	fs := flag.NewFlagSet("app apply", flag.ContinueOnError)
 	fs.SetOutput(a.errOut)
 	yes := fs.Bool("yes", false, "apply without asking, when not at a terminal")
+	asJSON := fs.Bool("json", false, "print the outcome as JSON")
+	events := fs.Bool("events", false, "print each event as a line of JSON")
+	defer func() { a.mode = human }()
 	file, rest := splitFirst(args)
 	if err := fs.Parse(rest); err != nil {
 		return 2
 	}
+	a.mode = pickMode(*asJSON, *events)
 	addr := fs.Arg(0)
 	if file == "" {
 		return a.fail(errors.New("name the application's oap.yaml"))
@@ -191,7 +195,10 @@ func (a *app) runIntent(ctx context.Context, client oapv1connect.AgentServiceCli
 		return "", a.fail(errors.New("the envelope denies this change"))
 	}
 	switch {
-	case a.terminal():
+	case a.mode != human && !yes:
+		a.printJSON(p)
+		return "", host.ExitOwner
+	case a.terminal() && a.mode == human:
 		if !a.u().Confirm("Apply this plan?") {
 			a.u().Note("Not applied.")
 			return "", host.ExitOwner
@@ -212,6 +219,12 @@ func (a *app) runIntent(ctx context.Context, client oapv1connect.AgentServiceCli
 		}
 		for stream.Receive() {
 			e := stream.Msg().Event
+			if a.mode == eventsMode {
+				a.printJSON(e)
+			}
+			if a.mode == jsonMode && e.GetOutcome() != nil {
+				a.printJSON(e)
+			}
 			if pr := e.GetOperationProgress(); pr != nil && int(pr.StepIndex) < len(lines) {
 				progress(fmt.Sprintf("%s: %s", strings.TrimSpace(lines[pr.StepIndex]), strings.ToLower(strings.TrimPrefix(pr.State.String(), "STEP_STATE_"))))
 			}
@@ -242,6 +255,9 @@ func (a *app) appScale(ctx context.Context, args []string) int {
 	fs := flag.NewFlagSet("app scale", flag.ContinueOnError)
 	fs.SetOutput(a.errOut)
 	yes := fs.Bool("yes", false, "apply without asking, when not at a terminal")
+	asJSON := fs.Bool("json", false, "print the outcome as JSON")
+	events := fs.Bool("events", false, "print each event as a line of JSON")
+	defer func() { a.mode = human }()
 	var pos []string
 	for len(args) > 0 {
 		if strings.HasPrefix(args[0], "-") {
@@ -253,6 +269,7 @@ func (a *app) appScale(ctx context.Context, args []string) int {
 		}
 		pos, args = append(pos, args[0]), args[1:]
 	}
+	a.mode = pickMode(*asJSON, *events)
 	if len(pos) < 3 {
 		return a.fail(errors.New("usage: app scale APP COMPONENT INSTANCES [ADDR]"))
 	}
@@ -339,4 +356,14 @@ func (a *app) mcpStdio(ctx context.Context, args []string) int {
 		}
 	}
 	return 0
+}
+
+func pickMode(asJSON, events bool) mode {
+	switch {
+	case events:
+		return eventsMode
+	case asJSON:
+		return jsonMode
+	}
+	return human
 }

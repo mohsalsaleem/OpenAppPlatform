@@ -1,0 +1,10 @@
+$ oapctl watch --since 1 --limit 8
+exit 0
+    2  apply    apply oap.yaml
+    3  step 0   write_desired                       started
+    4  step 0   write_desired                       succeeded
+    5  step 1   start_instance         web#1        started
+    6  step 1   start_instance         web#1        succeeded
+    7  step 2   await_ready            web#1        started
+    8  step 2   await_ready            web#1        succeeded
+    9  step 3   route_add              web#1        started

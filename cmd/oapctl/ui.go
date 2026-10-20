@@ -30,6 +30,19 @@ type ui interface {
 	Run(label string, work func(progress func(line string)) error) error
 }
 
+// quietUI prints nothing: --json and --events keep stdout for JSON.
+type quietUI struct{}
+
+func (quietUI) Welcome()                                          {}
+func (quietUI) Status(host.Status)                                {}
+func (quietUI) Ask(label, def string) string                      { return def }
+func (quietUI) Confirm(string) bool                               { return false }
+func (quietUI) Note(string)                                       {}
+func (quietUI) Success(string)                                    {}
+func (quietUI) Warn(string)                                       {}
+func (quietUI) Change(string, string, string)                     {}
+func (quietUI) Run(_ string, work func(func(string)) error) error { return work(func(string) {}) }
+
 // plainUI writes text, one line at a time.
 type plainUI struct {
 	a   *app

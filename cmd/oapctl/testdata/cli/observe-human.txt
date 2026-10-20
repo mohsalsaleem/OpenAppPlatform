@@ -1,0 +1,7 @@
+$ oapctl observe site
+exit 0
+revision 40 · host 
+
+site  unknown
+  web          NOT converged 0/3 running  release r-a391b9827fb5  unknown
+               route site.example.com/ → :8080
