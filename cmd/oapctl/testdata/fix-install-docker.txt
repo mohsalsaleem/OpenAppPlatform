@@ -24,7 +24,7 @@ Apply this? [y/N] Applying install-docker…
 
 Checking the server (read-only)…
 Server root@203.0.113.5: Ubuntu 26.04.1 LTS, x86_64, 1 CPU, 950 MiB memory, 15.7 GiB disk free
-  ✓ connect   ✓ check   → fix   · install   · owner account   · hand off
+  ✓ connect   ✓ check   → fix   · install   · owner key   · hand off
 
 ! Docker isn't running: needs Docker Engine 24 or later.
   Install Docker Engine from Docker's official package repository.

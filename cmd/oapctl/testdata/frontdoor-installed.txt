@@ -1,6 +1,0 @@
-exit 5
-Server root@203.0.113.5
-  ✓ connect   ✓ check   ✓ fix   ✓ install   → owner account   · hand off
-
-Next: owner, by the owner. Only the owner creates the owner account.
-This step isn't built yet (task R3.6).

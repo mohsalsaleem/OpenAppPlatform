@@ -70,14 +70,22 @@ const usage = `Usage:
   %[1]s host fix [ADDR]     apply the fixes the check proposes, each approved by you [--json: show them]
   %[1]s host undo FIX [ADDR] undo a fix OAP applied
   %[1]s host install [ADDR] --image IMAGE   install oapd and Caddy on the server
+  %[1]s host handoff [ADDR]                 remove OAP's SSH key once an owner key works; agents then work only through OAP
+  %[1]s host uninstall [ADDR] [--keep-access]   reverse everything OAP did on the server, each step approved by you
   %[1]s app apply FILE [ADDR]               create or update an application from its oap.yaml
   %[1]s app scale APP COMPONENT N [ADDR]    run N instances of a component
+  %[1]s app deploy APP COMPONENT=IMAGE...   roll out new images
+  %[1]s app rollback APP --to SPEC_HASH     return to the images of an earlier desired state
   %[1]s mcp [ADDR]                          serve OAP's tools over MCP on stdin and stdout
   %[1]s observe [APP]                       the world: applications, components, routes
   %[1]s explain APP [COMPONENT]             why an application differs from its desired state
   %[1]s watch [APP] [--since N] [--limit N] events as they happen
   %[1]s login URL --agent NAME             sign an agent in; the owner approves it once
-  %[1]s owner logins|approve|deny|agents|revoke|pause|resume|mode   the owner's control over agents
+  %[1]s briefing [APP]                      the briefing for agents: what runs, what you may do, house rules
+  %[1]s skill [NAME|schema]                 how to put an application on OAP (author-app), or the oap.yaml schema
+  %[1]s ask QUESTION [--kind K] [--option O]... [--wait]   involve the owner (as an agent)
+  %[1]s owner enroll|keys|secret|logins|approve|deny|agents|revoke|pause|resume|mode|asks|answer|briefing   the owner's control over agents
+  %[1]s owner secret set NAME [--ask ID]   store a secret; the value is read from the terminal (not shown) or piped on stdin
   With OAP_AGENT=NAME, agent API commands run as that signed-in agent.
   Agent API commands take --json (the result as JSON) or --events (each event as a JSON line).
 `
@@ -100,14 +108,28 @@ func (a *app) run(ctx context.Context, args []string) int {
 		return a.hostUndo(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "host" && args[1] == "install":
 		return a.hostInstall(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "host" && args[1] == "handoff":
+		return a.hostHandoff(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "host" && args[1] == "uninstall":
+		return a.hostUninstall(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "app" && args[1] == "apply":
 		return a.appApply(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "app" && args[1] == "scale":
 		return a.appScale(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "app" && args[1] == "deploy":
+		return a.appDeploy(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "app" && args[1] == "rollback":
+		return a.appRollback(ctx, args[2:])
 	case args[0] == "login":
 		return a.loginCmd(ctx, args[1:])
 	case args[0] == "owner":
 		return a.ownerCmd(ctx, args[1:])
+	case args[0] == "briefing":
+		return a.briefingCmd(ctx, args[1:])
+	case args[0] == "skill":
+		return a.skillCmd(ctx, args[1:])
+	case args[0] == "ask":
+		return a.askCmd(ctx, args[1:])
 	case args[0] == "observe":
 		return a.observeCmd(ctx, args[1:])
 	case args[0] == "explain":
@@ -159,6 +181,29 @@ func (a *app) frontDoor(ctx context.Context, asJSON bool) int {
 		if blocked, stopped := host.Blocking(s.Findings); blocked && !stopped {
 			return a.fix(ctx, s, false)
 		}
+	case host.StageInstalled:
+		if code := a.ownerEnroll(ctx, "", false); code != 0 {
+			return code
+		}
+		next, err := a.server(s.Address)
+		if err != nil {
+			return a.fail(err)
+		}
+		s = next
+	case host.StageOwned:
+		a.u().Status(host.Plan(s, a.cli))
+		if !a.u().Confirm(fmt.Sprintf("Remove OAP's SSH key from %s now?", s.Address)) {
+			a.u().Note("Not handed off yet.")
+			return host.ExitOK
+		}
+		if code := a.hostHandoff(ctx, []string{s.Address}); code != 0 {
+			return code
+		}
+		next, err := a.server(s.Address)
+		if err != nil {
+			return a.fail(err)
+		}
+		s = next
 	}
 	st := host.Plan(s, a.cli)
 	a.u().Status(st)

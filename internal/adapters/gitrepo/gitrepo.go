@@ -155,7 +155,7 @@ func (r *Repo) Commit(ctx context.Context, app string, tree any, author, message
 }
 
 func (r *Repo) commit(ctx context.Context, path, author, message string, trailers ...string) error {
-	if _, err := r.git(ctx, nil, "add", "--", path); err != nil {
+	if _, err := r.git(ctx, nil, "add", "-A", "--", path); err != nil {
 		return err
 	}
 	if strings.TrimSpace(message) == "" {
@@ -314,4 +314,66 @@ func (r *Repo) Export(ctx context.Context, remote string) error {
 	defer r.mu.Unlock()
 	_, err := r.git(ctx, nil, "push", "-q", "--force", remote, "main:main")
 	return err
+}
+
+// MaxBriefing is the largest briefing.md OAP stores.
+const MaxBriefing = 16 << 10
+
+func briefingPath(app string) string {
+	if app == "" {
+		return "briefing.md"
+	}
+	return filepath.Join("apps", app+".briefing.md")
+}
+
+// Briefing returns the owner's briefing.md for an application, or for the
+// server when app is empty.
+func (r *Repo) Briefing(ctx context.Context, app string) (string, error) {
+	if app != "" && !appName.MatchString(app) {
+		return "", nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	b, err := os.ReadFile(filepath.Join(r.dir, briefingPath(app)))
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	return string(b), err
+}
+
+// SetBriefing commits the owner's briefing.md; empty removes it.
+func (r *Repo) SetBriefing(ctx context.Context, app, markdown, author string) error {
+	if app != "" && !appName.MatchString(app) {
+		return fmt.Errorf("gitrepo: %q isn't an application name", app)
+	}
+	if len(markdown) > MaxBriefing {
+		return fmt.Errorf("gitrepo: briefing.md is %d bytes; the limit is %d", len(markdown), MaxBriefing)
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	path := briefingPath(app)
+	full := filepath.Join(r.dir, path)
+	if markdown == "" {
+		if _, err := os.Stat(full); errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		if err := os.Remove(full); err != nil {
+			return err
+		}
+		return r.commit(ctx, path, author, "Remove "+path, "Briefing: "+or(app, "server"))
+	}
+	if cur, err := os.ReadFile(full); err == nil && string(cur) == markdown {
+		return nil
+	}
+	if err := os.WriteFile(full, []byte(markdown), 0o600); err != nil {
+		return err
+	}
+	return r.commit(ctx, path, author, "Update "+path, "Briefing: "+or(app, "server"))
+}
+
+func or(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
 }

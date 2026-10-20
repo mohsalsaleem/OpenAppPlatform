@@ -44,6 +44,9 @@ const (
 	WhyUnknownLogin = "identity.unknown_login"
 	WhyUnknownAgent = "identity.unknown_agent"
 	WhyOwnerOnly    = "identity.owner_only"
+	WhyLocalOnly    = "identity.local_only"
+	WhyNotOwnerKey  = "identity.not_owner_key"
+	WhyUnknownKey   = "identity.unknown_key"
 )
 
 // Identity settings with their defaults.
@@ -68,6 +71,7 @@ type idEvent struct {
 	Forget  bool     `json:"forget,omitempty"`
 	Mode    string   `json:"mode,omitempty"`
 	Auto    bool     `json:"auto,omitempty"`
+	Label   string   `json:"label,omitempty"`
 }
 
 type agentState struct {
@@ -79,8 +83,14 @@ type agentState struct {
 
 type tokenState struct {
 	id, agent string
+	key       string // the owner key that signed this owner session in
 	expires   time.Time
 	revoked   bool
+}
+
+type ownerKey struct {
+	label    string
+	enrolled time.Time
 }
 
 type pendingLogin struct {
@@ -102,12 +112,14 @@ type identity struct {
 	mode      oapv1.ApprovalMode
 	pending   map[string]*pendingLogin
 	nonces    map[string]time.Time
+	ownerKeys map[string]*ownerKey // by public key
 }
 
 func (s *Service) ids() *identity {
 	s.idOnce.Do(func() {
 		s.id = &identity{agents: map[string]*agentState{}, tokens: map[string]*tokenState{},
-			mode: oapv1.ApprovalMode_APPROVAL_MODE_TRUSTED_IDENTITY, pending: map[string]*pendingLogin{}, nonces: map[string]time.Time{}}
+			mode: oapv1.ApprovalMode_APPROVAL_MODE_TRUSTED_IDENTITY, pending: map[string]*pendingLogin{}, nonces: map[string]time.Time{},
+			ownerKeys: map[string]*ownerKey{}}
 	})
 	return s.id
 }
@@ -123,13 +135,22 @@ func (s *Service) loadIdentity(entries []ops.Entry) {
 		}
 		var ev idEvent
 		if json.Unmarshal(e.Data, &ev) == nil {
-			id.apply(ev)
+			id.apply(ev, e.At)
 		}
 	}
 }
 
-func (id *identity) apply(ev idEvent) {
+func (id *identity) apply(ev idEvent, at time.Time) {
 	switch ev.Event {
+	case "owner_key":
+		id.ownerKeys[ev.Key] = &ownerKey{label: ev.Label, enrolled: at}
+	case "owner_key_removed":
+		delete(id.ownerKeys, ev.Key)
+		for _, t := range id.tokens {
+			if t.agent == "owner" && t.key == ev.Key {
+				t.revoked = true
+			}
+		}
 	case "approve":
 		a := &agentState{apps: ev.Apps, may: ev.May, trusted: ev.Trust, key: ev.Key}
 		if old, ok := id.agents[ev.Agent]; ok {
@@ -138,7 +159,7 @@ func (id *identity) apply(ev idEvent) {
 		id.agents[ev.Agent] = a
 	case "token":
 		exp, _ := time.Parse(time.RFC3339, ev.Expires)
-		id.tokens[ev.Hash] = &tokenState{id: ev.TokenID, agent: ev.Agent, expires: exp}
+		id.tokens[ev.Hash] = &tokenState{id: ev.TokenID, agent: ev.Agent, key: ev.Key, expires: exp}
 	case "revoke":
 		for _, t := range id.tokens {
 			if t.agent == ev.Agent {
@@ -168,12 +189,13 @@ func (s *Service) record(ctx context.Context, ev idEvent) error {
 	if err != nil {
 		return err
 	}
-	if _, err := s.Journal.Append(ctx, ops.Entry{At: s.Clock.Now(), Kind: KindIdentity, Data: data}); err != nil {
+	now := s.Clock.Now()
+	if _, err := s.Journal.Append(ctx, ops.Entry{At: now, Kind: KindIdentity, Data: data}); err != nil {
 		return err
 	}
 	id := s.ids()
 	id.mu.Lock()
-	id.apply(ev)
+	id.apply(ev, now)
 	id.mu.Unlock()
 	return nil
 }
@@ -205,6 +227,9 @@ func (s *Service) Authenticate(ctx context.Context, token string) (Caller, error
 	case !s.Clock.Now().Before(t.expires):
 		return Caller{}, fail(Unauthenticated, WhyExpired, "the token expired at %s; sign in again", t.expires.Format(time.RFC3339))
 	}
+	if t.agent == "owner" {
+		return Caller{Owner: true, Agent: "owner"}, nil
+	}
 	a, ok := id.agents[t.agent]
 	if !ok {
 		return Caller{}, fail(Unauthenticated, WhyUnknownAgent, "agent %s isn't approved", t.agent)
@@ -217,9 +242,14 @@ func (s *Service) Authenticate(ctx context.Context, token string) (Caller, error
 
 // issue creates a token for an agent.
 func (s *Service) issue(ctx context.Context, agent string) (string, time.Time, error) {
+	return s.issueWith(ctx, agent, "")
+}
+
+// issueWith creates a token, remembering the owner key that signed in.
+func (s *Service) issueWith(ctx context.Context, agent, key string) (string, time.Time, error) {
 	token := "oapt_" + randomString(32)
 	exp := s.Clock.Now().Add(DefaultTokenTTL).UTC().Truncate(time.Second)
-	err := s.record(ctx, idEvent{Event: "token", Agent: agent, TokenID: "tok_" + randomString(6), Hash: hashToken(token), Expires: exp.Format(time.RFC3339)})
+	err := s.record(ctx, idEvent{Event: "token", Agent: agent, Key: key, TokenID: "tok_" + randomString(6), Hash: hashToken(token), Expires: exp.Format(time.RFC3339)})
 	return token, exp, err
 }
 
@@ -292,7 +322,10 @@ func refused(why, format string, args ...any) *oapv1.LoginResponse {
 // the owner's answer or its expiry.
 func (s *Service) Login(ctx context.Context, req *oapv1.LoginRequest, send func(*oapv1.LoginResponse) error) error {
 	agent := req.GetAgent()
-	if !agentName.MatchString(agent) || agent == "owner" {
+	if agent == "owner" {
+		return s.ownerLogin(ctx, req, send)
+	}
+	if !agentName.MatchString(agent) {
 		return fail(InvalidArgument, WhyBadAgentName, "agent names are lowercase letters, digits, dots, dashes and underscores, and not \"owner\"")
 	}
 	var key ed25519.PublicKey
@@ -316,10 +349,11 @@ func (s *Service) Login(ctx context.Context, req *oapv1.LoginRequest, send func(
 		if err != nil {
 			return err
 		}
-		// The owner is notified through the journal (and, with R3.7, a notifier).
 		if err := s.record(ctx, idEvent{Event: "login", Agent: agent, Auto: true}); err != nil {
 			return err
 		}
+		s.tellOwner(ctx, ops.Notification{Kind: "login", Subject: agent + " signed in with its trusted identity",
+			Body: fmt.Sprintf("Key %s. Pause it with: oapctl owner pause %s; revoke with: oapctl owner revoke %s --forget", Fingerprint(req.GetPublicKey()), agent, agent)})
 		return send(&oapv1.LoginResponse{State: &oapv1.LoginResponse_Approved{Approved: &oapv1.LoginApproved{
 			Token: token, ExpiresInSeconds: int32(exp.Sub(s.Clock.Now()).Seconds()), Scope: scopeSummary(a)}}})
 	}

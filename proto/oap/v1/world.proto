@@ -25,7 +25,8 @@ message Host {
 message Capacity {
   // Memory in MiB.
   int32 memory_total_mib = 1;
-  int32 memory_available_mib = 2;
+  // Absent when the host doesn't report it (unknown, not 0).
+  optional int32 memory_available_mib = 2;
   int32 memory_reserved_mib = 3;
   int32 cpu_millis_total = 4;
 }

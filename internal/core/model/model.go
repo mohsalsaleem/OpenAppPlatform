@@ -53,11 +53,12 @@ type Observation struct {
 }
 
 type HostObservation struct {
-	Name               string
-	MemoryTotalMiB     int32
-	MemoryAvailableMiB int32
-	MemoryReservedMiB  int32
-	CPUMillisTotal     int32
+	Name              string
+	MemoryTotalMiB    int32
+	MemoryReservedMiB int32
+	CPUMillisTotal    int32
+	// MemoryAvailableMiB is nil when the host doesn't report it.
+	MemoryAvailableMiB *int32
 }
 
 type ObservedInstance struct {
@@ -117,7 +118,7 @@ func Build(revision uint64, desired []Desired, obs *Observation, opts Options) *
 	if obs != nil {
 		h := obs.Host
 		w.Host.Name = h.Name
-		w.Host.Capacity = &oapv1.Capacity{MemoryTotalMib: h.MemoryTotalMiB, MemoryAvailableMib: h.MemoryAvailableMiB,
+		w.Host.Capacity = &oapv1.Capacity{MemoryTotalMib: h.MemoryTotalMiB, MemoryAvailableMib: copyInt32(h.MemoryAvailableMiB),
 			MemoryReservedMib: h.MemoryReservedMiB, CpuMillisTotal: h.CPUMillisTotal}
 	}
 	byApp := map[string]Desired{}
@@ -450,4 +451,12 @@ func sortedKeys[V any](m map[string]V) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func copyInt32(p *int32) *int32 {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
 }

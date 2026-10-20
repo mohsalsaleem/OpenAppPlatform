@@ -12,6 +12,7 @@ import (
 	oapv1 "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/spec"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 var update = flag.Bool("update", false, "rewrite golden files")
@@ -19,7 +20,7 @@ var update = flag.Bool("update", false, "rewrite golden files")
 var (
 	now  = time.Date(2026, 10, 19, 14, 5, 0, 0, time.UTC)
 	opts = Options{Now: now, MaxAge: time.Minute}
-	host = HostObservation{Name: "vps-1", MemoryTotalMiB: 985, MemoryAvailableMiB: 412, MemoryReservedMiB: 448, CPUMillisTotal: 1000}
+	host = HostObservation{Name: "vps-1", MemoryTotalMiB: 985, MemoryAvailableMiB: proto.Int32(412), MemoryReservedMiB: 448, CPUMillisTotal: 1000}
 )
 
 func load(t *testing.T, name string) Desired {

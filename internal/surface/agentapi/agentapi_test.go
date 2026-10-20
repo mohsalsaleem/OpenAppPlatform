@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -142,12 +143,17 @@ func TestSameResultOverEveryProtocol(t *testing.T) {
 	}
 }
 
-// TestAskSaysWhyItIsUnavailable: ask reports Unimplemented with a reason.
-func TestAskSaysWhyItIsUnavailable(t *testing.T) {
+// TestAskOverGRPC: an ask over gRPC returns its id; an empty one is
+// refused with a typed error.
+func TestAskOverGRPC(t *testing.T) {
 	ts, h2 := server(t)
 	c := oapv1connect.NewAgentServiceClient(h2, ts.URL, connect.WithGRPC())
-	if _, err := c.Ask(ctx, connect.NewRequest(&oapv1.AskRequest{})); connect.CodeOf(err) != connect.CodeUnimplemented {
-		t.Fatalf("ask: %v", err)
+	if _, err := c.Ask(ctx, connect.NewRequest(&oapv1.AskRequest{})); connect.CodeOf(err) != connect.CodeInvalidArgument {
+		t.Fatalf("empty ask: %v", err)
+	}
+	res, err := c.Ask(ctx, connect.NewRequest(&oapv1.AskRequest{Kind: oapv1.AskKind_ASK_KIND_BLOCKER, Question: "Need DNS for site"}))
+	if err != nil || !strings.HasPrefix(res.Msg.AskId, "ask_") {
+		t.Fatalf("ask: %v %v", res, err)
 	}
 }
 

@@ -50,9 +50,15 @@ func InstanceSpecFor(app *spec.Application, component string, ordinal int) Insta
 	return s
 }
 
+// ServiceHost is the name a component's instances answer to on the
+// installation's network, whatever their release.
+func ServiceHost(app, component string) string {
+	return component + "." + app + ".oap.internal"
+}
+
 // ServiceURL is the in-network address of a component's instances.
 func ServiceURL(app, component string, port int) string {
-	return "http://" + component + "." + app + ".oap.internal:" + strconv.Itoa(port)
+	return "http://" + ServiceHost(app, component) + ":" + strconv.Itoa(port)
 }
 
 // JobSpecFor returns what the runtime needs to run a job component once.

@@ -30,6 +30,8 @@ type Server struct {
 	Findings []Finding `json:"findings,omitempty"`
 	// Install is the installation id once OAP is installed.
 	Install string `json:"install,omitempty"`
+	// API is the public agent API's URL, when the install has one.
+	API string `json:"api,omitempty"`
 }
 
 // Who does a step.
@@ -131,11 +133,16 @@ func Plan(s *Server, cli string) Status {
 			st.Exit = ExitOK
 		}
 	case StageInstalled:
-		st.Next = Next{Step: "owner", By: ByOwner, Why: "Only the owner creates the owner account.", Task: "R3.6", Then: then}
-		st.Exit = ExitNotBuiltYet
+		st.Next = Next{Step: "owner", By: ByOwner,
+			Why:      "The owner keeps access after hand-off with an owner key on their machine, enrolled while SSH still works.",
+			AskOwner: fmt.Sprintf("Please run `%s owner enroll` in a terminal on this machine. Tell me when it says this machine holds an owner key.", cli),
+			Command:  cli + " owner enroll", Then: then}
+		st.Exit = ExitOwner
 	case StageOwned:
-		st.Next = Next{Step: "hand-off", By: ByAgent, Why: "The agent signs in with a device login and the bootstrap key is removed.", Task: "R3.14", Then: then}
-		st.Exit = ExitNotBuiltYet
+		st.Next = Next{Step: "hand-off", By: ByAgent,
+			Why:     "With the owner key working, OAP's SSH key is removed and proven refused; agents then sign in with a device login and work only through OAP.",
+			Command: fmt.Sprintf("%s host handoff %s", cli, s.Address), Then: then}
+		st.Exit = ExitOK
 	case StageHandedOff:
 		st.Next = Next{Step: "done", By: ByAgent, Why: "Onboarding is complete; the agent works through OAP from here."}
 		st.Exit = ExitOK

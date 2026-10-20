@@ -79,3 +79,45 @@ func (s *Server) Resume(ctx context.Context, req *connect.Request[oapv1.ResumeRe
 func (s *Server) SetApprovalMode(ctx context.Context, req *connect.Request[oapv1.SetApprovalModeRequest]) (*connect.Response[oapv1.SetApprovalModeResponse], error) {
 	return call(s, ctx, req, s.Service.SetApprovalMode)
 }
+
+func (s *Server) ListAsks(ctx context.Context, req *connect.Request[oapv1.ListAsksRequest]) (*connect.Response[oapv1.ListAsksResponse], error) {
+	return call(s, ctx, req, func(ctx context.Context, c service.Caller, _ *oapv1.ListAsksRequest) (*oapv1.ListAsksResponse, error) {
+		return s.Service.ListAsks(ctx, c)
+	})
+}
+
+func (s *Server) AnswerAsk(ctx context.Context, req *connect.Request[oapv1.AnswerAskRequest]) (*connect.Response[oapv1.AnswerAskResponse], error) {
+	return call(s, ctx, req, s.Service.AnswerAsk)
+}
+
+func (s *Server) SetBriefing(ctx context.Context, req *connect.Request[oapv1.SetBriefingRequest]) (*connect.Response[oapv1.SetBriefingResponse], error) {
+	return call(s, ctx, req, s.Service.SetBriefing)
+}
+
+func (s *Server) EnrollOwnerKey(ctx context.Context, req *connect.Request[oapv1.EnrollOwnerKeyRequest]) (*connect.Response[oapv1.EnrollOwnerKeyResponse], error) {
+	return call(s, ctx, req, s.Service.EnrollOwnerKey)
+}
+
+func (s *Server) ListOwnerKeys(ctx context.Context, req *connect.Request[oapv1.ListOwnerKeysRequest]) (*connect.Response[oapv1.ListOwnerKeysResponse], error) {
+	return call(s, ctx, req, func(ctx context.Context, c service.Caller, _ *oapv1.ListOwnerKeysRequest) (*oapv1.ListOwnerKeysResponse, error) {
+		return s.Service.ListOwnerKeys(ctx, c)
+	})
+}
+
+func (s *Server) RemoveOwnerKey(ctx context.Context, req *connect.Request[oapv1.RemoveOwnerKeyRequest]) (*connect.Response[oapv1.RemoveOwnerKeyResponse], error) {
+	return call(s, ctx, req, s.Service.RemoveOwnerKey)
+}
+
+func (s *Server) SetSecret(ctx context.Context, req *connect.Request[oapv1.SetSecretRequest]) (*connect.Response[oapv1.SetSecretResponse], error) {
+	return call(s, ctx, req, s.Service.SetSecret)
+}
+
+func (s *Server) ListSecrets(ctx context.Context, req *connect.Request[oapv1.ListSecretsRequest]) (*connect.Response[oapv1.ListSecretsResponse], error) {
+	return call(s, ctx, req, func(ctx context.Context, c service.Caller, _ *oapv1.ListSecretsRequest) (*oapv1.ListSecretsResponse, error) {
+		return s.Service.ListSecrets(ctx, c)
+	})
+}
+
+func (s *Server) DeleteSecret(ctx context.Context, req *connect.Request[oapv1.DeleteSecretRequest]) (*connect.Response[oapv1.DeleteSecretResponse], error) {
+	return call(s, ctx, req, s.Service.DeleteSecret)
+}

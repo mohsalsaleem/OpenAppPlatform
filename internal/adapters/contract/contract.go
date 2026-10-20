@@ -262,6 +262,23 @@ func Desired(t *testing.T, newRepo func(t *testing.T) ports.DesiredRepo, app fun
 		if err != nil || cur != v || fmt.Sprint(got) != fmt.Sprint(env) {
 			t.Fatalf("envelope after SetEnvelope: %v %s (want %s) %v", got, cur, v, err)
 		}
+		if b, err := d.Briefing(ctx, "contract"); err != nil || b != "" {
+			t.Fatalf("briefing before any: %q %v", b, err)
+		}
+		for _, app := range []string{"", "contract"} {
+			if err := d.SetBriefing(ctx, app, "Deploy on weekdays.\n", "owner"); err != nil {
+				t.Fatal(err)
+			}
+			if b, _ := d.Briefing(ctx, app); b != "Deploy on weekdays.\n" {
+				t.Fatalf("briefing %q: %q", app, b)
+			}
+			if err := d.SetBriefing(ctx, app, "", "owner"); err != nil {
+				t.Fatal(err)
+			}
+			if b, _ := d.Briefing(ctx, app); b != "" {
+				t.Fatalf("removed briefing %q: %q", app, b)
+			}
+		}
 	})
 }
 

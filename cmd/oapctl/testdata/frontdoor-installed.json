@@ -1,12 +1,13 @@
-exit 5
+exit 3
 {
   "state": "installed",
   "server": "root@203.0.113.5",
   "next": {
     "step": "owner",
     "by": "owner",
-    "why": "Only the owner creates the owner account.",
-    "task": "R3.6",
+    "why": "The owner keeps access after hand-off with an owner key on their machine, enrolled while SSH still works.",
+    "ask_owner": "Please run `oap owner enroll` in a terminal on this machine. Tell me when it says this machine holds an owner key.",
+    "command": "oap owner enroll",
     "then": "oap --json"
   },
   "journey": [

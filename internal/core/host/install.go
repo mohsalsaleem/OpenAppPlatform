@@ -69,7 +69,7 @@ docker network inspect "oap-$ID" >/dev/null 2>&1 || docker network create $L --l
 for v in data caddy-data caddy-config caddy-admin; do
   docker volume inspect "oap-$ID-$v" >/dev/null 2>&1 || docker volume create $L --label io.openappplatform.role=volume "oap-$ID-$v" >/dev/null
 done
-docker image inspect "$CADDY" >/dev/null 2>&1 || docker pull -q "$CADDY" >/dev/null
+docker image inspect "$CADDY" >/dev/null 2>&1 || { docker pull -q "$CADDY" >/dev/null; printf '%%s\n' "$CADDY" >> /var/lib/oap/images; }
 docker image inspect "$OAPD" >/dev/null 2>&1 || { echo "oap: image $OAPD isn't on the server" >&2; exit 3; }
 
 # current NAME IMAGE: true when NAME runs IMAGE with this configuration.
@@ -134,7 +134,14 @@ F="--filter label=io.openappplatform.install=$ID"
 docker ps -aq $F | xargs -r docker rm -f >/dev/null
 docker network ls -q $F | xargs -r docker network rm >/dev/null
 docker volume ls -q $F | xargs -r docker volume rm >/dev/null
-rm -f /var/lib/oap/install-id /var/lib/oap/caddy.json
+# The images OAP brought, unless something else now uses them.
+if [ -f /var/lib/oap/images ]; then
+  while read -r img; do
+    [ -n "$img" ] || continue
+    if [ -z "$(docker ps -aq --filter "ancestor=$img")" ]; then docker image rm "$img" >/dev/null 2>&1 || true; fi
+  done < /var/lib/oap/images
+fi
+rm -f /var/lib/oap/install-id /var/lib/oap/caddy.json /var/lib/oap/images
 rm -rf /run/oapd
 echo "removed installation $ID"
 `, "@ID@", in.ID), nil

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/contract"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/model"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/ops"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/ports"
 )
@@ -123,4 +124,63 @@ func TestAdoptsOnlyByLabels(t *testing.T) {
 			t.Fatalf("the %s container was stopped", name)
 		}
 	}
+}
+
+// TestServiceNamesResolve: another container on the installation's
+// network reaches a component by the service name that connection URLs
+// use (ops.ServiceURL), whatever its instances' release.
+func TestServiceNamesResolve(t *testing.T) {
+	r := newRuntime(t)
+	ref := ops.InstanceRef{Application: "site", Component: "web", Ordinal: 1, Release: "r-1"}
+	if _, err := r.Start(ctx, ops.InstanceSpec{Ref: ref, Image: images.Web1, Port: 80}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.ensureImage(ctx, r.HelperImage); err != nil {
+		t.Fatal(err)
+	}
+	cfg := containerConfig{Image: r.HelperImage, Labels: map[string]string{LabelInstall: r.Install},
+		Cmd: []string{"wget", "-q", "-T", "5", "-O", "-", ops.ServiceURL("site", "web", 80)}}
+	cfg.HostConfig.NetworkMode = NetworkName(r.Install)
+	var created struct {
+		ID string `json:"Id"`
+	}
+	if err := r.c.do(ctx, http.MethodPost, "/containers/create", nil, cfg, &created); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { r.remove(context.Background(), created.ID) })
+	if err := r.c.do(ctx, http.MethodPost, "/containers/"+created.ID+"/start", nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	var exit struct{ StatusCode int }
+	if err := r.c.do(ctx, http.MethodPost, "/containers/"+created.ID+"/wait", nil, nil, &exit); err != nil {
+		t.Fatal(err)
+	}
+	if exit.StatusCode != 0 {
+		t.Fatalf("%s didn't answer from another container on the network (exit %d)", ops.ServiceURL("site", "web", 80), exit.StatusCode)
+	}
+}
+
+// TestStartEventWithoutHealthCheck: against real Docker, an instance whose
+// image has no HEALTHCHECK is healthy in its start event, not starting.
+func TestStartEventWithoutHealthCheck(t *testing.T) {
+	r := newRuntime(t)
+	ectx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	events, err := r.Events(ectx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ref := ops.InstanceRef{Application: "shop", Component: "worker", Ordinal: 1, Release: "r-1"}
+	if _, err := r.Start(ctx, ops.InstanceSpec{Ref: ref, Image: images.Web1}); err != nil {
+		t.Fatal(err)
+	}
+	for e := range events {
+		if e.Kind == ops.EventStarted && e.Instance == ref {
+			if e.Health != model.HealthHealthy {
+				t.Fatalf("start event health %v, want healthy", e.Health)
+			}
+			return
+		}
+	}
+	t.Fatal("no start event")
 }

@@ -3,6 +3,7 @@ syntax = "proto3";
 package oap.v1;
 
 import "google/protobuf/timestamp.proto";
+import "oap/v1/errors.proto";
 
 option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1";
 
@@ -26,6 +27,30 @@ service OwnerService {
   rpc Resume(ResumeRequest) returns (ResumeResponse);
   // SetApprovalMode chooses how later sessions are approved.
   rpc SetApprovalMode(SetApprovalModeRequest) returns (SetApprovalModeResponse);
+  // ListAsks returns agents' asks waiting for the owner.
+  rpc ListAsks(ListAsksRequest) returns (ListAsksResponse);
+  // AnswerAsk answers an ask that hasn't expired.
+  rpc AnswerAsk(AnswerAskRequest) returns (AnswerAskResponse);
+  // SetBriefing stores the owner's house rules (briefing.md) for an
+  // application, or for the server when application is empty.
+  rpc SetBriefing(SetBriefingRequest) returns (SetBriefingResponse);
+  // EnrollOwnerKey makes a key the owner's: a login proving it signs in
+  // as the owner over the public API. Only over oapd's local socket,
+  // reached over SSH, so a stolen owner token can't add a key.
+  rpc EnrollOwnerKey(EnrollOwnerKeyRequest) returns (EnrollOwnerKeyResponse);
+  // ListOwnerKeys returns the owner's keys.
+  rpc ListOwnerKeys(ListOwnerKeysRequest) returns (ListOwnerKeysResponse);
+  // RemoveOwnerKey removes an owner key and ends the sessions it signed
+  // in. Only over the local socket.
+  rpc RemoveOwnerKey(RemoveOwnerKeyRequest) returns (RemoveOwnerKeyResponse);
+  // SetSecret stores a secret value, encrypted, under a name that specs
+  // reference. The value is never returned, logged or journaled. With
+  // ask_id it also answers that secret ask with "provided".
+  rpc SetSecret(SetSecretRequest) returns (SetSecretResponse);
+  // ListSecrets returns the secrets' names, never their values.
+  rpc ListSecrets(ListSecretsRequest) returns (ListSecretsResponse);
+  // DeleteSecret removes a secret.
+  rpc DeleteSecret(DeleteSecretRequest) returns (DeleteSecretResponse);
 }
 
 // ApprovalMode is how an agent's sessions are approved.
@@ -119,3 +144,86 @@ message SetApprovalModeRequest {
 }
 
 message SetApprovalModeResponse {}
+
+message PendingAsk {
+  string ask_id = 1;
+  string agent = 2;
+  AskRequest request = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message ListAsksRequest {}
+
+message ListAsksResponse {
+  repeated PendingAsk asks = 1;
+}
+
+message AnswerAskRequest {
+  string ask_id = 1;
+  // Approvals: "approve" or "deny". Decisions: one of the options.
+  // Secrets: "provided" or "declined" (the value never passes through
+  // here). Blockers: any text.
+  string answer = 2;
+}
+
+message AnswerAskResponse {}
+
+message SetBriefingRequest {
+  string application = 1;
+  // Markdown; empty removes it. At most 16 KiB.
+  string markdown = 2;
+}
+
+message SetBriefingResponse {}
+
+message EnrollOwnerKeyRequest {
+  // "ed25519:" and the base64 public key.
+  string public_key = 1;
+  // Names the machine holding the key, for example "laptop".
+  string label = 2;
+}
+
+message EnrollOwnerKeyResponse {
+  string key_fingerprint = 1;
+}
+
+message OwnerKey {
+  string key_fingerprint = 1;
+  string label = 2;
+  google.protobuf.Timestamp enrolled_at = 3;
+}
+
+message ListOwnerKeysRequest {}
+
+message ListOwnerKeysResponse {
+  repeated OwnerKey keys = 1;
+}
+
+message RemoveOwnerKeyRequest {
+  string key_fingerprint = 1;
+}
+
+message RemoveOwnerKeyResponse {
+  int32 revoked_tokens = 1;
+}
+
+message SetSecretRequest {
+  string name = 1;
+  string value = 2;
+  // The secret ask this answers; its secret_ref must be name.
+  string ask_id = 3;
+}
+
+message SetSecretResponse {}
+
+message ListSecretsRequest {}
+
+message ListSecretsResponse {
+  repeated string names = 1;
+}
+
+message DeleteSecretRequest {
+  string name = 1;
+}
+
+message DeleteSecretResponse {}

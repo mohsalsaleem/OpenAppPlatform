@@ -1,6 +1,6 @@
 exit 4
 Server root@203.0.113.5: Ubuntu 18.04.2 LTS, x86_64, 1 CPU, 985 MiB memory, 12.1 GiB disk free
-  ✓ connect   → check   · fix   · install   · owner account   · hand off
+  ✓ connect   → check   · fix   · install   · owner key   · hand off
 
 ✗ Ubuntu 18.04.2 LTS: needs Ubuntu 22.04, 24.04 or 26.04, or Debian 12 or 13.
   Reinstall the server with Ubuntu 26.04 from your provider's console, then run oap again. OAP doesn't upgrade an operating system in place.

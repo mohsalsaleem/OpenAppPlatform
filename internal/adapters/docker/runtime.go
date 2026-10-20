@@ -15,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
@@ -62,6 +63,11 @@ type Runtime struct {
 	HelperImage string
 	// StopTimeout is how long an instance gets to exit after SIGTERM.
 	StopTimeout time.Duration
+	// MemInfo is the host's meminfo file, read for available memory, which
+	// the Engine API doesn't report. oapd runs on the Docker host (it reaches
+	// the engine on a unix socket), and a container's /proc/meminfo shows the
+	// host's memory. Empty, or unreadable, leaves available memory unknown.
+	MemInfo string
 
 	c *client
 }
@@ -72,7 +78,8 @@ func New(socket, install string) (*Runtime, error) {
 	if !validName.MatchString(install) {
 		return nil, fmt.Errorf("docker: installation id %q must match %s", install, validName)
 	}
-	return &Runtime{Install: install, HelperImage: "busybox:1.37", StopTimeout: 10 * time.Second, c: newClient(socket)}, nil
+	return &Runtime{Install: install, HelperImage: "busybox:1.37", StopTimeout: 10 * time.Second, MemInfo: "/proc/meminfo",
+		c: newClient(socket)}, nil
 }
 
 var (
@@ -202,7 +209,11 @@ func (r *Runtime) Start(ctx context.Context, s ops.InstanceSpec) (string, error)
 		}
 		host.Mounts = append(host.Mounts, mount{Type: "volume", Source: name, Target: s.Volumes[v]})
 	}
-	cfg := containerConfig{Image: s.Image, Env: env, Labels: labels, HostConfig: host}
+	cfg := containerConfig{Image: s.Image, Env: env, Labels: labels, HostConfig: host,
+		// Other components reach this one by its service name (ops.ServiceURL);
+		// Docker's DNS answers it with every running instance.
+		NetworkingConfig: &networkingConfig{EndpointsConfig: map[string]endpointConfig{
+			NetworkName(r.Install): {Aliases: []string{ops.ServiceHost(s.Ref.Application, s.Ref.Component)}}}}}
 	if s.Port > 0 {
 		port := fmt.Sprintf("%d/tcp", s.Port)
 		cfg.ExposedPorts = map[string]struct{}{port: {}}
@@ -400,7 +411,7 @@ func (r *Runtime) Observe(ctx context.Context) (model.Observation, error) {
 		return model.Observation{}, err
 	}
 	obs := model.Observation{At: time.Now(), Host: model.HostObservation{Name: info.Name,
-		MemoryTotalMiB: int32(info.MemTotal >> 20), CPUMillisTotal: int32(info.NCPU * 1000)}}
+		MemoryTotalMiB: int32(info.MemTotal >> 20), MemoryAvailableMiB: r.memAvailable(), CPUMillisTotal: int32(info.NCPU * 1000)}}
 	instances, err := r.containers(ctx, RoleInstance, nil)
 	if err != nil {
 		return model.Observation{}, err
@@ -434,6 +445,30 @@ func (r *Runtime) Observe(ctx context.Context) (model.Observation, error) {
 		obs.Jobs = append(obs.Jobs, run)
 	}
 	return obs, nil
+}
+
+// memAvailable reads MemAvailable from the host's meminfo, in MiB, or
+// returns nil when it can't.
+func (r *Runtime) memAvailable() *int32 {
+	if r.MemInfo == "" {
+		return nil
+	}
+	b, err := os.ReadFile(r.MemInfo)
+	if err != nil {
+		return nil
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		f := strings.Fields(line)
+		if len(f) == 3 && f[0] == "MemAvailable:" && f[2] == "kB" {
+			kb, err := strconv.ParseInt(f[1], 10, 64)
+			if err != nil {
+				return nil
+			}
+			mib := int32(kb >> 10)
+			return &mib
+		}
+	}
+	return nil
 }
 
 // healthOf reads a running container's health from its list status, for
@@ -474,7 +509,7 @@ func (r *Runtime) Events(ctx context.Context) (<-chan ops.RuntimeEvent, error) {
 			if json.Unmarshal(sc.Bytes(), &m) != nil {
 				continue
 			}
-			e, ok := r.event(m.Action, m.Actor.ID, m.Actor.Attributes)
+			e, ok := r.event(ctx, m.Action, m.Actor.ID, m.Actor.Attributes)
 			if !ok {
 				continue
 			}
@@ -489,7 +524,7 @@ func (r *Runtime) Events(ctx context.Context) (<-chan ops.RuntimeEvent, error) {
 	return ch, nil
 }
 
-func (r *Runtime) event(action, id string, attrs map[string]string) (ops.RuntimeEvent, bool) {
+func (r *Runtime) event(ctx context.Context, action, id string, attrs map[string]string) (ops.RuntimeEvent, bool) {
 	ref, ok := refOf(attrs)
 	if !ok || attrs[LabelInstall] != r.Install {
 		return ops.RuntimeEvent{}, false
@@ -498,7 +533,7 @@ func (r *Runtime) event(action, id string, attrs map[string]string) (ops.Runtime
 	role := attrs[LabelRole]
 	switch {
 	case role == RoleInstance && action == "start":
-		e.Kind, e.Health = ops.EventStarted, model.HealthStarting
+		e.Kind, e.Health = ops.EventStarted, r.startHealth(ctx, id)
 	case role == RoleInstance && action == "die":
 		e.Kind = ops.EventStopped
 	case role == RoleInstance && action == "health_status: healthy":
@@ -511,6 +546,30 @@ func (r *Runtime) event(action, id string, attrs map[string]string) (ops.Runtime
 		return ops.RuntimeEvent{}, false
 	}
 	return e, true
+}
+
+// startHealth is a just-started instance's health. Without a health check
+// (none set by OAP and none in the image) Docker never sends a
+// health_status event, so the instance is healthy while it runs, as
+// healthOf reads it. If the container can't be inspected it is starting,
+// and the next resync settles it.
+func (r *Runtime) startHealth(ctx context.Context, id string) model.InstanceHealth {
+	var in struct {
+		State struct{ Health *struct{ Status string } }
+	}
+	if err := r.c.do(ctx, http.MethodGet, "/containers/"+id+"/json", nil, nil, &in); err != nil {
+		return model.HealthStarting
+	}
+	if in.State.Health == nil {
+		return model.HealthHealthy
+	}
+	switch in.State.Health.Status {
+	case "healthy":
+		return model.HealthHealthy
+	case "unhealthy":
+		return model.HealthUnhealthy
+	}
+	return model.HealthStarting
 }
 
 // SnapshotVolume copies a volume into a new one, named after key so that a
@@ -624,13 +683,22 @@ func (r *Runtime) RemoveAll(ctx context.Context) error {
 }
 
 type containerConfig struct {
-	Image        string
-	Cmd          []string            `json:",omitempty"`
-	Env          []string            `json:",omitempty"`
-	Labels       map[string]string   `json:",omitempty"`
-	ExposedPorts map[string]struct{} `json:",omitempty"`
-	Healthcheck  *healthcheck        `json:",omitempty"`
-	HostConfig   hostConfig
+	Image            string
+	Cmd              []string            `json:",omitempty"`
+	Env              []string            `json:",omitempty"`
+	Labels           map[string]string   `json:",omitempty"`
+	ExposedPorts     map[string]struct{} `json:",omitempty"`
+	Healthcheck      *healthcheck        `json:",omitempty"`
+	HostConfig       hostConfig
+	NetworkingConfig *networkingConfig `json:",omitempty"`
+}
+
+type networkingConfig struct {
+	EndpointsConfig map[string]endpointConfig
+}
+
+type endpointConfig struct {
+	Aliases []string `json:",omitempty"`
 }
 
 type healthcheck struct {

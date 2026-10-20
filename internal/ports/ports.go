@@ -62,6 +62,11 @@ type DesiredRepo interface {
 	Applications(ctx context.Context) ([]string, error)
 	// SetEnvelope stores a new envelope and returns its version.
 	SetEnvelope(ctx context.Context, tree any, author, message string) (version string, err error)
+	// Briefing returns the owner's briefing.md for an application, or for
+	// the server when application is empty; "" when there is none.
+	Briefing(ctx context.Context, application string) (string, error)
+	// SetBriefing stores the owner's briefing.md; empty removes it.
+	SetBriefing(ctx context.Context, application, markdown, author string) error
 }
 
 // OpStore is the operational journal: append-only entries with monotonic
@@ -97,6 +102,14 @@ type Queue interface {
 // engine and agents never see the values.
 type Secrets interface {
 	Resolve(ctx context.Context, refs map[string]string) (map[string]string, error)
+}
+
+// SecretStore keeps secret values for the owner. Values go in and never
+// come back out through it, except to the runtime through Secrets.
+type SecretStore interface {
+	Set(name, value string) error
+	Delete(name string) error
+	Names() ([]string, error)
 }
 
 // FactSource reports facts about a code change, for example from GitHub.

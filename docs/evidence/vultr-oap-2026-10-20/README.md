@@ -112,3 +112,34 @@ by hand through its admin socket (forcing reloads, and turning HTTP/3
 off for the second). The plan says not to hand-edit Caddy on a server.
 The configuration was restored afterwards and checked identical to the
 one OAP wrote (`oap-gen-5`).
+
+## R3.9: an out-of-scope agent on the live public API
+
+oapd `55a199a` (built on the server) behind Caddy at
+`https://oap.139-180-132-23.sslip.io`, serving Nisha Shipping. A test agent
+`sec-probe` signed in through device login; the owner approved it for an
+application that doesn't exist (`probe-only`) with `scale`. It then tried
+`nisha-shipping` on every surface:
+
+| Surface | Result |
+|---|---|
+| Observe, Explain, Propose, Watch over Connect, Connect JSON, gRPC, gRPC-Web | `permission_denied` on each; Observe without an application showed 0 applications |
+| The same with no token, and with an unknown token | `unauthenticated` on each |
+| MCP `tools/call` observe and propose; `resources/read oap://briefing/nisha-shipping` | refused (`identity.out_of_scope`); `resources/list` didn't name it |
+| MCP without a token | HTTP 401 |
+| `/.well-known/oap/briefing.md?app=nisha-shipping` | HTTP 403; its own briefing listed no applications (the host is named `nishashipping`) |
+| Owner API (`OwnerService/ListAgents`) | HTTP 404: not served on the public listener |
+| `oapctl` observe, explain, briefing, watch, app scale, owner agents as `OAP_AGENT=sec-probe` | exit 1 with `permission_denied` (owner: `unimplemented`); plain `observe` showed no applications |
+| `oapctl mcp` (stdio) as `sec-probe` | refused |
+
+The owner then revoked it with `--forget`; its token got HTTP 401. A scan
+on the server (the token passed over stdin, never printed) found it in
+none of: oapd's log, Caddy's log (759 lines), the 94 files of oapd's data
+volume (the journal there records sec-probe's login, approval and
+revocation), or the desired-state history (963 lines of `git log -p`).
+`https://www.nishashipping.com/` answered 200 before and after.
+
+Not covered here: no secret is stored on this server (OAP has no
+command to set one yet), so the scan for secret values ran in the
+acceptance test (`TestAgentStaysInScopeOnEverySurface`), not live. oapd
+had been restarted for the run, so its log held only two lines.

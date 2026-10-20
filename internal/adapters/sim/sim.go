@@ -15,6 +15,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/model"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/ops"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/spec"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/ports"
 )
 
 // Clock is a manual clock. Sleep advances it instead of waiting.
@@ -49,6 +50,7 @@ func (c *Clock) Advance(d time.Duration) {
 type instance struct {
 	id     string
 	spec   ops.InstanceSpec
+	env    map[string]string // with secret values resolved, as a container gets them
 	health model.InstanceHealth
 }
 
@@ -69,6 +71,9 @@ type Runtime struct {
 	Unhealthy map[string]bool
 	// JobFails lists job components whose runs fail.
 	JobFails map[string]bool
+	// Secrets resolves secret references when an instance starts, as the
+	// Docker runtime does; nil leaves them unresolved.
+	Secrets ports.Secrets
 	// Effect counters.
 	Starts    map[ops.InstanceRef]int
 	Stops     map[ops.InstanceRef]int
@@ -90,8 +95,21 @@ func (r *Runtime) Start(ctx context.Context, s ops.InstanceSpec) (string, error)
 	if in, ok := r.instances[s.Ref]; ok {
 		return in.id, nil
 	}
+	env := map[string]string{}
+	for k, v := range s.Env {
+		env[k] = v
+	}
+	if len(s.SecretRefs) > 0 && r.Secrets != nil {
+		resolved, err := r.Secrets.Resolve(ctx, s.SecretRefs)
+		if err != nil {
+			return "", err
+		}
+		for k, v := range resolved {
+			env[k] = v
+		}
+	}
 	r.nextID++
-	in := &instance{id: fmt.Sprintf("c%04d", r.nextID), spec: s, health: model.HealthHealthy}
+	in := &instance{id: fmt.Sprintf("c%04d", r.nextID), spec: s, env: env, health: model.HealthHealthy}
 	if r.Unhealthy[s.Ref.Component] {
 		in.health = model.HealthUnhealthy
 	}
@@ -101,6 +119,17 @@ func (r *Runtime) Start(ctx context.Context, s ops.InstanceSpec) (string, error)
 		r.volumes[s.Ref.Application+"/"+s.Ref.Component+"/"+v] = true
 	}
 	return in.id, nil
+}
+
+// Env is the environment a running instance was started with, secret
+// values included; nil when it isn't running.
+func (r *Runtime) Env(ref ops.InstanceRef) map[string]string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if in, ok := r.instances[ref]; ok {
+		return in.env
+	}
+	return nil
 }
 
 func (r *Runtime) Stop(ctx context.Context, ref ops.InstanceRef) error {
@@ -285,6 +314,7 @@ type Desired struct {
 	current  map[string]any
 	byHash   map[string]any
 	envelope any
+	notes    map[string]string
 	Commits  int
 }
 
@@ -342,6 +372,24 @@ func (d *Desired) Applications(ctx context.Context) ([]string, error) {
 	return out, nil
 }
 
+// Briefing returns the owner's notes.
+func (d *Desired) Briefing(ctx context.Context, app string) (string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.notes[app], nil
+}
+
+// SetBriefing stores the owner's notes.
+func (d *Desired) SetBriefing(ctx context.Context, app, markdown, author string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.notes == nil {
+		d.notes = map[string]string{}
+	}
+	d.notes[app] = markdown
+	return nil
+}
+
 // SetEnvelope stores the envelope tree.
 func (d *Desired) SetEnvelope(ctx context.Context, tree any, author, message string) (string, error) {
 	d.mu.Lock()
@@ -352,6 +400,19 @@ func (d *Desired) SetEnvelope(ctx context.Context, tree any, author, message str
 
 // Secrets is an in-memory secret store.
 type Secrets map[string]string
+
+func (s Secrets) Set(name, value string) error { s[name] = value; return nil }
+
+func (s Secrets) Delete(name string) error { delete(s, name); return nil }
+
+func (s Secrets) Names() ([]string, error) {
+	out := make([]string, 0, len(s))
+	for n := range s {
+		out = append(out, n)
+	}
+	sort.Strings(out)
+	return out, nil
+}
 
 func (s Secrets) Resolve(ctx context.Context, refs map[string]string) (map[string]string, error) {
 	out := map[string]string{}

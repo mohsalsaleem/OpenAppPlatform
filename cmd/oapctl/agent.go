@@ -5,8 +5,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/agentapi"
 	"io"
+	"net/http"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	oapv1 "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1"
@@ -223,5 +226,141 @@ func (a *app) watchCmd(ctx context.Context, args []string) int {
 	if err := stream.Err(); err != nil && !errors.Is(err, io.EOF) && ctx.Err() == nil {
 		return a.fail(err)
 	}
+	return 0
+}
+
+// multi is a repeatable string flag.
+type multi []string
+
+func (m *multi) String() string     { return strings.Join(*m, ",") }
+func (m *multi) Set(v string) error { *m = append(*m, v); return nil }
+
+// askCmd: ask QUESTION [--kind K] [--option O]... [--proposal ID]
+// [--secret-ref R] [--expires D] [--wait] [--json].
+func (a *app) askCmd(ctx context.Context, args []string) int {
+	fs := flag.NewFlagSet("ask", flag.ContinueOnError)
+	fs.SetOutput(a.errOut)
+	kind := fs.String("kind", "blocker", "approval, secret, decision or blocker")
+	var options multi
+	fs.Var(&options, "option", "an option for a decision (repeat)")
+	proposal := fs.String("proposal", "", "the proposal an approval is for")
+	secretRef := fs.String("secret-ref", "", "the secret reference a secret ask is for")
+	expires := fs.Duration("expires", time.Hour, "how long the owner has to answer")
+	wait := fs.Bool("wait", false, "wait for the answer or the expiry")
+	asJSON := fs.Bool("json", false, "")
+	question, rest := splitFirst(args)
+	if err := fs.Parse(rest); err != nil {
+		return 2
+	}
+	k, ok := map[string]oapv1.AskKind{"approval": oapv1.AskKind_ASK_KIND_APPROVAL, "secret": oapv1.AskKind_ASK_KIND_SECRET,
+		"decision": oapv1.AskKind_ASK_KIND_DECISION, "blocker": oapv1.AskKind_ASK_KIND_BLOCKER}[*kind]
+	if !ok {
+		return a.fail(fmt.Errorf("kind is approval, secret, decision or blocker, not %q", *kind))
+	}
+	c, stop, err := a.connectClient(ctx, "")
+	if err != nil {
+		return a.fail(err)
+	}
+	defer stop()
+	obs, err := c.Observe(ctx, connect.NewRequest(&oapv1.ObserveRequest{}))
+	if err != nil {
+		return a.fail(err)
+	}
+	since := obs.Msg.World.GetRevision()
+	res, err := c.Ask(ctx, connect.NewRequest(&oapv1.AskRequest{Kind: k, Question: question, Options: options,
+		ProposalId: *proposal, SecretRef: *secretRef, ExpiresInSeconds: int32(expires.Seconds())}))
+	if err != nil {
+		return a.fail(err)
+	}
+	id := res.Msg.AskId
+	if !*wait {
+		if *asJSON {
+			a.printJSON(res.Msg)
+		} else {
+			fmt.Fprintf(a.out, "Asked the owner (%s). The answer arrives through watch; wait for it with --wait.\n", id)
+		}
+		return 0
+	}
+	if !*asJSON {
+		fmt.Fprintf(a.out, "Asked the owner (%s); waiting for the answer…\n", id)
+	}
+	stream, err := c.Watch(ctx, connect.NewRequest(&oapv1.WatchRequest{SinceRevision: since}))
+	if err != nil {
+		return a.fail(err)
+	}
+	defer stream.Close()
+	for stream.Receive() {
+		ans := stream.Msg().Event.GetAskAnswered()
+		if ans.GetAskId() != id {
+			continue
+		}
+		if *asJSON {
+			a.printJSON(ans)
+		} else if ans.Expired {
+			fmt.Fprintln(a.out, "The ask expired without an answer.")
+		} else {
+			fmt.Fprintf(a.out, "The owner answered: %s\n", ans.Answer)
+		}
+		if ans.Expired {
+			return 4
+		}
+		return 0
+	}
+	if err := stream.Err(); err != nil {
+		return a.fail(err)
+	}
+	return a.fail(errors.New("the stream ended before an answer"))
+}
+
+// briefingCmd: briefing [APP] — the generated briefing for this caller.
+func (a *app) briefingCmd(ctx context.Context, args []string) int {
+	app, _ := splitFirst(args)
+	c, stop, err := a.connectClient(ctx, "")
+	if err != nil {
+		return a.fail(err)
+	}
+	defer stop()
+	res, err := c.Observe(ctx, connect.NewRequest(&oapv1.ObserveRequest{Application: app, Briefing: true}))
+	if err != nil {
+		return a.fail(err)
+	}
+	fmt.Fprint(a.out, res.Msg.Briefing)
+	return 0
+}
+
+// skillCmd: skill [NAME|schema] — a guide for agents, from the server, so
+// it matches the server's version. NAME defaults to author-app.
+func (a *app) skillCmd(ctx context.Context, args []string) int {
+	name, _ := splitFirst(args)
+	if name == "" {
+		name = "author-app"
+	}
+	s, err := a.serverFor("")
+	if err != nil {
+		return a.fail(err)
+	}
+	hc, base, stop, err := a.transport(ctx, s)
+	if err != nil {
+		return a.fail(err)
+	}
+	defer stop()
+	path := agentapi.SkillsPath + name + ".md"
+	if name == "schema" {
+		path = agentapi.SchemaPath
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(base, "/")+path, nil)
+	if err != nil {
+		return a.fail(err)
+	}
+	res, err := hc.Do(req)
+	if err != nil {
+		return a.fail(err)
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK {
+		return a.fail(fmt.Errorf("%s: %s", res.Status, strings.TrimSpace(string(body))))
+	}
+	a.out.Write(body)
 	return 0
 }

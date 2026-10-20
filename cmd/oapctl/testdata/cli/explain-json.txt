@@ -1,3 +1,3 @@
 $ oapctl explain site --json
 exit 0
-{"revision":"40","gaps":["applications.site.components.web"],"causes":[{"why":"explain.stale","summary":"web: the last observation is too old to judge","confidence":60},{"why":"explain.never_observed","summary":"web: never observed running","confidence":70,"evidence":["observation"]}]}
+{"revision":"40"}

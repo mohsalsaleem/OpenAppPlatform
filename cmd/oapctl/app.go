@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -36,8 +37,9 @@ func (a *app) agentClient(ctx context.Context, s *host.Server) (oapv1connect.Age
 }
 
 // transport reaches oapd's API: as an agent with its saved token when
-// OAP_AGENT names one, directly when OAP_AGENT_URL is set (tests), or as
-// the owner through an SSH-forwarded socket.
+// OAP_AGENT names one, directly when OAP_AGENT_URL is set (tests), as the
+// owner on the public API once an owner key is enrolled from this machine,
+// or else as the owner through an SSH-forwarded socket.
 func (a *app) transport(ctx context.Context, s *host.Server) (*http.Client, string, func(), error) {
 	if name := os.Getenv("OAP_AGENT"); name != "" {
 		cr, err := a.credentials(ctx, name)
@@ -46,6 +48,19 @@ func (a *app) transport(ctx context.Context, s *host.Server) (*http.Client, stri
 		}
 		return &http.Client{Transport: bearer{token: cr.Token, next: http.DefaultTransport}}, cr.URL, func() {}, nil
 	}
+	if os.Getenv("OAP_AGENT_URL") == "" && a.hasOwnerKey(s) {
+		cr, err := a.ownerSession(ctx, s)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		return &http.Client{Transport: bearer{token: cr.Token, next: http.DefaultTransport}}, cr.URL, func() {}, nil
+	}
+	return a.localTransport(ctx, s)
+}
+
+// localTransport reaches oapd's local socket as the owner: through an SSH
+// forward, or directly when OAP_AGENT_URL is set (tests).
+func (a *app) localTransport(ctx context.Context, s *host.Server) (*http.Client, string, func(), error) {
 	if u := os.Getenv("OAP_AGENT_URL"); u != "" {
 		return http.DefaultClient, u, func() {}, nil
 	}
@@ -270,7 +285,11 @@ func (a *app) runIntent(ctx context.Context, client oapv1connect.AgentServiceCli
 			for _, r := range outcome.GetReasons() {
 				rs = append(rs, r.Message)
 			}
-			return fmt.Errorf("%s: %s", strings.ToLower(strings.TrimPrefix(outcome.GetStatus().String(), "OUTCOME_STATUS_")), strings.Join(rs, "; "))
+			msg := fmt.Sprintf("%s: %s", strings.ToLower(strings.TrimPrefix(outcome.GetStatus().String(), "OUTCOME_STATUS_")), strings.Join(rs, "; "))
+			if rb := p.GetUndo().GetRollback(); rb != nil {
+				msg += fmt.Sprintf("\nRoll back with: %s app rollback %s --to %s", a.cli, in.Application, rb.ToRelease)
+			}
+			return errors.New(msg)
 		}
 		return nil
 	})
@@ -346,15 +365,24 @@ func (a *app) serverFor(addr string) (*host.Server, error) {
 }
 
 // mcpStdio serves MCP on stdin and stdout for an agent on this machine,
-// relaying each message to oapd's MCP endpoint over the SSH forward.
+// relaying each message to oapd's MCP endpoint: with the agent's token when
+// OAP_AGENT names one, else as the owner over the SSH forward.
 func (a *app) mcpStdio(ctx context.Context, args []string) int {
 	addr, _ := splitFirst(args)
 	s, err := a.serverFor(addr)
 	if err != nil {
 		return a.fail(err)
 	}
-	endpoint, client := os.Getenv("OAP_AGENT_URL"), http.DefaultClient
-	if endpoint == "" {
+	var client *http.Client
+	var endpoint string
+	if os.Getenv("OAP_AGENT") != "" || os.Getenv("OAP_AGENT_URL") != "" || a.hasOwnerKey(s) {
+		hc, base, stop, err := a.transport(ctx, s)
+		if err != nil {
+			return a.fail(err)
+		}
+		defer stop()
+		client, endpoint = hc, base
+	} else {
 		t, err := a.target(s.Address)
 		if err != nil {
 			return a.fail(err)
@@ -384,8 +412,10 @@ func (a *app) mcpStdio(ctx context.Context, args []string) int {
 		}
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		if resp.StatusCode == http.StatusOK {
-			fmt.Fprintf(a.out, "%s\n", bytes.TrimSpace(body))
+		// A refusal (401) carries a JSON-RPC error; pass it on so the
+		// agent isn't left waiting.
+		if b := bytes.TrimSpace(body); len(b) > 0 && json.Valid(b) {
+			fmt.Fprintf(a.out, "%s\n", b)
 		}
 	}
 	return 0
@@ -399,4 +429,97 @@ func pickMode(asJSON, events bool) mode {
 		return jsonMode
 	}
 	return human
+}
+
+// intentFlags parses an app command's positional arguments and its --yes,
+// --json and --events flags, in any order.
+func (a *app) intentFlags(name string, args []string, extra func(*flag.FlagSet)) ([]string, bool, error) {
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(a.errOut)
+	yes := fs.Bool("yes", false, "apply without asking, when not at a terminal")
+	asJSON := fs.Bool("json", false, "print the outcome as JSON")
+	events := fs.Bool("events", false, "print each event as a line of JSON")
+	if extra != nil {
+		extra(fs)
+	}
+	var pos []string
+	for len(args) > 0 {
+		if strings.HasPrefix(args[0], "-") {
+			if err := fs.Parse(args); err != nil {
+				return nil, false, err
+			}
+			args = fs.Args()
+			continue
+		}
+		pos, args = append(pos, args[0]), args[1:]
+	}
+	a.mode = pickMode(*asJSON, *events)
+	return pos, *yes, nil
+}
+
+// runAppIntent proposes, applies and follows an intent on the first server.
+func (a *app) runAppIntent(ctx context.Context, in *oapv1.Intent, yes bool, done string) int {
+	s, err := a.serverFor("")
+	if err != nil {
+		return a.fail(err)
+	}
+	client, stop, err := a.agentClient(ctx, s)
+	if err != nil {
+		return a.fail(err)
+	}
+	defer stop()
+	opID, code := a.runIntent(ctx, client, s, in, yes)
+	switch code {
+	case noChange:
+		a.u().Success("Nothing to change.")
+		return host.ExitOK
+	case host.ExitOK:
+		if a.mode == human {
+			a.u().Success(fmt.Sprintf("%s (operation %s).", done, opID))
+		}
+	}
+	return code
+}
+
+// appDeploy rolls out new images: app deploy APP COMPONENT=IMAGE... [--yes].
+func (a *app) appDeploy(ctx context.Context, args []string) int {
+	defer func() { a.mode = human }()
+	pos, yes, err := a.intentFlags("app deploy", args, nil)
+	if err != nil {
+		return 2
+	}
+	if len(pos) < 2 {
+		return a.fail(errors.New("usage: app deploy APP COMPONENT=IMAGE [COMPONENT=IMAGE]... [--yes]"))
+	}
+	images := map[string]string{}
+	for _, kv := range pos[1:] {
+		c, img, ok := strings.Cut(kv, "=")
+		if !ok || c == "" || img == "" {
+			return a.fail(fmt.Errorf("%q isn't COMPONENT=IMAGE", kv))
+		}
+		images[c] = img
+	}
+	in := &oapv1.Intent{Application: pos[0], Because: "deploy new images",
+		Change: &oapv1.Intent_Deploy{Deploy: &oapv1.Deploy{Images: images}}}
+	return a.runAppIntent(ctx, in, yes, "Deployed "+pos[0])
+}
+
+// appRollback returns an application's workloads to the images of an
+// earlier desired state: app rollback APP --to SPEC_HASH [--yes]. A failed
+// operation prints the hash to roll back to.
+func (a *app) appRollback(ctx context.Context, args []string) int {
+	defer func() { a.mode = human }()
+	var to *string
+	pos, yes, err := a.intentFlags("app rollback", args, func(fs *flag.FlagSet) {
+		to = fs.String("to", "", "the spec hash of the desired state to return to")
+	})
+	if err != nil {
+		return 2
+	}
+	if len(pos) < 1 || *to == "" {
+		return a.fail(errors.New("usage: app rollback APP --to SPEC_HASH [--yes]"))
+	}
+	in := &oapv1.Intent{Application: pos[0], Because: "roll back to " + *to,
+		Change: &oapv1.Intent_Rollback{Rollback: &oapv1.Rollback{ToRelease: *to}}}
+	return a.runAppIntent(ctx, in, yes, "Rolled back "+pos[0])
 }

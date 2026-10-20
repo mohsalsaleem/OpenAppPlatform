@@ -1,6 +1,3 @@
 $ oapctl explain site
 exit 0
-site differs from desired (revision 40):
-  gap   applications.site.components.web
-  cause explain.stale (60%): web: the last observation is too old to judge
-  cause explain.never_observed (70%): web: never observed running
+site is as desired (revision 40).
