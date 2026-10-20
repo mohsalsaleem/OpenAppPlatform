@@ -37,6 +37,22 @@ Encrypt certificate; HTTP redirects with 308; the theme plugins left out
 of the image return 404. Observe reports the component converged and
 healthy, with its one instance routed.
 
+## Moving to www.nishashipping.com (2026-10-20)
+
+The site's real domain, `www.nishashipping.com`, already points at the
+server. Changing `oap.yaml`'s domain first produced a one-step plan
+(write desired) that left Caddy on the old host: the planner emitted no
+route steps for a route-only change. Fixed in `a321ba6` (failing test
+first); the domain then moved through OAP, and `www.nishashipping.com`
+serves every page with its own Let's Encrypt certificate. Still open: the
+world model doesn't compare the edge's actual hosts with desired routes,
+so Explain didn't report the gap.
+
+`oapd:a321ba6` was built on the server (owner decision, 2026-10-20):
+Docker Desktop's amd64 emulation on the owner's machine hung. The image
+build no longer emulates a CPU anywhere: apk installs the target
+architecture's packages from a native stage.
+
 ## Scaling 1 → 3 → 1 under traffic: 8 of 428 requests failed
 
 `traffic.py` sent requests from the owner's machine (four workers, a new

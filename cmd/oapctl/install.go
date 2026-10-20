@@ -62,6 +62,11 @@ func (a *app) remoteImage(ctx context.Context, t sshhost.Target, image string) (
 func (a *app) shipImage(ctx context.Context, t sshhost.Target, image string) error {
 	id, arch, err := a.localImage(ctx, image)
 	if err != nil {
+		// Not built here: fine if the server already has it (built there).
+		if cur, rerr := a.remoteImage(ctx, t, image); rerr == nil && cur != "" {
+			a.u().Note(fmt.Sprintf("Image %s is on the server (not on this machine); using it.", image))
+			return nil
+		}
 		return err
 	}
 	archOut, err := a.ssh.Run(ctx, t, "dpkg --print-architecture 2>/dev/null || uname -m")

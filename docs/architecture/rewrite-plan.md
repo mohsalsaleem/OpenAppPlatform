@@ -81,6 +81,8 @@ These hold for every task. Breaking one is a defect, even if all tests pass.
     (`vultr_oap`, reached over SSH from the owner's machine) may also run them
     (owner decision, 2026-10-19); test binaries are cross-compiled locally, not
     built there, and the server rules below apply.
+   On 2026-10-20 the owner had `oapd`'s image built on the test server,
+   when local CPU emulation hung.
 14. **Owner's server:** phase 5 deploy and the release journey. On the server, an
     agent touches only resources carrying OAP labels, never builds there unless the
     task says so, never edits databases or Caddy by hand, never prints credentials,
