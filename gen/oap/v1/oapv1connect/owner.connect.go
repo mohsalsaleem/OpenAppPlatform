@@ -67,6 +67,14 @@ const (
 	// OwnerServiceRemoveOwnerKeyProcedure is the fully-qualified name of the OwnerService's
 	// RemoveOwnerKey RPC.
 	OwnerServiceRemoveOwnerKeyProcedure = "/oap.v1.OwnerService/RemoveOwnerKey"
+	// OwnerServiceSetSecretProcedure is the fully-qualified name of the OwnerService's SetSecret RPC.
+	OwnerServiceSetSecretProcedure = "/oap.v1.OwnerService/SetSecret"
+	// OwnerServiceListSecretsProcedure is the fully-qualified name of the OwnerService's ListSecrets
+	// RPC.
+	OwnerServiceListSecretsProcedure = "/oap.v1.OwnerService/ListSecrets"
+	// OwnerServiceDeleteSecretProcedure is the fully-qualified name of the OwnerService's DeleteSecret
+	// RPC.
+	OwnerServiceDeleteSecretProcedure = "/oap.v1.OwnerService/DeleteSecret"
 )
 
 // OwnerServiceClient is a client for the oap.v1.OwnerService service.
@@ -103,6 +111,14 @@ type OwnerServiceClient interface {
 	// RemoveOwnerKey removes an owner key and ends the sessions it signed
 	// in. Only over the local socket.
 	RemoveOwnerKey(context.Context, *connect.Request[v1.RemoveOwnerKeyRequest]) (*connect.Response[v1.RemoveOwnerKeyResponse], error)
+	// SetSecret stores a secret value, encrypted, under a name that specs
+	// reference. The value is never returned, logged or journaled. With
+	// ask_id it also answers that secret ask with "provided".
+	SetSecret(context.Context, *connect.Request[v1.SetSecretRequest]) (*connect.Response[v1.SetSecretResponse], error)
+	// ListSecrets returns the secrets' names, never their values.
+	ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error)
+	// DeleteSecret removes a secret.
+	DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error)
 }
 
 // NewOwnerServiceClient constructs a client for the oap.v1.OwnerService service. By default, it
@@ -200,6 +216,24 @@ func NewOwnerServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(ownerServiceMethods.ByName("RemoveOwnerKey")),
 			connect.WithClientOptions(opts...),
 		),
+		setSecret: connect.NewClient[v1.SetSecretRequest, v1.SetSecretResponse](
+			httpClient,
+			baseURL+OwnerServiceSetSecretProcedure,
+			connect.WithSchema(ownerServiceMethods.ByName("SetSecret")),
+			connect.WithClientOptions(opts...),
+		),
+		listSecrets: connect.NewClient[v1.ListSecretsRequest, v1.ListSecretsResponse](
+			httpClient,
+			baseURL+OwnerServiceListSecretsProcedure,
+			connect.WithSchema(ownerServiceMethods.ByName("ListSecrets")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteSecret: connect.NewClient[v1.DeleteSecretRequest, v1.DeleteSecretResponse](
+			httpClient,
+			baseURL+OwnerServiceDeleteSecretProcedure,
+			connect.WithSchema(ownerServiceMethods.ByName("DeleteSecret")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -219,6 +253,9 @@ type ownerServiceClient struct {
 	enrollOwnerKey  *connect.Client[v1.EnrollOwnerKeyRequest, v1.EnrollOwnerKeyResponse]
 	listOwnerKeys   *connect.Client[v1.ListOwnerKeysRequest, v1.ListOwnerKeysResponse]
 	removeOwnerKey  *connect.Client[v1.RemoveOwnerKeyRequest, v1.RemoveOwnerKeyResponse]
+	setSecret       *connect.Client[v1.SetSecretRequest, v1.SetSecretResponse]
+	listSecrets     *connect.Client[v1.ListSecretsRequest, v1.ListSecretsResponse]
+	deleteSecret    *connect.Client[v1.DeleteSecretRequest, v1.DeleteSecretResponse]
 }
 
 // ListLogins calls oap.v1.OwnerService.ListLogins.
@@ -291,6 +328,21 @@ func (c *ownerServiceClient) RemoveOwnerKey(ctx context.Context, req *connect.Re
 	return c.removeOwnerKey.CallUnary(ctx, req)
 }
 
+// SetSecret calls oap.v1.OwnerService.SetSecret.
+func (c *ownerServiceClient) SetSecret(ctx context.Context, req *connect.Request[v1.SetSecretRequest]) (*connect.Response[v1.SetSecretResponse], error) {
+	return c.setSecret.CallUnary(ctx, req)
+}
+
+// ListSecrets calls oap.v1.OwnerService.ListSecrets.
+func (c *ownerServiceClient) ListSecrets(ctx context.Context, req *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error) {
+	return c.listSecrets.CallUnary(ctx, req)
+}
+
+// DeleteSecret calls oap.v1.OwnerService.DeleteSecret.
+func (c *ownerServiceClient) DeleteSecret(ctx context.Context, req *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error) {
+	return c.deleteSecret.CallUnary(ctx, req)
+}
+
 // OwnerServiceHandler is an implementation of the oap.v1.OwnerService service.
 type OwnerServiceHandler interface {
 	// ListLogins returns device logins waiting for the owner.
@@ -325,6 +377,14 @@ type OwnerServiceHandler interface {
 	// RemoveOwnerKey removes an owner key and ends the sessions it signed
 	// in. Only over the local socket.
 	RemoveOwnerKey(context.Context, *connect.Request[v1.RemoveOwnerKeyRequest]) (*connect.Response[v1.RemoveOwnerKeyResponse], error)
+	// SetSecret stores a secret value, encrypted, under a name that specs
+	// reference. The value is never returned, logged or journaled. With
+	// ask_id it also answers that secret ask with "provided".
+	SetSecret(context.Context, *connect.Request[v1.SetSecretRequest]) (*connect.Response[v1.SetSecretResponse], error)
+	// ListSecrets returns the secrets' names, never their values.
+	ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error)
+	// DeleteSecret removes a secret.
+	DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error)
 }
 
 // NewOwnerServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -418,6 +478,24 @@ func NewOwnerServiceHandler(svc OwnerServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(ownerServiceMethods.ByName("RemoveOwnerKey")),
 		connect.WithHandlerOptions(opts...),
 	)
+	ownerServiceSetSecretHandler := connect.NewUnaryHandler(
+		OwnerServiceSetSecretProcedure,
+		svc.SetSecret,
+		connect.WithSchema(ownerServiceMethods.ByName("SetSecret")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ownerServiceListSecretsHandler := connect.NewUnaryHandler(
+		OwnerServiceListSecretsProcedure,
+		svc.ListSecrets,
+		connect.WithSchema(ownerServiceMethods.ByName("ListSecrets")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ownerServiceDeleteSecretHandler := connect.NewUnaryHandler(
+		OwnerServiceDeleteSecretProcedure,
+		svc.DeleteSecret,
+		connect.WithSchema(ownerServiceMethods.ByName("DeleteSecret")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/oap.v1.OwnerService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case OwnerServiceListLoginsProcedure:
@@ -448,6 +526,12 @@ func NewOwnerServiceHandler(svc OwnerServiceHandler, opts ...connect.HandlerOpti
 			ownerServiceListOwnerKeysHandler.ServeHTTP(w, r)
 		case OwnerServiceRemoveOwnerKeyProcedure:
 			ownerServiceRemoveOwnerKeyHandler.ServeHTTP(w, r)
+		case OwnerServiceSetSecretProcedure:
+			ownerServiceSetSecretHandler.ServeHTTP(w, r)
+		case OwnerServiceListSecretsProcedure:
+			ownerServiceListSecretsHandler.ServeHTTP(w, r)
+		case OwnerServiceDeleteSecretProcedure:
+			ownerServiceDeleteSecretHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -511,4 +595,16 @@ func (UnimplementedOwnerServiceHandler) ListOwnerKeys(context.Context, *connect.
 
 func (UnimplementedOwnerServiceHandler) RemoveOwnerKey(context.Context, *connect.Request[v1.RemoveOwnerKeyRequest]) (*connect.Response[v1.RemoveOwnerKeyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("oap.v1.OwnerService.RemoveOwnerKey is not implemented"))
+}
+
+func (UnimplementedOwnerServiceHandler) SetSecret(context.Context, *connect.Request[v1.SetSecretRequest]) (*connect.Response[v1.SetSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("oap.v1.OwnerService.SetSecret is not implemented"))
+}
+
+func (UnimplementedOwnerServiceHandler) ListSecrets(context.Context, *connect.Request[v1.ListSecretsRequest]) (*connect.Response[v1.ListSecretsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("oap.v1.OwnerService.ListSecrets is not implemented"))
+}
+
+func (UnimplementedOwnerServiceHandler) DeleteSecret(context.Context, *connect.Request[v1.DeleteSecretRequest]) (*connect.Response[v1.DeleteSecretResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("oap.v1.OwnerService.DeleteSecret is not implemented"))
 }

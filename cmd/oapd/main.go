@@ -168,7 +168,7 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 	if u := os.Getenv("OAPD_WEBHOOK_URL"); u != "" {
 		notifier = notify.Webhook{URL: u, Secret: os.Getenv("OAPD_WEBHOOK_SECRET")}
 	}
-	svc := &service.Service{Desired: desired, Journal: store, Clock: clock, Observer: observer, Notifier: notifier,
+	svc := &service.Service{Desired: desired, Journal: store, Clock: clock, Observer: observer, Notifier: notifier, SecretStore: secrets,
 		Executor: &engine.Executor{Runtime: rt, Edge: edge, Journal: store, Desired: desired, Clock: clock}}
 	if err := svc.Start(ctx); err != nil {
 		return err

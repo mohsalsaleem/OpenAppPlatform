@@ -43,6 +43,14 @@ service OwnerService {
   // RemoveOwnerKey removes an owner key and ends the sessions it signed
   // in. Only over the local socket.
   rpc RemoveOwnerKey(RemoveOwnerKeyRequest) returns (RemoveOwnerKeyResponse);
+  // SetSecret stores a secret value, encrypted, under a name that specs
+  // reference. The value is never returned, logged or journaled. With
+  // ask_id it also answers that secret ask with "provided".
+  rpc SetSecret(SetSecretRequest) returns (SetSecretResponse);
+  // ListSecrets returns the secrets' names, never their values.
+  rpc ListSecrets(ListSecretsRequest) returns (ListSecretsResponse);
+  // DeleteSecret removes a secret.
+  rpc DeleteSecret(DeleteSecretRequest) returns (DeleteSecretResponse);
 }
 
 // ApprovalMode is how an agent's sessions are approved.
@@ -198,3 +206,24 @@ message RemoveOwnerKeyRequest {
 message RemoveOwnerKeyResponse {
   int32 revoked_tokens = 1;
 }
+
+message SetSecretRequest {
+  string name = 1;
+  string value = 2;
+  // The secret ask this answers; its secret_ref must be name.
+  string ask_id = 3;
+}
+
+message SetSecretResponse {}
+
+message ListSecretsRequest {}
+
+message ListSecretsResponse {
+  repeated string names = 1;
+}
+
+message DeleteSecretRequest {
+  string name = 1;
+}
+
+message DeleteSecretResponse {}

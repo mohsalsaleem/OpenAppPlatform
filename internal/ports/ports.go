@@ -104,6 +104,14 @@ type Secrets interface {
 	Resolve(ctx context.Context, refs map[string]string) (map[string]string, error)
 }
 
+// SecretStore keeps secret values for the owner. Values go in and never
+// come back out through it, except to the runtime through Secrets.
+type SecretStore interface {
+	Set(name, value string) error
+	Delete(name string) error
+	Names() ([]string, error)
+}
+
 // FactSource reports facts about a code change, for example from GitHub.
 type FactSource interface {
 	Facts(ctx context.Context, repository, commit string) (*oapv1.ChangeFacts, error)

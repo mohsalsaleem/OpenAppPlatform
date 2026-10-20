@@ -9,8 +9,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -197,7 +199,7 @@ func (a *app) loginCmd(ctx context.Context, args []string) int {
 // ownerCmd: owner logins|approve|deny|agents|revoke|pause|resume|mode.
 func (a *app) ownerCmd(ctx context.Context, args []string) int {
 	if len(args) == 0 {
-		return a.fail(errors.New("usage: owner enroll [--label NAME]|keys [remove FINGERPRINT]|logins|approve CODE --app APP [--may ACTIONS] [--trust=false]|deny CODE|agents|revoke AGENT [--forget]|pause [AGENT]|resume [AGENT]|mode trusted|every-session"))
+		return a.fail(errors.New("usage: owner enroll [--label NAME]|keys [remove FINGERPRINT]|secret set NAME [--ask ID]|secret list|secret delete NAME|logins|approve CODE --app APP [--may ACTIONS] [--trust=false]|deny CODE|agents|revoke AGENT [--forget]|pause [AGENT]|resume [AGENT]|mode trusted|every-session"))
 	}
 	sub, rest := args[0], args[1:]
 	fs := flag.NewFlagSet("owner "+sub, flag.ContinueOnError)
@@ -209,10 +211,26 @@ func (a *app) ownerCmd(ctx context.Context, args []string) int {
 	file := fs.String("file", "", "briefing: the Markdown file with the house rules")
 	clear := fs.Bool("clear", false, "briefing: remove the house rules")
 	label := fs.String("label", "", "enroll: names this machine, for example laptop (default: its host name)")
+	askID := fs.String("ask", "", "secret set: the secret ask this answers")
 	asJSON := fs.Bool("json", false, "")
 	arg, rest := splitFirst(rest)
 	if err := fs.Parse(rest); err != nil {
 		return 2
+	}
+	// Flags may follow positional arguments: owner secret set NAME --ask ID.
+	// An answer is free text, so it keeps everything after the ask's id.
+	var pos []string
+	for sub != "answer" && fs.NArg() > 0 {
+		pos = append(pos, fs.Arg(0))
+		if err := fs.Parse(fs.Args()[1:]); err != nil {
+			return 2
+		}
+	}
+	posArg := func(i int) string {
+		if i < len(pos) {
+			return pos[i]
+		}
+		return ""
 	}
 	if sub == "enroll" {
 		return a.ownerEnroll(ctx, *label, *asJSON)
@@ -353,6 +371,50 @@ func (a *app) ownerCmd(ctx context.Context, args []string) int {
 			fmt.Fprintf(a.out, "✓ House rules for %s %s.\n", scope, map[bool]string{true: "removed", false: "saved"}[*clear])
 			return 0
 		}
+	case "secret":
+		switch arg {
+		case "set":
+			name := posArg(0)
+			if name == "" {
+				return a.fail(errors.New("usage: owner secret set NAME [--ask ASK_ID]; the value is read from the terminal, or from stdin when piped"))
+			}
+			value, e := a.readSecret(name)
+			if e != nil {
+				return a.fail(e)
+			}
+			_, err = c.SetSecret(ctx, connect.NewRequest(&oapv1.SetSecretRequest{Name: name, Value: value, AskId: *askID}))
+			if err == nil {
+				msg := fmt.Sprintf("✓ Stored secret %s. Specs reference it by name; containers started from now on get it.", name)
+				if *askID != "" {
+					msg += " Answered " + *askID + " with provided."
+				}
+				fmt.Fprintln(a.out, msg)
+				return 0
+			}
+		case "list":
+			res, e := c.ListSecrets(ctx, connect.NewRequest(&oapv1.ListSecretsRequest{}))
+			err = e
+			if e == nil {
+				out = res.Msg
+				if !*asJSON {
+					if len(res.Msg.Names) == 0 {
+						fmt.Fprintln(a.out, "No secrets are stored.")
+					}
+					for _, n := range res.Msg.Names {
+						fmt.Fprintln(a.out, n)
+					}
+					return 0
+				}
+			}
+		case "delete":
+			_, err = c.DeleteSecret(ctx, connect.NewRequest(&oapv1.DeleteSecretRequest{Name: posArg(0)}))
+			if err == nil {
+				fmt.Fprintf(a.out, "✓ Deleted secret %s.\n", posArg(0))
+				return 0
+			}
+		default:
+			return a.fail(errors.New("usage: owner secret set NAME [--ask ASK_ID] | list | delete NAME"))
+		}
 	case "keys":
 		switch arg {
 		case "":
@@ -371,12 +433,12 @@ func (a *app) ownerCmd(ctx context.Context, args []string) int {
 				}
 			}
 		case "remove":
-			res, e := c.RemoveOwnerKey(ctx, connect.NewRequest(&oapv1.RemoveOwnerKeyRequest{KeyFingerprint: fs.Arg(0)}))
+			res, e := c.RemoveOwnerKey(ctx, connect.NewRequest(&oapv1.RemoveOwnerKeyRequest{KeyFingerprint: posArg(0)}))
 			err = e
 			if e == nil {
 				out = res.Msg
 				if !*asJSON {
-					fmt.Fprintf(a.out, "✓ Removed owner key %s and ended %d of its sessions.\n", fs.Arg(0), res.Msg.RevokedTokens)
+					fmt.Fprintf(a.out, "✓ Removed owner key %s and ended %d of its sessions.\n", posArg(0), res.Msg.RevokedTokens)
 					return 0
 				}
 			}
@@ -517,4 +579,37 @@ func (a *app) ownerEnroll(ctx context.Context, label string, asJSON bool) int {
 	a.u().Success(fmt.Sprintf("This machine holds an owner key for %s (%s, %s). Owner commands now sign in at %s with it, so they keep working after hand-off.",
 		s.Address, label, res.Msg.KeyFingerprint, c.URL))
 	return 0
+}
+
+// readSecret reads a secret value: from the terminal with echo off, or
+// from stdin when it is piped (one trailing newline is dropped). There is
+// deliberately no flag for it, so values stay out of shell history and
+// process lists.
+func (a *app) readSecret(name string) (string, error) {
+	if a.terminal() {
+		fmt.Fprintf(a.out, "Value for %s (not shown): ", name)
+		off := exec.Command("stty", "-echo")
+		off.Stdin = os.Stdin
+		echoOff := off.Run() == nil
+		line, err := a.in.ReadString('\n')
+		if echoOff {
+			on := exec.Command("stty", "echo")
+			on.Stdin = os.Stdin
+			on.Run()
+		}
+		fmt.Fprintln(a.out)
+		if err != nil && line == "" {
+			return "", errors.New("no value given")
+		}
+		return strings.TrimRight(line, "\r\n"), nil
+	}
+	b, err := io.ReadAll(io.LimitReader(a.in, service.MaxSecretSize+2))
+	if err != nil {
+		return "", err
+	}
+	v := strings.TrimSuffix(strings.TrimSuffix(string(b), "\n"), "\r")
+	if v == "" {
+		return "", errors.New("no value on stdin; pipe it in, or run this in a terminal")
+	}
+	return v, nil
 }

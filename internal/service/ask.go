@@ -213,6 +213,9 @@ func (s *Service) AnswerAsk(ctx context.Context, c Caller, req *oapv1.AnswerAskR
 		if !valid("provided", "declined") {
 			return nil, fail(InvalidArgument, WhyBadAnswer, "answer a secret ask with provided or declined; the value never passes through an answer")
 		}
+		if answer == "provided" && s.SecretStore != nil && !s.hasSecret(a.req.GetSecretRef()) {
+			return nil, fail(FailedPrecondition, WhyBadAnswer, "secret %q isn't set; set it with: oapctl owner secret set %s --ask %s", a.req.GetSecretRef(), a.req.GetSecretRef(), a.id)
+		}
 	default:
 		if answer == "" {
 			return nil, fail(InvalidArgument, WhyBadAnswer, "the answer is empty")

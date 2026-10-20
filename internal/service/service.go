@@ -121,6 +121,8 @@ type Service struct {
 	LoginTTL time.Duration
 	// Notifier tells the owner about asks and trusted logins; nil sends none.
 	Notifier ports.Notifier
+	// SecretStore keeps the owner's secret values; nil means none can be set.
+	SecretStore ports.SecretStore
 
 	serializer *engine.Serializer
 	runCtx     context.Context

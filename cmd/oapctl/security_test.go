@@ -33,6 +33,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/service"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/listeners"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/wire"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // R3.9: the whole surface, attacked by an agent with a narrow scope, on a
@@ -117,6 +118,7 @@ type securityRig struct {
 	seen, logs    lockedBuffer // every response body; oapd's log
 	cliOut        lockedBuffer // every CLI output
 	secret        string
+	apiKey        string // set by the owner through the CLI, answering an agent's ask
 }
 
 func newSecurityRig(t *testing.T) *securityRig {
@@ -145,6 +147,8 @@ func newSecurityRig(t *testing.T) *securityRig {
 	raw := make([]byte, 18)
 	rand.Read(raw)
 	r.secret = "pw-" + hex.EncodeToString(raw)
+	rand.Read(raw)
+	r.apiKey = "key-" + hex.EncodeToString(raw)
 	if err := secrets.Set("shop-db", r.secret); err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +156,7 @@ func newSecurityRig(t *testing.T) *securityRig {
 	r.rt.Secrets = secrets
 	edge := sim.NewEdge()
 	log := slog.New(slog.NewTextHandler(&r.logs, nil))
-	r.svc = &service.Service{Desired: desired, Journal: journal, Clock: r.clock, Notifier: notify.Log{Logger: log},
+	r.svc = &service.Service{Desired: desired, Journal: journal, Clock: r.clock, Notifier: notify.Log{Logger: log}, SecretStore: secrets,
 		Observer: &engine.Observer{Runtime: r.rt, Clock: r.clock},
 		Executor: &engine.Executor{Runtime: r.rt, Edge: edge, Journal: journal, Desired: desired, Clock: r.clock}}
 	if err := r.svc.Start(ctx); err != nil {
@@ -341,6 +345,55 @@ func (r *securityRig) setUp() fixture {
 	var f fixture
 	f.alice = r.login("alice", "shop", "scale,deploy,rollback,configure,spec-patch")
 	f.bob = r.login("bob", "blog", "scale")
+
+	// R3.15: alice asks for an API key; "provided" isn't accepted before it
+	// is set; the owner sets it through the CLI, piping the value in, which
+	// answers the ask; the shop's new instances start with it.
+	alice, err := r.svc.Authenticate(ctx, f.alice)
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	keyAsk, err := r.svc.Ask(ctx, alice, &oapv1.AskRequest{Kind: oapv1.AskKind_ASK_KIND_SECRET, SecretRef: "shop-api-key", Question: "The shop needs its payment API key."})
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	if _, err := r.svc.AnswerAsk(ctx, service.Owner, &oapv1.AnswerAskRequest{AskId: keyAsk.AskId, Answer: "provided"}); err == nil {
+		r.t.Fatal("a secret ask was answered provided before the secret was set")
+	}
+	h := newHarness(r.t, false, r.apiKey+"\n", "")
+	h.a.configDir, h.a.now = r.dir, time.Now
+	r.t.Setenv("OAP_AGENT", "")
+	r.t.Setenv("OAP_AGENT_URL", r.local)
+	if code := h.run("owner", "secret", "set", "shop-api-key", "--ask", keyAsk.AskId); code != 0 {
+		r.t.Fatalf("owner secret set: %s", h.out.String())
+	}
+	r.cliOut.Write(h.out.Bytes())
+	if code, out := r.cli(owner, "owner", "secret", "list"); code != 0 || !strings.Contains(out, "shop-api-key") || !strings.Contains(out, "shop-db") {
+		r.t.Fatalf("owner secret list: %s", out)
+	}
+	if asks, _ := r.svc.ListAsks(ctx, service.Owner); len(asks.Asks) != 0 {
+		r.t.Fatalf("the secret ask is still open: %v", asks.Asks)
+	}
+	bind, _ := structpb.NewStruct(map[string]any{"components": map[string]any{"web": map[string]any{"secrets": map[string]any{"DB_PASSWORD": "shop-db", "API_KEY": "shop-api-key"}}}})
+	bp, err := r.svc.Propose(ctx, service.Owner, &oapv1.ProposeRequest{Intent: &oapv1.Intent{Application: "shop", Change: &oapv1.Intent_SpecPatch{SpecPatch: &oapv1.SpecPatch{MergePatch: bind}}}})
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	ba, err := r.svc.Apply(ctx, service.Owner, &oapv1.ApplyRequest{ProposalId: bp.Proposal.Id})
+	if err != nil {
+		r.t.Fatal(err)
+	}
+	r.svc.Await(ctx, service.Owner, &oapv1.AwaitRequest{OperationId: ba.OperationId}, func(*oapv1.Event) error { return nil })
+	started := false
+	for _, ref := range r.rt.Running() {
+		if ref.Application == "shop" {
+			env := r.rt.Env(ref)
+			started = env["API_KEY"] == r.apiKey && env["DB_PASSWORD"] == r.secret
+		}
+	}
+	if !started {
+		r.t.Fatal("the shop didn't start with the owner's API key")
+	}
 	scale := func(app string, n int32) *oapv1.Intent {
 		return &oapv1.Intent{Application: app, Change: &oapv1.Intent_Scale{Scale: &oapv1.Scale{Component: "web", Instances: n}}}
 	}
@@ -491,6 +544,9 @@ func TestAgentStaysInScopeOnEverySurface(t *testing.T) {
 		_, calls["EnrollOwnerKey"] = oc.EnrollOwnerKey(ctx, connect.NewRequest(&oapv1.EnrollOwnerKeyRequest{PublicKey: "ed25519:" + base64.StdEncoding.EncodeToString(make([]byte, 32))}))
 		_, calls["ListOwnerKeys"] = oc.ListOwnerKeys(ctx, connect.NewRequest(&oapv1.ListOwnerKeysRequest{}))
 		_, calls["RemoveOwnerKey"] = oc.RemoveOwnerKey(ctx, connect.NewRequest(&oapv1.RemoveOwnerKeyRequest{KeyFingerprint: "SHA256:x"}))
+		_, calls["SetSecret"] = oc.SetSecret(ctx, connect.NewRequest(&oapv1.SetSecretRequest{Name: "shop-db", Value: "agent-chosen"}))
+		_, calls["ListSecrets"] = oc.ListSecrets(ctx, connect.NewRequest(&oapv1.ListSecretsRequest{}))
+		_, calls["DeleteSecret"] = oc.DeleteSecret(ctx, connect.NewRequest(&oapv1.DeleteSecretRequest{Name: "shop-db"}))
 		if got, all := len(calls), oapv1.File_oap_v1_owner_proto.Services().ByName("OwnerService").Methods().Len(); got != all {
 			t.Errorf("the test calls %d of the owner API's %d methods", got, all)
 		}
@@ -675,9 +731,11 @@ func (r *securityRig) scan(tokens ...string) {
 		return []string{s, base64.StdEncoding.EncodeToString([]byte(s)), base64.RawURLEncoding.EncodeToString([]byte(s)), hex.EncodeToString([]byte(s))}
 	}
 	for where, text := range places {
-		for _, form := range forms(r.secret) {
-			if strings.Contains(text, form) {
-				t.Errorf("the secret value appears in %s", where)
+		for _, value := range []string{r.secret, r.apiKey} {
+			for _, form := range forms(value) {
+				if strings.Contains(text, form) {
+					t.Errorf("a secret value appears in %s", where)
+				}
 			}
 		}
 	}

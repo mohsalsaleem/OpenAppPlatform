@@ -107,3 +107,17 @@ func (s *Server) ListOwnerKeys(ctx context.Context, req *connect.Request[oapv1.L
 func (s *Server) RemoveOwnerKey(ctx context.Context, req *connect.Request[oapv1.RemoveOwnerKeyRequest]) (*connect.Response[oapv1.RemoveOwnerKeyResponse], error) {
 	return call(s, ctx, req, s.Service.RemoveOwnerKey)
 }
+
+func (s *Server) SetSecret(ctx context.Context, req *connect.Request[oapv1.SetSecretRequest]) (*connect.Response[oapv1.SetSecretResponse], error) {
+	return call(s, ctx, req, s.Service.SetSecret)
+}
+
+func (s *Server) ListSecrets(ctx context.Context, req *connect.Request[oapv1.ListSecretsRequest]) (*connect.Response[oapv1.ListSecretsResponse], error) {
+	return call(s, ctx, req, func(ctx context.Context, c service.Caller, _ *oapv1.ListSecretsRequest) (*oapv1.ListSecretsResponse, error) {
+		return s.Service.ListSecrets(ctx, c)
+	})
+}
+
+func (s *Server) DeleteSecret(ctx context.Context, req *connect.Request[oapv1.DeleteSecretRequest]) (*connect.Response[oapv1.DeleteSecretResponse], error) {
+	return call(s, ctx, req, s.Service.DeleteSecret)
+}

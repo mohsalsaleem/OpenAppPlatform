@@ -1600,6 +1600,263 @@ func (x *RemoveOwnerKeyResponse) GetRevokedTokens() int32 {
 	return 0
 }
 
+type SetSecretRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Value string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	// The secret ask this answers; its secret_ref must be name.
+	AskId         string `protobuf:"bytes,3,opt,name=ask_id,json=askId,proto3" json:"ask_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetSecretRequest) Reset() {
+	*x = SetSecretRequest{}
+	mi := &file_oap_v1_owner_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetSecretRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetSecretRequest) ProtoMessage() {}
+
+func (x *SetSecretRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_oap_v1_owner_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetSecretRequest.ProtoReflect.Descriptor instead.
+func (*SetSecretRequest) Descriptor() ([]byte, []int) {
+	return file_oap_v1_owner_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *SetSecretRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *SetSecretRequest) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *SetSecretRequest) GetAskId() string {
+	if x != nil {
+		return x.AskId
+	}
+	return ""
+}
+
+type SetSecretResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetSecretResponse) Reset() {
+	*x = SetSecretResponse{}
+	mi := &file_oap_v1_owner_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetSecretResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetSecretResponse) ProtoMessage() {}
+
+func (x *SetSecretResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_oap_v1_owner_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetSecretResponse.ProtoReflect.Descriptor instead.
+func (*SetSecretResponse) Descriptor() ([]byte, []int) {
+	return file_oap_v1_owner_proto_rawDescGZIP(), []int{33}
+}
+
+type ListSecretsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSecretsRequest) Reset() {
+	*x = ListSecretsRequest{}
+	mi := &file_oap_v1_owner_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSecretsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSecretsRequest) ProtoMessage() {}
+
+func (x *ListSecretsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_oap_v1_owner_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSecretsRequest.ProtoReflect.Descriptor instead.
+func (*ListSecretsRequest) Descriptor() ([]byte, []int) {
+	return file_oap_v1_owner_proto_rawDescGZIP(), []int{34}
+}
+
+type ListSecretsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Names         []string               `protobuf:"bytes,1,rep,name=names,proto3" json:"names,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSecretsResponse) Reset() {
+	*x = ListSecretsResponse{}
+	mi := &file_oap_v1_owner_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSecretsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSecretsResponse) ProtoMessage() {}
+
+func (x *ListSecretsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_oap_v1_owner_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSecretsResponse.ProtoReflect.Descriptor instead.
+func (*ListSecretsResponse) Descriptor() ([]byte, []int) {
+	return file_oap_v1_owner_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ListSecretsResponse) GetNames() []string {
+	if x != nil {
+		return x.Names
+	}
+	return nil
+}
+
+type DeleteSecretRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteSecretRequest) Reset() {
+	*x = DeleteSecretRequest{}
+	mi := &file_oap_v1_owner_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteSecretRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteSecretRequest) ProtoMessage() {}
+
+func (x *DeleteSecretRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_oap_v1_owner_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteSecretRequest.ProtoReflect.Descriptor instead.
+func (*DeleteSecretRequest) Descriptor() ([]byte, []int) {
+	return file_oap_v1_owner_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *DeleteSecretRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type DeleteSecretResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteSecretResponse) Reset() {
+	*x = DeleteSecretResponse{}
+	mi := &file_oap_v1_owner_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteSecretResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteSecretResponse) ProtoMessage() {}
+
+func (x *DeleteSecretResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_oap_v1_owner_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteSecretResponse.ProtoReflect.Descriptor instead.
+func (*DeleteSecretResponse) Descriptor() ([]byte, []int) {
+	return file_oap_v1_owner_proto_rawDescGZIP(), []int{37}
+}
+
 var File_oap_v1_owner_proto protoreflect.FileDescriptor
 
 const file_oap_v1_owner_proto_rawDesc = "" +
@@ -1687,11 +1944,22 @@ const file_oap_v1_owner_proto_rawDesc = "" +
 	"\x15RemoveOwnerKeyRequest\x12'\n" +
 	"\x0fkey_fingerprint\x18\x01 \x01(\tR\x0ekeyFingerprint\"?\n" +
 	"\x16RemoveOwnerKeyResponse\x12%\n" +
-	"\x0erevoked_tokens\x18\x01 \x01(\x05R\rrevokedTokens*r\n" +
+	"\x0erevoked_tokens\x18\x01 \x01(\x05R\rrevokedTokens\"S\n" +
+	"\x10SetSecretRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\x12\x15\n" +
+	"\x06ask_id\x18\x03 \x01(\tR\x05askId\"\x13\n" +
+	"\x11SetSecretResponse\"\x14\n" +
+	"\x12ListSecretsRequest\"+\n" +
+	"\x13ListSecretsResponse\x12\x14\n" +
+	"\x05names\x18\x01 \x03(\tR\x05names\")\n" +
+	"\x13DeleteSecretRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"\x16\n" +
+	"\x14DeleteSecretResponse*r\n" +
 	"\fApprovalMode\x12\x1d\n" +
 	"\x19APPROVAL_MODE_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eAPPROVAL_MODE_TRUSTED_IDENTITY\x10\x01\x12\x1f\n" +
-	"\x1bAPPROVAL_MODE_EVERY_SESSION\x10\x022\xda\a\n" +
+	"\x1bAPPROVAL_MODE_EVERY_SESSION\x10\x022\xaf\t\n" +
 	"\fOwnerService\x12C\n" +
 	"\n" +
 	"ListLogins\x12\x19.oap.v1.ListLoginsRequest\x1a\x1a.oap.v1.ListLoginsResponse\x12I\n" +
@@ -1708,7 +1976,10 @@ const file_oap_v1_owner_proto_rawDesc = "" +
 	"\vSetBriefing\x12\x1a.oap.v1.SetBriefingRequest\x1a\x1b.oap.v1.SetBriefingResponse\x12O\n" +
 	"\x0eEnrollOwnerKey\x12\x1d.oap.v1.EnrollOwnerKeyRequest\x1a\x1e.oap.v1.EnrollOwnerKeyResponse\x12L\n" +
 	"\rListOwnerKeys\x12\x1c.oap.v1.ListOwnerKeysRequest\x1a\x1d.oap.v1.ListOwnerKeysResponse\x12O\n" +
-	"\x0eRemoveOwnerKey\x12\x1d.oap.v1.RemoveOwnerKeyRequest\x1a\x1e.oap.v1.RemoveOwnerKeyResponseB:Z8github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1b\x06proto3"
+	"\x0eRemoveOwnerKey\x12\x1d.oap.v1.RemoveOwnerKeyRequest\x1a\x1e.oap.v1.RemoveOwnerKeyResponse\x12@\n" +
+	"\tSetSecret\x12\x18.oap.v1.SetSecretRequest\x1a\x19.oap.v1.SetSecretResponse\x12F\n" +
+	"\vListSecrets\x12\x1a.oap.v1.ListSecretsRequest\x1a\x1b.oap.v1.ListSecretsResponse\x12I\n" +
+	"\fDeleteSecret\x12\x1b.oap.v1.DeleteSecretRequest\x1a\x1c.oap.v1.DeleteSecretResponseB:Z8github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1b\x06proto3"
 
 var (
 	file_oap_v1_owner_proto_rawDescOnce sync.Once
@@ -1723,7 +1994,7 @@ func file_oap_v1_owner_proto_rawDescGZIP() []byte {
 }
 
 var file_oap_v1_owner_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_oap_v1_owner_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_oap_v1_owner_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_oap_v1_owner_proto_goTypes = []any{
 	(ApprovalMode)(0),               // 0: oap.v1.ApprovalMode
 	(*PendingLogin)(nil),            // 1: oap.v1.PendingLogin
@@ -1758,20 +2029,26 @@ var file_oap_v1_owner_proto_goTypes = []any{
 	(*ListOwnerKeysResponse)(nil),   // 30: oap.v1.ListOwnerKeysResponse
 	(*RemoveOwnerKeyRequest)(nil),   // 31: oap.v1.RemoveOwnerKeyRequest
 	(*RemoveOwnerKeyResponse)(nil),  // 32: oap.v1.RemoveOwnerKeyResponse
-	(*timestamppb.Timestamp)(nil),   // 33: google.protobuf.Timestamp
-	(*AskRequest)(nil),              // 34: oap.v1.AskRequest
+	(*SetSecretRequest)(nil),        // 33: oap.v1.SetSecretRequest
+	(*SetSecretResponse)(nil),       // 34: oap.v1.SetSecretResponse
+	(*ListSecretsRequest)(nil),      // 35: oap.v1.ListSecretsRequest
+	(*ListSecretsResponse)(nil),     // 36: oap.v1.ListSecretsResponse
+	(*DeleteSecretRequest)(nil),     // 37: oap.v1.DeleteSecretRequest
+	(*DeleteSecretResponse)(nil),    // 38: oap.v1.DeleteSecretResponse
+	(*timestamppb.Timestamp)(nil),   // 39: google.protobuf.Timestamp
+	(*AskRequest)(nil),              // 40: oap.v1.AskRequest
 }
 var file_oap_v1_owner_proto_depIdxs = []int32{
-	33, // 0: oap.v1.PendingLogin.expires_at:type_name -> google.protobuf.Timestamp
+	39, // 0: oap.v1.PendingLogin.expires_at:type_name -> google.protobuf.Timestamp
 	1,  // 1: oap.v1.ListLoginsResponse.logins:type_name -> oap.v1.PendingLogin
 	8,  // 2: oap.v1.ApproveLoginResponse.agent:type_name -> oap.v1.AgentInfo
 	8,  // 3: oap.v1.ListAgentsResponse.agents:type_name -> oap.v1.AgentInfo
 	0,  // 4: oap.v1.ListAgentsResponse.mode:type_name -> oap.v1.ApprovalMode
 	0,  // 5: oap.v1.SetApprovalModeRequest.mode:type_name -> oap.v1.ApprovalMode
-	34, // 6: oap.v1.PendingAsk.request:type_name -> oap.v1.AskRequest
-	33, // 7: oap.v1.PendingAsk.expires_at:type_name -> google.protobuf.Timestamp
+	40, // 6: oap.v1.PendingAsk.request:type_name -> oap.v1.AskRequest
+	39, // 7: oap.v1.PendingAsk.expires_at:type_name -> google.protobuf.Timestamp
 	19, // 8: oap.v1.ListAsksResponse.asks:type_name -> oap.v1.PendingAsk
-	33, // 9: oap.v1.OwnerKey.enrolled_at:type_name -> google.protobuf.Timestamp
+	39, // 9: oap.v1.OwnerKey.enrolled_at:type_name -> google.protobuf.Timestamp
 	28, // 10: oap.v1.ListOwnerKeysResponse.keys:type_name -> oap.v1.OwnerKey
 	2,  // 11: oap.v1.OwnerService.ListLogins:input_type -> oap.v1.ListLoginsRequest
 	4,  // 12: oap.v1.OwnerService.ApproveLogin:input_type -> oap.v1.ApproveLoginRequest
@@ -1787,22 +2064,28 @@ var file_oap_v1_owner_proto_depIdxs = []int32{
 	26, // 22: oap.v1.OwnerService.EnrollOwnerKey:input_type -> oap.v1.EnrollOwnerKeyRequest
 	29, // 23: oap.v1.OwnerService.ListOwnerKeys:input_type -> oap.v1.ListOwnerKeysRequest
 	31, // 24: oap.v1.OwnerService.RemoveOwnerKey:input_type -> oap.v1.RemoveOwnerKeyRequest
-	3,  // 25: oap.v1.OwnerService.ListLogins:output_type -> oap.v1.ListLoginsResponse
-	5,  // 26: oap.v1.OwnerService.ApproveLogin:output_type -> oap.v1.ApproveLoginResponse
-	7,  // 27: oap.v1.OwnerService.DenyLogin:output_type -> oap.v1.DenyLoginResponse
-	10, // 28: oap.v1.OwnerService.ListAgents:output_type -> oap.v1.ListAgentsResponse
-	12, // 29: oap.v1.OwnerService.Revoke:output_type -> oap.v1.RevokeResponse
-	14, // 30: oap.v1.OwnerService.Pause:output_type -> oap.v1.PauseResponse
-	16, // 31: oap.v1.OwnerService.Resume:output_type -> oap.v1.ResumeResponse
-	18, // 32: oap.v1.OwnerService.SetApprovalMode:output_type -> oap.v1.SetApprovalModeResponse
-	21, // 33: oap.v1.OwnerService.ListAsks:output_type -> oap.v1.ListAsksResponse
-	23, // 34: oap.v1.OwnerService.AnswerAsk:output_type -> oap.v1.AnswerAskResponse
-	25, // 35: oap.v1.OwnerService.SetBriefing:output_type -> oap.v1.SetBriefingResponse
-	27, // 36: oap.v1.OwnerService.EnrollOwnerKey:output_type -> oap.v1.EnrollOwnerKeyResponse
-	30, // 37: oap.v1.OwnerService.ListOwnerKeys:output_type -> oap.v1.ListOwnerKeysResponse
-	32, // 38: oap.v1.OwnerService.RemoveOwnerKey:output_type -> oap.v1.RemoveOwnerKeyResponse
-	25, // [25:39] is the sub-list for method output_type
-	11, // [11:25] is the sub-list for method input_type
+	33, // 25: oap.v1.OwnerService.SetSecret:input_type -> oap.v1.SetSecretRequest
+	35, // 26: oap.v1.OwnerService.ListSecrets:input_type -> oap.v1.ListSecretsRequest
+	37, // 27: oap.v1.OwnerService.DeleteSecret:input_type -> oap.v1.DeleteSecretRequest
+	3,  // 28: oap.v1.OwnerService.ListLogins:output_type -> oap.v1.ListLoginsResponse
+	5,  // 29: oap.v1.OwnerService.ApproveLogin:output_type -> oap.v1.ApproveLoginResponse
+	7,  // 30: oap.v1.OwnerService.DenyLogin:output_type -> oap.v1.DenyLoginResponse
+	10, // 31: oap.v1.OwnerService.ListAgents:output_type -> oap.v1.ListAgentsResponse
+	12, // 32: oap.v1.OwnerService.Revoke:output_type -> oap.v1.RevokeResponse
+	14, // 33: oap.v1.OwnerService.Pause:output_type -> oap.v1.PauseResponse
+	16, // 34: oap.v1.OwnerService.Resume:output_type -> oap.v1.ResumeResponse
+	18, // 35: oap.v1.OwnerService.SetApprovalMode:output_type -> oap.v1.SetApprovalModeResponse
+	21, // 36: oap.v1.OwnerService.ListAsks:output_type -> oap.v1.ListAsksResponse
+	23, // 37: oap.v1.OwnerService.AnswerAsk:output_type -> oap.v1.AnswerAskResponse
+	25, // 38: oap.v1.OwnerService.SetBriefing:output_type -> oap.v1.SetBriefingResponse
+	27, // 39: oap.v1.OwnerService.EnrollOwnerKey:output_type -> oap.v1.EnrollOwnerKeyResponse
+	30, // 40: oap.v1.OwnerService.ListOwnerKeys:output_type -> oap.v1.ListOwnerKeysResponse
+	32, // 41: oap.v1.OwnerService.RemoveOwnerKey:output_type -> oap.v1.RemoveOwnerKeyResponse
+	34, // 42: oap.v1.OwnerService.SetSecret:output_type -> oap.v1.SetSecretResponse
+	36, // 43: oap.v1.OwnerService.ListSecrets:output_type -> oap.v1.ListSecretsResponse
+	38, // 44: oap.v1.OwnerService.DeleteSecret:output_type -> oap.v1.DeleteSecretResponse
+	28, // [28:45] is the sub-list for method output_type
+	11, // [11:28] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name
 	11, // [11:11] is the sub-list for extension extendee
 	0,  // [0:11] is the sub-list for field type_name
@@ -1820,7 +2103,7 @@ func file_oap_v1_owner_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_oap_v1_owner_proto_rawDesc), len(file_oap_v1_owner_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   32,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

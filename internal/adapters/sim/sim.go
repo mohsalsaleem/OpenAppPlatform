@@ -401,6 +401,19 @@ func (d *Desired) SetEnvelope(ctx context.Context, tree any, author, message str
 // Secrets is an in-memory secret store.
 type Secrets map[string]string
 
+func (s Secrets) Set(name, value string) error { s[name] = value; return nil }
+
+func (s Secrets) Delete(name string) error { delete(s, name); return nil }
+
+func (s Secrets) Names() ([]string, error) {
+	out := make([]string, 0, len(s))
+	for n := range s {
+		out = append(out, n)
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
 func (s Secrets) Resolve(ctx context.Context, refs map[string]string) (map[string]string, error) {
 	out := map[string]string{}
 	for variable, ref := range refs {

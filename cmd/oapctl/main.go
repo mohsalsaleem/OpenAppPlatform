@@ -81,7 +81,8 @@ const usage = `Usage:
   %[1]s login URL --agent NAME             sign an agent in; the owner approves it once
   %[1]s briefing [APP]                      the briefing for agents: what runs, what you may do, house rules
   %[1]s ask QUESTION [--kind K] [--option O]... [--wait]   involve the owner (as an agent)
-  %[1]s owner enroll|keys|logins|approve|deny|agents|revoke|pause|resume|mode|asks|answer|briefing   the owner's control over agents
+  %[1]s owner enroll|keys|secret|logins|approve|deny|agents|revoke|pause|resume|mode|asks|answer|briefing   the owner's control over agents
+  %[1]s owner secret set NAME [--ask ID]   store a secret; the value is read from the terminal (not shown) or piped on stdin
   With OAP_AGENT=NAME, agent API commands run as that signed-in agent.
   Agent API commands take --json (the result as JSON) or --events (each event as a JSON line).
 `
