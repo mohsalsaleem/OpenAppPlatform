@@ -202,7 +202,11 @@ func (r *Runtime) Start(ctx context.Context, s ops.InstanceSpec) (string, error)
 		}
 		host.Mounts = append(host.Mounts, mount{Type: "volume", Source: name, Target: s.Volumes[v]})
 	}
-	cfg := containerConfig{Image: s.Image, Env: env, Labels: labels, HostConfig: host}
+	cfg := containerConfig{Image: s.Image, Env: env, Labels: labels, HostConfig: host,
+		// Other components reach this one by its service name (ops.ServiceURL);
+		// Docker's DNS answers it with every running instance.
+		NetworkingConfig: &networkingConfig{EndpointsConfig: map[string]endpointConfig{
+			NetworkName(r.Install): {Aliases: []string{ops.ServiceHost(s.Ref.Application, s.Ref.Component)}}}}}
 	if s.Port > 0 {
 		port := fmt.Sprintf("%d/tcp", s.Port)
 		cfg.ExposedPorts = map[string]struct{}{port: {}}
@@ -624,13 +628,22 @@ func (r *Runtime) RemoveAll(ctx context.Context) error {
 }
 
 type containerConfig struct {
-	Image        string
-	Cmd          []string            `json:",omitempty"`
-	Env          []string            `json:",omitempty"`
-	Labels       map[string]string   `json:",omitempty"`
-	ExposedPorts map[string]struct{} `json:",omitempty"`
-	Healthcheck  *healthcheck        `json:",omitempty"`
-	HostConfig   hostConfig
+	Image            string
+	Cmd              []string            `json:",omitempty"`
+	Env              []string            `json:",omitempty"`
+	Labels           map[string]string   `json:",omitempty"`
+	ExposedPorts     map[string]struct{} `json:",omitempty"`
+	Healthcheck      *healthcheck        `json:",omitempty"`
+	HostConfig       hostConfig
+	NetworkingConfig *networkingConfig `json:",omitempty"`
+}
+
+type networkingConfig struct {
+	EndpointsConfig map[string]endpointConfig
+}
+
+type endpointConfig struct {
+	Aliases []string `json:",omitempty"`
 }
 
 type healthcheck struct {
