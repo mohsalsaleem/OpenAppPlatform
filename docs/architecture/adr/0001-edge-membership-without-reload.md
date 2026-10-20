@@ -1,9 +1,8 @@
 # ADR 0001: Change route membership without reloading Caddy
 
-Status: **accepted by Claude under the owner's standing instruction** to
-complete the work with the best approach (2026-10-20); the owner should
-confirm or reverse it. Implemented as `caddy.DNSEdge`, on by default in
-oapd (`--edge dns`); `--edge static` keeps the reload-per-change edge.
+Status: **accepted** by the owner (2026-10-20). Implemented as
+`caddy.DNSEdge`, on by default in oapd (`--edge dns`); `--edge static`
+keeps the reload-per-change edge.
 
 ## Context
 

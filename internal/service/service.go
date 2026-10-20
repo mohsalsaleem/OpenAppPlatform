@@ -281,16 +281,50 @@ func (s *Service) world(ctx context.Context) (*oapv1.World, error) {
 		if err != nil {
 			return nil, err
 		}
+		apps := map[string]*spec.Application{}
+		for _, d := range desired {
+			apps[d.App.Name] = d.App
+		}
 		insts := make([]model.ObservedInstance, len(obs.Instances))
 		copy(insts, obs.Instances)
 		for i, in := range insts {
-			insts[i].Routed = ops.HasInstance(cfg, ops.InstanceRef{Application: in.Application, Component: in.Component, Ordinal: int(in.Ordinal), Release: in.Release})
+			ref := ops.InstanceRef{Application: in.Application, Component: in.Component, Ordinal: int(in.Ordinal), Release: in.Release}
+			insts[i].Routed = routedAsDesired(cfg, apps[in.Application], ref)
 		}
 		o := *obs
 		o.Instances = insts
 		obs = &o
 	}
 	return model.Build(head, desired, obs, model.Options{Now: s.Clock.Now(), MaxAge: s.MaxAge}), nil
+}
+
+// routedAsDesired reports whether the edge routes an instance exactly as
+// desired: every desired route and no other. An instance routed under an
+// old domain or path isn't routed as desired, so its component isn't
+// converged.
+func routedAsDesired(cfg ops.EdgeConfig, app *spec.Application, ref ops.InstanceRef) bool {
+	var want []ops.RouteMember
+	if app != nil {
+		want = ops.Members(app, ref)
+	}
+	have := map[ops.RouteMember]bool{}
+	for _, m := range cfg.Members {
+		if m.Instance == ref {
+			have[m] = true
+		}
+	}
+	if len(want) == 0 {
+		return len(have) > 0
+	}
+	if len(have) != len(want) {
+		return false
+	}
+	for _, m := range want {
+		if !have[m] {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Service) envelope(ctx context.Context) (*oapv1.Envelope, error) {
@@ -649,6 +683,9 @@ func (s *Service) Explain(ctx context.Context, c Caller, req *oapv1.ExplainReque
 		case a.GetInstances() < d.GetInstances():
 			out.Causes = append(out.Causes, &oapv1.Cause{Why: "explain.missing_instances", Confidence: 90,
 				Summary: fmt.Sprintf("%s: %d of %d instances running", comp.Name, a.GetInstances(), d.GetInstances())})
+		case len(d.GetRoutes()) > 0 && unrouted(comp):
+			out.Causes = append(out.Causes, &oapv1.Cause{Why: "explain.routes", Confidence: 90,
+				Summary: fmt.Sprintf("%s: the edge doesn't route its instances as desired (domain or paths differ); an operation that moves its routes fixes it", comp.Name)})
 		case a.GetRelease() != d.GetRelease():
 			out.Causes = append(out.Causes, &oapv1.Cause{Why: "explain.old_release", Confidence: 90,
 				Summary: fmt.Sprintf("%s: running release %s, desired %s", comp.Name, a.GetRelease(), d.GetRelease())})
@@ -659,6 +696,15 @@ func (s *Service) Explain(ctx context.Context, c Caller, req *oapv1.ExplainReque
 	}
 	sort.Strings(out.Gaps)
 	return out, nil
+}
+
+func unrouted(c *oapv1.Component) bool {
+	for _, in := range c.GetInstances() {
+		if !in.GetRouted() {
+			return true
+		}
+	}
+	return false
 }
 
 // Ask needs notifications (R3.7).

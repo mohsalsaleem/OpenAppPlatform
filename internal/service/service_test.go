@@ -364,3 +364,33 @@ func TestDomainChangeMovesRoutes(t *testing.T) {
 		t.Fatalf("instances changed: %v -> %v", running, now)
 	}
 }
+
+// TestWrongHostAtTheEdgeIsAGap: an instance the edge routes under another
+// host than the desired one isn't converged, and Explain says why. (Found
+// on vultr_oap: OAP reported converged while Caddy served the old domain.)
+func TestWrongHostAtTheEdgeIsAGap(t *testing.T) {
+	r := newRig(t)
+	r.create(t)
+	ref := r.runtime.Running()[0]
+	cfg, _, _ := r.edge.Config(ctx)
+	for i := range cfg.Members {
+		cfg.Members[i].Host = "old.example.com" // the edge never moved
+	}
+	r.edge.Apply(ctx, cfg)
+	r.svc.Observer.Resync(ctx)
+	w, err := r.svc.Observe(ctx, Owner, &oapv1.ObserveRequest{Application: "site", Detail: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	web := w.World.Applications[0].Components[0]
+	if web.Converged || web.Instances[0].Routed {
+		t.Fatalf("%v routed under the wrong host counts as converged: %v", ref, web)
+	}
+	x, err := r.svc.Explain(ctx, Owner, &oapv1.ExplainRequest{Application: "site"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(x.Gaps) != 1 || len(x.Causes) == 0 || x.Causes[0].Why != "explain.routes" {
+		t.Fatalf("explain: %v", x)
+	}
+}
