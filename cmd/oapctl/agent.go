@@ -5,7 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/agentapi"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -323,5 +325,42 @@ func (a *app) briefingCmd(ctx context.Context, args []string) int {
 		return a.fail(err)
 	}
 	fmt.Fprint(a.out, res.Msg.Briefing)
+	return 0
+}
+
+// skillCmd: skill [NAME|schema] — a guide for agents, from the server, so
+// it matches the server's version. NAME defaults to author-app.
+func (a *app) skillCmd(ctx context.Context, args []string) int {
+	name, _ := splitFirst(args)
+	if name == "" {
+		name = "author-app"
+	}
+	s, err := a.serverFor("")
+	if err != nil {
+		return a.fail(err)
+	}
+	hc, base, stop, err := a.transport(ctx, s)
+	if err != nil {
+		return a.fail(err)
+	}
+	defer stop()
+	path := agentapi.SkillsPath + name + ".md"
+	if name == "schema" {
+		path = agentapi.SchemaPath
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(base, "/")+path, nil)
+	if err != nil {
+		return a.fail(err)
+	}
+	res, err := hc.Do(req)
+	if err != nil {
+		return a.fail(err)
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != http.StatusOK {
+		return a.fail(fmt.Errorf("%s: %s", res.Status, strings.TrimSpace(string(body))))
+	}
+	a.out.Write(body)
 	return 0
 }

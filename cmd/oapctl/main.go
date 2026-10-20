@@ -80,6 +80,7 @@ const usage = `Usage:
   %[1]s watch [APP] [--since N] [--limit N] events as they happen
   %[1]s login URL --agent NAME             sign an agent in; the owner approves it once
   %[1]s briefing [APP]                      the briefing for agents: what runs, what you may do, house rules
+  %[1]s skill [NAME|schema]                 how to put an application on OAP (author-app), or the oap.yaml schema
   %[1]s ask QUESTION [--kind K] [--option O]... [--wait]   involve the owner (as an agent)
   %[1]s owner enroll|keys|secret|logins|approve|deny|agents|revoke|pause|resume|mode|asks|answer|briefing   the owner's control over agents
   %[1]s owner secret set NAME [--ask ID]   store a secret; the value is read from the terminal (not shown) or piped on stdin
@@ -119,6 +120,8 @@ func (a *app) run(ctx context.Context, args []string) int {
 		return a.ownerCmd(ctx, args[1:])
 	case args[0] == "briefing":
 		return a.briefingCmd(ctx, args[1:])
+	case args[0] == "skill":
+		return a.skillCmd(ctx, args[1:])
 	case args[0] == "ask":
 		return a.askCmd(ctx, args[1:])
 	case args[0] == "observe":

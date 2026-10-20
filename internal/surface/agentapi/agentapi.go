@@ -228,3 +228,46 @@ func BriefingHandler(svc *service.Service, auth func(context.Context, http.Heade
 		io.WriteString(w, md)
 	})
 }
+
+// Paths of the guides for agents (R3.16): each skill as Markdown, and the
+// JSON Schema of oap.yaml.
+const (
+	SkillsPath = "/.well-known/oap/skills/"
+	SchemaPath = "/.well-known/oap/schema/application.json"
+)
+
+// GuideHandler serves skills at SkillsPath+NAME.md and the schema at
+// SchemaPath, to any signed-in caller.
+func GuideHandler(svc *service.Service, auth func(context.Context, http.Header) (service.Caller, error)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "GET only", http.StatusMethodNotAllowed)
+			return
+		}
+		c, err := auth(r.Context(), r.Header)
+		if err != nil {
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		if r.URL.Path == SchemaPath {
+			w.Header().Set("Content-Type", "application/schema+json")
+			w.Write(svc.ApplicationSchema(r.Context(), c))
+			return
+		}
+		name, ok := strings.CutSuffix(strings.TrimPrefix(r.URL.Path, SkillsPath), ".md")
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		sk, err := svc.Skill(r.Context(), c, name)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		io.WriteString(w, sk.Markdown)
+	})
+}

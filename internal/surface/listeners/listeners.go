@@ -27,6 +27,8 @@ func Socket(svc *service.Service) *http.ServeMux {
 	mux.Handle((&ownerapi.Server{Service: svc, Auth: auth}).Handler())
 	mux.Handle("/mcp", &mcp.Server{Service: svc, Caller: service.Owner, Auth: auth})
 	mux.Handle(agentapi.BriefingPath, agentapi.BriefingHandler(svc, auth))
+	mux.Handle(agentapi.SkillsPath, agentapi.GuideHandler(svc, auth))
+	mux.Handle(agentapi.SchemaPath, agentapi.GuideHandler(svc, auth))
 	mux.HandleFunc("/healthz", healthz)
 	return mux
 }
@@ -40,6 +42,8 @@ func Public(svc *service.Service) *http.ServeMux {
 	mux.Handle((&ownerapi.Server{Service: svc, Auth: auth}).Handler())
 	mux.Handle("/mcp", &mcp.Server{Service: svc, Auth: auth})
 	mux.Handle(agentapi.BriefingPath, agentapi.BriefingHandler(svc, auth))
+	mux.Handle(agentapi.SkillsPath, agentapi.GuideHandler(svc, auth))
+	mux.Handle(agentapi.SchemaPath, agentapi.GuideHandler(svc, auth))
 	mux.HandleFunc("/healthz", healthz)
 	return mux
 }
