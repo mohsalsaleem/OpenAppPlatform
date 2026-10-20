@@ -174,6 +174,8 @@ Depends on phase 2.
 | R3.12 | Host fixes as approved steps, with a manifest and undo | Each fix's apply then undo returns the fixture host to its starting state; an unapproved fix never runs; destructive fixes can't be grouped |
 | R3.13 | `oap host install`: `oapd` and Caddy as containers, idempotent, upgrade by digest | Running install twice changes nothing the second time; Caddy is observed as an OAP system component; a fresh 1 GB host stays inside the footprint budget |
 | R3.14 | Hand-off and uninstall | After hand-off the bootstrap key no longer authenticates; uninstall on a fresh host leaves only what was there before, compared by a host snapshot |
+| R3.15 | Owner secrets: `oapctl owner secret set`, `list` and `delete`; the value is read from the terminal (or stdin), never echoed, and stored in oapd's encrypted secret store; a secret ask is answered by setting the secret it names | The value never appears in any response, CLI output, log, journal entry or desired-state commit (R3.9's scan); an agent can't set, list or read secrets; an app referencing the secret starts with it |
+| R3.16 | App-authoring skill: guidance that teaches any agent to turn a repository, whatever its stack, into an image and an `oap.yaml` (find the port, health endpoint, env, data and workers; write a Dockerfile if missing; declare secret references and ask for their values; validate by proposing). Served by `oapd` over MCP (prompt and resource) with the application schema, so it matches the server's version; a Claude Code skill package points to it. Pulls the authoring part of R5.4 forward | Reference repositories of different stacks (at least a Go API with Postgres and a Node service with a worker) become specs that OAP accepts, with no secret value in them, following only the skill; the skill and schema served by `oapd` match the ones in the repository |
 
 **Phase exit:** the local journey (create, deploy with a migration, scale,
 injected failure, explain, fix, roll back, verify) passes driven only through
@@ -220,6 +222,11 @@ Decided (owner, 2026-10-19): R3.0, R3.10 and R3.11 run ahead of R3.1, because
 they need only SSH, not `oapd`. OAP uses the system OpenSSH client (`ssh`,
 `ssh-keygen`, `ssh-keyscan`), so no SSH library is added and `ssh` itself reads
 the password from the terminal.
+
+Decided (owner, 2026-10-20): add R3.15 (owner secrets) and R3.16 (the app-authoring
+skill), found while planning to host an owner's backend service: OAP stays
+independent of any stack, and agents learn to author apps for it from a skill
+OAP serves. Testing with the owner's real application is parked.
 
 | Decision (rewrite doc §17) | Needed before | Recommendation |
 |---|---|---|
@@ -273,6 +280,8 @@ the password from the terminal.
 | R3.8 | done | `ee1db23` | Golden briefings (`internal/core/briefing/testdata`) for the reference worlds (two components; topology mismatched, stale and never observed; failed pre-deploy job) and for the owner, generated from the world model by a pure renderer (deterministic over 20 renders). The owner's `briefing.md` (server and per application, in the desired-state repository) appears under "House rules … (written by the owner)", quoted and marked as not generated or enforced, so a heading inside it can't pass for OAP's own. Each caller's briefing covers only its applications, grants and own asks. Served by `observe` (`briefing: true`), at `/.well-known/oap/briefing.md` (token required on the public listener) and as MCP resources `oap://briefing[/APP]`; `oapctl briefing` and `oapctl owner briefing`. On `vultr_oap`: the owner's briefing for nisha-shipping showed it converged, the recent scaling and a temporary house rule under the owner-written heading (removed afterwards); the public briefing URL answered 401 without a token |
 | R3.9 | done | `55a199a` | `TestAgentStaysInScopeOnEverySurface` (`cmd/oapctl`), on a fresh install with the real SQLite journal, Git desired state and secret store, and oapd's own listeners (now `internal/surface/listeners`): an agent scoped to one application is refused on another (observe, briefing, explain, propose, apply, await, watch, ask) over Connect, Connect JSON, gRPC, gRPC-Web and plain JSON, on the public listener and on the socket with its token; can't apply the owner's proposal on its own application; can't call any of the owner API's 11 methods (absent from the public listener, `permission_denied` on the socket); is refused through MCP over HTTP and stdio, the briefing endpoint and the CLI; and sees nothing of the other application or another agent's ask in observe, watch, briefings or MCP listings. Missing and unknown tokens are refused everywhere (an unknown token on the socket is not taken for the owner); paused, revoked and expired tokens from the next request. Every response, CLI output, oapd's log, the data directory and the desired-state history were scanned for the secret value (plain, base64, hex) and for tokens: none found; a planted leak fails the scan, and the secret is checked to have reached the instance. Found and fixed: `oapctl mcp` ignored `OAP_AGENT` and reached oapd as the owner. Owner decision pinned by `TestFreshInstallAutonomy`: on a fresh install an approved agent's scaling runs without the owner, and a domain change needs approval. On `vultr_oap` over HTTPS: an agent scoped elsewhere was refused on `nisha-shipping` on every surface and protocol, and after revocation its token appeared in no log, data file or desired-state commit (`docs/evidence/vultr-oap-2026-10-20`). The secret-value scan ran in the test only: there is no way to store a secret on the server yet |
 | R3.14 | not started | | |
+| R3.15 | not started | | |
+| R3.16 | not started | | |
 | R4.1–R4.5 | not started | | |
 | R5.1 | dropped | | Owner decision, 2026-10-19: no install runs today's code |
 | R5.2–R5.5 | not started | | |
