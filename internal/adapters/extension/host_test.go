@@ -17,6 +17,7 @@ import (
 
 	extensionv1 "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/extension/v1"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/ops"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/ports"
 )
 
 var binaries = map[string]string{} // mode -> path
@@ -58,7 +59,7 @@ func newHost(t *testing.T) *Host {
 
 func install(t *testing.T, h *Host, name, mode string) {
 	t.Helper()
-	h.Install(Config{Name: name, Path: binaries[mode], SHA256: digest(t, binaries[mode]),
+	h.Add(Config{Name: name, Path: binaries[mode], SHA256: digest(t, binaries[mode]),
 		Points: []extensionv1.Point{extensionv1.Point_POINT_NOTIFIER}, Settings: map[string]string{"channel": "ops"},
 		Secrets: []string{"token"}, MemoryMiB: 64, CallTimeout: 2 * time.Second})
 }
@@ -73,7 +74,7 @@ func alive(pid int) bool { return pid > 0 && syscall.Kill(pid, 0) == nil }
 func TestGrantsOnly(t *testing.T) {
 	t.Setenv("OAPD_WEBHOOK_SECRET", "canary-host-secret")
 	h := newHost(t)
-	h.Install(Config{Name: "testext", Path: binaries["good"], SHA256: digest(t, binaries["good"]),
+	h.Add(Config{Name: "testext", Path: binaries["good"], SHA256: digest(t, binaries["good"]),
 		Points: []extensionv1.Point{extensionv1.Point_POINT_NOTIFIER}, Settings: map[string]string{"channel": "ops"},
 		Secrets: []string{"token"}})
 	detail, err := h.Notifier("testext").NotifyDetail(context.Background(), note)
@@ -163,7 +164,7 @@ func TestFailuresStayInTheExtension(t *testing.T) {
 // neither does a point that wasn't granted.
 func TestRefusesMismatchedExtensions(t *testing.T) {
 	h := newHost(t)
-	h.Install(Config{Name: "testext", Path: binaries["good"], SHA256: strings.Repeat("0", 64),
+	h.Add(Config{Name: "testext", Path: binaries["good"], SHA256: strings.Repeat("0", 64),
 		Points: []extensionv1.Point{extensionv1.Point_POINT_NOTIFIER}})
 	if err := h.Notifier("testext").Notify(context.Background(), note); !errors.Is(err, ErrDigest) {
 		t.Fatalf("changed binary: %v", err)
@@ -172,13 +173,15 @@ func TestRefusesMismatchedExtensions(t *testing.T) {
 	if err := h.Notifier("testext").Notify(context.Background(), note); err == nil || !strings.Contains(err.Error(), "someone-else") {
 		t.Fatalf("another name: %v", err)
 	}
-	h.Install(Config{Name: "testext", Path: binaries["good"], SHA256: digest(t, binaries["good"])})
+	h.Add(Config{Name: "testext", Path: binaries["good"], SHA256: digest(t, binaries["good"])})
 	if err := h.Notifier("testext").Notify(context.Background(), note); !errors.Is(err, ErrNotGranted) {
 		t.Fatalf("ungranted point: %v", err)
 	}
-	h.Install(Config{Name: "testext", Path: binaries["good"], SHA256: digest(t, binaries["good"]),
+	h.Add(Config{Name: "testext", Path: binaries["good"], SHA256: digest(t, binaries["good"]),
 		Points: []extensionv1.Point{extensionv1.Point_POINT_NOTIFIER}, Secrets: []string{"not-asked-for"}})
 	if err := h.Notifier("testext").Notify(context.Background(), note); err == nil || !strings.Contains(err.Error(), "doesn't ask for it") {
 		t.Fatalf("a grant it didn't ask for: %v", err)
 	}
 }
+
+var _ ports.Extensions = (*Host)(nil)

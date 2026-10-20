@@ -27,7 +27,7 @@
           "may": {
             "type": "array",
             "maxItems": 16,
-            "items": {"type": "string", "enum": ["scale", "deploy", "rollback", "configure", "add-component", "remove-component", "spec-patch"]}
+            "items": {"type": "string", "enum": ["scale", "deploy", "rollback", "configure", "add-component", "remove-component", "spec-patch", "install-extension", "remove-extension"]}
           }
         }
       }
@@ -93,7 +93,7 @@
     },
     "categories": {
       "type": "array",
-      "items": {"type": "string", "enum": ["images", "instances", "env", "resources", "secret-bindings", "connections", "ordering", "routes", "domains", "volumes", "host-ports", "health", "components-added", "components-removed", "job-flags", "security"]}
+      "items": {"type": "string", "enum": ["images", "instances", "env", "resources", "secret-bindings", "connections", "ordering", "routes", "domains", "volumes", "host-ports", "health", "components-added", "components-removed", "job-flags", "security", "extensions"]}
     }
   }
 }

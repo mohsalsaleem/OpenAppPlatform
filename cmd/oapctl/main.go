@@ -76,6 +76,8 @@ const usage = `Usage:
   %[1]s app scale APP COMPONENT N [ADDR]    run N instances of a component
   %[1]s app deploy APP COMPONENT=IMAGE...   roll out new images
   %[1]s app rollback APP --to SPEC_HASH     return to the images of an earlier desired state
+  %[1]s ext install NAME --path P --point notifier [--setting K=V] [--secret S]   install an extension (a sensitive change)
+  %[1]s ext remove NAME                     uninstall an extension
   %[1]s mcp [ADDR]                          serve OAP's tools over MCP on stdin and stdout
   %[1]s observe [APP]                       the world: applications, components, routes
   %[1]s explain APP [COMPONENT]             why an application differs from its desired state
@@ -120,6 +122,10 @@ func (a *app) run(ctx context.Context, args []string) int {
 		return a.appDeploy(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "app" && args[1] == "rollback":
 		return a.appRollback(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "ext" && args[1] == "install":
+		return a.extInstall(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "ext" && args[1] == "remove":
+		return a.extRemove(ctx, args[2:])
 	case args[0] == "login":
 		return a.loginCmd(ctx, args[1:])
 	case args[0] == "owner":

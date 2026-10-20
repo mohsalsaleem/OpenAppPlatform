@@ -310,12 +310,13 @@ func (j *Journal) Head(ctx context.Context) (uint64, error) {
 
 // Desired is an in-memory DesiredRepo.
 type Desired struct {
-	mu       sync.Mutex
-	current  map[string]any
-	byHash   map[string]any
-	envelope any
-	notes    map[string]string
-	Commits  int
+	mu         sync.Mutex
+	current    map[string]any
+	byHash     map[string]any
+	envelope   any
+	extensions any
+	notes      map[string]string
+	Commits    int
 }
 
 func NewDesired() *Desired { return &Desired{current: map[string]any{}, byHash: map[string]any{}} }
@@ -391,6 +392,55 @@ func (d *Desired) SetBriefing(ctx context.Context, app, markdown, author string)
 }
 
 // SetEnvelope stores the envelope tree.
+func (d *Desired) Extensions(ctx context.Context) (any, string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	t := d.extensions
+	if t == nil {
+		t = map[string]any{}
+	}
+	h, err := spec.Hash(t)
+	return spec.Clone(t), h, err
+}
+
+func (d *Desired) SetExtensions(ctx context.Context, tree any, author, message string) (string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.extensions = spec.Clone(tree)
+	return spec.Hash(tree)
+}
+
+// Extensions is a simulated extension host: it records installs and
+// removals, and fails installs of the names in Broken.
+type Extensions struct {
+	mu        sync.Mutex
+	Installed map[string]spec.Extension
+	Verified  map[string]int
+	Broken    map[string]bool
+}
+
+func (x *Extensions) Install(ctx context.Context, e spec.Extension, verify bool) error {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if x.Installed == nil {
+		x.Installed, x.Verified = map[string]spec.Extension{}, map[string]int{}
+	}
+	x.Installed[e.Name] = e
+	if verify {
+		if x.Broken[e.Name] {
+			return fmt.Errorf("sim: extension %s doesn't start", e.Name)
+		}
+		x.Verified[e.Name]++
+	}
+	return nil
+}
+
+func (x *Extensions) Remove(name string) {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	delete(x.Installed, name)
+}
+
 func (d *Desired) SetEnvelope(ctx context.Context, tree any, author, message string) (string, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()

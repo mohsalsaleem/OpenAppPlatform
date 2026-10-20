@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -235,7 +237,11 @@ func (a *app) runIntent(ctx context.Context, client oapv1connect.AgentServiceCli
 	if len(why) > 0 {
 		because += "; " + strings.Join(why, "; ")
 	}
-	a.u().Change(fmt.Sprintf("Plan for %s on %s (%d steps)", in.Application, s.Address, len(p.Steps)), because, strings.Join(lines, "\n"))
+	target := in.Application
+	if target == "" {
+		target = "the server's extensions"
+	}
+	a.u().Change(fmt.Sprintf("Plan for %s on %s (%d steps)", target, s.Address, len(p.Steps)), because, strings.Join(lines, "\n"))
 	if p.Verdict == oapv1.Verdict_VERDICT_DENIED {
 		return "", a.fail(errors.New("the envelope denies this change"))
 	}
@@ -257,7 +263,7 @@ func (a *app) runIntent(ctx context.Context, client oapv1connect.AgentServiceCli
 		return "", a.fail(fmt.Errorf("apply: %v", err))
 	}
 	var outcome *oapv1.Outcome
-	err = a.u().Run("Applying to "+in.Application, func(progress func(string)) error {
+	err = a.u().Run("Applying to "+target, func(progress func(string)) error {
 		stream, err := client.Await(ctx, connect.NewRequest(&oapv1.AwaitRequest{OperationId: applied.Msg.OperationId, TimeoutSeconds: 900}))
 		if err != nil {
 			return err
@@ -522,4 +528,61 @@ func (a *app) appRollback(ctx context.Context, args []string) int {
 	in := &oapv1.Intent{Application: pos[0], Because: "roll back to " + *to,
 		Change: &oapv1.Intent_Rollback{Rollback: &oapv1.Rollback{ToRelease: *to}}}
 	return a.runAppIntent(ctx, in, yes, "Rolled back "+pos[0])
+}
+
+// extInstall installs or upgrades an extension:
+// ext install NAME --path PATH [--sha256 HEX] --point P... [--setting K=V]... [--secret NAME]... [--memory MIB] [--yes].
+// Without --sha256 the digest is computed from PATH on this machine.
+func (a *app) extInstall(ctx context.Context, args []string) int {
+	defer func() { a.mode = human }()
+	var path, digest *string
+	var memory *int
+	var points, settings, secrets multi
+	pos, yes, err := a.intentFlags("ext install", args, func(fs *flag.FlagSet) {
+		path = fs.String("path", "", "the extension's binary on the server")
+		digest = fs.String("sha256", "", "the binary's sha256 (default: computed from --path on this machine)")
+		memory = fs.Int("memory", 0, "memory cap in MiB (default 64)")
+		fs.Var(&points, "point", "an extension point it serves, for example notifier (repeat)")
+		fs.Var(&settings, "setting", "a granted setting, NAME=VALUE (repeat)")
+		fs.Var(&secrets, "secret", "a granted secret's name (repeat)")
+	})
+	if err != nil {
+		return 2
+	}
+	if len(pos) != 1 || *path == "" || len(points) == 0 {
+		return a.fail(errors.New("usage: ext install NAME --path PATH --point POINT [--sha256 HEX] [--setting K=V]... [--secret NAME]... [--memory MIB] [--yes]"))
+	}
+	if *digest == "" {
+		b, err := os.ReadFile(*path)
+		if err != nil {
+			return a.fail(fmt.Errorf("give --sha256, or a --path readable on this machine: %v", err))
+		}
+		sum := sha256.Sum256(b)
+		*digest = hex.EncodeToString(sum[:])
+	}
+	set := map[string]string{}
+	for _, kv := range settings {
+		k, v, ok := strings.Cut(kv, "=")
+		if !ok {
+			return a.fail(fmt.Errorf("%q isn't NAME=VALUE", kv))
+		}
+		set[k] = v
+	}
+	in := &oapv1.Intent{Because: "install extension " + pos[0], Change: &oapv1.Intent_InstallExtension{InstallExtension: &oapv1.InstallExtension{
+		Name: pos[0], Path: *path, Sha256: *digest, Points: points, Settings: set, Secrets: secrets, MemoryMib: int32(*memory)}}}
+	return a.runAppIntent(ctx, in, yes, "Installed extension "+pos[0])
+}
+
+// extRemove uninstalls an extension: ext remove NAME [--yes].
+func (a *app) extRemove(ctx context.Context, args []string) int {
+	defer func() { a.mode = human }()
+	pos, yes, err := a.intentFlags("ext remove", args, nil)
+	if err != nil {
+		return 2
+	}
+	if len(pos) != 1 {
+		return a.fail(errors.New("usage: ext remove NAME [--yes]"))
+	}
+	in := &oapv1.Intent{Because: "remove extension " + pos[0], Change: &oapv1.Intent_RemoveExtension{RemoveExtension: &oapv1.RemoveExtension{Name: pos[0]}}}
+	return a.runAppIntent(ctx, in, yes, "Removed extension "+pos[0])
 }

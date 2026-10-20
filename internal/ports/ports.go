@@ -7,6 +7,7 @@ import (
 	oapv1 "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/model"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/ops"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/spec"
 )
 
 // Clock is the only source of time for the engine. Simulations control it.
@@ -67,6 +68,20 @@ type DesiredRepo interface {
 	Briefing(ctx context.Context, application string) (string, error)
 	// SetBriefing stores the owner's briefing.md; empty removes it.
 	SetBriefing(ctx context.Context, application, markdown, author string) error
+	// Extensions returns the installed extensions (extensions.yaml) and
+	// its hash; an empty tree when there are none.
+	Extensions(ctx context.Context) (tree any, hash string, err error)
+	// SetExtensions stores the installed extensions.
+	SetExtensions(ctx context.Context, tree any, author, message string) (hash string, err error)
+}
+
+// Extensions runs installed extensions (R4.1).
+type Extensions interface {
+	// Install registers an extension and, with verify, starts it and checks
+	// its manifest against its grants.
+	Install(ctx context.Context, e spec.Extension, verify bool) error
+	// Remove stops and forgets an extension.
+	Remove(name string)
 }
 
 // OpStore is the operational journal: append-only entries with monotonic

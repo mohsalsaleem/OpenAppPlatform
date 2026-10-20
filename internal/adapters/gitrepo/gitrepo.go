@@ -34,7 +34,8 @@ var DefaultEnvelope = map[string]any{
 	"agents": map[string]any{
 		"owner": map[string]any{
 			"scope": map[string]any{"applications": []any{"*"}},
-			"may":   []any{"scale", "deploy", "rollback", "configure", "add-component", "remove-component", "spec-patch"},
+			"may": []any{"scale", "deploy", "rollback", "configure", "add-component", "remove-component", "spec-patch",
+				"install-extension", "remove-extension"},
 		},
 	},
 	"invariants": []any{
@@ -238,6 +239,45 @@ func (r *Repo) SetEnvelope(ctx context.Context, tree any, author, message string
 		return "", err
 	}
 	return h, r.commit(ctx, "envelope.yaml", author, message, "Envelope-Version: "+h)
+}
+
+// Extensions returns extensions.yaml and its hash; empty when absent.
+func (r *Repo) Extensions(ctx context.Context) (any, string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	tree := any(map[string]any{})
+	b, err := os.ReadFile(filepath.Join(r.dir, "extensions.yaml"))
+	if err == nil {
+		t, probs := desiredyaml.Parse(b)
+		if len(probs) > 0 {
+			return nil, "", fmt.Errorf("gitrepo: extensions.yaml is invalid: %s", probs[0].Message)
+		}
+		if t != nil {
+			tree = t
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, "", err
+	}
+	h, err := spec.Hash(tree)
+	return tree, h, err
+}
+
+// SetExtensions commits extensions.yaml.
+func (r *Repo) SetExtensions(ctx context.Context, tree any, author, message string) (string, error) {
+	b, err := desiredyaml.Emit(tree)
+	if err != nil {
+		return "", err
+	}
+	h, err := spec.Hash(tree)
+	if err != nil {
+		return "", err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if err := os.WriteFile(filepath.Join(r.dir, "extensions.yaml"), b, 0o600); err != nil {
+		return "", err
+	}
+	return h, r.commit(ctx, "extensions.yaml", author, message, "Extensions-Version: "+h)
 }
 
 // Version is one commit of an application's desired state.

@@ -37,6 +37,8 @@ type Intent struct {
 	//	*Intent_AddComponent
 	//	*Intent_RemoveComponent
 	//	*Intent_SpecPatch
+	//	*Intent_InstallExtension
+	//	*Intent_RemoveExtension
 	Change        isIntent_Change `protobuf_oneof:"change"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -156,6 +158,24 @@ func (x *Intent) GetSpecPatch() *SpecPatch {
 	return nil
 }
 
+func (x *Intent) GetInstallExtension() *InstallExtension {
+	if x != nil {
+		if x, ok := x.Change.(*Intent_InstallExtension); ok {
+			return x.InstallExtension
+		}
+	}
+	return nil
+}
+
+func (x *Intent) GetRemoveExtension() *RemoveExtension {
+	if x != nil {
+		if x, ok := x.Change.(*Intent_RemoveExtension); ok {
+			return x.RemoveExtension
+		}
+	}
+	return nil
+}
+
 type isIntent_Change interface {
 	isIntent_Change()
 }
@@ -188,6 +208,14 @@ type Intent_SpecPatch struct {
 	SpecPatch *SpecPatch `protobuf:"bytes,16,opt,name=spec_patch,json=specPatch,proto3,oneof"`
 }
 
+type Intent_InstallExtension struct {
+	InstallExtension *InstallExtension `protobuf:"bytes,17,opt,name=install_extension,json=installExtension,proto3,oneof"`
+}
+
+type Intent_RemoveExtension struct {
+	RemoveExtension *RemoveExtension `protobuf:"bytes,18,opt,name=remove_extension,json=removeExtension,proto3,oneof"`
+}
+
 func (*Intent_Scale) isIntent_Change() {}
 
 func (*Intent_Deploy) isIntent_Change() {}
@@ -201,6 +229,10 @@ func (*Intent_AddComponent) isIntent_Change() {}
 func (*Intent_RemoveComponent) isIntent_Change() {}
 
 func (*Intent_SpecPatch) isIntent_Change() {}
+
+func (*Intent_InstallExtension) isIntent_Change() {}
+
+func (*Intent_RemoveExtension) isIntent_Change() {}
 
 type Scale struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -587,6 +619,154 @@ func (x *SpecPatch) GetMergePatch() *structpb.Struct {
 	return nil
 }
 
+// InstallExtension installs or upgrades an extension (R4.1), with the
+// grants the owner gives it. Extensions are server-wide: the intent's
+// application is empty, and the envelope treats the change as sensitive
+// unless the owner says otherwise.
+type InstallExtension struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Lowercase letters, digits and dashes.
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// The extension's binary on the server, and its sha256 (hex). The host
+	// refuses a binary that doesn't match.
+	Path   string `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Sha256 string `protobuf:"bytes,3,opt,name=sha256,proto3" json:"sha256,omitempty"`
+	// The extension points the core may use it for, for example "notifier".
+	Points []string `protobuf:"bytes,4,rep,name=points,proto3" json:"points,omitempty"`
+	// Granted settings by name, and granted secrets by name. The extension
+	// receives these and nothing else.
+	Settings map[string]string `protobuf:"bytes,5,rep,name=settings,proto3" json:"settings,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Secrets  []string          `protobuf:"bytes,6,rep,name=secrets,proto3" json:"secrets,omitempty"`
+	// Its memory cap; 64 MiB when zero.
+	MemoryMib     int32 `protobuf:"varint,7,opt,name=memory_mib,json=memoryMib,proto3" json:"memory_mib,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InstallExtension) Reset() {
+	*x = InstallExtension{}
+	mi := &file_oap_v1_intent_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InstallExtension) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InstallExtension) ProtoMessage() {}
+
+func (x *InstallExtension) ProtoReflect() protoreflect.Message {
+	mi := &file_oap_v1_intent_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InstallExtension.ProtoReflect.Descriptor instead.
+func (*InstallExtension) Descriptor() ([]byte, []int) {
+	return file_oap_v1_intent_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *InstallExtension) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *InstallExtension) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *InstallExtension) GetSha256() string {
+	if x != nil {
+		return x.Sha256
+	}
+	return ""
+}
+
+func (x *InstallExtension) GetPoints() []string {
+	if x != nil {
+		return x.Points
+	}
+	return nil
+}
+
+func (x *InstallExtension) GetSettings() map[string]string {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+func (x *InstallExtension) GetSecrets() []string {
+	if x != nil {
+		return x.Secrets
+	}
+	return nil
+}
+
+func (x *InstallExtension) GetMemoryMib() int32 {
+	if x != nil {
+		return x.MemoryMib
+	}
+	return 0
+}
+
+// RemoveExtension stops and uninstalls an extension.
+type RemoveExtension struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveExtension) Reset() {
+	*x = RemoveExtension{}
+	mi := &file_oap_v1_intent_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveExtension) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveExtension) ProtoMessage() {}
+
+func (x *RemoveExtension) ProtoReflect() protoreflect.Message {
+	mi := &file_oap_v1_intent_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveExtension.ProtoReflect.Descriptor instead.
+func (*RemoveExtension) Descriptor() ([]byte, []int) {
+	return file_oap_v1_intent_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RemoveExtension) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 type Source struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// owner/name on the code host.
@@ -599,7 +779,7 @@ type Source struct {
 
 func (x *Source) Reset() {
 	*x = Source{}
-	mi := &file_oap_v1_intent_proto_msgTypes[8]
+	mi := &file_oap_v1_intent_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -611,7 +791,7 @@ func (x *Source) String() string {
 func (*Source) ProtoMessage() {}
 
 func (x *Source) ProtoReflect() protoreflect.Message {
-	mi := &file_oap_v1_intent_proto_msgTypes[8]
+	mi := &file_oap_v1_intent_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -624,7 +804,7 @@ func (x *Source) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Source.ProtoReflect.Descriptor instead.
 func (*Source) Descriptor() ([]byte, []int) {
-	return file_oap_v1_intent_proto_rawDescGZIP(), []int{8}
+	return file_oap_v1_intent_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *Source) GetRepository() string {
@@ -652,7 +832,7 @@ var File_oap_v1_intent_proto protoreflect.FileDescriptor
 
 const file_oap_v1_intent_proto_rawDesc = "" +
 	"\n" +
-	"\x13oap/v1/intent.proto\x12\x06oap.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xb9\x03\n" +
+	"\x13oap/v1/intent.proto\x12\x06oap.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xc8\x04\n" +
 	"\x06Intent\x12 \n" +
 	"\vapplication\x18\x01 \x01(\tR\vapplication\x12\x18\n" +
 	"\abecause\x18\x02 \x01(\tR\abecause\x12%\n" +
@@ -664,7 +844,9 @@ const file_oap_v1_intent_proto_rawDesc = "" +
 	"\radd_component\x18\x0e \x01(\v2\x14.oap.v1.AddComponentH\x00R\faddComponent\x12D\n" +
 	"\x10remove_component\x18\x0f \x01(\v2\x17.oap.v1.RemoveComponentH\x00R\x0fremoveComponent\x122\n" +
 	"\n" +
-	"spec_patch\x18\x10 \x01(\v2\x11.oap.v1.SpecPatchH\x00R\tspecPatchB\b\n" +
+	"spec_patch\x18\x10 \x01(\v2\x11.oap.v1.SpecPatchH\x00R\tspecPatch\x12G\n" +
+	"\x11install_extension\x18\x11 \x01(\v2\x18.oap.v1.InstallExtensionH\x00R\x10installExtension\x12D\n" +
+	"\x10remove_extension\x18\x12 \x01(\v2\x17.oap.v1.RemoveExtensionH\x00R\x0fremoveExtensionB\b\n" +
 	"\x06change\"C\n" +
 	"\x05Scale\x12\x1c\n" +
 	"\tcomponent\x18\x01 \x01(\tR\tcomponent\x12\x1c\n" +
@@ -698,7 +880,21 @@ const file_oap_v1_intent_proto_rawDesc = "" +
 	"\x0edelete_volumes\x18\x02 \x01(\bR\rdeleteVolumes\"E\n" +
 	"\tSpecPatch\x128\n" +
 	"\vmerge_patch\x18\x01 \x01(\v2\x17.google.protobuf.StructR\n" +
-	"mergePatch\"y\n" +
+	"mergePatch\"\xa4\x02\n" +
+	"\x10InstallExtension\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x16\n" +
+	"\x06sha256\x18\x03 \x01(\tR\x06sha256\x12\x16\n" +
+	"\x06points\x18\x04 \x03(\tR\x06points\x12B\n" +
+	"\bsettings\x18\x05 \x03(\v2&.oap.v1.InstallExtension.SettingsEntryR\bsettings\x12\x18\n" +
+	"\asecrets\x18\x06 \x03(\tR\asecrets\x12\x1d\n" +
+	"\n" +
+	"memory_mib\x18\a \x01(\x05R\tmemoryMib\x1a;\n" +
+	"\rSettingsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"%\n" +
+	"\x0fRemoveExtension\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\"y\n" +
 	"\x06Source\x12\x1e\n" +
 	"\n" +
 	"repository\x18\x01 \x01(\tR\n" +
@@ -719,20 +915,23 @@ func file_oap_v1_intent_proto_rawDescGZIP() []byte {
 	return file_oap_v1_intent_proto_rawDescData
 }
 
-var file_oap_v1_intent_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_oap_v1_intent_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_oap_v1_intent_proto_goTypes = []any{
-	(*Intent)(nil),          // 0: oap.v1.Intent
-	(*Scale)(nil),           // 1: oap.v1.Scale
-	(*Deploy)(nil),          // 2: oap.v1.Deploy
-	(*Rollback)(nil),        // 3: oap.v1.Rollback
-	(*Configure)(nil),       // 4: oap.v1.Configure
-	(*AddComponent)(nil),    // 5: oap.v1.AddComponent
-	(*RemoveComponent)(nil), // 6: oap.v1.RemoveComponent
-	(*SpecPatch)(nil),       // 7: oap.v1.SpecPatch
-	(*Source)(nil),          // 8: oap.v1.Source
-	nil,                     // 9: oap.v1.Deploy.ImagesEntry
-	nil,                     // 10: oap.v1.Configure.SetEnvEntry
-	(*structpb.Struct)(nil), // 11: google.protobuf.Struct
+	(*Intent)(nil),           // 0: oap.v1.Intent
+	(*Scale)(nil),            // 1: oap.v1.Scale
+	(*Deploy)(nil),           // 2: oap.v1.Deploy
+	(*Rollback)(nil),         // 3: oap.v1.Rollback
+	(*Configure)(nil),        // 4: oap.v1.Configure
+	(*AddComponent)(nil),     // 5: oap.v1.AddComponent
+	(*RemoveComponent)(nil),  // 6: oap.v1.RemoveComponent
+	(*SpecPatch)(nil),        // 7: oap.v1.SpecPatch
+	(*InstallExtension)(nil), // 8: oap.v1.InstallExtension
+	(*RemoveExtension)(nil),  // 9: oap.v1.RemoveExtension
+	(*Source)(nil),           // 10: oap.v1.Source
+	nil,                      // 11: oap.v1.Deploy.ImagesEntry
+	nil,                      // 12: oap.v1.Configure.SetEnvEntry
+	nil,                      // 13: oap.v1.InstallExtension.SettingsEntry
+	(*structpb.Struct)(nil),  // 14: google.protobuf.Struct
 }
 var file_oap_v1_intent_proto_depIdxs = []int32{
 	1,  // 0: oap.v1.Intent.scale:type_name -> oap.v1.Scale
@@ -742,16 +941,19 @@ var file_oap_v1_intent_proto_depIdxs = []int32{
 	5,  // 4: oap.v1.Intent.add_component:type_name -> oap.v1.AddComponent
 	6,  // 5: oap.v1.Intent.remove_component:type_name -> oap.v1.RemoveComponent
 	7,  // 6: oap.v1.Intent.spec_patch:type_name -> oap.v1.SpecPatch
-	9,  // 7: oap.v1.Deploy.images:type_name -> oap.v1.Deploy.ImagesEntry
-	8,  // 8: oap.v1.Deploy.source:type_name -> oap.v1.Source
-	10, // 9: oap.v1.Configure.set_env:type_name -> oap.v1.Configure.SetEnvEntry
-	11, // 10: oap.v1.AddComponent.spec:type_name -> google.protobuf.Struct
-	11, // 11: oap.v1.SpecPatch.merge_patch:type_name -> google.protobuf.Struct
-	12, // [12:12] is the sub-list for method output_type
-	12, // [12:12] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	8,  // 7: oap.v1.Intent.install_extension:type_name -> oap.v1.InstallExtension
+	9,  // 8: oap.v1.Intent.remove_extension:type_name -> oap.v1.RemoveExtension
+	11, // 9: oap.v1.Deploy.images:type_name -> oap.v1.Deploy.ImagesEntry
+	10, // 10: oap.v1.Deploy.source:type_name -> oap.v1.Source
+	12, // 11: oap.v1.Configure.set_env:type_name -> oap.v1.Configure.SetEnvEntry
+	14, // 12: oap.v1.AddComponent.spec:type_name -> google.protobuf.Struct
+	14, // 13: oap.v1.SpecPatch.merge_patch:type_name -> google.protobuf.Struct
+	13, // 14: oap.v1.InstallExtension.settings:type_name -> oap.v1.InstallExtension.SettingsEntry
+	15, // [15:15] is the sub-list for method output_type
+	15, // [15:15] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_oap_v1_intent_proto_init() }
@@ -767,16 +969,18 @@ func file_oap_v1_intent_proto_init() {
 		(*Intent_AddComponent)(nil),
 		(*Intent_RemoveComponent)(nil),
 		(*Intent_SpecPatch)(nil),
+		(*Intent_InstallExtension)(nil),
+		(*Intent_RemoveExtension)(nil),
 	}
 	file_oap_v1_intent_proto_msgTypes[4].OneofWrappers = []any{}
-	file_oap_v1_intent_proto_msgTypes[8].OneofWrappers = []any{}
+	file_oap_v1_intent_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_oap_v1_intent_proto_rawDesc), len(file_oap_v1_intent_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

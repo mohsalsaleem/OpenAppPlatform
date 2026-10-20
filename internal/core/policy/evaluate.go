@@ -97,7 +97,9 @@ func Evaluate(in Input) Decision {
 		}
 		j.scope(policy, app, in.Proposal.GetBlastRadius().GetComponents(), in.Kind)
 	}
-	j.invariants(in, app)
+	if in.New != nil { // server-wide changes (extensions) have no application invariants
+		j.invariants(in, app)
+	}
 	j.categories(in)
 	j.facts(in)
 	for _, r := range in.Irreversible {
@@ -290,6 +292,8 @@ var defaultTiers = map[string]oapv1.Risk{
 	"volumes": oapv1.Risk_RISK_SENSITIVE, "host-ports": oapv1.Risk_RISK_SENSITIVE,
 	"components-removed": oapv1.Risk_RISK_SENSITIVE, "job-flags": oapv1.Risk_RISK_SENSITIVE,
 	"security": oapv1.Risk_RISK_SENSITIVE,
+	// Installing, upgrading or removing an extension (R4.1).
+	"extensions": oapv1.Risk_RISK_SENSITIVE,
 }
 
 var fieldCategory = map[string]string{
@@ -318,6 +322,8 @@ func Category(c spec.Change) string {
 		return "routes"
 	case parts[0] == "ingress":
 		return "domains"
+	case parts[0] == "extensions":
+		return "extensions"
 	}
 	return "other"
 }

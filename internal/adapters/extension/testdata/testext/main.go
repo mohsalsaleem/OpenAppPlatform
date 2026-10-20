@@ -15,7 +15,10 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/extension/sdk"
 )
 
-var mode = "good"
+var (
+	mode = "good"
+	name = "testext"
+)
 
 var got struct {
 	Settings map[string]string `json:"settings"`
@@ -26,7 +29,6 @@ var got struct {
 var hoard [][]byte
 
 func main() {
-	name := "testext"
 	if mode == "liar" {
 		name = "someone-else"
 	}

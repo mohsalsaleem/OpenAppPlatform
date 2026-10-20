@@ -90,6 +90,11 @@ const (
 	StepKind_STEP_KIND_SWAP_RELEASE          StepKind = 10
 	StepKind_STEP_KIND_DELETE_VOLUME         StepKind = 11
 	StepKind_STEP_KIND_WRITE_DESIRED         StepKind = 12
+	// An extension is started and its manifest checked against its grants;
+	// the step's component is the extension's name.
+	StepKind_STEP_KIND_START_EXTENSION StepKind = 13
+	// An extension is stopped.
+	StepKind_STEP_KIND_STOP_EXTENSION StepKind = 14
 )
 
 // Enum value maps for StepKind.
@@ -108,6 +113,8 @@ var (
 		10: "STEP_KIND_SWAP_RELEASE",
 		11: "STEP_KIND_DELETE_VOLUME",
 		12: "STEP_KIND_WRITE_DESIRED",
+		13: "STEP_KIND_START_EXTENSION",
+		14: "STEP_KIND_STOP_EXTENSION",
 	}
 	StepKind_value = map[string]int32{
 		"STEP_KIND_UNSPECIFIED":           0,
@@ -123,6 +130,8 @@ var (
 		"STEP_KIND_SWAP_RELEASE":          10,
 		"STEP_KIND_DELETE_VOLUME":         11,
 		"STEP_KIND_WRITE_DESIRED":         12,
+		"STEP_KIND_START_EXTENSION":       13,
+		"STEP_KIND_STOP_EXTENSION":        14,
 	}
 )
 
@@ -712,7 +721,7 @@ const file_oap_v1_plan_proto_rawDesc = "" +
 	"\x10RISK_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fRISK_ROUTINE\x10\x01\x12\x12\n" +
 	"\x0eRISK_SENSITIVE\x10\x02\x12\x15\n" +
-	"\x11RISK_IRREVERSIBLE\x10\x03*\xed\x02\n" +
+	"\x11RISK_IRREVERSIBLE\x10\x03*\xaa\x03\n" +
 	"\bStepKind\x12\x19\n" +
 	"\x15STEP_KIND_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18STEP_KIND_START_INSTANCE\x10\x01\x12\x19\n" +
@@ -727,7 +736,9 @@ const file_oap_v1_plan_proto_rawDesc = "" +
 	"\x16STEP_KIND_SWAP_RELEASE\x10\n" +
 	"\x12\x1b\n" +
 	"\x17STEP_KIND_DELETE_VOLUME\x10\v\x12\x1b\n" +
-	"\x17STEP_KIND_WRITE_DESIRED\x10\fB:Z8github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1b\x06proto3"
+	"\x17STEP_KIND_WRITE_DESIRED\x10\f\x12\x1d\n" +
+	"\x19STEP_KIND_START_EXTENSION\x10\r\x12\x1c\n" +
+	"\x18STEP_KIND_STOP_EXTENSION\x10\x0eB:Z8github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1b\x06proto3"
 
 var (
 	file_oap_v1_plan_proto_rawDescOnce sync.Once

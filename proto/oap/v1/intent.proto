@@ -19,6 +19,8 @@ message Intent {
     AddComponent add_component = 14;
     RemoveComponent remove_component = 15;
     SpecPatch spec_patch = 16;
+    InstallExtension install_extension = 17;
+    RemoveExtension remove_extension = 18;
   }
 }
 
@@ -69,6 +71,32 @@ message RemoveComponent {
 // desired spec.
 message SpecPatch {
   google.protobuf.Struct merge_patch = 1;
+}
+
+// InstallExtension installs or upgrades an extension (R4.1), with the
+// grants the owner gives it. Extensions are server-wide: the intent's
+// application is empty, and the envelope treats the change as sensitive
+// unless the owner says otherwise.
+message InstallExtension {
+  // Lowercase letters, digits and dashes.
+  string name = 1;
+  // The extension's binary on the server, and its sha256 (hex). The host
+  // refuses a binary that doesn't match.
+  string path = 2;
+  string sha256 = 3;
+  // The extension points the core may use it for, for example "notifier".
+  repeated string points = 4;
+  // Granted settings by name, and granted secrets by name. The extension
+  // receives these and nothing else.
+  map<string, string> settings = 5;
+  repeated string secrets = 6;
+  // Its memory cap; 64 MiB when zero.
+  int32 memory_mib = 7;
+}
+
+// RemoveExtension stops and uninstalls an extension.
+message RemoveExtension {
+  string name = 1;
 }
 
 message Source {

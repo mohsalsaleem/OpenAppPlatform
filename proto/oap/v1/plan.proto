@@ -69,6 +69,11 @@ enum StepKind {
   STEP_KIND_SWAP_RELEASE = 10;
   STEP_KIND_DELETE_VOLUME = 11;
   STEP_KIND_WRITE_DESIRED = 12;
+  // An extension is started and its manifest checked against its grants;
+  // the step's component is the extension's name.
+  STEP_KIND_START_EXTENSION = 13;
+  // An extension is stopped.
+  STEP_KIND_STOP_EXTENSION = 14;
 }
 
 // Step is one typed unit of work. Every operation compiles to steps.

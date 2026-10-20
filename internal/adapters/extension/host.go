@@ -20,6 +20,7 @@ import (
 	"github.com/hashicorp/go-plugin"
 	extensionv1 "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/extension/v1"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/ops"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/spec"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -86,8 +87,8 @@ type running struct {
 	stop   chan struct{}
 }
 
-// Install registers an extension; it starts on first use.
-func (h *Host) Install(cfg Config) {
+// Add registers an extension; it starts on first use.
+func (h *Host) Add(cfg Config) {
 	if cfg.MemoryMiB <= 0 {
 		cfg.MemoryMiB = DefaultMemoryMiB
 	}
@@ -104,6 +105,35 @@ func (h *Host) Install(cfg Config) {
 	}
 	h.exts[cfg.Name] = &running{cfg: cfg}
 }
+
+// Install registers an installed extension from its desired state and,
+// with verify, starts it now and checks its manifest against its grants.
+// It implements ports.Extensions.
+func (h *Host) Install(ctx context.Context, e spec.Extension, verify bool) error {
+	cfg := Config{Name: e.Name, Path: e.Path, SHA256: e.SHA256, Settings: e.Settings, Secrets: e.Secrets, MemoryMiB: e.MemoryMiB}
+	for _, p := range e.Points {
+		pt, ok := points[p]
+		if !ok {
+			return &Error{Extension: e.Name, Op: "install", Err: fmt.Errorf("unknown point %q", p)}
+		}
+		cfg.Points = append(cfg.Points, pt)
+	}
+	h.Add(cfg)
+	if !verify {
+		return nil
+	}
+	r, err := h.get(e.Name)
+	if err != nil {
+		return err
+	}
+	if _, err := h.start(ctx, r); err != nil {
+		return &Error{Extension: e.Name, Op: "start", Err: err}
+	}
+	return nil
+}
+
+// points maps desired-state point names to the contract's.
+var points = map[string]extensionv1.Point{"notifier": extensionv1.Point_POINT_NOTIFIER}
 
 // Remove stops and forgets an extension.
 func (h *Host) Remove(name string) {
@@ -179,6 +209,10 @@ func (h *Host) call(ctx context.Context, name string, point extensionv1.Point, m
 	case status.Code(err) == codes.DeadlineExceeded && ctx.Err() == nil:
 		r.kill(ErrTimeout)
 		err = ErrTimeout
+	case status.Code(err) == codes.Unavailable:
+		// The process died or dropped the connection: make sure it is gone,
+		// so the next call starts it afresh instead of reusing the conn.
+		r.kill(nil)
 	}
 	return &Error{Extension: name, Op: method, Err: err}
 }
@@ -404,4 +438,39 @@ func (n Notifier) NotifyDetail(ctx context.Context, msg ops.Notification) (strin
 	err := n.h.call(ctx, n.name, extensionv1.Point_POINT_NOTIFIER, "/oap.extension.v1.NotifierService/Notify",
 		&extensionv1.NotifyRequest{Kind: msg.Kind, Subject: msg.Subject, Body: msg.Body}, &res)
 	return res.Detail, err
+}
+
+// Fanout sends each notification to the base notifier and, in the
+// background, to every installed extension granted the notifier point, so
+// a slow, hung or failing extension never holds up or fails the caller.
+// Errors returns extensions' failures as they happen, when set.
+type Fanout struct {
+	Host *Host
+	Base interface {
+		Notify(context.Context, ops.Notification) error
+	}
+	Errors func(error)
+}
+
+func (f Fanout) Notify(ctx context.Context, n ops.Notification) error {
+	var err error
+	if f.Base != nil {
+		err = f.Base.Notify(ctx, n)
+	}
+	f.Host.mu.Lock()
+	var names []string
+	for name, r := range f.Host.exts {
+		if slices.Contains(r.cfg.Points, extensionv1.Point_POINT_NOTIFIER) {
+			names = append(names, name)
+		}
+	}
+	f.Host.mu.Unlock()
+	for _, name := range names {
+		go func() {
+			if err := f.Host.Notifier(name).Notify(context.WithoutCancel(ctx), n); err != nil && f.Errors != nil {
+				f.Errors(err)
+			}
+		}()
+	}
+	return err
 }

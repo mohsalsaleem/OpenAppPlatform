@@ -20,6 +20,7 @@ import (
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/caddy"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/docker"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/extension"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/gitrepo"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/notify"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/secretstore"
@@ -168,8 +169,18 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 	if u := os.Getenv("OAPD_WEBHOOK_URL"); u != "" {
 		notifier = notify.Webhook{URL: u, Secret: os.Getenv("OAPD_WEBHOOK_SECRET")}
 	}
+	// Extensions run out of process; a granted secret is resolved only
+	// when its extension is configured.
+	extensions := &extension.Host{SecretValue: func(name string) (string, error) {
+		v, err := secrets.Resolve(ctx, map[string]string{name: name})
+		return v[name], err
+	}}
+	defer extensions.Close()
+	notifier = extension.Fanout{Host: extensions, Base: notifier,
+		Errors: func(err error) { log.Warn("extension notifier", "err", err) }}
 	svc := &service.Service{Desired: desired, Journal: store, Clock: clock, Observer: observer, Notifier: notifier, SecretStore: secrets,
-		Executor: &engine.Executor{Runtime: rt, Edge: edge, Journal: store, Desired: desired, Clock: clock}}
+		Extensions: extensions,
+		Executor:   &engine.Executor{Runtime: rt, Edge: edge, Journal: store, Desired: desired, Clock: clock}}
 	if err := svc.Start(ctx); err != nil {
 		return err
 	}

@@ -123,6 +123,8 @@ type Service struct {
 	Notifier ports.Notifier
 	// SecretStore keeps the owner's secret values; nil means none can be set.
 	SecretStore ports.SecretStore
+	// Extensions runs installed extensions; nil means none can be installed.
+	Extensions ports.Extensions
 
 	serializer *engine.Serializer
 	runCtx     context.Context
@@ -189,6 +191,9 @@ func (s *Service) Start(ctx context.Context) error {
 	}
 	s.loadIdentity(entries)
 	s.loadAsks(entries)
+	if err := s.loadExtensions(ctx); err != nil {
+		return err
+	}
 	go func() { // record asks' expiry as it happens
 		t := time.NewTicker(time.Second)
 		defer t.Stop()
@@ -218,6 +223,10 @@ func (s *Service) Start(ctx context.Context) error {
 		p, err := s.proposal(ctx, je.GetParentId())
 		if err != nil {
 			return err
+		}
+		if isExtensionOp(p) {
+			s.runExtension(e.Operation, p)
+			continue
 		}
 		op, err := s.operation(ctx, e.Operation, p, false)
 		if err != nil {
@@ -446,6 +455,23 @@ func creates(in *oapv1.Intent) bool {
 // the journal and returns it. It changes nothing else.
 func (s *Service) Propose(ctx context.Context, c Caller, req *oapv1.ProposeRequest) (*oapv1.ProposeResponse, error) {
 	in := req.GetIntent()
+	if intent.IsExtension(in) {
+		if !c.Allows("") {
+			return nil, extensionOutOfScope(c)
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		head, err := s.Journal.Head(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if exp := req.GetExpectedRevision(); exp != 0 && exp != head {
+			e := fail(FailedPrecondition, WhyStaleRevision, "decided at revision %d, but the world is at %d", exp, head)
+			e.Detail.Remedy = refresh
+			return nil, e
+		}
+		return s.proposeExtension(ctx, c, req, head)
+	}
 	if in.GetApplication() == "" {
 		return nil, fail(InvalidArgument, intent.WhyIncomplete, "the intent names no application")
 	}
@@ -487,6 +513,9 @@ func (s *Service) Propose(ctx context.Context, c Caller, req *oapv1.ProposeReque
 func summary(in *oapv1.Intent) string {
 	if b := strings.TrimSpace(in.GetBecause()); b != "" {
 		return b
+	}
+	if e := extensionSummary(in); e != "" {
+		return e
 	}
 	return fmt.Sprintf("%s %s", intent.KindOf(in), in.GetApplication())
 }
@@ -561,6 +590,9 @@ func (s *Service) Apply(ctx context.Context, c Caller, req *oapv1.ApplyRequest) 
 	if err != nil {
 		return nil, err
 	}
+	if isExtensionOp(p) && !c.Allows("") {
+		return nil, extensionOutOfScope(c)
+	}
 	if !c.Allows(p.GetIntent().GetApplication()) {
 		return nil, outOfScope(c, p.GetIntent().GetApplication())
 	}
@@ -586,6 +618,19 @@ func (s *Service) Apply(ctx context.Context, c Caller, req *oapv1.ApplyRequest) 
 		return nil, e
 	default:
 		return nil, fail(PermissionDenied, WhyNotAllowed, "the envelope denies this proposal: %s", reasons(p))
+	}
+	if isExtensionOp(p) {
+		if err := s.checkExtensionBase(ctx, p); err != nil {
+			return nil, err
+		}
+		entryID := "apply_" + strings.TrimPrefix(id, "op_")
+		head, _ := s.Journal.Head(ctx)
+		if _, err := s.append(ctx, KindApply, id, &oapv1.JournalEntry{Id: entryID, ParentId: p.GetId(), Kind: oapv1.EntryKind_ENTRY_KIND_APPLY,
+			Actor: actor(c), BaseRevision: head, Summary: summary(p.GetIntent()), Detail: &oapv1.JournalEntry_OperationId{OperationId: id}}); err != nil {
+			return nil, err
+		}
+		s.runExtension(id, p)
+		return &oapv1.ApplyResponse{OperationId: id, EntryId: entryID}, nil
 	}
 	op, err := s.operation(ctx, id, p, true)
 	if err != nil {
