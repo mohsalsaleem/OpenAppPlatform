@@ -25,6 +25,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/sqlite"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/ops"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/engine"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/ports"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/service"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/agentapi"
 )
@@ -34,6 +35,7 @@ var Version = "dev"
 
 type config struct {
 	data, socket, dockerSocket, install, caddyAdmin string
+	edgeMode                                        string
 	tls                                             bool
 	observeEvery                                    time.Duration
 }
@@ -45,6 +47,7 @@ func main() {
 	flag.StringVar(&c.dockerSocket, "docker", env("OAPD_DOCKER", "/var/run/docker.sock"), "Docker Engine socket")
 	flag.StringVar(&c.install, "install", env("OAPD_INSTALL", ""), "installation id, on every resource OAP creates")
 	flag.StringVar(&c.caddyAdmin, "caddy-admin", env("OAPD_CADDY_ADMIN", "/run/oap-caddy/admin.sock"), "Caddy admin API socket")
+	flag.StringVar(&c.edgeMode, "edge", env("OAPD_EDGE", "dns"), `"dns": membership through oapd's DNS, no Caddy reload (ADR 0001); "static": reload Caddy on every change`)
 	flag.BoolVar(&c.tls, "tls", env("OAPD_TLS", "true") == "true", "serve routed hosts over HTTPS with automatic certificates")
 	flag.DurationVar(&c.observeEvery, "observe-every", 10*time.Second, "how often to re-observe the runtime in full")
 	version := flag.Bool("version", false, "print the version and exit")
@@ -117,10 +120,25 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 		return err
 	}
 	rt.Secrets = secrets
-	edge := caddy.Unix(c.caddyAdmin, func(r ops.InstanceRef) string { return docker.ContainerName(c.install, r) })
-	edge.TLS = c.tls
+	admin := caddy.Unix(c.caddyAdmin, func(r ops.InstanceRef) string { return docker.ContainerName(c.install, r) })
+	admin.TLS = c.tls
 	if c.tls {
-		edge.Listen = []string{":443"}
+		admin.Listen = []string{":443"}
+	}
+	var edge ports.Edge = admin
+	if c.edgeMode == "dns" {
+		dns := &caddy.DNSEdge{Admin: admin, Resolver: "udp/oap-" + c.install + "-oapd:53", Refresh: time.Second,
+			StatePath: filepath.Join(c.data, "edge.json")}
+		conn, err := net.ListenPacket("udp", ":53")
+		if err != nil {
+			return fmt.Errorf("edge DNS: %w", err)
+		}
+		go func() {
+			if err := dns.ServeDNS(ctx, conn); err != nil && ctx.Err() == nil {
+				log.Error("edge DNS stopped", "err", err)
+			}
+		}()
+		edge = dns
 	}
 	clock := systemClock{}
 	observer := &engine.Observer{Runtime: rt, Clock: clock, Interval: c.observeEvery}
@@ -166,7 +184,7 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 		defer cancel()
 		srv.Shutdown(shut)
 	}()
-	log.Info("oapd serving", "version", Version, "socket", c.socket, "install", c.install, "tls", c.tls)
+	log.Info("oapd serving", "version", Version, "socket", c.socket, "install", c.install, "tls", c.tls, "edge", c.edgeMode)
 	if err := srv.Serve(ln); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
