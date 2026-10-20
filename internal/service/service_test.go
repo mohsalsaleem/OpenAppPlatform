@@ -548,3 +548,29 @@ func seed(t *testing.T, r *rig) {
 		t.Fatal(err)
 	}
 }
+
+// TestWorldAgreesWithOutcome: once await reports an operation achieved,
+// observe already shows its result, without waiting for the observer's
+// next event or resync.
+func TestWorldAgreesWithOutcome(t *testing.T) {
+	r := newRig(t)
+	r.create(t)
+	p, err := r.svc.Propose(ctx, Owner, &oapv1.ProposeRequest{Intent: scale("site", 3)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := r.svc.Apply(ctx, Owner, &oapv1.ApplyRequest{ProposalId: p.Proposal.Id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r.await(t, a.OperationId)
+	w, err := r.svc.Observe(ctx, Owner, &oapv1.ObserveRequest{Application: "site", Detail: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range w.World.Applications[0].Components {
+		if c.Name == "web" && (!c.Converged || c.GetActual().GetInstances() != 3) {
+			t.Fatalf("observe right after the outcome: converged %v, %d instances", c.Converged, c.GetActual().GetInstances())
+		}
+	}
+}

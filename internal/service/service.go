@@ -627,6 +627,11 @@ func (s *Service) outcome(id string, runErr error) {
 		o.Reasons = []*oapv1.Reason{{Why: "engine.interrupted", Message: runErr.Error()}}
 	}
 	ctx := context.WithoutCancel(s.runCtx)
+	// Observe the runtime before telling anyone the outcome, so a caller
+	// that observes right after await sees the operation's result.
+	if s.Observer != nil {
+		s.Observer.Resync(ctx) // on failure the world stays as last observed and says how old it is
+	}
 	s.append(ctx, KindOutcome, id, &oapv1.JournalEntry{Id: "outcome_" + strings.TrimPrefix(id, "op_"), Kind: oapv1.EntryKind_ENTRY_KIND_OUTCOME,
 		Actor: &oapv1.Actor{Who: &oapv1.Actor_System{System: true}}, Summary: o.Status.String(), Detail: &oapv1.JournalEntry_Outcome{Outcome: o}})
 }
