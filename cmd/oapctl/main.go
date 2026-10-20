@@ -165,6 +165,15 @@ func (a *app) frontDoor(ctx context.Context, asJSON bool) int {
 		if blocked, stopped := host.Blocking(s.Findings); blocked && !stopped {
 			return a.fix(ctx, s, false)
 		}
+	case host.StageInstalled:
+		if code := a.ownerEnroll(ctx, "", false); code != 0 {
+			return code
+		}
+		next, err := a.server(s.Address)
+		if err != nil {
+			return a.fail(err)
+		}
+		s = next
 	}
 	st := host.Plan(s, a.cli)
 	a.u().Status(st)

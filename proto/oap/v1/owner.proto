@@ -34,6 +34,15 @@ service OwnerService {
   // SetBriefing stores the owner's house rules (briefing.md) for an
   // application, or for the server when application is empty.
   rpc SetBriefing(SetBriefingRequest) returns (SetBriefingResponse);
+  // EnrollOwnerKey makes a key the owner's: a login proving it signs in
+  // as the owner over the public API. Only over oapd's local socket,
+  // reached over SSH, so a stolen owner token can't add a key.
+  rpc EnrollOwnerKey(EnrollOwnerKeyRequest) returns (EnrollOwnerKeyResponse);
+  // ListOwnerKeys returns the owner's keys.
+  rpc ListOwnerKeys(ListOwnerKeysRequest) returns (ListOwnerKeysResponse);
+  // RemoveOwnerKey removes an owner key and ends the sessions it signed
+  // in. Only over the local socket.
+  rpc RemoveOwnerKey(RemoveOwnerKeyRequest) returns (RemoveOwnerKeyResponse);
 }
 
 // ApprovalMode is how an agent's sessions are approved.
@@ -158,3 +167,34 @@ message SetBriefingRequest {
 }
 
 message SetBriefingResponse {}
+
+message EnrollOwnerKeyRequest {
+  // "ed25519:" and the base64 public key.
+  string public_key = 1;
+  // Names the machine holding the key, for example "laptop".
+  string label = 2;
+}
+
+message EnrollOwnerKeyResponse {
+  string key_fingerprint = 1;
+}
+
+message OwnerKey {
+  string key_fingerprint = 1;
+  string label = 2;
+  google.protobuf.Timestamp enrolled_at = 3;
+}
+
+message ListOwnerKeysRequest {}
+
+message ListOwnerKeysResponse {
+  repeated OwnerKey keys = 1;
+}
+
+message RemoveOwnerKeyRequest {
+  string key_fingerprint = 1;
+}
+
+message RemoveOwnerKeyResponse {
+  int32 revoked_tokens = 1;
+}

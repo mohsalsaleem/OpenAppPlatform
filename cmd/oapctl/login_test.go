@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/sim"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/host"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/model"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/spec"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/engine"
@@ -108,8 +109,7 @@ func TestAgentLoginEndToEnd(t *testing.T) {
 	if code, out := cli(t, dir, agent, "app", "scale", "site", "web", "2", "--yes"); code != 0 {
 		t.Fatalf("agent scale: %s", out)
 	}
-	// The public listener doesn't serve the owner API at all.
-	if code, out := cli(t, dir, agent, "owner", "agents"); code == 0 || !strings.Contains(out, "unimplemented") {
+	if code, out := cli(t, dir, agent, "owner", "agents"); code == 0 || !strings.Contains(out, "only the owner") {
 		t.Fatalf("agent used the owner API: %s", out)
 	}
 
@@ -280,5 +280,68 @@ func TestBriefingEndToEnd(t *testing.T) {
 	read := fmt.Sprint(rpc("resources/read", map[string]any{"uri": "oap://briefing/site"}))
 	if !strings.Contains(read, "Scale up only after 18:00 UTC.") || !strings.Contains(read, "text/markdown") {
 		t.Fatalf("MCP read: %s", read)
+	}
+}
+
+// TestOwnerEnroll: on a terminal, the front door at the installed stage
+// enrolls an owner key over the local socket; owner commands then sign in
+// on the public listener with it (there is no SSH in this test, so they
+// can only work that way) and approve an agent; removing the key over the
+// local socket ends the owner's network access.
+func TestOwnerEnroll(t *testing.T) {
+	local, public := twoListeners(t)
+	dir := t.TempDir()
+	h := newHarness(t, true, "", "")
+	h.a.configDir, h.a.now = dir, time.Now
+	if err := h.a.update(host.Server{Address: "root@203.0.113.5", Stage: host.StageInstalled, API: public}); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("OAP_AGENT", "")
+	t.Setenv("OAP_AGENT_URL", local) // the local socket, as SSH would reach it
+	if code := h.run(); code != host.ExitNotBuiltYet || !strings.Contains(h.out.String(), "holds an owner key") {
+		t.Fatalf("front door at installed: %d %s", code, h.out.String())
+	}
+	if s, _ := h.a.server(""); s.Stage != host.StageOwned {
+		t.Fatalf("stage after enrolling: %s", s.Stage)
+	}
+	if st, _ := os.Stat(filepath.Join(dir, "owner", "root_203.0.113.5", "identity")); st == nil || st.Mode().Perm() != 0o600 {
+		t.Fatal("owner key not saved 0600")
+	}
+
+	owner := map[string]string{} // no OAP_AGENT_URL: the owner key on the public listener
+	if code, out := cli(t, dir, owner, "owner", "keys"); code != 0 || !strings.Contains(out, "SHA256:") {
+		t.Fatalf("owner keys over the public listener: %d %s", code, out)
+	}
+	done := make(chan string, 1)
+	go func() {
+		h := newHarness(t, false, "", "")
+		h.a.configDir, h.a.now = dir, time.Now
+		h.run("login", public, "--agent", "claude")
+		done <- h.out.String()
+	}()
+	var code string
+	for i := 0; i < 50 && code == ""; i++ {
+		time.Sleep(50 * time.Millisecond)
+		if _, out := cli(t, dir, owner, "owner", "logins"); strings.Contains(out, "claude") {
+			code = strings.Fields(out)[0]
+		}
+	}
+	if code == "" {
+		t.Fatal("the owner session never saw the agent's login")
+	}
+	if c, out := cli(t, dir, owner, "owner", "approve", code, "--app", "site"); c != 0 {
+		t.Fatalf("approve over the public listener: %s", out)
+	}
+	if out := <-done; !strings.Contains(out, "Signed in") {
+		t.Fatalf("agent login: %s", out)
+	}
+
+	_, out := cli(t, dir, owner, "owner", "keys")
+	fp := strings.Fields(out)[0]
+	if c, out := cli(t, dir, map[string]string{"OAP_AGENT_URL": local}, "owner", "keys", "remove", fp); c != 0 || !strings.Contains(out, "ended 1") {
+		t.Fatalf("remove the key over the local socket: %d %s", c, out)
+	}
+	if c, out := cli(t, dir, owner, "owner", "agents"); c == 0 {
+		t.Fatalf("owner commands still work after removing the key: %s", out)
 	}
 }

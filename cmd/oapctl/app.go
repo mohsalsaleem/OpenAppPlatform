@@ -37,8 +37,9 @@ func (a *app) agentClient(ctx context.Context, s *host.Server) (oapv1connect.Age
 }
 
 // transport reaches oapd's API: as an agent with its saved token when
-// OAP_AGENT names one, directly when OAP_AGENT_URL is set (tests), or as
-// the owner through an SSH-forwarded socket.
+// OAP_AGENT names one, directly when OAP_AGENT_URL is set (tests), as the
+// owner on the public API once an owner key is enrolled from this machine,
+// or else as the owner through an SSH-forwarded socket.
 func (a *app) transport(ctx context.Context, s *host.Server) (*http.Client, string, func(), error) {
 	if name := os.Getenv("OAP_AGENT"); name != "" {
 		cr, err := a.credentials(ctx, name)
@@ -47,6 +48,19 @@ func (a *app) transport(ctx context.Context, s *host.Server) (*http.Client, stri
 		}
 		return &http.Client{Transport: bearer{token: cr.Token, next: http.DefaultTransport}}, cr.URL, func() {}, nil
 	}
+	if os.Getenv("OAP_AGENT_URL") == "" && a.hasOwnerKey(s) {
+		cr, err := a.ownerSession(ctx, s)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		return &http.Client{Transport: bearer{token: cr.Token, next: http.DefaultTransport}}, cr.URL, func() {}, nil
+	}
+	return a.localTransport(ctx, s)
+}
+
+// localTransport reaches oapd's local socket as the owner: through an SSH
+// forward, or directly when OAP_AGENT_URL is set (tests).
+func (a *app) localTransport(ctx context.Context, s *host.Server) (*http.Client, string, func(), error) {
 	if u := os.Getenv("OAP_AGENT_URL"); u != "" {
 		return http.DefaultClient, u, func() {}, nil
 	}
@@ -357,7 +371,7 @@ func (a *app) mcpStdio(ctx context.Context, args []string) int {
 	}
 	var client *http.Client
 	var endpoint string
-	if os.Getenv("OAP_AGENT") != "" || os.Getenv("OAP_AGENT_URL") != "" {
+	if os.Getenv("OAP_AGENT") != "" || os.Getenv("OAP_AGENT_URL") != "" || a.hasOwnerKey(s) {
 		hc, base, stop, err := a.transport(ctx, s)
 		if err != nil {
 			return a.fail(err)

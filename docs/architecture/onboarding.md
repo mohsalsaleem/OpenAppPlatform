@@ -53,7 +53,7 @@ owner + agent (laptop)                      server
 2 check     oap host check (read-only probe)     ──►  JSON findings
 3 fix       agent proposes fixes; owner approves ──►  approved fixes applied, manifest written
 4 install   oap host install                     ──►  oapd + Caddy containers
-5 owner     one-time owner login on oapd (R3.6)
+5 owner     owner key enrolled over SSH (R3.6)
 6 hand off  bootstrap key removed and verified gone; agent signs in with device login
 ```
 
@@ -81,7 +81,7 @@ reinstall or the next day.
 | `connected` | Bootstrap key works | Check the server | Agent or owner |
 | `checked` | Check has run | Approve fixes, or reinstall the server if a check is a stop | Owner approves, agent proposes |
 | `ready` | No blocking findings | Install OAP | Agent or owner |
-| `installed` | `oapd` and Caddy healthy | Create the owner account | Owner |
+| `installed` | `oapd` and Caddy healthy | Enroll an owner key (`oap owner enroll`) | Owner |
 | `owned` | Owner account exists | Connect an agent (device login) | Agent starts, owner approves |
 | `handed-off` | Bootstrap key removed and verified | Deploy a first app | Agent |
 
@@ -97,7 +97,7 @@ You don't have a server connected yet. Setup takes about 10 minutes and needs:
 the server's IP address, its username and its password.
 
   1 connect   ← you are here
-  2 check     3 fix   4 install   5 owner account   6 hand off
+  2 check     3 fix   4 install   5 owner key   6 hand off
 
 Server address: 203.0.113.5
 Username [root]:
@@ -271,9 +271,16 @@ and an upgrade is the same command with a newer digest.
 
 ### 5. Owner login
 
-The owner opens the one-time setup link printed by `install` over HTTPS,
-or over an SSH tunnel when there is no hostname yet. There they create the
-owner account (R3.6). The link expires in 15 minutes and works once.
+Decided (owner, 2026-10-20): an owner key, not a setup link and account.
+While SSH still works, `oap owner enroll` (or `oap` on a terminal) creates
+an Ed25519 key on the owner's machine and enrolls it with `oapd` over the
+local socket. It then signs in with it on the public API to prove it works.
+From then on owner commands sign in there with that key, so the owner
+keeps access after hand-off removes SSH. Keys are enrolled and removed only
+over the local socket, so a stolen owner session can't add one; every
+owner sign-in is reported to the owner. A machine that holds an owner key
+is as sensitive as the bootstrap key was; losing it means break-glass to
+enroll a new key and remove the old one (`oap owner keys remove`).
 
 ### 6. Hand off
 

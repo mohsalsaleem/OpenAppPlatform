@@ -93,3 +93,17 @@ func (s *Server) AnswerAsk(ctx context.Context, req *connect.Request[oapv1.Answe
 func (s *Server) SetBriefing(ctx context.Context, req *connect.Request[oapv1.SetBriefingRequest]) (*connect.Response[oapv1.SetBriefingResponse], error) {
 	return call(s, ctx, req, s.Service.SetBriefing)
 }
+
+func (s *Server) EnrollOwnerKey(ctx context.Context, req *connect.Request[oapv1.EnrollOwnerKeyRequest]) (*connect.Response[oapv1.EnrollOwnerKeyResponse], error) {
+	return call(s, ctx, req, s.Service.EnrollOwnerKey)
+}
+
+func (s *Server) ListOwnerKeys(ctx context.Context, req *connect.Request[oapv1.ListOwnerKeysRequest]) (*connect.Response[oapv1.ListOwnerKeysResponse], error) {
+	return call(s, ctx, req, func(ctx context.Context, c service.Caller, _ *oapv1.ListOwnerKeysRequest) (*oapv1.ListOwnerKeysResponse, error) {
+		return s.Service.ListOwnerKeys(ctx, c)
+	})
+}
+
+func (s *Server) RemoveOwnerKey(ctx context.Context, req *connect.Request[oapv1.RemoveOwnerKeyRequest]) (*connect.Response[oapv1.RemoveOwnerKeyResponse], error) {
+	return call(s, ctx, req, s.Service.RemoveOwnerKey)
+}

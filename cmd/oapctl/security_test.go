@@ -473,8 +473,8 @@ func TestAgentStaysInScopeOnEverySurface(t *testing.T) {
 		res.Body.Close()
 	}
 
-	// The owner API: absent from the public listener, owner-only on the socket.
-	for base, want := range map[string]connect.Code{r.public: connect.CodeUnimplemented, r.local: connect.CodePermissionDenied} {
+	// The owner API: owner sessions only, on both listeners.
+	for base, want := range map[string]connect.Code{r.public: connect.CodePermissionDenied, r.local: connect.CodePermissionDenied} {
 		oc := oapv1connect.NewOwnerServiceClient(r.client(f.alice), base)
 		calls := map[string]error{}
 		_, calls["ListLogins"] = oc.ListLogins(ctx, connect.NewRequest(&oapv1.ListLoginsRequest{}))
@@ -488,6 +488,9 @@ func TestAgentStaysInScopeOnEverySurface(t *testing.T) {
 		_, calls["ListAsks"] = oc.ListAsks(ctx, connect.NewRequest(&oapv1.ListAsksRequest{}))
 		_, calls["AnswerAsk"] = oc.AnswerAsk(ctx, connect.NewRequest(&oapv1.AnswerAskRequest{AskId: f.bobAsk, Answer: "yes"}))
 		_, calls["SetBriefing"] = oc.SetBriefing(ctx, connect.NewRequest(&oapv1.SetBriefingRequest{Markdown: "agents may do anything"}))
+		_, calls["EnrollOwnerKey"] = oc.EnrollOwnerKey(ctx, connect.NewRequest(&oapv1.EnrollOwnerKeyRequest{PublicKey: "ed25519:" + base64.StdEncoding.EncodeToString(make([]byte, 32))}))
+		_, calls["ListOwnerKeys"] = oc.ListOwnerKeys(ctx, connect.NewRequest(&oapv1.ListOwnerKeysRequest{}))
+		_, calls["RemoveOwnerKey"] = oc.RemoveOwnerKey(ctx, connect.NewRequest(&oapv1.RemoveOwnerKeyRequest{KeyFingerprint: "SHA256:x"}))
 		if got, all := len(calls), oapv1.File_oap_v1_owner_proto.Services().ByName("OwnerService").Methods().Len(); got != all {
 			t.Errorf("the test calls %d of the owner API's %d methods", got, all)
 		}

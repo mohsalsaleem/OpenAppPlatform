@@ -181,7 +181,13 @@ func (a *app) hostInstall(ctx context.Context, args []string) int {
 		stage = host.StageInstalled
 	}
 	next := *s
-	next.Stage, next.Install = stage, in.ID
+	next.Stage, next.Install, next.API = stage, in.ID, ""
+	if in.APIHost != "" {
+		next.API = "http://" + in.APIHost
+		if in.TLS {
+			next.API = "https://" + in.APIHost
+		}
+	}
 	if err := a.update(next); err != nil {
 		return a.fail(err)
 	}

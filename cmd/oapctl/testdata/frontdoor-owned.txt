@@ -1,6 +1,6 @@
 exit 5
 Server root@203.0.113.5
-  ✓ connect   ✓ check   ✓ fix   ✓ install   ✓ owner account   → hand off
+  ✓ connect   ✓ check   ✓ fix   ✓ install   ✓ owner key   → hand off
 
 Next: hand-off, by the agent. The agent signs in with a device login and the bootstrap key is removed.
 This step isn't built yet (task R3.14).

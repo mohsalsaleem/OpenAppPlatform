@@ -80,6 +80,9 @@ type Caller struct {
 	// Apps are the applications an agent may act on; "*" for all. The
 	// owner may act on everything.
 	Apps []string
+	// Local is true for the owner on oapd's local socket, reached over
+	// SSH, and false for an owner session signed in over the network.
+	Local bool
 }
 
 // Allows reports whether the caller may act on an application.
@@ -103,7 +106,7 @@ func outOfScope(c Caller, app string) error {
 }
 
 // Owner is the caller on the local socket.
-var Owner = Caller{Owner: true, Agent: "owner"}
+var Owner = Caller{Owner: true, Agent: "owner", Local: true}
 
 // Service runs the primitives.
 type Service struct {

@@ -119,7 +119,7 @@ func stepIndex(st host.Status) int {
 	return len(host.Steps)
 }
 
-var stepLabels = map[string]string{"owner": "owner account", "hand-off": "hand off"}
+var stepLabels = map[string]string{"owner": "owner key", "hand-off": "hand off"}
 
 func renderSteps(w io.Writer, st host.Status) {
 	at := stepIndex(st)

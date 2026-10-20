@@ -58,6 +58,15 @@ const (
 	// OwnerServiceSetBriefingProcedure is the fully-qualified name of the OwnerService's SetBriefing
 	// RPC.
 	OwnerServiceSetBriefingProcedure = "/oap.v1.OwnerService/SetBriefing"
+	// OwnerServiceEnrollOwnerKeyProcedure is the fully-qualified name of the OwnerService's
+	// EnrollOwnerKey RPC.
+	OwnerServiceEnrollOwnerKeyProcedure = "/oap.v1.OwnerService/EnrollOwnerKey"
+	// OwnerServiceListOwnerKeysProcedure is the fully-qualified name of the OwnerService's
+	// ListOwnerKeys RPC.
+	OwnerServiceListOwnerKeysProcedure = "/oap.v1.OwnerService/ListOwnerKeys"
+	// OwnerServiceRemoveOwnerKeyProcedure is the fully-qualified name of the OwnerService's
+	// RemoveOwnerKey RPC.
+	OwnerServiceRemoveOwnerKeyProcedure = "/oap.v1.OwnerService/RemoveOwnerKey"
 )
 
 // OwnerServiceClient is a client for the oap.v1.OwnerService service.
@@ -85,6 +94,15 @@ type OwnerServiceClient interface {
 	// SetBriefing stores the owner's house rules (briefing.md) for an
 	// application, or for the server when application is empty.
 	SetBriefing(context.Context, *connect.Request[v1.SetBriefingRequest]) (*connect.Response[v1.SetBriefingResponse], error)
+	// EnrollOwnerKey makes a key the owner's: a login proving it signs in
+	// as the owner over the public API. Only over oapd's local socket,
+	// reached over SSH, so a stolen owner token can't add a key.
+	EnrollOwnerKey(context.Context, *connect.Request[v1.EnrollOwnerKeyRequest]) (*connect.Response[v1.EnrollOwnerKeyResponse], error)
+	// ListOwnerKeys returns the owner's keys.
+	ListOwnerKeys(context.Context, *connect.Request[v1.ListOwnerKeysRequest]) (*connect.Response[v1.ListOwnerKeysResponse], error)
+	// RemoveOwnerKey removes an owner key and ends the sessions it signed
+	// in. Only over the local socket.
+	RemoveOwnerKey(context.Context, *connect.Request[v1.RemoveOwnerKeyRequest]) (*connect.Response[v1.RemoveOwnerKeyResponse], error)
 }
 
 // NewOwnerServiceClient constructs a client for the oap.v1.OwnerService service. By default, it
@@ -164,6 +182,24 @@ func NewOwnerServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(ownerServiceMethods.ByName("SetBriefing")),
 			connect.WithClientOptions(opts...),
 		),
+		enrollOwnerKey: connect.NewClient[v1.EnrollOwnerKeyRequest, v1.EnrollOwnerKeyResponse](
+			httpClient,
+			baseURL+OwnerServiceEnrollOwnerKeyProcedure,
+			connect.WithSchema(ownerServiceMethods.ByName("EnrollOwnerKey")),
+			connect.WithClientOptions(opts...),
+		),
+		listOwnerKeys: connect.NewClient[v1.ListOwnerKeysRequest, v1.ListOwnerKeysResponse](
+			httpClient,
+			baseURL+OwnerServiceListOwnerKeysProcedure,
+			connect.WithSchema(ownerServiceMethods.ByName("ListOwnerKeys")),
+			connect.WithClientOptions(opts...),
+		),
+		removeOwnerKey: connect.NewClient[v1.RemoveOwnerKeyRequest, v1.RemoveOwnerKeyResponse](
+			httpClient,
+			baseURL+OwnerServiceRemoveOwnerKeyProcedure,
+			connect.WithSchema(ownerServiceMethods.ByName("RemoveOwnerKey")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -180,6 +216,9 @@ type ownerServiceClient struct {
 	listAsks        *connect.Client[v1.ListAsksRequest, v1.ListAsksResponse]
 	answerAsk       *connect.Client[v1.AnswerAskRequest, v1.AnswerAskResponse]
 	setBriefing     *connect.Client[v1.SetBriefingRequest, v1.SetBriefingResponse]
+	enrollOwnerKey  *connect.Client[v1.EnrollOwnerKeyRequest, v1.EnrollOwnerKeyResponse]
+	listOwnerKeys   *connect.Client[v1.ListOwnerKeysRequest, v1.ListOwnerKeysResponse]
+	removeOwnerKey  *connect.Client[v1.RemoveOwnerKeyRequest, v1.RemoveOwnerKeyResponse]
 }
 
 // ListLogins calls oap.v1.OwnerService.ListLogins.
@@ -237,6 +276,21 @@ func (c *ownerServiceClient) SetBriefing(ctx context.Context, req *connect.Reque
 	return c.setBriefing.CallUnary(ctx, req)
 }
 
+// EnrollOwnerKey calls oap.v1.OwnerService.EnrollOwnerKey.
+func (c *ownerServiceClient) EnrollOwnerKey(ctx context.Context, req *connect.Request[v1.EnrollOwnerKeyRequest]) (*connect.Response[v1.EnrollOwnerKeyResponse], error) {
+	return c.enrollOwnerKey.CallUnary(ctx, req)
+}
+
+// ListOwnerKeys calls oap.v1.OwnerService.ListOwnerKeys.
+func (c *ownerServiceClient) ListOwnerKeys(ctx context.Context, req *connect.Request[v1.ListOwnerKeysRequest]) (*connect.Response[v1.ListOwnerKeysResponse], error) {
+	return c.listOwnerKeys.CallUnary(ctx, req)
+}
+
+// RemoveOwnerKey calls oap.v1.OwnerService.RemoveOwnerKey.
+func (c *ownerServiceClient) RemoveOwnerKey(ctx context.Context, req *connect.Request[v1.RemoveOwnerKeyRequest]) (*connect.Response[v1.RemoveOwnerKeyResponse], error) {
+	return c.removeOwnerKey.CallUnary(ctx, req)
+}
+
 // OwnerServiceHandler is an implementation of the oap.v1.OwnerService service.
 type OwnerServiceHandler interface {
 	// ListLogins returns device logins waiting for the owner.
@@ -262,6 +316,15 @@ type OwnerServiceHandler interface {
 	// SetBriefing stores the owner's house rules (briefing.md) for an
 	// application, or for the server when application is empty.
 	SetBriefing(context.Context, *connect.Request[v1.SetBriefingRequest]) (*connect.Response[v1.SetBriefingResponse], error)
+	// EnrollOwnerKey makes a key the owner's: a login proving it signs in
+	// as the owner over the public API. Only over oapd's local socket,
+	// reached over SSH, so a stolen owner token can't add a key.
+	EnrollOwnerKey(context.Context, *connect.Request[v1.EnrollOwnerKeyRequest]) (*connect.Response[v1.EnrollOwnerKeyResponse], error)
+	// ListOwnerKeys returns the owner's keys.
+	ListOwnerKeys(context.Context, *connect.Request[v1.ListOwnerKeysRequest]) (*connect.Response[v1.ListOwnerKeysResponse], error)
+	// RemoveOwnerKey removes an owner key and ends the sessions it signed
+	// in. Only over the local socket.
+	RemoveOwnerKey(context.Context, *connect.Request[v1.RemoveOwnerKeyRequest]) (*connect.Response[v1.RemoveOwnerKeyResponse], error)
 }
 
 // NewOwnerServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -337,6 +400,24 @@ func NewOwnerServiceHandler(svc OwnerServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(ownerServiceMethods.ByName("SetBriefing")),
 		connect.WithHandlerOptions(opts...),
 	)
+	ownerServiceEnrollOwnerKeyHandler := connect.NewUnaryHandler(
+		OwnerServiceEnrollOwnerKeyProcedure,
+		svc.EnrollOwnerKey,
+		connect.WithSchema(ownerServiceMethods.ByName("EnrollOwnerKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ownerServiceListOwnerKeysHandler := connect.NewUnaryHandler(
+		OwnerServiceListOwnerKeysProcedure,
+		svc.ListOwnerKeys,
+		connect.WithSchema(ownerServiceMethods.ByName("ListOwnerKeys")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ownerServiceRemoveOwnerKeyHandler := connect.NewUnaryHandler(
+		OwnerServiceRemoveOwnerKeyProcedure,
+		svc.RemoveOwnerKey,
+		connect.WithSchema(ownerServiceMethods.ByName("RemoveOwnerKey")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/oap.v1.OwnerService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case OwnerServiceListLoginsProcedure:
@@ -361,6 +442,12 @@ func NewOwnerServiceHandler(svc OwnerServiceHandler, opts ...connect.HandlerOpti
 			ownerServiceAnswerAskHandler.ServeHTTP(w, r)
 		case OwnerServiceSetBriefingProcedure:
 			ownerServiceSetBriefingHandler.ServeHTTP(w, r)
+		case OwnerServiceEnrollOwnerKeyProcedure:
+			ownerServiceEnrollOwnerKeyHandler.ServeHTTP(w, r)
+		case OwnerServiceListOwnerKeysProcedure:
+			ownerServiceListOwnerKeysHandler.ServeHTTP(w, r)
+		case OwnerServiceRemoveOwnerKeyProcedure:
+			ownerServiceRemoveOwnerKeyHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -412,4 +499,16 @@ func (UnimplementedOwnerServiceHandler) AnswerAsk(context.Context, *connect.Requ
 
 func (UnimplementedOwnerServiceHandler) SetBriefing(context.Context, *connect.Request[v1.SetBriefingRequest]) (*connect.Response[v1.SetBriefingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("oap.v1.OwnerService.SetBriefing is not implemented"))
+}
+
+func (UnimplementedOwnerServiceHandler) EnrollOwnerKey(context.Context, *connect.Request[v1.EnrollOwnerKeyRequest]) (*connect.Response[v1.EnrollOwnerKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("oap.v1.OwnerService.EnrollOwnerKey is not implemented"))
+}
+
+func (UnimplementedOwnerServiceHandler) ListOwnerKeys(context.Context, *connect.Request[v1.ListOwnerKeysRequest]) (*connect.Response[v1.ListOwnerKeysResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("oap.v1.OwnerService.ListOwnerKeys is not implemented"))
+}
+
+func (UnimplementedOwnerServiceHandler) RemoveOwnerKey(context.Context, *connect.Request[v1.RemoveOwnerKeyRequest]) (*connect.Response[v1.RemoveOwnerKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("oap.v1.OwnerService.RemoveOwnerKey is not implemented"))
 }

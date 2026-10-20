@@ -137,7 +137,7 @@ func TestFrontDoorGolden(t *testing.T) {
 		{"checked-fixes", &host.Server{Address: "root@203.0.113.5", Stage: host.StageChecked, Summary: "Ubuntu 24.04.5 LTS, aarch64, 12 CPUs, 7836 MiB memory, 46.6 GiB disk free",
 			Findings: findings(t, "container-ubuntu-24-04.txt")}, host.ExitOwner},
 		{"ready", &host.Server{Address: "root@203.0.113.5", Stage: host.StageReady, Summary: "Debian GNU/Linux 12 (bookworm), aarch64, 2 CPUs, 3931 MiB memory, 28.6 GiB disk free"}, host.ExitOK},
-		{"installed", &host.Server{Address: "root@203.0.113.5", Stage: host.StageInstalled}, host.ExitNotBuiltYet},
+		{"installed", &host.Server{Address: "root@203.0.113.5", Stage: host.StageInstalled}, host.ExitOwner},
 		{"owned", &host.Server{Address: "root@203.0.113.5", Stage: host.StageOwned}, host.ExitNotBuiltYet},
 		{"handed-off", &host.Server{Address: "root@203.0.113.5", Stage: host.StageHandedOff}, host.ExitOK},
 	}
@@ -153,10 +153,10 @@ func TestFrontDoorGolden(t *testing.T) {
 				var code int
 				if mode == "json" {
 					code = h.run("--json")
-				} else if s.server != nil && s.server.Stage != host.StageNew && s.server.Stage != host.StageConnected && s.name != "checked-fixes" {
+				} else if s.server != nil && s.server.Stage != host.StageNew && s.server.Stage != host.StageConnected && s.name != "checked-fixes" && s.server.Stage != host.StageInstalled {
 					code = h.run()
 				} else {
-					continue // on a terminal these start connecting, checking or fixing: TestFirstRunOnTerminal, fix_test.go
+					continue // on a terminal these start connecting, checking, fixing or enrolling: TestFirstRunOnTerminal, fix_test.go, TestOwnerEnroll
 				}
 				if code != s.exit {
 					t.Fatalf("%s: exit %d, want %d\n%s", mode, code, s.exit, h.out.String())

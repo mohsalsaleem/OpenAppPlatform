@@ -2,8 +2,9 @@
 // security tests (R3.9) serve exactly the same routes.
 //
 // On the local socket, reached over SSH, a request without a token is the
-// owner's; with one it is that agent's. The public listener requires a
-// token for everything but login and doesn't serve the owner API.
+// owner's; with one it is that agent's (or an owner session's). The public
+// listener requires a token for everything but login; its owner API takes
+// only owner sessions, signed in with an enrolled owner key.
 package listeners
 
 import (
@@ -30,12 +31,13 @@ func Socket(svc *service.Service) *http.ServeMux {
 	return mux
 }
 
-// Public is the public listener's mux: agent API, MCP and briefing, each
-// requiring a token except login.
+// Public is the public listener's mux: agent API, owner API, MCP and
+// briefing, each requiring a token except login.
 func Public(svc *service.Service) *http.ServeMux {
 	auth := agentapi.Bearer(svc, nil)
 	mux := http.NewServeMux()
 	mux.Handle((&agentapi.Server{Service: svc}).Handler())
+	mux.Handle((&ownerapi.Server{Service: svc, Auth: auth}).Handler())
 	mux.Handle("/mcp", &mcp.Server{Service: svc, Auth: auth})
 	mux.Handle(agentapi.BriefingPath, agentapi.BriefingHandler(svc, auth))
 	mux.HandleFunc("/healthz", healthz)
