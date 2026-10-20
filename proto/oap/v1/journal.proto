@@ -139,4 +139,6 @@ message AskAnswered {
   string ask_id = 1;
   string answer = 2;
   Actor by = 3;
+  // The ask expired unanswered; it can't be answered any more.
+  bool expired = 4;
 }

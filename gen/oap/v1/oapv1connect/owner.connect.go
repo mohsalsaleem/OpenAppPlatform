@@ -51,6 +51,10 @@ const (
 	// OwnerServiceSetApprovalModeProcedure is the fully-qualified name of the OwnerService's
 	// SetApprovalMode RPC.
 	OwnerServiceSetApprovalModeProcedure = "/oap.v1.OwnerService/SetApprovalMode"
+	// OwnerServiceListAsksProcedure is the fully-qualified name of the OwnerService's ListAsks RPC.
+	OwnerServiceListAsksProcedure = "/oap.v1.OwnerService/ListAsks"
+	// OwnerServiceAnswerAskProcedure is the fully-qualified name of the OwnerService's AnswerAsk RPC.
+	OwnerServiceAnswerAskProcedure = "/oap.v1.OwnerService/AnswerAsk"
 )
 
 // OwnerServiceClient is a client for the oap.v1.OwnerService service.
@@ -71,6 +75,10 @@ type OwnerServiceClient interface {
 	Resume(context.Context, *connect.Request[v1.ResumeRequest]) (*connect.Response[v1.ResumeResponse], error)
 	// SetApprovalMode chooses how later sessions are approved.
 	SetApprovalMode(context.Context, *connect.Request[v1.SetApprovalModeRequest]) (*connect.Response[v1.SetApprovalModeResponse], error)
+	// ListAsks returns agents' asks waiting for the owner.
+	ListAsks(context.Context, *connect.Request[v1.ListAsksRequest]) (*connect.Response[v1.ListAsksResponse], error)
+	// AnswerAsk answers an ask that hasn't expired.
+	AnswerAsk(context.Context, *connect.Request[v1.AnswerAskRequest]) (*connect.Response[v1.AnswerAskResponse], error)
 }
 
 // NewOwnerServiceClient constructs a client for the oap.v1.OwnerService service. By default, it
@@ -132,6 +140,18 @@ func NewOwnerServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(ownerServiceMethods.ByName("SetApprovalMode")),
 			connect.WithClientOptions(opts...),
 		),
+		listAsks: connect.NewClient[v1.ListAsksRequest, v1.ListAsksResponse](
+			httpClient,
+			baseURL+OwnerServiceListAsksProcedure,
+			connect.WithSchema(ownerServiceMethods.ByName("ListAsks")),
+			connect.WithClientOptions(opts...),
+		),
+		answerAsk: connect.NewClient[v1.AnswerAskRequest, v1.AnswerAskResponse](
+			httpClient,
+			baseURL+OwnerServiceAnswerAskProcedure,
+			connect.WithSchema(ownerServiceMethods.ByName("AnswerAsk")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -145,6 +165,8 @@ type ownerServiceClient struct {
 	pause           *connect.Client[v1.PauseRequest, v1.PauseResponse]
 	resume          *connect.Client[v1.ResumeRequest, v1.ResumeResponse]
 	setApprovalMode *connect.Client[v1.SetApprovalModeRequest, v1.SetApprovalModeResponse]
+	listAsks        *connect.Client[v1.ListAsksRequest, v1.ListAsksResponse]
+	answerAsk       *connect.Client[v1.AnswerAskRequest, v1.AnswerAskResponse]
 }
 
 // ListLogins calls oap.v1.OwnerService.ListLogins.
@@ -187,6 +209,16 @@ func (c *ownerServiceClient) SetApprovalMode(ctx context.Context, req *connect.R
 	return c.setApprovalMode.CallUnary(ctx, req)
 }
 
+// ListAsks calls oap.v1.OwnerService.ListAsks.
+func (c *ownerServiceClient) ListAsks(ctx context.Context, req *connect.Request[v1.ListAsksRequest]) (*connect.Response[v1.ListAsksResponse], error) {
+	return c.listAsks.CallUnary(ctx, req)
+}
+
+// AnswerAsk calls oap.v1.OwnerService.AnswerAsk.
+func (c *ownerServiceClient) AnswerAsk(ctx context.Context, req *connect.Request[v1.AnswerAskRequest]) (*connect.Response[v1.AnswerAskResponse], error) {
+	return c.answerAsk.CallUnary(ctx, req)
+}
+
 // OwnerServiceHandler is an implementation of the oap.v1.OwnerService service.
 type OwnerServiceHandler interface {
 	// ListLogins returns device logins waiting for the owner.
@@ -205,6 +237,10 @@ type OwnerServiceHandler interface {
 	Resume(context.Context, *connect.Request[v1.ResumeRequest]) (*connect.Response[v1.ResumeResponse], error)
 	// SetApprovalMode chooses how later sessions are approved.
 	SetApprovalMode(context.Context, *connect.Request[v1.SetApprovalModeRequest]) (*connect.Response[v1.SetApprovalModeResponse], error)
+	// ListAsks returns agents' asks waiting for the owner.
+	ListAsks(context.Context, *connect.Request[v1.ListAsksRequest]) (*connect.Response[v1.ListAsksResponse], error)
+	// AnswerAsk answers an ask that hasn't expired.
+	AnswerAsk(context.Context, *connect.Request[v1.AnswerAskRequest]) (*connect.Response[v1.AnswerAskResponse], error)
 }
 
 // NewOwnerServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -262,6 +298,18 @@ func NewOwnerServiceHandler(svc OwnerServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(ownerServiceMethods.ByName("SetApprovalMode")),
 		connect.WithHandlerOptions(opts...),
 	)
+	ownerServiceListAsksHandler := connect.NewUnaryHandler(
+		OwnerServiceListAsksProcedure,
+		svc.ListAsks,
+		connect.WithSchema(ownerServiceMethods.ByName("ListAsks")),
+		connect.WithHandlerOptions(opts...),
+	)
+	ownerServiceAnswerAskHandler := connect.NewUnaryHandler(
+		OwnerServiceAnswerAskProcedure,
+		svc.AnswerAsk,
+		connect.WithSchema(ownerServiceMethods.ByName("AnswerAsk")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/oap.v1.OwnerService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case OwnerServiceListLoginsProcedure:
@@ -280,6 +328,10 @@ func NewOwnerServiceHandler(svc OwnerServiceHandler, opts ...connect.HandlerOpti
 			ownerServiceResumeHandler.ServeHTTP(w, r)
 		case OwnerServiceSetApprovalModeProcedure:
 			ownerServiceSetApprovalModeHandler.ServeHTTP(w, r)
+		case OwnerServiceListAsksProcedure:
+			ownerServiceListAsksHandler.ServeHTTP(w, r)
+		case OwnerServiceAnswerAskProcedure:
+			ownerServiceAnswerAskHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -319,4 +371,12 @@ func (UnimplementedOwnerServiceHandler) Resume(context.Context, *connect.Request
 
 func (UnimplementedOwnerServiceHandler) SetApprovalMode(context.Context, *connect.Request[v1.SetApprovalModeRequest]) (*connect.Response[v1.SetApprovalModeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("oap.v1.OwnerService.SetApprovalMode is not implemented"))
+}
+
+func (UnimplementedOwnerServiceHandler) ListAsks(context.Context, *connect.Request[v1.ListAsksRequest]) (*connect.Response[v1.ListAsksResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("oap.v1.OwnerService.ListAsks is not implemented"))
+}
+
+func (UnimplementedOwnerServiceHandler) AnswerAsk(context.Context, *connect.Request[v1.AnswerAskRequest]) (*connect.Response[v1.AnswerAskResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("oap.v1.OwnerService.AnswerAsk is not implemented"))
 }

@@ -146,3 +146,59 @@ func TestAgentLoginEndToEnd(t *testing.T) {
 		t.Fatalf("forgotten identity: %s", h.out.String())
 	}
 }
+
+// TestAskEndToEnd: an agent asks and waits; the owner lists and answers;
+// the agent prints the answer.
+func TestAskEndToEnd(t *testing.T) {
+	local, public := twoListeners(t)
+	dir := t.TempDir()
+	owner := map[string]string{"OAP_AGENT_URL": local}
+	go func() {
+		h := newHarness(t, false, "", "")
+		h.a.configDir, h.a.now = dir, time.Now
+		h.run("login", public, "--agent", "claude")
+	}()
+	var code string
+	for i := 0; i < 50 && code == ""; i++ {
+		time.Sleep(50 * time.Millisecond)
+		if _, out := cli(t, dir, owner, "owner", "logins"); strings.Contains(out, "claude") {
+			code = strings.Fields(out)[0]
+		}
+	}
+	cli(t, dir, owner, "owner", "approve", code, "--app", "*")
+	for i := 0; i < 50; i++ { // the login finishes in the background
+		if _, err := os.Stat(filepath.Join(dir, "agents/claude/credentials.json")); err == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	done := make(chan string, 1)
+	go func() {
+		_, out := cli(t, dir, map[string]string{"OAP_AGENT": "claude"}, "ask", "Which region?", "--kind", "decision", "--option", "eu", "--option", "us", "--wait")
+		done <- out
+	}()
+	var askID string
+	for i := 0; i < 50 && askID == ""; i++ {
+		time.Sleep(50 * time.Millisecond)
+		if _, out := cli(t, dir, owner, "owner", "asks"); strings.Contains(out, "Which region?") {
+			askID = strings.Fields(out)[0]
+			if !strings.Contains(out, "[eu | us]") {
+				t.Errorf("asks: %s", out)
+			}
+		}
+	}
+	if askID == "" {
+		t.Fatal("the ask never reached the owner")
+	}
+	if c, out := cli(t, dir, owner, "owner", "answer", askID, "eu"); c != 0 {
+		t.Fatalf("answer: %s", out)
+	}
+	select {
+	case out := <-done:
+		if !strings.Contains(out, "The owner answered: eu") {
+			t.Fatalf("agent: %s", out)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the agent never got the answer")
+	}
+}

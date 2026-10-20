@@ -116,6 +116,8 @@ type Service struct {
 	MaxAge time.Duration
 	// LoginTTL is how long a device login waits for the owner.
 	LoginTTL time.Duration
+	// Notifier tells the owner about asks and trusted logins; nil sends none.
+	Notifier ports.Notifier
 
 	serializer *engine.Serializer
 	runCtx     context.Context
@@ -126,6 +128,9 @@ type Service struct {
 
 	idOnce sync.Once
 	id     *identity
+
+	askOnce sync.Once
+	asks    *askBook
 }
 
 // notifyingJournal wakes Await whenever anything is appended, including
@@ -178,6 +183,19 @@ func (s *Service) Start(ctx context.Context) error {
 		return err
 	}
 	s.loadIdentity(entries)
+	s.loadAsks(entries)
+	go func() { // record asks' expiry as it happens
+		t := time.NewTicker(time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				s.ExpireAsks(context.WithoutCancel(ctx))
+			}
+		}
+	}()
 	done := map[string]bool{}
 	for _, e := range entries {
 		if e.Kind == KindOutcome {
@@ -547,8 +565,12 @@ func (s *Service) Apply(ctx context.Context, c Caller, req *oapv1.ApplyRequest) 
 	switch v := p.GetVerdict(); {
 	case v == oapv1.Verdict_VERDICT_ALLOWED && (c.Owner || c.Agent == p.GetAgent()):
 	case v == oapv1.Verdict_VERDICT_NEEDS_APPROVAL && c.Owner:
+	case v == oapv1.Verdict_VERDICT_NEEDS_APPROVAL && c.Agent == p.GetAgent() && s.approvedByOwner(p.GetId()):
 	case v == oapv1.Verdict_VERDICT_NEEDS_APPROVAL:
-		return nil, fail(PermissionDenied, WhyNotAllowed, "this proposal needs the owner's approval")
+		e := fail(PermissionDenied, WhyNotAllowed, "this proposal needs the owner's approval")
+		e.Detail.Remedy = &oapv1.Remedy{Action: &oapv1.Remedy_Ask{Ask: &oapv1.AskRequest{Kind: oapv1.AskKind_ASK_KIND_APPROVAL,
+			ProposalId: p.GetId(), Question: "Approve " + summary(p.GetIntent()) + "?"}}}
+		return nil, e
 	default:
 		return nil, fail(PermissionDenied, WhyNotAllowed, "the envelope denies this proposal: %s", reasons(p))
 	}
@@ -616,7 +638,7 @@ func (s *Service) Await(ctx context.Context, c Caller, req *oapv1.AwaitRequest, 
 	}
 	deadline := s.Clock.Now().Add(timeout)
 	var last uint64
-	err := s.stream(ctx, req.GetSinceRevision(), func(op, app string) bool { return op == id }, deadline, func(e *oapv1.Event) (bool, error) {
+	err := s.stream(ctx, req.GetSinceRevision(), func(op, app, _ string) bool { return op == id }, deadline, func(e *oapv1.Event) (bool, error) {
 		last = e.Revision
 		if e.GetJournalEntry() != nil {
 			return false, nil // await reports progress and the outcome only
@@ -651,7 +673,10 @@ func (s *Service) Watch(ctx context.Context, c Caller, req *oapv1.WatchRequest, 
 	if app != "" && !c.Allows(app) {
 		return outOfScope(c, app)
 	}
-	return s.stream(ctx, after, func(_, a string) bool { return (app == "" || a == app) && (c.Owner || (a != "" && c.Allows(a))) }, time.Time{}, func(e *oapv1.Event) (bool, error) {
+	visible := func(a, asker string) bool { // an agent sees its applications and its own asks
+		return c.Owner || (a != "" && c.Allows(a)) || (asker != "" && asker == c.Agent)
+	}
+	return s.stream(ctx, after, func(_, a, asker string) bool { return (app == "" || a == app) && visible(a, asker) }, time.Time{}, func(e *oapv1.Event) (bool, error) {
 		return false, send(e)
 	})
 }
@@ -661,7 +686,7 @@ var errDeadline = errors.New("service: deadline")
 // stream sends the events of journal entries after a revision that match,
 // waiting for new ones, until emit says stop, ctx ends or the deadline
 // (if not zero) passes. match gets the entry's operation and application.
-func (s *Service) stream(ctx context.Context, after uint64, match func(op, app string) bool, deadline time.Time,
+func (s *Service) stream(ctx context.Context, after uint64, match func(op, app, asker string) bool, deadline time.Time,
 	emit func(*oapv1.Event) (stop bool, err error)) error {
 	apps := map[string]string{}         // operation -> application
 	steps := map[string][]*oapv1.Step{} // operation -> its steps
@@ -701,8 +726,8 @@ func (s *Service) stream(ctx context.Context, after uint64, match func(op, app s
 		for _, e := range page {
 			after = e.Revision
 			index(e)
-			ev, app := s.event(e, apps, steps)
-			if ev == nil || !match(e.Operation, app) {
+			ev, app, asker := s.event(e, apps, steps)
+			if ev == nil || !match(e.Operation, app, asker) {
 				continue
 			}
 			stop, err := emit(ev)
@@ -722,8 +747,9 @@ func (s *Service) stream(ctx context.Context, after uint64, match func(op, app s
 	}
 }
 
-// event turns a journal entry into an API event and names its application.
-func (s *Service) event(e ops.Entry, apps map[string]string, steps map[string][]*oapv1.Step) (*oapv1.Event, string) {
+// event turns a journal entry into an API event and names its
+// application and, for asks, the agent that asked.
+func (s *Service) event(e ops.Entry, apps map[string]string, steps map[string][]*oapv1.Step) (*oapv1.Event, string, string) {
 	ev := &oapv1.Event{Revision: e.Revision, At: timestamppb.New(e.At)}
 	switch e.Kind {
 	case engine.KindStep:
@@ -732,23 +758,36 @@ func (s *Service) event(e ops.Entry, apps map[string]string, steps map[string][]
 			prog.Step = proto.Clone(st[e.Step]).(*oapv1.Step)
 		}
 		ev.Kind = &oapv1.Event_OperationProgress{OperationProgress: prog}
-		return ev, apps[e.Operation]
+		return ev, apps[e.Operation], ""
 	case KindProposal, KindApply, KindOutcome:
 		je, err := decode(e.Data)
 		if err != nil {
-			return nil, ""
+			return nil, "", ""
 		}
 		if e.Kind == KindOutcome {
 			ev.Kind = &oapv1.Event_Outcome{Outcome: je.GetOutcome()}
-			return ev, apps[e.Operation]
+			return ev, apps[e.Operation], ""
 		}
 		ev.Kind = &oapv1.Event_JournalEntry{JournalEntry: je}
 		if e.Kind == KindProposal {
-			return ev, je.GetProposal().GetIntent().GetApplication()
+			return ev, je.GetProposal().GetIntent().GetApplication(), ""
 		}
-		return ev, apps[e.Operation]
+		return ev, apps[e.Operation], ""
+	case KindAsk, KindAskAnswer:
+		je, err := decode(e.Data)
+		if err != nil {
+			return nil, "", ""
+		}
+		app, asker := s.askInfo(e.Operation)
+		if e.Kind == KindAsk {
+			ev.Kind = &oapv1.Event_JournalEntry{JournalEntry: je}
+		} else {
+			ev.Kind = &oapv1.Event_AskAnswered{AskAnswered: &oapv1.AskAnswered{AskId: je.GetParentId(), Answer: je.GetAnswer(),
+				By: je.GetActor(), Expired: je.GetActor().GetSystem()}}
+		}
+		return ev, app, asker
 	}
-	return nil, ""
+	return nil, "", ""
 }
 
 // operationApp names an operation's application.
@@ -859,9 +898,4 @@ func unrouted(c *oapv1.Component) bool {
 		}
 	}
 	return false
-}
-
-// Ask needs notifications (R3.7).
-func (s *Service) Ask(ctx context.Context, c Caller, req *oapv1.AskRequest) (*oapv1.AskResponse, error) {
-	return nil, fail(Unimplemented, WhyNotAvailable, "ask isn't available yet (task R3.7)")
 }

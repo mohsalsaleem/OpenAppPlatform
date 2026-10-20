@@ -316,10 +316,11 @@ func (s *Service) Login(ctx context.Context, req *oapv1.LoginRequest, send func(
 		if err != nil {
 			return err
 		}
-		// The owner is notified through the journal (and, with R3.7, a notifier).
 		if err := s.record(ctx, idEvent{Event: "login", Agent: agent, Auto: true}); err != nil {
 			return err
 		}
+		s.tellOwner(ctx, ops.Notification{Kind: "login", Subject: agent + " signed in with its trusted identity",
+			Body: fmt.Sprintf("Key %s. Pause it with: oapctl owner pause %s; revoke with: oapctl owner revoke %s --forget", Fingerprint(req.GetPublicKey()), agent, agent)})
 		return send(&oapv1.LoginResponse{State: &oapv1.LoginResponse_Approved{Approved: &oapv1.LoginApproved{
 			Token: token, ExpiresInSeconds: int32(exp.Sub(s.Clock.Now()).Seconds()), Scope: scopeSummary(a)}}})
 	}

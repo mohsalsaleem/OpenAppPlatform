@@ -79,3 +79,13 @@ func (s *Server) Resume(ctx context.Context, req *connect.Request[oapv1.ResumeRe
 func (s *Server) SetApprovalMode(ctx context.Context, req *connect.Request[oapv1.SetApprovalModeRequest]) (*connect.Response[oapv1.SetApprovalModeResponse], error) {
 	return call(s, ctx, req, s.Service.SetApprovalMode)
 }
+
+func (s *Server) ListAsks(ctx context.Context, req *connect.Request[oapv1.ListAsksRequest]) (*connect.Response[oapv1.ListAsksResponse], error) {
+	return call(s, ctx, req, func(ctx context.Context, c service.Caller, _ *oapv1.ListAsksRequest) (*oapv1.ListAsksResponse, error) {
+		return s.Service.ListAsks(ctx, c)
+	})
+}
+
+func (s *Server) AnswerAsk(ctx context.Context, req *connect.Request[oapv1.AnswerAskRequest]) (*connect.Response[oapv1.AnswerAskResponse], error) {
+	return call(s, ctx, req, s.Service.AnswerAsk)
+}

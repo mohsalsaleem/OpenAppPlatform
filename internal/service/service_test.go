@@ -292,13 +292,6 @@ func TestExplainFindsMissingInstances(t *testing.T) {
 	}
 }
 
-func TestAskIsNotAvailableYet(t *testing.T) {
-	r := newRig(t)
-	if _, err := r.svc.Ask(ctx, Owner, &oapv1.AskRequest{}); code(err) != Unimplemented {
-		t.Fatal(err)
-	}
-}
-
 // TestResumeAfterCrash: an apply recorded with no outcome is resumed by
 // the next service on the same journal and runs to its outcome once.
 func TestResumeAfterCrash(t *testing.T) {

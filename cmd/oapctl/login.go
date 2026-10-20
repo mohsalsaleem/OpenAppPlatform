@@ -282,6 +282,39 @@ func (a *app) ownerCmd(ctx context.Context, args []string) int {
 		_, err = c.Pause(ctx, connect.NewRequest(&oapv1.PauseRequest{Agent: arg}))
 	case "resume":
 		_, err = c.Resume(ctx, connect.NewRequest(&oapv1.ResumeRequest{Agent: arg}))
+	case "asks":
+		res, e := c.ListAsks(ctx, connect.NewRequest(&oapv1.ListAsksRequest{}))
+		err = e
+		if e == nil {
+			out = res.Msg
+			if !*asJSON {
+				if len(res.Msg.Asks) == 0 {
+					fmt.Fprintln(a.out, "No asks are waiting.")
+				}
+				for _, q := range res.Msg.Asks {
+					kind := strings.ToLower(strings.TrimPrefix(q.Request.GetKind().String(), "ASK_KIND_"))
+					line := fmt.Sprintf("%s  %-8s %s asks: %s", q.AskId, kind, q.Agent, q.Request.GetQuestion())
+					if o := q.Request.GetOptions(); len(o) > 0 {
+						line += "  [" + strings.Join(o, " | ") + "]"
+					}
+					if p := q.Request.GetProposalId(); p != "" {
+						line += "  proposal " + p
+					}
+					fmt.Fprintf(a.out, "%s  (expires %s)\n", line, q.ExpiresAt.AsTime().UTC().Format("15:04 UTC"))
+				}
+				return 0
+			}
+		}
+	case "answer":
+		answer := strings.Join(fs.Args(), " ")
+		if arg == "" || answer == "" {
+			return a.fail(errors.New("usage: owner answer ASK_ID ANSWER"))
+		}
+		_, err = c.AnswerAsk(ctx, connect.NewRequest(&oapv1.AnswerAskRequest{AskId: arg, Answer: answer}))
+		if err == nil {
+			fmt.Fprintf(a.out, "✓ Answered %s: %s\n", arg, answer)
+			return 0
+		}
 	case "mode":
 		m := map[string]oapv1.ApprovalMode{"trusted": oapv1.ApprovalMode_APPROVAL_MODE_TRUSTED_IDENTITY, "every-session": oapv1.ApprovalMode_APPROVAL_MODE_EVERY_SESSION}[arg]
 		if m == 0 {

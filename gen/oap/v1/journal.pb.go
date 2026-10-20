@@ -1083,10 +1083,12 @@ func (x *RequestFailure) GetReason() string {
 }
 
 type AskAnswered struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AskId         string                 `protobuf:"bytes,1,opt,name=ask_id,json=askId,proto3" json:"ask_id,omitempty"`
-	Answer        string                 `protobuf:"bytes,2,opt,name=answer,proto3" json:"answer,omitempty"`
-	By            *Actor                 `protobuf:"bytes,3,opt,name=by,proto3" json:"by,omitempty"`
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	AskId  string                 `protobuf:"bytes,1,opt,name=ask_id,json=askId,proto3" json:"ask_id,omitempty"`
+	Answer string                 `protobuf:"bytes,2,opt,name=answer,proto3" json:"answer,omitempty"`
+	By     *Actor                 `protobuf:"bytes,3,opt,name=by,proto3" json:"by,omitempty"`
+	// The ask expired unanswered; it can't be answered any more.
+	Expired       bool `protobuf:"varint,4,opt,name=expired,proto3" json:"expired,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1140,6 +1142,13 @@ func (x *AskAnswered) GetBy() *Actor {
 		return x.By
 	}
 	return nil
+}
+
+func (x *AskAnswered) GetExpired() bool {
+	if x != nil {
+		return x.Expired
+	}
+	return false
 }
 
 var File_oap_v1_journal_proto protoreflect.FileDescriptor
@@ -1208,11 +1217,12 @@ const file_oap_v1_journal_proto_rawDesc = "" +
 	"\x0eRequestFailure\x12*\n" +
 	"\x02at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x02at\x12\x16\n" +
 	"\x06target\x18\x02 \x01(\tR\x06target\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason\"[\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"u\n" +
 	"\vAskAnswered\x12\x15\n" +
 	"\x06ask_id\x18\x01 \x01(\tR\x05askId\x12\x16\n" +
 	"\x06answer\x18\x02 \x01(\tR\x06answer\x12\x1d\n" +
-	"\x02by\x18\x03 \x01(\v2\r.oap.v1.ActorR\x02by*\xb5\x01\n" +
+	"\x02by\x18\x03 \x01(\v2\r.oap.v1.ActorR\x02by\x12\x18\n" +
+	"\aexpired\x18\x04 \x01(\bR\aexpired*\xb5\x01\n" +
 	"\tEntryKind\x12\x1a\n" +
 	"\x16ENTRY_KIND_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13ENTRY_KIND_PROPOSAL\x10\x01\x12\x12\n" +

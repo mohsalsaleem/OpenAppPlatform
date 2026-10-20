@@ -3,6 +3,7 @@ syntax = "proto3";
 package oap.v1;
 
 import "google/protobuf/timestamp.proto";
+import "oap/v1/errors.proto";
 
 option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1";
 
@@ -26,6 +27,10 @@ service OwnerService {
   rpc Resume(ResumeRequest) returns (ResumeResponse);
   // SetApprovalMode chooses how later sessions are approved.
   rpc SetApprovalMode(SetApprovalModeRequest) returns (SetApprovalModeResponse);
+  // ListAsks returns agents' asks waiting for the owner.
+  rpc ListAsks(ListAsksRequest) returns (ListAsksResponse);
+  // AnswerAsk answers an ask that hasn't expired.
+  rpc AnswerAsk(AnswerAskRequest) returns (AnswerAskResponse);
 }
 
 // ApprovalMode is how an agent's sessions are approved.
@@ -119,3 +124,26 @@ message SetApprovalModeRequest {
 }
 
 message SetApprovalModeResponse {}
+
+message PendingAsk {
+  string ask_id = 1;
+  string agent = 2;
+  AskRequest request = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}
+
+message ListAsksRequest {}
+
+message ListAsksResponse {
+  repeated PendingAsk asks = 1;
+}
+
+message AnswerAskRequest {
+  string ask_id = 1;
+  // Approvals: "approve" or "deny". Decisions: one of the options.
+  // Secrets: "provided" or "declined" (the value never passes through
+  // here). Blockers: any text.
+  string answer = 2;
+}
+
+message AnswerAskResponse {}

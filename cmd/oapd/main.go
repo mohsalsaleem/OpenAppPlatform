@@ -21,6 +21,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/caddy"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/docker"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/gitrepo"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/notify"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/secretstore"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/sqlite"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/ops"
@@ -165,7 +166,11 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 			}
 		}
 	}()
-	svc := &service.Service{Desired: desired, Journal: store, Clock: clock, Observer: observer,
+	var notifier ports.Notifier = notify.Log{Logger: log}
+	if u := os.Getenv("OAPD_WEBHOOK_URL"); u != "" {
+		notifier = notify.Webhook{URL: u, Secret: os.Getenv("OAPD_WEBHOOK_SECRET")}
+	}
+	svc := &service.Service{Desired: desired, Journal: store, Clock: clock, Observer: observer, Notifier: notifier,
 		Executor: &engine.Executor{Runtime: rt, Edge: edge, Journal: store, Desired: desired, Clock: clock}}
 	if err := svc.Start(ctx); err != nil {
 		return err
