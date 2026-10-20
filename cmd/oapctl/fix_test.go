@@ -125,3 +125,40 @@ func TestCheckKeepsProgress(t *testing.T) {
 		t.Fatalf("a blocking finding should need fixing again, keeping the id: %+v", s)
 	}
 }
+
+// TestBreakGlass: access after hand-off is time-limited (1 to 24 hours),
+// needs the owner, installs the key with an expiry sshd enforces, is
+// recorded with its end in the host manifest, and leaves the journey alone.
+func TestBreakGlass(t *testing.T) {
+	h := newHarness(t, false, "", "")
+	h.a.update(host.Server{Address: "root@203.0.113.5", Stage: host.StageHandedOff, Install: "abc123def0"})
+	if code := h.run("host", "connect", "root@203.0.113.5", "--break-glass", "--hours", "48"); code != 1 || !strings.Contains(h.out.String(), "1 to 24 hours") {
+		t.Fatalf("48 hours: %d\n%s", code, h.out.String())
+	}
+	if code := h.run("host", "connect", "root@203.0.113.5", "--break-glass"); code != 1 || !strings.Contains(h.out.String(), "needs the owner") {
+		t.Fatalf("without the owner: %d\n%s", code, h.out.String())
+	}
+	h = newHarness(t, false, "", "")
+	h.a.update(host.Server{Address: "root@203.0.113.5", Stage: host.StageHandedOff, Install: "abc123def0"})
+	if code := h.run("host", "connect", "root@203.0.113.5", "--break-glass", "--hours", "2", "--identity", "/keys/mine", "--fingerprint", "SHA256:testfingerprint"); code != 0 {
+		t.Fatalf("break-glass: %d\n%s", code, h.out.String())
+	}
+	var install string
+	for _, c := range h.ssh.calls {
+		if strings.Contains(c, "expiry-time=") {
+			install = c
+		}
+	}
+	// The harness clock is 2026-10-19 14:00 UTC.
+	if !strings.Contains(install, `expiry-time="202610191600Z" ssh-ed25519 `) {
+		t.Fatalf("install: %q", install)
+	}
+	recorded := false
+	for _, s := range h.ssh.ran(t) {
+		recorded = recorded || strings.Contains(s, `"fix":"break-glass","action":"apply","at":"2026-10-19T14:00:00Z","until":"2026-10-19T16:00:00Z"`)
+	}
+	s, _ := h.a.server("root@203.0.113.5")
+	if !recorded || s.Stage != host.StageHandedOff || !strings.Contains(h.out.String(), "until 2026-10-19 16:00 UTC") {
+		t.Fatalf("recorded %v, stage %s\n%s", recorded, s.Stage, h.out.String())
+	}
+}

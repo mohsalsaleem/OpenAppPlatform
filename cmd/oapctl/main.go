@@ -135,14 +135,14 @@ func (a *app) frontDoor(ctx context.Context, asJSON bool) int {
 		if !strings.Contains(addr, "@") {
 			addr = a.u().Ask("Username", "root") + "@" + addr
 		}
-		if code := a.connect(ctx, addr, "", ""); code != 0 {
+		if code := a.connect(ctx, addr, "", "", time.Time{}); code != 0 {
 			return code
 		}
 		return a.check(ctx, addr, false)
 	}
 	switch s.Stage {
 	case host.StageNew:
-		if code := a.connect(ctx, s.Address, "", ""); code != 0 {
+		if code := a.connect(ctx, s.Address, "", "", time.Time{}); code != 0 {
 			return code
 		}
 		return a.check(ctx, s.Address, false)
@@ -163,6 +163,8 @@ func (a *app) hostConnect(ctx context.Context, args []string) int {
 	fs.SetOutput(a.errOut)
 	identity := fs.String("identity", "", "")
 	fingerprint := fs.String("fingerprint", "", "")
+	breakGlass := fs.Bool("break-glass", false, "return to host access after hand-off, for a limited time")
+	hours := fs.Int("hours", 4, "how long break-glass access lasts, 1 to 24 hours")
 	addr, rest := splitFirst(args)
 	if err := fs.Parse(rest); err != nil {
 		return 2
@@ -174,7 +176,13 @@ func (a *app) hostConnect(ctx context.Context, args []string) int {
 		fmt.Fprintf(a.errOut, usage, a.cli)
 		return 2
 	}
-	if code := a.connect(ctx, addr, *identity, *fingerprint); code != 0 {
+	if *breakGlass {
+		if *hours < 1 || *hours > 24 {
+			return a.fail(fmt.Errorf("break-glass access lasts 1 to 24 hours, not %d", *hours))
+		}
+		return a.breakGlass(ctx, addr, *identity, *fingerprint, time.Duration(*hours)*time.Hour)
+	}
+	if code := a.connect(ctx, addr, *identity, *fingerprint, time.Time{}); code != 0 {
 		return code
 	}
 	if a.terminal() {
@@ -210,7 +218,7 @@ func (a *app) hostCheck(ctx context.Context, args []string) int {
 }
 
 // connect pins the host key, creates the bootstrap key and installs it.
-func (a *app) connect(ctx context.Context, addr, identity, fingerprint string) int {
+func (a *app) connect(ctx context.Context, addr, identity, fingerprint string, until time.Time) int {
 	t, err := a.target(addr)
 	if err != nil {
 		return a.fail(err)
@@ -243,16 +251,19 @@ func (a *app) connect(ctx context.Context, addr, identity, fingerprint string) i
 		return a.fail(err)
 	}
 	if identity != "" {
-		err = a.ssh.InstallKeyWithIdentity(ctx, t, pub, identity)
+		err = a.ssh.InstallKeyWithIdentity(ctx, t, pub, identity, until)
 	} else {
 		a.u().Note(fmt.Sprintf("ssh will ask for the password of %s. It is used once to install OAP's key and never stored.", t.Address()))
-		err = a.ssh.InstallKeyWithPassword(ctx, t, pub)
+		err = a.ssh.InstallKeyWithPassword(ctx, t, pub, until)
 	}
 	if err != nil {
 		return a.fail(err)
 	}
 	if _, err := a.ssh.Run(ctx, t, "true"); err != nil {
 		return a.fail(fmt.Errorf("the bootstrap key was installed but doesn't log in: %v", err))
+	}
+	if !until.IsZero() {
+		return 0 // break-glass: the journey stays where it is
 	}
 	if err := a.update(host.Server{Address: t.Address(), Stage: host.StageConnected}); err != nil {
 		return a.fail(err)
@@ -359,4 +370,24 @@ func isTerminal() bool {
 	in, err1 := os.Stdin.Stat()
 	out, err2 := os.Stdout.Stat()
 	return err1 == nil && err2 == nil && in.Mode()&os.ModeCharDevice != 0 && out.Mode()&os.ModeCharDevice != 0
+}
+
+// breakGlass returns the owner to host access for a limited time: OAP's key
+// is installed with an expiry that sshd enforces, and the access is
+// recorded in the host manifest. It needs the owner, like connecting.
+func (a *app) breakGlass(ctx context.Context, addr, identity, fingerprint string, d time.Duration) int {
+	until := a.now().Add(d).UTC().Truncate(time.Minute)
+	if code := a.connect(ctx, addr, identity, fingerprint, until); code != 0 {
+		return code
+	}
+	t, err := a.target(addr)
+	if err != nil {
+		return a.fail(err)
+	}
+	if _, err := a.ssh.Run(ctx, t, host.RecordUntil("break-glass", "apply", a.now(), until)); err != nil {
+		return a.fail(fmt.Errorf("break-glass access works, but couldn't be recorded in the host manifest: %v", err))
+	}
+	a.u().Success(fmt.Sprintf("Break-glass access to %s until %s UTC, recorded in %s. The key stops working then.",
+		t.Address(), until.Format("2006-01-02 15:04"), host.ManifestPath))
+	return 0
 }

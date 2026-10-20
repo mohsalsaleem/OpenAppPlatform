@@ -187,22 +187,31 @@ func baseArgs(t Target) []string {
 }
 
 // installScript appends pub to authorized_keys unless it is already there.
-func installScript(pub string) (string, error) {
-	if strings.ContainsAny(pub, "'\n\r") || !strings.HasPrefix(pub, "ssh-") {
+// With until set, the key is installed with an expiry-time option, which
+// sshd enforces, replacing any earlier line for the same key.
+func installScript(pub string, until time.Time) (string, error) {
+	if strings.ContainsAny(pub, "'\"\n\r") || !strings.HasPrefix(pub, "ssh-") {
 		return "", fmt.Errorf("sshhost: refusing to install an unexpected public key")
 	}
+	if until.IsZero() {
+		return fmt.Sprintf(`umask 077; mkdir -p ~/.ssh && touch ~/.ssh/authorized_keys && `+
+			`(grep -qxF '%[1]s' ~/.ssh/authorized_keys || printf '%%s\n' '%[1]s' >> ~/.ssh/authorized_keys)`, pub), nil
+	}
+	line := fmt.Sprintf(`expiry-time="%sZ" %s`, until.UTC().Format("200601021504"), pub)
 	return fmt.Sprintf(`umask 077; mkdir -p ~/.ssh && touch ~/.ssh/authorized_keys && `+
-		`(grep -qxF '%[1]s' ~/.ssh/authorized_keys || printf '%%s\n' '%[1]s' >> ~/.ssh/authorized_keys)`, pub), nil
+		`{ grep -vF '%[1]s' ~/.ssh/authorized_keys > ~/.ssh/authorized_keys.oap-tmp || true; `+
+		`printf '%%s\n' '%[2]s' >> ~/.ssh/authorized_keys.oap-tmp; `+
+		`cat ~/.ssh/authorized_keys.oap-tmp > ~/.ssh/authorized_keys; rm -f ~/.ssh/authorized_keys.oap-tmp; }`, pub, line), nil
 }
 
 // InstallKeyWithPassword installs pub with one password login. ssh asks the
 // owner for the password on the terminal; without a terminal it refuses
 // before connecting.
-func (c Client) InstallKeyWithPassword(ctx context.Context, t Target, pub string) error {
+func (c Client) InstallKeyWithPassword(ctx context.Context, t Target, pub string, until time.Time) error {
 	if !c.terminal() {
 		return ErrNeedsTerminal
 	}
-	script, err := installScript(pub)
+	script, err := installScript(pub, until)
 	if err != nil {
 		return err
 	}
@@ -221,8 +230,8 @@ func (c Client) InstallKeyWithPassword(ctx context.Context, t Target, pub string
 
 // InstallKeyWithIdentity installs pub using a key the owner already has,
 // for servers the provider set up with a key rather than a password.
-func (c Client) InstallKeyWithIdentity(ctx context.Context, t Target, pub, identity string) error {
-	script, err := installScript(pub)
+func (c Client) InstallKeyWithIdentity(ctx context.Context, t Target, pub, identity string, until time.Time) error {
+	script, err := installScript(pub, until)
 	if err != nil {
 		return err
 	}

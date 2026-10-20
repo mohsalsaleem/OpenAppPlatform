@@ -137,11 +137,21 @@ type ManifestEntry struct {
 	Fix    string `json:"fix"`
 	Action string `json:"action"` // "apply" or "undo"
 	At     string `json:"at"`
+	Until  string `json:"until,omitempty"` // when time-limited access ends
 }
 
 // RecordScript appends an entry to the host manifest.
 func RecordScript(fix, action string, at time.Time) string {
-	b, _ := json.Marshal(ManifestEntry{Fix: fix, Action: action, At: at.UTC().Format(time.RFC3339)})
+	return RecordUntil(fix, action, at, time.Time{})
+}
+
+// RecordUntil appends an entry for time-limited access to the manifest.
+func RecordUntil(fix, action string, at, until time.Time) string {
+	e := ManifestEntry{Fix: fix, Action: action, At: at.UTC().Format(time.RFC3339)}
+	if !until.IsZero() {
+		e.Until = until.UTC().Format(time.RFC3339)
+	}
+	b, _ := json.Marshal(e)
 	return fmt.Sprintf("set -eu\nmkdir -p /var/lib/oap\nchmod 700 /var/lib/oap\nprintf '%%s\\n' '%s' >> %s\n", b, ManifestPath)
 }
 

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 var ctx = context.Background()
@@ -46,7 +47,7 @@ func (r *recorder) command(ctx context.Context, name string, args ...string) *ex
 func TestPasswordLoginRefusedWithoutTerminal(t *testing.T) {
 	r := &recorder{}
 	c := Client{Command: r.command, Terminal: func() bool { return false }}
-	err := c.InstallKeyWithPassword(ctx, Target{User: "root", Host: "203.0.113.5", Dir: t.TempDir()}, "ssh-ed25519 AAAA oap-bootstrap")
+	err := c.InstallKeyWithPassword(ctx, Target{User: "root", Host: "203.0.113.5", Dir: t.TempDir()}, "ssh-ed25519 AAAA oap-bootstrap", time.Time{})
 	if !errors.Is(err, ErrNeedsTerminal) || len(r.calls) != 0 {
 		t.Fatalf("err %v, %d commands run", err, len(r.calls))
 	}
@@ -57,8 +58,8 @@ func TestConnectionsUseOnlyOAPsKeyAndPinnedHost(t *testing.T) {
 	c := Client{Command: r.command, Terminal: func() bool { return true }}
 	tg := Target{User: "root", Host: "203.0.113.5", Port: 2222, Dir: t.TempDir()}
 	c.Run(ctx, tg, "true")
-	c.InstallKeyWithIdentity(ctx, tg, "ssh-ed25519 AAAA oap-bootstrap", "/keys/mine")
-	c.InstallKeyWithPassword(ctx, tg, "ssh-ed25519 AAAA oap-bootstrap")
+	c.InstallKeyWithIdentity(ctx, tg, "ssh-ed25519 AAAA oap-bootstrap", "/keys/mine", time.Time{})
+	c.InstallKeyWithPassword(ctx, tg, "ssh-ed25519 AAAA oap-bootstrap", time.Time{})
 	if len(r.calls) != 3 {
 		t.Fatalf("%d calls", len(r.calls))
 	}
@@ -85,14 +86,19 @@ func TestConnectionsUseOnlyOAPsKeyAndPinnedHost(t *testing.T) {
 }
 
 func TestInstallScriptRefusesOddKeys(t *testing.T) {
-	for _, pub := range []string{"ssh-ed25519 AAAA x'; rm -rf / #", "ecdsa AAAA", "ssh-ed25519 AAAA\nssh-rsa BBBB"} {
-		if _, err := installScript(pub); err == nil {
+	for _, pub := range []string{"ssh-ed25519 AAAA x'; rm -rf / #", "ecdsa AAAA", "ssh-ed25519 AAAA\nssh-rsa BBBB", `ssh-ed25519 AAAA "x"`} {
+		if _, err := installScript(pub, time.Time{}); err == nil {
 			t.Errorf("accepted %q", pub)
 		}
 	}
-	s, err := installScript("ssh-ed25519 AAAA oap-bootstrap 2026-10-19")
-	if err != nil || !strings.Contains(s, "grep -qxF") || !strings.Contains(s, "umask 077") {
+	s, err := installScript("ssh-ed25519 AAAA oap-bootstrap 2026-10-19", time.Time{})
+	if err != nil || !strings.Contains(s, "grep -qxF") || !strings.Contains(s, "umask 077") || strings.Contains(s, "expiry-time") {
 		t.Fatalf("%q %v", s, err)
+	}
+	until := time.Date(2026, 10, 20, 11, 5, 0, 0, time.FixedZone("x", 3600))
+	s, err = installScript("ssh-ed25519 AAAA oap-bootstrap", until)
+	if err != nil || !strings.Contains(s, `expiry-time="202610201005Z" ssh-ed25519 AAAA oap-bootstrap`) || !strings.Contains(s, "grep -vF") {
+		t.Fatalf("break-glass script %q %v", s, err)
 	}
 }
 
