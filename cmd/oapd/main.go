@@ -184,6 +184,7 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 	mux.Handle((&agentapi.Server{Service: svc, Caller: &service.Owner}).Handler())
 	mux.Handle((&ownerapi.Server{Service: svc, Auth: ownerAuth}).Handler())
 	mux.Handle("/mcp", &mcp.Server{Service: svc, Caller: service.Owner, Auth: ownerAuth})
+	mux.Handle(agentapi.BriefingPath, agentapi.BriefingHandler(svc, ownerAuth))
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
 	if err := os.MkdirAll(filepath.Dir(c.socket), 0o700); err != nil {
 		return err
@@ -210,6 +211,7 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 		pub := http.NewServeMux()
 		pub.Handle((&agentapi.Server{Service: svc}).Handler())
 		pub.Handle("/mcp", &mcp.Server{Service: svc, Auth: agentapi.Bearer(svc, nil)})
+		pub.Handle(agentapi.BriefingPath, agentapi.BriefingHandler(svc, agentapi.Bearer(svc, nil)))
 		pub.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ok") })
 		psrv := &http.Server{Addr: c.publicListen, Handler: pub, Protocols: &protocols, ReadHeaderTimeout: 10 * time.Second}
 		go func() {

@@ -309,3 +309,19 @@ func (a *app) askCmd(ctx context.Context, args []string) int {
 	}
 	return a.fail(errors.New("the stream ended before an answer"))
 }
+
+// briefingCmd: briefing [APP] — the generated briefing for this caller.
+func (a *app) briefingCmd(ctx context.Context, args []string) int {
+	app, _ := splitFirst(args)
+	c, stop, err := a.connectClient(ctx, "")
+	if err != nil {
+		return a.fail(err)
+	}
+	defer stop()
+	res, err := c.Observe(ctx, connect.NewRequest(&oapv1.ObserveRequest{Application: app, Briefing: true}))
+	if err != nil {
+		return a.fail(err)
+	}
+	fmt.Fprint(a.out, res.Msg.Briefing)
+	return 0
+}

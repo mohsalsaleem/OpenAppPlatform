@@ -205,11 +205,33 @@ func (s *Server) Handle(ctx context.Context, raw []byte) []byte {
 	switch req.Method {
 	case "initialize":
 		res.Result = map[string]any{"protocolVersion": ProtocolVersion,
-			"capabilities": map[string]any{"tools": map[string]any{}},
+			"capabilities": map[string]any{"tools": map[string]any{}, "resources": map[string]any{}},
 			"serverInfo":   map[string]any{"name": "oap", "version": "1"},
 			"instructions": "OAP runs applications on the owner's server. Observe first, propose a change, apply the proposal, then await its outcome."}
 	case "ping":
 		res.Result = map[string]any{}
+	case "resources/list":
+		res.Result = s.resources(ctx)
+	case "resources/read":
+		var p struct {
+			URI string `json:"uri"`
+		}
+		if err := json.Unmarshal(req.Params, &p); err != nil {
+			res.Error = &rpcError{Code: -32602, Message: "invalid params"}
+			break
+		}
+		app, ok := strings.CutPrefix(p.URI, "oap://briefing")
+		app = strings.TrimPrefix(app, "/")
+		if !ok {
+			res.Error = &rpcError{Code: -32002, Message: "no resource " + p.URI}
+			break
+		}
+		md, err := s.Service.Briefing(ctx, s.Caller, app)
+		if err != nil {
+			res.Error = &rpcError{Code: -32002, Message: err.Error()}
+			break
+		}
+		res.Result = map[string]any{"contents": []any{map[string]any{"uri": p.URI, "mimeType": "text/markdown", "text": md}}}
 	case "tools/list":
 		res.Result = map[string]any{"tools": Tools()}
 	case "tools/call":
@@ -461,4 +483,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(out)
+}
+
+// resources lists the briefings the caller may read: the server's and
+// each of its applications'.
+func (s *Server) resources(ctx context.Context) map[string]any {
+	list := []any{map[string]any{"uri": "oap://briefing", "name": "OAP briefing", "mimeType": "text/markdown",
+		"description": "What runs on this server, what you may do, open incidents, recent changes, pending asks and the owner's house rules."}}
+	if w, err := s.Service.Observe(ctx, s.Caller, &oapv1.ObserveRequest{}); err == nil {
+		for _, a := range w.GetWorld().GetApplications() {
+			list = append(list, map[string]any{"uri": "oap://briefing/" + a.Name, "name": "OAP briefing: " + a.Name, "mimeType": "text/markdown"})
+		}
+	}
+	return map[string]any{"resources": list}
 }

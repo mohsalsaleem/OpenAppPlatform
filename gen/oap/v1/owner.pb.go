@@ -1185,6 +1185,95 @@ func (*AnswerAskResponse) Descriptor() ([]byte, []int) {
 	return file_oap_v1_owner_proto_rawDescGZIP(), []int{22}
 }
 
+type SetBriefingRequest struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Application string                 `protobuf:"bytes,1,opt,name=application,proto3" json:"application,omitempty"`
+	// Markdown; empty removes it. At most 16 KiB.
+	Markdown      string `protobuf:"bytes,2,opt,name=markdown,proto3" json:"markdown,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetBriefingRequest) Reset() {
+	*x = SetBriefingRequest{}
+	mi := &file_oap_v1_owner_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetBriefingRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetBriefingRequest) ProtoMessage() {}
+
+func (x *SetBriefingRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_oap_v1_owner_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetBriefingRequest.ProtoReflect.Descriptor instead.
+func (*SetBriefingRequest) Descriptor() ([]byte, []int) {
+	return file_oap_v1_owner_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *SetBriefingRequest) GetApplication() string {
+	if x != nil {
+		return x.Application
+	}
+	return ""
+}
+
+func (x *SetBriefingRequest) GetMarkdown() string {
+	if x != nil {
+		return x.Markdown
+	}
+	return ""
+}
+
+type SetBriefingResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetBriefingResponse) Reset() {
+	*x = SetBriefingResponse{}
+	mi := &file_oap_v1_owner_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetBriefingResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetBriefingResponse) ProtoMessage() {}
+
+func (x *SetBriefingResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_oap_v1_owner_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetBriefingResponse.ProtoReflect.Descriptor instead.
+func (*SetBriefingResponse) Descriptor() ([]byte, []int) {
+	return file_oap_v1_owner_proto_rawDescGZIP(), []int{24}
+}
+
 var File_oap_v1_owner_proto protoreflect.FileDescriptor
 
 const file_oap_v1_owner_proto_rawDesc = "" +
@@ -1250,11 +1339,15 @@ const file_oap_v1_owner_proto_rawDesc = "" +
 	"\x10AnswerAskRequest\x12\x15\n" +
 	"\x06ask_id\x18\x01 \x01(\tR\x05askId\x12\x16\n" +
 	"\x06answer\x18\x02 \x01(\tR\x06answer\"\x13\n" +
-	"\x11AnswerAskResponse*r\n" +
+	"\x11AnswerAskResponse\"R\n" +
+	"\x12SetBriefingRequest\x12 \n" +
+	"\vapplication\x18\x01 \x01(\tR\vapplication\x12\x1a\n" +
+	"\bmarkdown\x18\x02 \x01(\tR\bmarkdown\"\x15\n" +
+	"\x13SetBriefingResponse*r\n" +
 	"\fApprovalMode\x12\x1d\n" +
 	"\x19APPROVAL_MODE_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eAPPROVAL_MODE_TRUSTED_IDENTITY\x10\x01\x12\x1f\n" +
-	"\x1bAPPROVAL_MODE_EVERY_SESSION\x10\x022\xa2\x05\n" +
+	"\x1bAPPROVAL_MODE_EVERY_SESSION\x10\x022\xea\x05\n" +
 	"\fOwnerService\x12C\n" +
 	"\n" +
 	"ListLogins\x12\x19.oap.v1.ListLoginsRequest\x1a\x1a.oap.v1.ListLoginsResponse\x12I\n" +
@@ -1267,7 +1360,8 @@ const file_oap_v1_owner_proto_rawDesc = "" +
 	"\x06Resume\x12\x15.oap.v1.ResumeRequest\x1a\x16.oap.v1.ResumeResponse\x12R\n" +
 	"\x0fSetApprovalMode\x12\x1e.oap.v1.SetApprovalModeRequest\x1a\x1f.oap.v1.SetApprovalModeResponse\x12=\n" +
 	"\bListAsks\x12\x17.oap.v1.ListAsksRequest\x1a\x18.oap.v1.ListAsksResponse\x12@\n" +
-	"\tAnswerAsk\x12\x18.oap.v1.AnswerAskRequest\x1a\x19.oap.v1.AnswerAskResponseB:Z8github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1b\x06proto3"
+	"\tAnswerAsk\x12\x18.oap.v1.AnswerAskRequest\x1a\x19.oap.v1.AnswerAskResponse\x12F\n" +
+	"\vSetBriefing\x12\x1a.oap.v1.SetBriefingRequest\x1a\x1b.oap.v1.SetBriefingResponseB:Z8github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1b\x06proto3"
 
 var (
 	file_oap_v1_owner_proto_rawDescOnce sync.Once
@@ -1282,7 +1376,7 @@ func file_oap_v1_owner_proto_rawDescGZIP() []byte {
 }
 
 var file_oap_v1_owner_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_oap_v1_owner_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
+var file_oap_v1_owner_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_oap_v1_owner_proto_goTypes = []any{
 	(ApprovalMode)(0),               // 0: oap.v1.ApprovalMode
 	(*PendingLogin)(nil),            // 1: oap.v1.PendingLogin
@@ -1308,18 +1402,20 @@ var file_oap_v1_owner_proto_goTypes = []any{
 	(*ListAsksResponse)(nil),        // 21: oap.v1.ListAsksResponse
 	(*AnswerAskRequest)(nil),        // 22: oap.v1.AnswerAskRequest
 	(*AnswerAskResponse)(nil),       // 23: oap.v1.AnswerAskResponse
-	(*timestamppb.Timestamp)(nil),   // 24: google.protobuf.Timestamp
-	(*AskRequest)(nil),              // 25: oap.v1.AskRequest
+	(*SetBriefingRequest)(nil),      // 24: oap.v1.SetBriefingRequest
+	(*SetBriefingResponse)(nil),     // 25: oap.v1.SetBriefingResponse
+	(*timestamppb.Timestamp)(nil),   // 26: google.protobuf.Timestamp
+	(*AskRequest)(nil),              // 27: oap.v1.AskRequest
 }
 var file_oap_v1_owner_proto_depIdxs = []int32{
-	24, // 0: oap.v1.PendingLogin.expires_at:type_name -> google.protobuf.Timestamp
+	26, // 0: oap.v1.PendingLogin.expires_at:type_name -> google.protobuf.Timestamp
 	1,  // 1: oap.v1.ListLoginsResponse.logins:type_name -> oap.v1.PendingLogin
 	8,  // 2: oap.v1.ApproveLoginResponse.agent:type_name -> oap.v1.AgentInfo
 	8,  // 3: oap.v1.ListAgentsResponse.agents:type_name -> oap.v1.AgentInfo
 	0,  // 4: oap.v1.ListAgentsResponse.mode:type_name -> oap.v1.ApprovalMode
 	0,  // 5: oap.v1.SetApprovalModeRequest.mode:type_name -> oap.v1.ApprovalMode
-	25, // 6: oap.v1.PendingAsk.request:type_name -> oap.v1.AskRequest
-	24, // 7: oap.v1.PendingAsk.expires_at:type_name -> google.protobuf.Timestamp
+	27, // 6: oap.v1.PendingAsk.request:type_name -> oap.v1.AskRequest
+	26, // 7: oap.v1.PendingAsk.expires_at:type_name -> google.protobuf.Timestamp
 	19, // 8: oap.v1.ListAsksResponse.asks:type_name -> oap.v1.PendingAsk
 	2,  // 9: oap.v1.OwnerService.ListLogins:input_type -> oap.v1.ListLoginsRequest
 	4,  // 10: oap.v1.OwnerService.ApproveLogin:input_type -> oap.v1.ApproveLoginRequest
@@ -1331,18 +1427,20 @@ var file_oap_v1_owner_proto_depIdxs = []int32{
 	17, // 16: oap.v1.OwnerService.SetApprovalMode:input_type -> oap.v1.SetApprovalModeRequest
 	20, // 17: oap.v1.OwnerService.ListAsks:input_type -> oap.v1.ListAsksRequest
 	22, // 18: oap.v1.OwnerService.AnswerAsk:input_type -> oap.v1.AnswerAskRequest
-	3,  // 19: oap.v1.OwnerService.ListLogins:output_type -> oap.v1.ListLoginsResponse
-	5,  // 20: oap.v1.OwnerService.ApproveLogin:output_type -> oap.v1.ApproveLoginResponse
-	7,  // 21: oap.v1.OwnerService.DenyLogin:output_type -> oap.v1.DenyLoginResponse
-	10, // 22: oap.v1.OwnerService.ListAgents:output_type -> oap.v1.ListAgentsResponse
-	12, // 23: oap.v1.OwnerService.Revoke:output_type -> oap.v1.RevokeResponse
-	14, // 24: oap.v1.OwnerService.Pause:output_type -> oap.v1.PauseResponse
-	16, // 25: oap.v1.OwnerService.Resume:output_type -> oap.v1.ResumeResponse
-	18, // 26: oap.v1.OwnerService.SetApprovalMode:output_type -> oap.v1.SetApprovalModeResponse
-	21, // 27: oap.v1.OwnerService.ListAsks:output_type -> oap.v1.ListAsksResponse
-	23, // 28: oap.v1.OwnerService.AnswerAsk:output_type -> oap.v1.AnswerAskResponse
-	19, // [19:29] is the sub-list for method output_type
-	9,  // [9:19] is the sub-list for method input_type
+	24, // 19: oap.v1.OwnerService.SetBriefing:input_type -> oap.v1.SetBriefingRequest
+	3,  // 20: oap.v1.OwnerService.ListLogins:output_type -> oap.v1.ListLoginsResponse
+	5,  // 21: oap.v1.OwnerService.ApproveLogin:output_type -> oap.v1.ApproveLoginResponse
+	7,  // 22: oap.v1.OwnerService.DenyLogin:output_type -> oap.v1.DenyLoginResponse
+	10, // 23: oap.v1.OwnerService.ListAgents:output_type -> oap.v1.ListAgentsResponse
+	12, // 24: oap.v1.OwnerService.Revoke:output_type -> oap.v1.RevokeResponse
+	14, // 25: oap.v1.OwnerService.Pause:output_type -> oap.v1.PauseResponse
+	16, // 26: oap.v1.OwnerService.Resume:output_type -> oap.v1.ResumeResponse
+	18, // 27: oap.v1.OwnerService.SetApprovalMode:output_type -> oap.v1.SetApprovalModeResponse
+	21, // 28: oap.v1.OwnerService.ListAsks:output_type -> oap.v1.ListAsksResponse
+	23, // 29: oap.v1.OwnerService.AnswerAsk:output_type -> oap.v1.AnswerAskResponse
+	25, // 30: oap.v1.OwnerService.SetBriefing:output_type -> oap.v1.SetBriefingResponse
+	20, // [20:31] is the sub-list for method output_type
+	9,  // [9:20] is the sub-list for method input_type
 	9,  // [9:9] is the sub-list for extension type_name
 	9,  // [9:9] is the sub-list for extension extendee
 	0,  // [0:9] is the sub-list for field type_name
@@ -1360,7 +1458,7 @@ func file_oap_v1_owner_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_oap_v1_owner_proto_rawDesc), len(file_oap_v1_owner_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   23,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

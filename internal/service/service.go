@@ -304,7 +304,15 @@ func (s *Service) Observe(ctx context.Context, c Caller, req *oapv1.ObserveReque
 	if env, err := s.envelope(ctx); err == nil {
 		policy.Affordances(env, c.Agent, w)
 	}
-	return &oapv1.ObserveResponse{World: w}, nil
+	out := &oapv1.ObserveResponse{World: w}
+	if req.GetBriefing() {
+		md, err := s.Briefing(ctx, c, req.GetApplication())
+		if err != nil {
+			return nil, err
+		}
+		out.Briefing = md
+	}
+	return out, nil
 }
 
 func (s *Service) world(ctx context.Context) (*oapv1.World, error) {

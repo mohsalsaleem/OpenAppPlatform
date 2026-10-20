@@ -285,6 +285,7 @@ type Desired struct {
 	current  map[string]any
 	byHash   map[string]any
 	envelope any
+	notes    map[string]string
 	Commits  int
 }
 
@@ -340,6 +341,24 @@ func (d *Desired) Applications(ctx context.Context) ([]string, error) {
 	}
 	sort.Strings(out)
 	return out, nil
+}
+
+// Briefing returns the owner's notes.
+func (d *Desired) Briefing(ctx context.Context, app string) (string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.notes[app], nil
+}
+
+// SetBriefing stores the owner's notes.
+func (d *Desired) SetBriefing(ctx context.Context, app, markdown, author string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.notes == nil {
+		d.notes = map[string]string{}
+	}
+	d.notes[app] = markdown
+	return nil
 }
 
 // SetEnvelope stores the envelope tree.

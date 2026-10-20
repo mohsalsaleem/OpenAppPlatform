@@ -31,6 +31,9 @@ service OwnerService {
   rpc ListAsks(ListAsksRequest) returns (ListAsksResponse);
   // AnswerAsk answers an ask that hasn't expired.
   rpc AnswerAsk(AnswerAskRequest) returns (AnswerAskResponse);
+  // SetBriefing stores the owner's house rules (briefing.md) for an
+  // application, or for the server when application is empty.
+  rpc SetBriefing(SetBriefingRequest) returns (SetBriefingResponse);
 }
 
 // ApprovalMode is how an agent's sessions are approved.
@@ -147,3 +150,11 @@ message AnswerAskRequest {
 }
 
 message AnswerAskResponse {}
+
+message SetBriefingRequest {
+  string application = 1;
+  // Markdown; empty removes it. At most 16 KiB.
+  string markdown = 2;
+}
+
+message SetBriefingResponse {}

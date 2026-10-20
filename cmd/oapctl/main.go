@@ -77,8 +77,9 @@ const usage = `Usage:
   %[1]s explain APP [COMPONENT]             why an application differs from its desired state
   %[1]s watch [APP] [--since N] [--limit N] events as they happen
   %[1]s login URL --agent NAME             sign an agent in; the owner approves it once
+  %[1]s briefing [APP]                      the briefing for agents: what runs, what you may do, house rules
   %[1]s ask QUESTION [--kind K] [--option O]... [--wait]   involve the owner (as an agent)
-  %[1]s owner logins|approve|deny|agents|revoke|pause|resume|mode|asks|answer   the owner's control over agents
+  %[1]s owner logins|approve|deny|agents|revoke|pause|resume|mode|asks|answer|briefing   the owner's control over agents
   With OAP_AGENT=NAME, agent API commands run as that signed-in agent.
   Agent API commands take --json (the result as JSON) or --events (each event as a JSON line).
 `
@@ -109,6 +110,8 @@ func (a *app) run(ctx context.Context, args []string) int {
 		return a.loginCmd(ctx, args[1:])
 	case args[0] == "owner":
 		return a.ownerCmd(ctx, args[1:])
+	case args[0] == "briefing":
+		return a.briefingCmd(ctx, args[1:])
 	case args[0] == "ask":
 		return a.askCmd(ctx, args[1:])
 	case args[0] == "observe":

@@ -203,6 +203,8 @@ func (a *app) ownerCmd(ctx context.Context, args []string) int {
 	may := fs.String("may", "scale,deploy,rollback,configure", "intent kinds the agent may propose, comma-separated")
 	trust := fs.Bool("trust", true, "trust the agent's key, so later sessions sign in without asking")
 	forget := fs.Bool("forget", false, "also forget the agent's trusted identity")
+	file := fs.String("file", "", "briefing: the Markdown file with the house rules")
+	clear := fs.Bool("clear", false, "briefing: remove the house rules")
 	asJSON := fs.Bool("json", false, "")
 	arg, rest := splitFirst(rest)
 	if err := fs.Parse(rest); err != nil {
@@ -313,6 +315,27 @@ func (a *app) ownerCmd(ctx context.Context, args []string) int {
 		_, err = c.AnswerAsk(ctx, connect.NewRequest(&oapv1.AnswerAskRequest{AskId: arg, Answer: answer}))
 		if err == nil {
 			fmt.Fprintf(a.out, "✓ Answered %s: %s\n", arg, answer)
+			return 0
+		}
+	case "briefing":
+		md := ""
+		if !*clear {
+			if *file == "" {
+				return a.fail(errors.New("usage: owner briefing [APP] --file FILE, or --clear"))
+			}
+			b, e := os.ReadFile(*file)
+			if e != nil {
+				return a.fail(e)
+			}
+			md = string(b)
+		}
+		_, err = c.SetBriefing(ctx, connect.NewRequest(&oapv1.SetBriefingRequest{Application: arg, Markdown: md}))
+		if err == nil {
+			scope := arg
+			if scope == "" {
+				scope = "the server"
+			}
+			fmt.Fprintf(a.out, "✓ House rules for %s %s.\n", scope, map[bool]string{true: "removed", false: "saved"}[*clear])
 			return 0
 		}
 	case "mode":

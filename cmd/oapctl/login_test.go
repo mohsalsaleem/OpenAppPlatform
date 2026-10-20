@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -16,6 +19,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/engine"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/service"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/agentapi"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/mcp"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/surface/ownerapi"
 )
 
@@ -35,9 +39,12 @@ func twoListeners(t *testing.T) (local, public string) {
 	lm := http.NewServeMux()
 	lm.Handle((&agentapi.Server{Service: svc, Caller: &service.Owner}).Handler())
 	lm.Handle((&ownerapi.Server{Service: svc, Auth: agentapi.Bearer(svc, &service.Owner)}).Handler())
+	lm.Handle(agentapi.BriefingPath, agentapi.BriefingHandler(svc, agentapi.Bearer(svc, &service.Owner)))
 	pm := http.NewServeMux()
 	pm.Handle((&agentapi.Server{Service: svc}).Handler())
 	pm.Handle((&ownerapi.Server{Service: svc, Auth: agentapi.Bearer(svc, nil)}).Handler())
+	pm.Handle(agentapi.BriefingPath, agentapi.BriefingHandler(svc, agentapi.Bearer(svc, nil)))
+	pm.Handle("/mcp", &mcp.Server{Service: svc, Auth: agentapi.Bearer(svc, nil)})
 	l, p := httptest.NewServer(lm), httptest.NewServer(pm)
 	t.Cleanup(l.Close)
 	t.Cleanup(p.Close)
@@ -200,5 +207,86 @@ func TestAskEndToEnd(t *testing.T) {
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("the agent never got the answer")
+	}
+}
+
+// TestBriefingEndToEnd: the owner sets house rules; a signed-in agent
+// reads its briefing through the CLI, HTTP and MCP; without a token the
+// public briefing is refused.
+func TestBriefingEndToEnd(t *testing.T) {
+	local, public := twoListeners(t)
+	dir := t.TempDir()
+	owner := map[string]string{"OAP_AGENT_URL": local}
+	file := filepath.Join(t.TempDir(), "oap.yaml")
+	os.WriteFile(file, []byte(parityYAML), 0o600)
+	cli(t, dir, owner, "app", "apply", file, "--yes")
+	rules := filepath.Join(t.TempDir(), "briefing.md")
+	os.WriteFile(rules, []byte("Scale up only after 18:00 UTC.\n"), 0o600)
+	if code, out := cli(t, dir, owner, "owner", "briefing", "site", "--file", rules); code != 0 || !strings.Contains(out, "House rules for site saved") {
+		t.Fatalf("set briefing: %s", out)
+	}
+	go func() {
+		h := newHarness(t, false, "", "")
+		h.a.configDir, h.a.now = dir, time.Now
+		h.run("login", public, "--agent", "claude")
+	}()
+	var code string
+	for i := 0; i < 50 && code == ""; i++ {
+		time.Sleep(50 * time.Millisecond)
+		if _, out := cli(t, dir, owner, "owner", "logins"); strings.Contains(out, "claude") {
+			code = strings.Fields(out)[0]
+		}
+	}
+	cli(t, dir, owner, "owner", "approve", code, "--app", "site")
+	var cr creds
+	for i := 0; i < 50 && cr.Token == ""; i++ {
+		time.Sleep(50 * time.Millisecond)
+		if b, err := os.ReadFile(filepath.Join(dir, "agents/claude/credentials.json")); err == nil {
+			json.Unmarshal(b, &cr)
+		}
+	}
+	if c, out := cli(t, dir, map[string]string{"OAP_AGENT": "claude"}, "briefing", "site"); c != 0 ||
+		!strings.Contains(out, "> Scale up only after 18:00 UTC.") || !strings.Contains(out, "You are agent `claude`") {
+		t.Fatalf("CLI briefing: %s", out)
+	}
+	get := func(token string) (int, string) {
+		req, _ := http.NewRequest(http.MethodGet, public+agentapi.BriefingPath+"?app=site", nil)
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(b)
+	}
+	if status, _ := get(""); status != http.StatusUnauthorized {
+		t.Fatalf("briefing without a token: %d", status)
+	}
+	if status, body := get(cr.Token); status != 200 || !strings.Contains(body, "Scale up only after 18:00 UTC.") {
+		t.Fatalf("briefing with a token: %d %s", status, body)
+	}
+	rpc := func(method string, params any) map[string]any {
+		b, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
+		req, _ := http.NewRequest(http.MethodPost, public+"/mcp", strings.NewReader(string(b)))
+		req.Header.Set("Authorization", "Bearer "+cr.Token)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var out map[string]any
+		json.NewDecoder(resp.Body).Decode(&out)
+		return out
+	}
+	list := fmt.Sprint(rpc("resources/list", map[string]any{}))
+	if !strings.Contains(list, "oap://briefing/site") {
+		t.Fatalf("MCP resources: %s", list)
+	}
+	read := fmt.Sprint(rpc("resources/read", map[string]any{"uri": "oap://briefing/site"}))
+	if !strings.Contains(read, "Scale up only after 18:00 UTC.") || !strings.Contains(read, "text/markdown") {
+		t.Fatalf("MCP read: %s", read)
 	}
 }

@@ -89,3 +89,7 @@ func (s *Server) ListAsks(ctx context.Context, req *connect.Request[oapv1.ListAs
 func (s *Server) AnswerAsk(ctx context.Context, req *connect.Request[oapv1.AnswerAskRequest]) (*connect.Response[oapv1.AnswerAskResponse], error) {
 	return call(s, ctx, req, s.Service.AnswerAsk)
 }
+
+func (s *Server) SetBriefing(ctx context.Context, req *connect.Request[oapv1.SetBriefingRequest]) (*connect.Response[oapv1.SetBriefingResponse], error) {
+	return call(s, ctx, req, s.Service.SetBriefing)
+}

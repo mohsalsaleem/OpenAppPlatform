@@ -55,6 +55,9 @@ const (
 	OwnerServiceListAsksProcedure = "/oap.v1.OwnerService/ListAsks"
 	// OwnerServiceAnswerAskProcedure is the fully-qualified name of the OwnerService's AnswerAsk RPC.
 	OwnerServiceAnswerAskProcedure = "/oap.v1.OwnerService/AnswerAsk"
+	// OwnerServiceSetBriefingProcedure is the fully-qualified name of the OwnerService's SetBriefing
+	// RPC.
+	OwnerServiceSetBriefingProcedure = "/oap.v1.OwnerService/SetBriefing"
 )
 
 // OwnerServiceClient is a client for the oap.v1.OwnerService service.
@@ -79,6 +82,9 @@ type OwnerServiceClient interface {
 	ListAsks(context.Context, *connect.Request[v1.ListAsksRequest]) (*connect.Response[v1.ListAsksResponse], error)
 	// AnswerAsk answers an ask that hasn't expired.
 	AnswerAsk(context.Context, *connect.Request[v1.AnswerAskRequest]) (*connect.Response[v1.AnswerAskResponse], error)
+	// SetBriefing stores the owner's house rules (briefing.md) for an
+	// application, or for the server when application is empty.
+	SetBriefing(context.Context, *connect.Request[v1.SetBriefingRequest]) (*connect.Response[v1.SetBriefingResponse], error)
 }
 
 // NewOwnerServiceClient constructs a client for the oap.v1.OwnerService service. By default, it
@@ -152,6 +158,12 @@ func NewOwnerServiceClient(httpClient connect.HTTPClient, baseURL string, opts .
 			connect.WithSchema(ownerServiceMethods.ByName("AnswerAsk")),
 			connect.WithClientOptions(opts...),
 		),
+		setBriefing: connect.NewClient[v1.SetBriefingRequest, v1.SetBriefingResponse](
+			httpClient,
+			baseURL+OwnerServiceSetBriefingProcedure,
+			connect.WithSchema(ownerServiceMethods.ByName("SetBriefing")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -167,6 +179,7 @@ type ownerServiceClient struct {
 	setApprovalMode *connect.Client[v1.SetApprovalModeRequest, v1.SetApprovalModeResponse]
 	listAsks        *connect.Client[v1.ListAsksRequest, v1.ListAsksResponse]
 	answerAsk       *connect.Client[v1.AnswerAskRequest, v1.AnswerAskResponse]
+	setBriefing     *connect.Client[v1.SetBriefingRequest, v1.SetBriefingResponse]
 }
 
 // ListLogins calls oap.v1.OwnerService.ListLogins.
@@ -219,6 +232,11 @@ func (c *ownerServiceClient) AnswerAsk(ctx context.Context, req *connect.Request
 	return c.answerAsk.CallUnary(ctx, req)
 }
 
+// SetBriefing calls oap.v1.OwnerService.SetBriefing.
+func (c *ownerServiceClient) SetBriefing(ctx context.Context, req *connect.Request[v1.SetBriefingRequest]) (*connect.Response[v1.SetBriefingResponse], error) {
+	return c.setBriefing.CallUnary(ctx, req)
+}
+
 // OwnerServiceHandler is an implementation of the oap.v1.OwnerService service.
 type OwnerServiceHandler interface {
 	// ListLogins returns device logins waiting for the owner.
@@ -241,6 +259,9 @@ type OwnerServiceHandler interface {
 	ListAsks(context.Context, *connect.Request[v1.ListAsksRequest]) (*connect.Response[v1.ListAsksResponse], error)
 	// AnswerAsk answers an ask that hasn't expired.
 	AnswerAsk(context.Context, *connect.Request[v1.AnswerAskRequest]) (*connect.Response[v1.AnswerAskResponse], error)
+	// SetBriefing stores the owner's house rules (briefing.md) for an
+	// application, or for the server when application is empty.
+	SetBriefing(context.Context, *connect.Request[v1.SetBriefingRequest]) (*connect.Response[v1.SetBriefingResponse], error)
 }
 
 // NewOwnerServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -310,6 +331,12 @@ func NewOwnerServiceHandler(svc OwnerServiceHandler, opts ...connect.HandlerOpti
 		connect.WithSchema(ownerServiceMethods.ByName("AnswerAsk")),
 		connect.WithHandlerOptions(opts...),
 	)
+	ownerServiceSetBriefingHandler := connect.NewUnaryHandler(
+		OwnerServiceSetBriefingProcedure,
+		svc.SetBriefing,
+		connect.WithSchema(ownerServiceMethods.ByName("SetBriefing")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/oap.v1.OwnerService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case OwnerServiceListLoginsProcedure:
@@ -332,6 +359,8 @@ func NewOwnerServiceHandler(svc OwnerServiceHandler, opts ...connect.HandlerOpti
 			ownerServiceListAsksHandler.ServeHTTP(w, r)
 		case OwnerServiceAnswerAskProcedure:
 			ownerServiceAnswerAskHandler.ServeHTTP(w, r)
+		case OwnerServiceSetBriefingProcedure:
+			ownerServiceSetBriefingHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -379,4 +408,8 @@ func (UnimplementedOwnerServiceHandler) ListAsks(context.Context, *connect.Reque
 
 func (UnimplementedOwnerServiceHandler) AnswerAsk(context.Context, *connect.Request[v1.AnswerAskRequest]) (*connect.Response[v1.AnswerAskResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("oap.v1.OwnerService.AnswerAsk is not implemented"))
+}
+
+func (UnimplementedOwnerServiceHandler) SetBriefing(context.Context, *connect.Request[v1.SetBriefingRequest]) (*connect.Response[v1.SetBriefingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("oap.v1.OwnerService.SetBriefing is not implemented"))
 }

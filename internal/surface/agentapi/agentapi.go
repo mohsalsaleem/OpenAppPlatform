@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -188,4 +189,42 @@ func (s *Server) Ask(ctx context.Context, req *connect.Request[oapv1.AskRequest]
 
 func (s *Server) Login(ctx context.Context, req *connect.Request[oapv1.LoginRequest], stream *connect.ServerStream[oapv1.LoginResponse]) error {
 	return ToConnect(s.Service.Login(ctx, req.Msg, stream.Send))
+}
+
+// BriefingPath is where the briefing is served, for any harness to load.
+const BriefingPath = "/.well-known/oap/briefing.md"
+
+// BriefingHandler serves the caller's briefing as Markdown; ?app=NAME
+// limits it to one application.
+func BriefingHandler(svc *service.Service, auth func(context.Context, http.Header) (service.Caller, error)) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			w.Header().Set("Allow", "GET, HEAD")
+			http.Error(w, "GET only", http.StatusMethodNotAllowed)
+			return
+		}
+		c, err := auth(r.Context(), r.Header)
+		if err != nil {
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+			return
+		}
+		md, err := svc.Briefing(r.Context(), c, r.URL.Query().Get("app"))
+		if err != nil {
+			status := http.StatusInternalServerError
+			var se *service.Error
+			if errors.As(err, &se) {
+				status = map[service.Code]int{service.NotFound: http.StatusNotFound, service.PermissionDenied: http.StatusForbidden,
+					service.Unauthenticated: http.StatusUnauthorized}[se.Code]
+				if status == 0 {
+					status = http.StatusBadRequest
+				}
+			}
+			http.Error(w, err.Error(), status)
+			return
+		}
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		io.WriteString(w, md)
+	})
 }
