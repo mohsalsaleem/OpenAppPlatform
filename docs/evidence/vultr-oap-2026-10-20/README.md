@@ -84,6 +84,27 @@ Proposed fix: change route membership without reloading Caddy
 ([ADR 0001](../../architecture/adr/0001-edge-membership-without-reload.md),
 awaiting the owner).
 
+## The fix: route membership through DNS (ADR 0001, 2026-10-20)
+
+`oapd:cf84b00` runs the DNS edge: Caddy's routes take their upstreams
+from names oapd resolves, so scaling changes DNS answers, not Caddy's
+configuration. One operation converted Caddy to this form (its only
+reload). Then, against `https://www.nishashipping.com`, with the same
+traffic as before:
+
+| Run | Requests | Failed | Caddy reloads |
+|---|---|---|---|
+| Scale 1 → 3 → 1 once (`dns-edge-scale-1-3-1.jsonl`) | 503 | 0 | 0 |
+| Scale 1 → 3 → 1 ten times, 20 of 20 operations succeeded (`dns-edge-10-cycles.jsonl`) | 3,282 | 0 | 0 |
+
+The same test against real Caddy on the owner's machine (gated
+`TestDNSEdgeScalesWithoutLoss`) lost 0 of 348. Before the fix, the same
+scaling lost 8 of 428. VPS-H-001 is resolved.
+
+An earlier ten-cycle attempt didn't count: every scale-up in it failed
+(its output wasn't kept), so no instance moved. The run above logged
+every command; all twenty succeeded.
+
 ## A guardrail slip
 
 For the two no-op reload experiments Claude edited Caddy's configuration
