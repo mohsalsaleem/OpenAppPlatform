@@ -54,8 +54,12 @@ var _ oapv1connect.AgentServiceHandler = (*Server)(nil)
 // OAP's wire conventions (field names as written in the protos), not
 // protojson's default lowerCamelCase.
 func (s *Server) Handler() (string, http.Handler) {
-	return oapv1connect.NewAgentServiceHandler(s, connect.WithCodec(JSONCodec{}))
+	return oapv1connect.NewAgentServiceHandler(s, connect.WithCodec(JSONCodec{}), connect.WithReadMaxBytes(MaxRequestBytes))
 }
+
+// MaxRequestBytes bounds a request's message, so nobody, signed in or not,
+// can make oapd read an arbitrarily large body (R5.8).
+const MaxRequestBytes = 4 << 20
 
 // JSONCodec is Connect's "json" codec with OAP's JSON conventions.
 type JSONCodec struct{}

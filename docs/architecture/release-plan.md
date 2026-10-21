@@ -104,3 +104,13 @@ through break-glass.
 - One server per installation.
 - The default envelope has no `change_facts` rules; the owner adds them.
 - Proposed, awaiting the owner: an ask kind for notices.
+- An extension granted the `docker_socket` setting (the builders) can use
+  Docker, which is root on the host. Grant it only to extensions you trust;
+  every other extension runs as `nobody` without it.
+- `install.sh` checks `oapctl` against the release's `SHA256SUMS`, which
+  catches a corrupted or swapped download but not a compromised release:
+  releases aren't signed yet.
+- An agent refused for an application outside its scope learns that the
+  application exists (from the refusal).
+- Only logins are rate-bounded on the public listener; signed-in agents'
+  calls aren't rate-limited.

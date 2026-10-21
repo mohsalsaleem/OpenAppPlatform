@@ -32,21 +32,22 @@ const KindIdentity = "identity"
 
 // Why codes for identity errors.
 const (
-	WhyUnknownToken = "identity.unknown_token"
-	WhyRevoked      = "identity.revoked"
-	WhyExpired      = "identity.expired"
-	WhyPaused       = "identity.paused"
-	WhyBadAgentName = "identity.bad_agent_name"
-	WhyBadKey       = "identity.bad_key"
-	WhyBadProof     = "identity.bad_proof"
-	WhyDenied       = "identity.denied"
-	WhyLoginExpired = "identity.login_expired"
-	WhyUnknownLogin = "identity.unknown_login"
-	WhyUnknownAgent = "identity.unknown_agent"
-	WhyOwnerOnly    = "identity.owner_only"
-	WhyLocalOnly    = "identity.local_only"
-	WhyNotOwnerKey  = "identity.not_owner_key"
-	WhyUnknownKey   = "identity.unknown_key"
+	WhyUnknownToken  = "identity.unknown_token"
+	WhyRevoked       = "identity.revoked"
+	WhyExpired       = "identity.expired"
+	WhyPaused        = "identity.paused"
+	WhyBadAgentName  = "identity.bad_agent_name"
+	WhyBadKey        = "identity.bad_key"
+	WhyBadProof      = "identity.bad_proof"
+	WhyDenied        = "identity.denied"
+	WhyLoginExpired  = "identity.login_expired"
+	WhyUnknownLogin  = "identity.unknown_login"
+	WhyUnknownAgent  = "identity.unknown_agent"
+	WhyOwnerOnly     = "identity.owner_only"
+	WhyTooManyLogins = "identity.too_many_logins"
+	WhyLocalOnly     = "identity.local_only"
+	WhyNotOwnerKey   = "identity.not_owner_key"
+	WhyUnknownKey    = "identity.unknown_key"
 )
 
 // Identity settings with their defaults.
@@ -54,6 +55,11 @@ const (
 	DefaultTokenTTL = time.Hour
 	DefaultLoginTTL = 10 * time.Minute
 	proofWindow     = 2 * time.Minute
+	// MaxPendingLogins bounds the logins waiting for the owner: anyone can
+	// start one on the public listener, without a token.
+	MaxPendingLogins = 16
+	// maxNonces bounds the proof nonces remembered within the window.
+	maxNonces = 4096
 )
 
 var agentName = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,62}$`)
@@ -304,6 +310,9 @@ func (s *Service) checkProof(req *oapv1.LoginRequest, key ed25519.PublicKey) err
 	if _, used := id.nonces[req.GetNonce()]; used {
 		return fmt.Errorf("the nonce was already used")
 	}
+	if len(id.nonces) >= maxNonces {
+		return fmt.Errorf("too many sign-ins in the last few minutes; try again shortly")
+	}
 	id.nonces[req.GetNonce()] = now
 	return nil
 }
@@ -360,6 +369,10 @@ func (s *Service) Login(ctx context.Context, req *oapv1.LoginRequest, send func(
 
 	p := &pendingLogin{code: userCode(), agent: agent, key: req.GetPublicKey(), expires: s.Clock.Now().Add(s.loginTTL()), done: make(chan loginResult, 1)}
 	id.mu.Lock()
+	if len(id.pending) >= MaxPendingLogins {
+		id.mu.Unlock()
+		return send(refused(WhyTooManyLogins, "%d logins are already waiting for the owner; try again once they are answered or expire", MaxPendingLogins))
+	}
 	id.pending[p.code] = p
 	id.mu.Unlock()
 	defer func() {

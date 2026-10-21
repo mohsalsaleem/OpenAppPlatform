@@ -54,7 +54,7 @@ func TestBuildsOneAtATimeOn1GB(t *testing.T) {
 	owner := map[string]string{"OAP_AGENT_URL": h.api}
 	digest := strings.Fields(sh(`docker exec ` + oapd + ` sha256sum /usr/local/lib/oap/extensions/builder`))[0]
 	if code, out := cli(t, dir, owner, "ext", "install", "builder", "--path", "/usr/local/lib/oap/extensions/builder", "--sha256", digest,
-		"--point", "builder", "--setting", "install_id=journey1", "--yes"); code != 0 {
+		"--point", "builder", "--setting", "install_id=journey1", "--setting", "allow_local_repos=true", "--setting", "docker_socket=/var/run/docker.sock", "--yes"); code != 0 {
 		t.Fatalf("install the builder: %s", out)
 	}
 	spec := journeySpec("built")
@@ -118,6 +118,16 @@ func TestBuildsOneAtATimeOn1GB(t *testing.T) {
 			t.Fatalf("build %d: %v %v", i, r.outcome, r.err)
 		}
 	}
+	// The builder runs as nobody: it can use the socket it was granted, but
+	// can't read oapd's data.
+	if ps := sh(`docker exec ` + oapd + ` ps -o user,args`); !strings.Contains(ps, "nobody") || !strings.Contains(ps, "extensions/builder") {
+		t.Fatalf("the builder isn't running as nobody:\n%s", ps)
+	}
+	for _, f := range []string{"/var/lib/oapd/secret.key", "/var/lib/oapd/oap.db"} {
+		if out, err := exec.Command("docker", "exec", h.name, "docker", "exec", "-u", "65534", oapd, "cat", f).CombinedOutput(); err == nil {
+			t.Fatalf("nobody can read %s: %.80s", f, out)
+		}
+	}
 	if after := ooms(); after != before {
 		t.Fatalf("the host ran out of memory during the builds: %s, then %s", before, after)
 	}
@@ -151,10 +161,10 @@ func TestBuildsOneAtATimeOn1GB(t *testing.T) {
 docker tag busybox:1.37 localhost:5000/built-web:` + commit[:12] + ` && docker push -q localhost:5000/built-web:` + commit[:12] + ` >/dev/null`)
 	regDigest := strings.Fields(sh(`docker exec ` + oapd + ` sha256sum /usr/local/lib/oap/extensions/registry`))[0]
 	if code, out := cli(t, dir, owner, "ext", "install", "registry", "--path", "/usr/local/lib/oap/extensions/registry", "--sha256", regDigest,
-		"--point", "builder", "--setting", "image_template=localhost:5000/built-web:{short}", "--yes"); code != 0 {
+		"--point", "builder", "--setting", "image_template=localhost:5000/built-web:{short}", "--setting", "allow_local_repos=true", "--setting", "docker_socket=/var/run/docker.sock", "--yes"); code != 0 {
 		t.Fatalf("install the registry builder: %s", out)
 	}
-	if code, out := cli(t, dir, owner, "app", "build", "built", "web", "--repo", "file:///tmp/repo", "--commit", "main", "--yes"); code == 0 || !strings.Contains(out, "several builders") {
+	if code, out := cli(t, dir, owner, "app", "build", "built", "web", "--repo", "file:///tmp/repo", "--commit", "main", "--yes"); code == 0 || !strings.Contains(out, "several builder extensions") {
 		t.Fatalf("a build naming no builder with two installed: %d\n%s", code, out)
 	}
 	code, out := cli(t, dir, owner, "app", "build", "built", "web", "--repo", "file:///tmp/repo", "--commit", "main", "--builder", "registry", "--yes")

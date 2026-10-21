@@ -29,6 +29,7 @@ func main() {
 			Capabilities: []*extensionv1.Capability{
 				{Kind: &extensionv1.Capability_Setting{Setting: "image_template"}, Why: "the image for a commit, with {commit} or {short}"},
 				{Kind: &extensionv1.Capability_Setting{Setting: "docker_socket"}, Why: "the Docker Engine that pulls (default /var/run/docker.sock)"},
+				{Kind: &extensionv1.Capability_Setting{Setting: "allow_local_repos"}, Why: "\"true\" to resolve file:// repositories inside oapd's container (tests only)"},
 				{Kind: &extensionv1.Capability_Secret{Secret: "git-token"}, Why: "to resolve branches of private repositories (optional)"},
 				{Kind: &extensionv1.Capability_Network{Network: "registries and git hosts:443"}, Why: "to resolve commits and pull images"},
 			}},
@@ -44,8 +45,11 @@ func main() {
 
 func resolve(ctx context.Context, req *extensionv1.BuildRequest) (*extensionv1.BuildResponse, error) {
 	mu.Lock()
-	tmpl, socket, token := settings["image_template"], settings["docker_socket"], secrets["git-token"]
+	tmpl, socket, token, local := settings["image_template"], settings["docker_socket"], secrets["git-token"], settings["allow_local_repos"] == "true"
 	mu.Unlock()
+	if err := dockerapi.CheckRepository(req.Repository, local); err != nil {
+		return nil, err
+	}
 	if !strings.Contains(tmpl, "{commit}") && !strings.Contains(tmpl, "{short}") {
 		return nil, errors.New("the image_template setting needs {commit} or {short}")
 	}

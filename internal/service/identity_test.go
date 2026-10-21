@@ -1,10 +1,12 @@
 package service
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -241,3 +243,42 @@ func TestPendingLoginExpires(t *testing.T) {
 }
 
 func errorsAs(err error, target **Error) bool { return errors.As(err, target) }
+
+// TestLoginFloodIsBounded (R5.8): logins anyone can start without a token
+// are bounded: past MaxPendingLogins waiting, a new one is refused at once,
+// and the owner's list stays that long.
+func TestLoginFloodIsBounded(t *testing.T) {
+	r := newRig(t)
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	for i := 0; i < MaxPendingLogins; i++ {
+		go r.svc.Login(ctx, &oapv1.LoginRequest{Agent: fmt.Sprintf("flood%d", i)}, func(*oapv1.LoginResponse) error { return nil })
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		l, _ := r.svc.ListLogins(ctx, Owner)
+		if len(l.Logins) == MaxPendingLogins {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("%d logins waiting", len(l.Logins))
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	var got *oapv1.LoginResponse
+	done := make(chan error, 1)
+	go func() {
+		done <- r.svc.Login(ctx, &oapv1.LoginRequest{Agent: "one-more"}, func(res *oapv1.LoginResponse) error { got = res; return nil })
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("a login past the limit waits instead of being refused")
+	}
+	if got.GetRefused().GetWhy() != WhyTooManyLogins {
+		t.Fatalf("past the limit: %v", got)
+	}
+	if l, _ := r.svc.ListLogins(ctx, Owner); len(l.Logins) != MaxPendingLogins {
+		t.Fatalf("%d logins waiting", len(l.Logins))
+	}
+}

@@ -64,3 +64,16 @@ func ResolveRemote(ctx context.Context, repo, ref, token string) (string, error)
 	}
 	return f[0], nil
 }
+
+// CheckRepository allows remote repositories (https, ssh) and, only when
+// the owner allows it, file:// ones: a local path inside oapd's container
+// could otherwise put oapd's own files into an image an agent can read.
+func CheckRepository(repo string, allowLocal bool) error {
+	switch {
+	case strings.HasPrefix(repo, "https://"), strings.HasPrefix(repo, "ssh://"), strings.HasPrefix(repo, "git@"):
+		return nil
+	case strings.HasPrefix(repo, "file://") && allowLocal:
+		return nil
+	}
+	return fmt.Errorf("the builder clones https or ssh repositories; %q isn't one", repo)
+}

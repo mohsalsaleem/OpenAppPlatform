@@ -30,6 +30,7 @@ func main() {
 			Capabilities: []*extensionv1.Capability{
 				{Kind: &extensionv1.Capability_Setting{Setting: "docker_socket"}, Why: "the Docker Engine to build with (default /var/run/docker.sock)"},
 				{Kind: &extensionv1.Capability_Setting{Setting: "install_id"}, Why: "to label the images it builds as this installation's"},
+				{Kind: &extensionv1.Capability_Setting{Setting: "allow_local_repos"}, Why: "\"true\" to build from file:// repositories inside oapd's container (tests only)"},
 				{Kind: &extensionv1.Capability_Secret{Secret: "git-token"}, Why: "to clone private repositories over https (optional)"},
 				{Kind: &extensionv1.Capability_Network{Network: "git hosts:443"}, Why: "to clone repositories"},
 			}},
@@ -45,8 +46,11 @@ func main() {
 
 func build(ctx context.Context, req *extensionv1.BuildRequest) (*extensionv1.BuildResponse, error) {
 	mu.Lock()
-	socket, install, token := settings["docker_socket"], settings["install_id"], secrets["git-token"]
+	socket, install, token, local := settings["docker_socket"], settings["install_id"], secrets["git-token"], settings["allow_local_repos"] == "true"
 	mu.Unlock()
+	if err := dockerapi.CheckRepository(req.Repository, local); err != nil {
+		return nil, err
+	}
 	if socket == "" {
 		socket = "/var/run/docker.sock"
 	}

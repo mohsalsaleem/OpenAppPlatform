@@ -252,6 +252,7 @@ func (h *Host) start(ctx context.Context, r *running) (*grpc.ClientConn, error) 
 	cmd := exec.Command(cfg.Path)
 	// Nothing of oapd's environment: only what a process needs to run.
 	cmd.Env = []string{"PATH=/usr/local/bin:/usr/bin:/bin", "GOMEMLIMIT=" + strconv.Itoa(cfg.MemoryMiB*3/4) + "MiB"}
+	cmd.SysProcAttr = unprivileged(cfg)
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig:  Handshake,
 		Plugins:          plugin.PluginSet{pluginName: &grpcPlugin{}},

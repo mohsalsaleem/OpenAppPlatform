@@ -25,7 +25,7 @@ var _ oapv1connect.OwnerServiceHandler = (*Server)(nil)
 
 // Handler returns the HTTP path and handler for the owner API.
 func (s *Server) Handler() (string, http.Handler) {
-	return oapv1connect.NewOwnerServiceHandler(s, connect.WithCodec(agentapi.JSONCodec{}))
+	return oapv1connect.NewOwnerServiceHandler(s, connect.WithCodec(agentapi.JSONCodec{}), connect.WithReadMaxBytes(agentapi.MaxRequestBytes))
 }
 
 // call resolves the caller, runs fn and translates errors.

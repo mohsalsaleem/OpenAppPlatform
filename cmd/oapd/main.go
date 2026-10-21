@@ -102,6 +102,11 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 	if err := os.MkdirAll(c.data, 0o700); err != nil {
 		return err
 	}
+	// The directory may already exist (Docker creates volume mounts 0755):
+	// only oapd may read its journal, desired state and secret store.
+	if err := os.Chmod(c.data, 0o700); err != nil {
+		return err
+	}
 	store, err := sqlite.Open(ctx, filepath.Join(c.data, "oap.db"))
 	if err != nil {
 		return err
@@ -212,7 +217,7 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 	var protocols http.Protocols
 	protocols.SetHTTP1(true)
 	protocols.SetUnencryptedHTTP2(true)
-	srv := &http.Server{Handler: mux, Protocols: &protocols, ReadHeaderTimeout: 10 * time.Second}
+	srv := &http.Server{Handler: mux, Protocols: &protocols, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute, MaxHeaderBytes: 64 << 10}
 	go func() {
 		<-ctx.Done()
 		shut, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -221,7 +226,7 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 	}()
 	if c.apiHost != "" {
 		pub := listeners.Public(svc)
-		psrv := &http.Server{Addr: c.publicListen, Handler: pub, Protocols: &protocols, ReadHeaderTimeout: 10 * time.Second}
+		psrv := &http.Server{Addr: c.publicListen, Handler: pub, Protocols: &protocols, ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute, MaxHeaderBytes: 64 << 10}
 		go func() {
 			if err := psrv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				log.Error("public listener", "err", err)
