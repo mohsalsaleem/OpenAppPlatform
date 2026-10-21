@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,11 +18,65 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/host"
 )
 
-// journeyHost is a Docker-in-Docker host running the real oapd and Caddy.
-// oapd's socket is reachable at api (as an SSH forward would make it),
-// and Caddy's port 80 at web.
+// journeyHost is a host running the real oapd and Caddy: a Docker-in-Docker
+// container (newJourneyHost) or a real server (newRemoteJourneyHost).
+// oapd's socket is reachable at api (as an SSH forward makes it, for the
+// owner), its public API at public (where agents sign in), and Caddy's
+// port 80 at web.
 type journeyHost struct {
 	name, api, web string
+	public         string   // api, on a Docker-in-Docker host
+	oapd, install  string   // oapd's container and the installation's id
+	ssh            []string // the ssh command for a real server
+}
+
+// sh runs a script on the host.
+func (h *journeyHost) sh(script string) (string, error) {
+	cmd := exec.Command("docker", "exec", "-i", h.name, "sh", "-s")
+	if h.ssh != nil {
+		cmd = exec.Command(h.ssh[0], append(h.ssh[1:], "sh", "-s")...)
+	}
+	cmd.Stdin = strings.NewReader(script)
+	out, err := cmd.CombinedOutput()
+	return strings.TrimSpace(string(out)), err
+}
+
+// newRemoteJourneyHost uses a real server where OAP is installed and OAP's
+// SSH key still works (before hand-off): OAP_JOURNEY_SERVER (user@host),
+// OAP_JOURNEY_SSH_KEY, OAP_JOURNEY_KNOWN_HOSTS (the host key oapctl
+// pinned) and OAP_JOURNEY_PUBLIC (oapd's public URL).
+func newRemoteJourneyHost(t *testing.T) *journeyHost {
+	t.Helper()
+	server, public := os.Getenv("OAP_JOURNEY_SERVER"), os.Getenv("OAP_JOURNEY_PUBLIC")
+	sshArgs := []string{"ssh", "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=yes",
+		"-o", "UserKnownHostsFile=" + os.Getenv("OAP_JOURNEY_KNOWN_HOSTS"), "-i", os.Getenv("OAP_JOURNEY_SSH_KEY"), "-o", "ServerAliveInterval=15"}
+	h := &journeyHost{name: server, public: public, web: "http://" + server[strings.LastIndex(server, "@")+1:], ssh: append(sshArgs, server)}
+	id, err := h.sh(`cat /var/lib/oap/install-id`)
+	if err != nil || id == "" {
+		t.Fatalf("the server's installation: %v %s", err, id)
+	}
+	h.install, h.oapd = id, "oap-"+id+"-oapd"
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := l.Addr().String()
+	l.Close()
+	fwd := exec.Command(sshArgs[0], append(sshArgs[1:], "-N", "-o", "ExitOnForwardFailure=yes", "-L", addr+":"+host.OapdSocket, server)...)
+	if err := fwd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { fwd.Process.Kill(); fwd.Wait() })
+	h.api = "http://" + addr
+	for i := 0; i < 100; i++ {
+		if res, err := http.Get(h.api + "/healthz"); err == nil && res.StatusCode == 200 {
+			res.Body.Close()
+			return h
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	t.Fatal("oapd's socket never answered through the SSH forward")
+	return nil
 }
 
 func newJourneyHost(t *testing.T, memory ...string) *journeyHost {
@@ -41,7 +96,7 @@ func newJourneyHost(t *testing.T, memory ...string) *journeyHost {
 	const image = "oapd:journey-test"
 	buildOapdImage(t, image)
 
-	h := &journeyHost{name: fmt.Sprintf("oap-journey-%d", time.Now().UnixNano())}
+	h := &journeyHost{name: fmt.Sprintf("oap-journey-%d", time.Now().UnixNano()), oapd: "oap-journey1-oapd", install: "journey1"}
 	run(nil, "env", "DOCKER_CONFIG="+t.TempDir(), "docker", "pull", "-q", "docker:27.5.1-dind")
 	runArgs := []string{"run", "-d", "--privileged", "--name", h.name, "-p", "127.0.0.1::80", "-p", "127.0.0.1::7000"}
 	if len(memory) > 0 { // the host's whole memory, swap included
@@ -69,6 +124,7 @@ apk add -q --no-cache curl socat`)
 		return "http://127.0.0.1:" + out[strings.LastIndex(out, ":")+1:]
 	}
 	h.api, h.web = port("7000"), port("80")
+	h.public = h.api
 	for i := 0; i < 50; i++ {
 		if res, err := http.Get(h.api + "/healthz"); err == nil && res.StatusCode == 200 {
 			res.Body.Close()

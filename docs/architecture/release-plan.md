@@ -65,7 +65,7 @@ It ships what phases 1 to 4.3 built:
 
 ## R5.3 on vultr_oap
 
-The site is down from step 2 until step 9. Steps marked **Owner** need
+The site is down from step 2 until step 8. Steps marked **Owner** need
 the owner at a terminal.
 
 1. Save Nisha Shipping's image outside OAP (`docker save` to `/root`) and
@@ -78,15 +78,20 @@ the owner at a terminal.
 4. Check, fix if anything is proposed, and install. `host install` pulls the
    released oapd by digest.
 5. **Owner:** `oapctl owner enroll`.
-6. Hand-off: OAP's SSH key is removed and refused.
-7. The release journey: three agents sign in by device login and the owner
-   approves them. The CLI run is full; the Connect JSON and MCP runs are
-   smoke runs. The checks for coexistence, oapd restart and host health
-   follow. A monitor records traffic and memory throughout.
-8. Evidence pack committed.
-9. Nisha Shipping redeployed through OAP as the owner (from the saved
-   image, sent with break-glass access, or built from its repository if
-   it's pushed). The site serves at www.nishashipping.com.
+6. The release journey, before hand-off (owner decision, 2026-10-21: its
+   host checks need OAP's SSH access): `TestReleaseJourney` with
+   `OAP_JOURNEY_SERVER`. Three agents sign in by device login over oapd's
+   public HTTPS and the owner approves them (over an SSH forward of oapd's
+   socket). The CLI run is full; the Connect JSON and MCP runs are smoke
+   runs. The checks for coexistence, oapd restart and host health follow.
+   A monitor records traffic and memory throughout.
+7. The journey's applications are scaled to 0 (OAP can't remove an
+   application yet).
+8. Nisha Shipping redeployed through OAP as the owner, from its saved image
+   (loaded over OAP's SSH access while it still works) and its recorded
+   spec. The site serves at www.nishashipping.com.
+9. Hand-off: OAP's SSH key is removed and refused; owner commands work over
+   HTTPS with the owner key. The evidence pack is committed.
 
 After R5.3 the server runs released v0.2.0 the way a user's would: no
 OAP SSH access, owner commands over HTTPS with the owner key, upgrades

@@ -28,25 +28,47 @@ import (
 // the full journey, the Connect and MCP runs are smoke runs. Final checks:
 // the apps coexist behind the shared edge, keep serving while oapd is
 // stopped, and the host stays out of memory trouble. Gated on
-// OAP_TEST_DOCKER=1; OAP_JOURNEY_OUT keeps the receipt.
+// OAP_TEST_DOCKER=1; OAP_JOURNEY_OUT keeps the receipt. With
+// OAP_JOURNEY_SERVER it runs against a real server (newRemoteJourneyHost)
+// instead of a Docker-in-Docker host.
 
 const fixtureImage = "journey-fixture"
 
-// buildFixture builds the fixture's three image versions on the host.
+// buildFixture builds the fixture's three image versions for the host,
+// labelled as its installation's (so uninstalling OAP removes them). On a
+// real server they're built here and loaded over SSH.
 func buildFixture(t *testing.T, h *journeyHost) {
 	t.Helper()
+	arch := runtime.GOARCH
+	if h.ssh != nil {
+		m, err := h.sh(`uname -m`)
+		if err != nil {
+			t.Fatal(m, err)
+		}
+		arch = map[string]string{"x86_64": "amd64", "aarch64": "arm64"}[m]
+	}
 	dir := t.TempDir()
 	for _, v := range []string{"v1", "v2", "bad"} {
 		build := exec.Command("go", "build", "-ldflags", "-X main.version="+v, "-o", filepath.Join(dir, v, "journeyfixture"), "./testdata/journeyfixture")
-		build.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+runtime.GOARCH)
+		build.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+arch)
 		if out, err := build.CombinedOutput(); err != nil {
 			t.Fatalf("build fixture %s: %v\n%s", v, err, out)
 		}
 		os.WriteFile(filepath.Join(dir, v, "Dockerfile"), []byte(`FROM busybox:1.37
 COPY journeyfixture /journeyfixture
+LABEL io.openappplatform.install=`+h.install+`
 HEALTHCHECK --interval=5s --timeout=3s --retries=3 CMD ["/journeyfixture", "health"]
 ENTRYPOINT ["/journeyfixture"]
 `), 0o644)
+		if h.ssh != nil {
+			// A Docker config of our own: no desktop credential helper.
+			build := exec.Command("docker", "build", "-q", "--platform", "linux/"+arch, "-t", fixtureImage+":"+v, filepath.Join(dir, v))
+			build.Env = append(os.Environ(), "DOCKER_CONFIG="+t.TempDir())
+			if out, err := build.CombinedOutput(); err != nil {
+				t.Fatalf("docker build fixture %s: %v\n%s", v, err, out)
+			}
+			continue
+		}
 		if out, err := exec.Command("docker", "cp", filepath.Join(dir, v), h.name+":/root/fixture-"+v).CombinedOutput(); err != nil {
 			t.Fatalf("copy fixture: %v %s", err, out)
 		}
@@ -55,6 +77,25 @@ ENTRYPOINT ["/journeyfixture"]
 			local, _ := exec.Command("ls", "-la", filepath.Join(dir, v)).CombinedOutput()
 			t.Fatalf("docker build fixture %s: %v\n%s\nhost:\n%s\nlocal:\n%s", v, err, out, ls, local)
 		}
+	}
+	if h.ssh != nil {
+		images := []string{fixtureImage + ":v1", fixtureImage + ":v2", fixtureImage + ":bad"}
+		save := exec.Command("docker", append([]string{"save"}, images...)...)
+		load := exec.Command(h.ssh[0], append(h.ssh[1:], "docker", "load", "-q")...)
+		pipe, _ := save.StdoutPipe()
+		load.Stdin = pipe
+		var out bytes.Buffer
+		load.Stdout, load.Stderr = &out, &out
+		if err := load.Start(); err != nil {
+			t.Fatal(err)
+		}
+		if err := save.Run(); err != nil {
+			t.Fatalf("docker save: %v", err)
+		}
+		if err := load.Wait(); err != nil {
+			t.Fatalf("load the fixture on the server: %v\n%s", err, out.String())
+		}
+		exec.Command("docker", append([]string{"image", "rm"}, images...)...).Run()
 	}
 }
 
@@ -187,7 +228,12 @@ func TestReleaseJourney(t *testing.T) {
 	if os.Getenv("OAP_TEST_DOCKER") != "1" {
 		t.Skip("needs Docker; set OAP_TEST_DOCKER=1")
 	}
-	h := newJourneyHost(t, "1g")
+	h := (*journeyHost)(nil)
+	if os.Getenv("OAP_JOURNEY_SERVER") != "" {
+		h = newRemoteJourneyHost(t)
+	} else {
+		h = newJourneyHost(t, "1g")
+	}
 	buildFixture(t, h)
 	rec := &receipt{Runs: map[string]map[string]any{}, Final: map[string]any{}}
 	defer func() {
@@ -199,13 +245,48 @@ func TestReleaseJourney(t *testing.T) {
 	}()
 	hostSh := func(script string) string {
 		t.Helper()
-		out, err := exec.Command("docker", "exec", "-i", h.name, "sh", "-c", script).CombinedOutput()
+		out, err := h.sh(script)
 		if err != nil {
 			t.Fatalf("%s: %v\n%s", script, err, out)
 		}
-		return strings.TrimSpace(string(out))
+		return out
 	}
+	// Out-of-memory kills: the Docker-in-Docker host's cgroup, or a real
+	// server's kernel counter.
 	ooms := func() string { return hostSh(`grep '^oom_kill ' /sys/fs/cgroup/memory.events`) }
+	memoryPeak := func() string { return hostSh(`echo $(( $(cat /sys/fs/cgroup/memory.peak) / 1048576 ))`) }
+	if h.ssh != nil {
+		ooms = func() string { return hostSh(`grep '^oom_kill ' /proc/vmstat`) }
+		// A monitor: the server's memory in use, every 5 s.
+		var mu sync.Mutex
+		peak, minAvail, stop := 0, -1, make(chan struct{})
+		go func() {
+			for {
+				select {
+				case <-stop:
+					return
+				case <-time.After(5 * time.Second):
+				}
+				out, err := h.sh(`awk '/^MemTotal/{t=$2}/^MemAvailable/{a=$2}END{print int((t-a)/1024), int(a/1024)}' /proc/meminfo`)
+				var used, avail int
+				if _, e := fmt.Sscan(out, &used, &avail); err == nil && e == nil {
+					mu.Lock()
+					peak = max(peak, used)
+					if minAvail < 0 || avail < minAvail {
+						minAvail = avail
+					}
+					mu.Unlock()
+				}
+			}
+		}()
+		t.Cleanup(func() { close(stop) })
+		memoryPeak = func() string {
+			mu.Lock()
+			defer mu.Unlock()
+			rec.Final["memoryMinAvailableMiB"] = minAvail
+			return fmt.Sprint(peak)
+		}
+	}
 	oomsBefore := ooms()
 
 	dir := t.TempDir()
@@ -216,7 +297,7 @@ func TestReleaseJourney(t *testing.T) {
 		go func() {
 			hh := newHarness(t, false, "", "")
 			hh.a.configDir, hh.a.now = dir, time.Now
-			hh.run("login", h.api, "--agent", agent)
+			hh.run("login", h.public, "--agent", agent)
 			done <- hh.out.String()
 		}()
 		code := ""
@@ -430,7 +511,7 @@ func TestReleaseJourney(t *testing.T) {
 	t.Run("connect", func(t *testing.T) {
 		const app, domain = "journey-connect", "connect.journey.test"
 		tok := signIn("journey-connect", app)
-		c := oapv1connect.NewAgentServiceClient(&http.Client{Transport: withToken{tok, http.DefaultTransport}, Timeout: 10 * time.Minute}, h.api, connect.WithProtoJSON())
+		c := oapv1connect.NewAgentServiceClient(&http.Client{Transport: withToken{tok, http.DefaultTransport}, Timeout: 10 * time.Minute}, h.public, connect.WithProtoJSON())
 		ctx := context.Background()
 		if _, err := c.Observe(ctx, connect.NewRequest(&oapv1.ObserveRequest{})); err != nil {
 			t.Fatalf("S1 observe: %v", err)
@@ -493,7 +574,7 @@ func TestReleaseJourney(t *testing.T) {
 		call := func(method string, params any) map[string]any {
 			t.Helper()
 			body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
-			req, _ := http.NewRequest(http.MethodPost, h.api+"/mcp", bytes.NewReader(body))
+			req, _ := http.NewRequest(http.MethodPost, h.public+"/mcp", bytes.NewReader(body))
 			req.Header.Set("Authorization", "Bearer "+tok)
 			req.Header.Set("Content-Type", "application/json")
 			res, err := (&http.Client{Timeout: 10 * time.Minute}).Do(req)
@@ -571,7 +652,7 @@ func TestReleaseJourney(t *testing.T) {
 		// X2: oapd stopped: the apps keep serving through the edge; nothing
 		// they run is restarted; every interface works again after.
 		before := hostSh(`docker ps --format '{{.ID}} {{.Names}}' | grep -v oapd | sort`)
-		hostSh(`docker stop oap-journey1-oapd >/dev/null`)
+		hostSh(`docker stop ` + h.oapd + ` >/dev/null`)
 		probes := map[string]*trafficProbe{}
 		for _, d := range []string{"cli.journey.test", "connect.journey.test", "mcp.journey.test"} {
 			probes[d] = h.probe(d, "/api")
@@ -583,7 +664,7 @@ func TestReleaseJourney(t *testing.T) {
 			failed += p.failures
 			rec.observe("X2 %s while oapd was down: %s", d, p)
 		}
-		hostSh(`docker start oap-journey1-oapd >/dev/null; i=0; until curl -sf --unix-socket /run/oapd/oapd.sock http://oapd/healthz >/dev/null; do i=$((i+1)); [ $i -gt 60 ] && exit 1; sleep 1; done`)
+		hostSh(`docker start ` + h.oapd + ` >/dev/null; i=0; until curl -sf --unix-socket /run/oapd/oapd.sock http://oapd/healthz >/dev/null; do i=$((i+1)); [ $i -gt 60 ] && exit 1; sleep 1; done`)
 		after := hostSh(`docker ps --format '{{.ID}} {{.Names}}' | grep -v oapd | sort`)
 		rec.Final["outageProbeFailures"] = failed
 		if failed != 0 {
@@ -609,7 +690,7 @@ func TestReleaseJourney(t *testing.T) {
 			t.Errorf("X3: %s became %s", oomsBefore, after)
 		}
 		rec.Final["oomKills"] = ooms()
-		rec.Final["memoryPeakMiB"] = hostSh(`echo $(( $(cat /sys/fs/cgroup/memory.peak) / 1048576 ))`)
+		rec.Final["memoryPeakMiB"] = memoryPeak()
 	})
 }
 
