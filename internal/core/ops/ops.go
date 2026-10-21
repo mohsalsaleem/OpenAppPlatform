@@ -137,6 +137,15 @@ type BuildRequest struct {
 	Started func()
 }
 
+// ErrNoFactSource is a fact source with nothing installed to ask.
+var ErrNoFactSource = errors.New("no fact source is installed")
+
+// FactsRequest asks a fact source about a commit.
+type FactsRequest struct {
+	Repository, Commit string
+	PullRequest        int
+}
+
 // BuildResult is what a build produced.
 type BuildResult struct {
 	Image   string // the full reference, with its tag

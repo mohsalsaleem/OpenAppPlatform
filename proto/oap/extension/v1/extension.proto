@@ -26,6 +26,8 @@ enum Point {
   POINT_NOTIFIER = 1;
   // Builder turns source into images (builder.proto).
   POINT_BUILDER = 2;
+  // FactSource reports facts about commits (facts.proto).
+  POINT_FACT_SOURCE = 3;
 }
 
 message DescribeRequest {

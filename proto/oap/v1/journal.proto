@@ -106,6 +106,8 @@ message Outcome {
   Evidence evidence = 5;
   // Images an operation produced, by component (builds).
   map<string, string> images = 6;
+  // The commit each built image came from, by component.
+  map<string, string> commits = 7;
 }
 
 message Evidence {

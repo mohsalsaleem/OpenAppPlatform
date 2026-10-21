@@ -90,7 +90,7 @@ var layers = []layer{
 		[]string{local("internal/core"), local("internal/engine"), local("internal/ports"),
 			local("internal/adapters"), local("internal/service"), local("internal/surface"), local("gen")},
 		append(append([]string{}, ThirdParty...), CLIOnly...)},
-	{"commands", []string{local("cmd/oapd"), local("cmd/oap-ext-builder"), local("cmd/oap-ext-registry")},
+	{"commands", []string{local("cmd/oapd"), local("cmd/oap-ext-builder"), local("cmd/oap-ext-registry"), local("cmd/oap-ext-github")},
 		[]string{local("internal/core"), local("internal/engine"), local("internal/ports"),
 			local("internal/adapters"), local("internal/service"), local("internal/surface"), local("gen")},
 		ThirdParty},

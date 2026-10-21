@@ -127,9 +127,11 @@ type SecretStore interface {
 	Names() ([]string, error)
 }
 
-// FactSource reports facts about a code change, for example from GitHub.
+// FactSource reports facts about a code change, for example from GitHub:
+// the files it changed, CI, review and signature. The service classifies
+// the files; the envelope decides what the facts mean.
 type FactSource interface {
-	Facts(ctx context.Context, repository, commit string) (*oapv1.ChangeFacts, error)
+	Facts(ctx context.Context, req ops.FactsRequest) (*oapv1.ChangeFacts, error)
 }
 
 // Notifier delivers messages to the owner.

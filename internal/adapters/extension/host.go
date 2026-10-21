@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 	extensionv1 "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/extension/v1"
+	oapv1 "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/ops"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/spec"
 	"google.golang.org/grpc"
@@ -139,7 +140,8 @@ func (h *Host) Install(ctx context.Context, e spec.Extension, verify bool) error
 }
 
 // points maps desired-state point names to the contract's.
-var points = map[string]extensionv1.Point{"notifier": extensionv1.Point_POINT_NOTIFIER, "builder": extensionv1.Point_POINT_BUILDER}
+var points = map[string]extensionv1.Point{"notifier": extensionv1.Point_POINT_NOTIFIER, "builder": extensionv1.Point_POINT_BUILDER,
+	"facts": extensionv1.Point_POINT_FACT_SOURCE}
 
 // Remove stops and forgets an extension.
 func (h *Host) Remove(name string) {
@@ -496,26 +498,39 @@ func (h *Host) Builder() Builder { return Builder{h: h} }
 // Builder builds images through builder extensions.
 type Builder struct{ h *Host }
 
+// noneInstalled is the error when no extension serves a point.
+type noneInstalled string
+
+func (e noneInstalled) Error() string { return string(e) }
+
+// only returns the one extension granted a point, or an error naming them.
+func (h *Host) only(point extensionv1.Point, kind, pointName string) (string, error) {
+	h.mu.Lock()
+	var found []string
+	for n, r := range h.exts {
+		if slices.Contains(r.cfg.Points, point) {
+			found = append(found, n)
+		}
+	}
+	h.mu.Unlock()
+	slices.Sort(found)
+	switch len(found) {
+	case 0:
+		return "", noneInstalled(fmt.Sprintf("no %s extension is installed; install one with oapctl ext install NAME --point %s", kind, pointName))
+	case 1:
+		return found[0], nil
+	}
+	return "", fmt.Errorf("several %s extensions are installed (%s); name one", kind, strings.Join(found, ", "))
+}
+
 func (b Builder) Build(ctx context.Context, req ops.BuildRequest) (ops.BuildResult, error) {
 	name := req.Builder
 	if name == "" {
-		b.h.mu.Lock()
-		var found []string
-		for n, r := range b.h.exts {
-			if slices.Contains(r.cfg.Points, extensionv1.Point_POINT_BUILDER) {
-				found = append(found, n)
-			}
+		n, err := b.h.only(extensionv1.Point_POINT_BUILDER, "builder", "builder")
+		if err != nil {
+			return ops.BuildResult{}, err
 		}
-		b.h.mu.Unlock()
-		slices.Sort(found)
-		switch len(found) {
-		case 0:
-			return ops.BuildResult{}, errors.New("no builder extension is installed; install one with oapctl ext install NAME --point builder")
-		case 1:
-			name = found[0]
-		default:
-			return ops.BuildResult{}, fmt.Errorf("several builders are installed (%s); name one", strings.Join(found, ", "))
-		}
+		name = n
 	}
 	r, err := b.h.get(name)
 	if err != nil {
@@ -532,4 +547,36 @@ func (b Builder) Build(ctx context.Context, req ops.BuildRequest) (ops.BuildResu
 		return ops.BuildResult{}, &Error{Extension: name, Op: "build", Err: errors.New("it returned no image")}
 	}
 	return ops.BuildResult{Image: res.Image, Commit: res.Commit, LogTail: res.LogTail}, nil
+}
+
+// FactSource returns the host as the core's fact source: the installed
+// extension granted the facts point.
+func (h *Host) FactSource() FactSource { return FactSource{h: h} }
+
+// FactSource gets change facts through a fact-source extension.
+type FactSource struct{ h *Host }
+
+var ciStates = map[extensionv1.CiState]string{extensionv1.CiState_CI_STATE_GREEN: "green", extensionv1.CiState_CI_STATE_RED: "red",
+	extensionv1.CiState_CI_STATE_PENDING: "pending"}
+
+func (f FactSource) Facts(ctx context.Context, req ops.FactsRequest) (*oapv1.ChangeFacts, error) {
+	name, err := f.h.only(extensionv1.Point_POINT_FACT_SOURCE, "fact source", "facts")
+	if err != nil {
+		var none noneInstalled
+		if errors.As(err, &none) {
+			return nil, fmt.Errorf("%w: %v", ops.ErrNoFactSource, err)
+		}
+		return nil, err
+	}
+	var res extensionv1.FactsResponse
+	if err := f.h.call(ctx, name, extensionv1.Point_POINT_FACT_SOURCE, "/oap.extension.v1.FactSourceService/Facts",
+		&extensionv1.FactsRequest{Repository: req.Repository, Commit: req.Commit, PullRequest: int32(req.PullRequest)}, &res); err != nil {
+		return nil, err
+	}
+	ci, ok := ciStates[res.Ci]
+	if !ok {
+		ci = "unknown"
+	}
+	return &oapv1.ChangeFacts{Repository: req.Repository, Commit: res.Commit, FilesChanged: res.FilesChanged, Ci: ci,
+		Reviewed: res.Reviewed, Signed: res.Signed}, nil
 }

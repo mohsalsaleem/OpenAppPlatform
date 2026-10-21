@@ -127,6 +127,9 @@ type Service struct {
 	Extensions ports.Extensions
 	// Builder builds images, through the build queue; nil means no builds.
 	Builder ports.Builder
+	// Facts reports facts about the commits deploys come from; nil means
+	// proposals carry none.
+	Facts ports.FactSource
 
 	serializer *engine.Serializer
 	runCtx     context.Context
@@ -508,7 +511,7 @@ func (s *Service) Propose(ctx context.Context, c Caller, req *oapv1.ProposeReque
 	}
 	p, ierr := proposal.Propose(proposal.Inputs{Agent: c.Agent, BaseRevision: head, Tree: tree,
 		History: func(h string) (any, bool) { t, ok, _ := s.Desired.ByHash(ctx, h); return t, ok },
-		Intent:  in, Envelope: env})
+		Intent:  in, Envelope: env, Facts: s.changeFacts(ctx, in)})
 	if ierr != nil {
 		return nil, &Error{Code: InvalidArgument, Detail: ierr.Detail()}
 	}
@@ -678,13 +681,14 @@ func (s *Service) submit(op engine.Operation) {
 	go func() { s.outcome(op.ID, <-done) }()
 }
 
-func (s *Service) outcome(id string, runErr error) { s.outcomeWith(id, runErr, nil) }
+func (s *Service) outcome(id string, runErr error) { s.outcomeWith(id, runErr, nil, nil) }
 
-// outcomeWith records an operation's outcome, with the images it built.
-func (s *Service) outcomeWith(id string, runErr error, images map[string]string) {
+// outcomeWith records an operation's outcome, with the images it built and
+// their commits.
+func (s *Service) outcomeWith(id string, runErr error, images, commits map[string]string) {
 	o := &oapv1.Outcome{OperationId: id, Status: oapv1.OutcomeStatus_OUTCOME_STATUS_ACHIEVED}
 	if runErr == nil {
-		o.Images = images
+		o.Images, o.Commits = images, commits
 	}
 	var se *engine.StepError
 	switch {

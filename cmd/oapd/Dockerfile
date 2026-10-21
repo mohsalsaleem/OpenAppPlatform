@@ -18,5 +18,6 @@ COPY oapd-linux-${TARGETARCH} /usr/local/bin/oapd
 # First-party extensions (R4.2): installed only when the owner approves.
 COPY oap-ext-builder-linux-${TARGETARCH} /usr/local/lib/oap/extensions/builder
 COPY oap-ext-registry-linux-${TARGETARCH} /usr/local/lib/oap/extensions/registry
+COPY oap-ext-github-linux-${TARGETARCH} /usr/local/lib/oap/extensions/github
 VOLUME /var/lib/oapd
 ENTRYPOINT ["/usr/local/bin/oapd"]

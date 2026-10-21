@@ -191,7 +191,7 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 			return 0, false
 		}}
 	svc := &service.Service{Desired: desired, Journal: store, Clock: clock, Observer: observer, Notifier: notifier, SecretStore: secrets,
-		Extensions: extensions, Builder: builds,
+		Extensions: extensions, Builder: builds, Facts: extensions.FactSource(),
 		Executor: &engine.Executor{Runtime: rt, Edge: edge, Journal: store, Desired: desired, Clock: clock}}
 	if err := svc.Start(ctx); err != nil {
 		return err

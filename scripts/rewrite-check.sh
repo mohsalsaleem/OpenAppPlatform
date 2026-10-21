@@ -6,9 +6,9 @@ cd "$(dirname "$0")/.."
 
 NEW_TREE=(./internal/core/... ./internal/engine/... ./internal/ports/... ./internal/adapters/...
   ./internal/service/... ./internal/surface/... ./cmd/oapd/... ./cmd/oapctl/... ./cmd/oap-ext-builder/...
-  ./cmd/oap-ext-registry/... ./tests/arch/...)
+  ./cmd/oap-ext-registry/... ./cmd/oap-ext-github/... ./tests/arch/...)
 NEW_DIRS=(internal/core internal/engine internal/ports internal/adapters internal/service
-  internal/surface cmd/oapd cmd/oapctl cmd/oap-ext-builder cmd/oap-ext-registry tests/arch)
+  internal/surface cmd/oapd cmd/oapctl cmd/oap-ext-builder cmd/oap-ext-registry cmd/oap-ext-github tests/arch)
 [ -n "$(find gen -name '*.go' -print -quit)" ] && NEW_TREE+=(./gen/...) && NEW_DIRS+=(gen)
 
 step() { printf '\n== %s\n' "$1"; }

@@ -54,27 +54,27 @@ func isBuildOp(p *oapv1.Proposal) bool { return p.GetIntent().GetBuild() != nil 
 func (s *Service) runBuild(id string, p *oapv1.Proposal) {
 	ctx := context.WithoutCancel(s.runCtx)
 	go func() {
-		images, err := s.build(ctx, id, p)
-		s.outcomeWith(id, err, images)
+		images, commits, err := s.build(ctx, id, p)
+		s.outcomeWith(id, err, images, commits)
 	}()
 }
 
-func (s *Service) build(ctx context.Context, id string, p *oapv1.Proposal) (map[string]string, error) {
+func (s *Service) build(ctx context.Context, id string, p *oapv1.Proposal) (images, commits map[string]string, err error) {
 	step := p.GetSteps()[0]
 	fail := func(reason string) error {
 		s.recordStep(ctx, id, 0, engine.StateFailed, reason)
 		return &engine.StepError{Step: 0, Kind: step.GetKind(), Reason: reason}
 	}
 	if s.Builder == nil {
-		return nil, fail("this server has no build queue")
+		return nil, nil, fail("this server has no build queue")
 	}
 	tree, err := s.current(ctx, p.GetIntent().GetApplication(), false)
 	if err != nil {
-		return nil, fail(err.Error())
+		return nil, nil, fail(err.Error())
 	}
 	res, ierr := intent.CompileBuild(tree, p.GetIntent())
 	if ierr != nil {
-		return nil, fail(ierr.Message)
+		return nil, nil, fail(ierr.Message)
 	}
 	out, err := s.Builder.Build(ctx, ops.BuildRequest{Application: p.GetIntent().GetApplication(), Component: res.Component,
 		Repository: res.Repository, Commit: res.Commit, Context: res.Context, Dockerfile: res.Dockerfile,
@@ -82,8 +82,8 @@ func (s *Service) build(ctx context.Context, id string, p *oapv1.Proposal) (map[
 		// The step starts when the queue lets the build run.
 		Started: func() { s.recordStep(ctx, id, 0, engine.StateStarted, "") }})
 	if err != nil {
-		return nil, fail(err.Error())
+		return nil, nil, fail(err.Error())
 	}
 	s.recordStep(ctx, id, 0, engine.StateSucceeded, "built "+out.Image+" from "+out.Commit)
-	return map[string]string{res.Component: out.Image}, nil
+	return map[string]string{res.Component: out.Image}, map[string]string{res.Component: out.Commit}, nil
 }

@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package oap.extension.v1;
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/extension/v1;extensionv1";
+
+// FactSourceService is the change-facts extension point (R4.3): it reports
+// what a code host knows about a commit. It reports raw facts only; the
+// core classifies the files and the owner's envelope decides what they
+// mean.
+service FactSourceService {
+  rpc Facts(FactsRequest) returns (FactsResponse);
+}
+
+message FactsRequest {
+  // A repository URL (https://host/owner/name, git@host:owner/name) and a
+  // commit; the pull request is optional.
+  string repository = 1;
+  string commit = 2;
+  int32 pull_request = 3;
+}
+
+// CiState is what the code host's checks say about a commit.
+enum CiState {
+  CI_STATE_UNSPECIFIED = 0;
+  // No checks or statuses ran.
+  CI_STATE_NONE = 1;
+  CI_STATE_GREEN = 2;
+  CI_STATE_RED = 3;
+  CI_STATE_PENDING = 4;
+}
+
+message FactsResponse {
+  // The full commit the facts are about.
+  string commit = 1;
+  // Paths the commit changed.
+  repeated string files_changed = 2;
+  CiState ci = 3;
+  // Whether a pull request containing the commit has an approving review
+  // and no outstanding request for changes.
+  bool reviewed = 4;
+  // Whether the code host verified the commit's signature.
+  bool signed = 5;
+  // The pull request the facts came from, if any.
+  int32 pull_request = 6;
+}

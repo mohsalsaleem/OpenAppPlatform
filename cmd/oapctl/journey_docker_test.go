@@ -91,7 +91,7 @@ func (h *journeyHost) ps() string {
 func buildOapdImage(t *testing.T, image string) {
 	t.Helper()
 	ctxDir := t.TempDir()
-	for bin, pkg := range map[string]string{"oapd": "../oapd", "oap-ext-builder": "../oap-ext-builder", "oap-ext-registry": "../oap-ext-registry"} {
+	for bin, pkg := range map[string]string{"oapd": "../oapd", "oap-ext-builder": "../oap-ext-builder", "oap-ext-registry": "../oap-ext-registry", "oap-ext-github": "../oap-ext-github"} {
 		build := exec.Command("go", "build", "-trimpath", "-o", filepath.Join(ctxDir, bin+"-linux-"+runtime.GOARCH), pkg)
 		build.Env = append(os.Environ(), "CGO_ENABLED=0", "GOOS=linux", "GOARCH="+runtime.GOARCH)
 		if out, err := build.CombinedOutput(); err != nil {

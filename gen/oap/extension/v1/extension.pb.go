@@ -30,6 +30,8 @@ const (
 	Point_POINT_NOTIFIER Point = 1
 	// Builder turns source into images (builder.proto).
 	Point_POINT_BUILDER Point = 2
+	// FactSource reports facts about commits (facts.proto).
+	Point_POINT_FACT_SOURCE Point = 3
 )
 
 // Enum value maps for Point.
@@ -38,11 +40,13 @@ var (
 		0: "POINT_UNSPECIFIED",
 		1: "POINT_NOTIFIER",
 		2: "POINT_BUILDER",
+		3: "POINT_FACT_SOURCE",
 	}
 	Point_value = map[string]int32{
 		"POINT_UNSPECIFIED": 0,
 		"POINT_NOTIFIER":    1,
 		"POINT_BUILDER":     2,
+		"POINT_FACT_SOURCE": 3,
 	}
 )
 
@@ -474,11 +478,12 @@ const file_oap_extension_v1_extension_proto_rawDesc = "" +
 	"\fSecretsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x13\n" +
-	"\x11ConfigureResponse*E\n" +
+	"\x11ConfigureResponse*\\\n" +
 	"\x05Point\x12\x15\n" +
 	"\x11POINT_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0ePOINT_NOTIFIER\x10\x01\x12\x11\n" +
-	"\rPOINT_BUILDER\x10\x022\xbb\x01\n" +
+	"\rPOINT_BUILDER\x10\x02\x12\x15\n" +
+	"\x11POINT_FACT_SOURCE\x10\x032\xbb\x01\n" +
 	"\x10ExtensionService\x12Q\n" +
 	"\bDescribe\x12!.oap.extension.v1.DescribeRequest\x1a\".oap.extension.v1.DescribeResponse\x12T\n" +
 	"\tConfigure\x12\".oap.extension.v1.ConfigureRequest\x1a#.oap.extension.v1.ConfigureResponseBJZHgithub.com/mohsalsaleem/OpenAppPlatform/gen/oap/extension/v1;extensionv1b\x06proto3"
