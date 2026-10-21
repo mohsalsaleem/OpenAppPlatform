@@ -1,0 +1,40 @@
+{
+  "runs": {
+    "cli": {
+      "brokenReleaseApiFailures": 0,
+      "brokenReleaseNotCompleted": true,
+      "correctedToV2": true,
+      "deployWithMigrationFirst": true,
+      "desiredRestoredAfterFailure": true,
+      "failingMigrationBlocksRollout": true,
+      "outcomeNamesApi": true,
+      "proposeNeedsApproval": true,
+      "replaySameOperation": true,
+      "rollbackSkippedMigration": true,
+      "scaleDownFailures": 0,
+      "scaleUpFailures": 0,
+      "scaleUpTo3": true,
+      "serving": true,
+      "volumeDataRetained": true
+    },
+    "connect": {
+      "smoke": "passed"
+    },
+    "mcp": {
+      "smoke": "passed"
+    }
+  },
+  "final": {
+    "coexistence": true,
+    "interfacesAfterRestart": true,
+    "memoryPeakMiB": "530",
+    "oomKills": "oom_kill 0",
+    "outageProbeFailures": 0
+  },
+  "observations": [
+    "E1 explain: journey-cli is as desired (revision 71).",
+    "X2 cli.journey.test while oapd was down: 549 requests, 0 failed, versions map[v1:549], 1 instances",
+    "X2 connect.journey.test while oapd was down: 550 requests, 0 failed, versions map[v1:550], 1 instances",
+    "X2 mcp.journey.test while oapd was down: 551 requests, 0 failed, versions map[v1:551], 1 instances"
+  ]
+}

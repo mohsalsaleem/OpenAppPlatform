@@ -248,10 +248,19 @@ func (a *app) askCmd(ctx context.Context, args []string) int {
 	expires := fs.Duration("expires", time.Hour, "how long the owner has to answer")
 	wait := fs.Bool("wait", false, "wait for the answer or the expiry")
 	asJSON := fs.Bool("json", false, "")
-	question, rest := splitFirst(args)
-	if err := fs.Parse(rest); err != nil {
-		return 2
+	// The question and the flags may come in any order.
+	var words []string
+	for len(args) > 0 {
+		if strings.HasPrefix(args[0], "-") {
+			if err := fs.Parse(args); err != nil {
+				return 2
+			}
+			args = fs.Args()
+			continue
+		}
+		words, args = append(words, args[0]), args[1:]
 	}
+	question := strings.Join(words, " ")
 	k, ok := map[string]oapv1.AskKind{"approval": oapv1.AskKind_ASK_KIND_APPROVAL, "secret": oapv1.AskKind_ASK_KIND_SECRET,
 		"decision": oapv1.AskKind_ASK_KIND_DECISION, "blocker": oapv1.AskKind_ASK_KIND_BLOCKER}[*kind]
 	if !ok {

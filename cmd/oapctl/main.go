@@ -80,6 +80,7 @@ const usage = `Usage:
   %[1]s app scale APP COMPONENT N [ADDR]    run N instances of a component
   %[1]s app deploy APP COMPONENT=IMAGE...   roll out new images
   %[1]s app build APP COMPONENT --repo URL --commit REF   build an image from source on the server
+  %[1]s apply PROPOSAL_ID                   apply a proposal by its id, for example once the owner approved it
   %[1]s app rollback APP --to SPEC_HASH     return to the images of an earlier desired state
   %[1]s ext install NAME --path P --point notifier [--setting K=V] [--secret S]   install an extension (a sensitive change)
   %[1]s ext remove NAME                     uninstall an extension
@@ -135,6 +136,8 @@ func (a *app) run(ctx context.Context, args []string) int {
 		return a.extInstall(ctx, args[2:])
 	case len(args) >= 2 && args[0] == "ext" && args[1] == "remove":
 		return a.extRemove(ctx, args[2:])
+	case args[0] == "apply":
+		return a.applyCmd(ctx, args[1:])
 	case args[0] == "login":
 		return a.loginCmd(ctx, args[1:])
 	case args[0] == "owner":

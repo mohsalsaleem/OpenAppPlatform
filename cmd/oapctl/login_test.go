@@ -200,6 +200,14 @@ func TestAskEndToEnd(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatal("the agent never got the answer")
 	}
+
+	// Flags may come before the question (agents write it both ways).
+	if c, out := cli(t, dir, map[string]string{"OAP_AGENT": "claude"}, "ask", "--kind", "blocker", "--expires", "5m", "Is", "the", "registry", "down?"); c != 0 {
+		t.Fatalf("ask with flags first: %d %s", c, out)
+	}
+	if _, out := cli(t, dir, owner, "owner", "asks"); !strings.Contains(out, "Is the registry down?") {
+		t.Fatalf("asks: %s", out)
+	}
 }
 
 // TestBriefingEndToEnd: the owner sets house rules; a signed-in agent

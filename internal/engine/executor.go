@@ -38,8 +38,11 @@ type Operation struct {
 	// Old is the desired state the plan starts from; New is where it ends.
 	Old, New *spec.Application
 	NewTree  any
-	Author   string
-	Message  string
+	// OldTree is the desired state the operation started from; the
+	// service restores it when the operation isn't achieved.
+	OldTree any
+	Author  string
+	Message string
 }
 
 // Executor runs operations.
@@ -250,7 +253,14 @@ func (x *Executor) step(ctx context.Context, op Operation, i int, s *oapv1.Step)
 		return stepDetail{}, err
 
 	case oapv1.StepKind_STEP_KIND_AWAIT_READY:
-		return stepDetail{}, x.awaitReady(ctx, op, i, s, r)
+		err := x.awaitReady(ctx, op, i, s, r)
+		var se *StepError
+		if errors.As(err, &se) {
+			// It never became ready, so it was never routed: stop it rather
+			// than leave it running beside the release that serves.
+			x.Runtime.Stop(ctx, r)
+		}
+		return stepDetail{}, err
 
 	case oapv1.StepKind_STEP_KIND_ROUTE_ADD, oapv1.StepKind_STEP_KIND_ROUTE_REMOVE:
 		cfg, _, err := x.Edge.Config(ctx)

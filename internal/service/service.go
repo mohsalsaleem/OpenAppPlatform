@@ -585,7 +585,7 @@ func (s *Service) operation(ctx context.Context, id string, p *oapv1.Proposal, f
 		return op, &Error{Code: FailedPrecondition, Detail: ierr.Detail()}
 	}
 	op.Old, _ = spec.ParseApplication(base)
-	op.New, op.NewTree = res.App, res.Tree
+	op.New, op.NewTree, op.OldTree = res.App, res.Tree, base
 	return op, nil
 }
 
@@ -678,7 +678,33 @@ func reasons(p *oapv1.Proposal) string {
 
 func (s *Service) submit(op engine.Operation) {
 	done := s.serializer.Submit(s.runCtx, op)
-	go func() { s.outcome(op.ID, <-done) }()
+	go func() {
+		err := <-done
+		var se *engine.StepError
+		if errors.As(err, &se) {
+			s.restoreDesired(op)
+		}
+		s.outcome(op.ID, err)
+	}()
+}
+
+// restoreDesired puts an application's desired state back to where a
+// failed operation started, so it describes what runs: the next proposal
+// then plans from the instances that actually serve. The failure stays in
+// the journal and the outcome.
+func (s *Service) restoreDesired(op engine.Operation) {
+	if op.OldTree == nil || op.Old == nil {
+		return // a new application has no earlier desired state to go back to
+	}
+	ctx := context.WithoutCancel(s.runCtx)
+	cur, curHash, err := s.Desired.Get(ctx, op.Application)
+	if err != nil || cur == nil {
+		return
+	}
+	if oldHash, err := spec.Hash(op.OldTree); err != nil || oldHash == curHash {
+		return
+	}
+	s.Desired.Commit(ctx, op.Application, op.OldTree, "oapd", "Restore after "+op.ID+" wasn't achieved")
 }
 
 func (s *Service) outcome(id string, runErr error) { s.outcomeWith(id, runErr, nil, nil) }

@@ -574,3 +574,67 @@ func TestWorldAgreesWithOutcome(t *testing.T) {
 		}
 	}
 }
+
+// TestFailedDeployLeavesNoStrays: a deploy whose new instance never becomes
+// healthy is not achieved; its unready instance is stopped, and the desired
+// state goes back to what runs. The next deploy then replaces exactly the
+// instances that serve: none of the old release is left behind (R5.2).
+func TestFailedDeployLeavesNoStrays(t *testing.T) {
+	r := newRig(t)
+	r.create(t)
+	r.await(t, r.applyOK(t, scale("site", 3)))
+	_, before, _ := r.desired.Get(ctx, "site")
+	deploy := func(image string) *oapv1.Outcome {
+		t.Helper()
+		evs := r.await(t, r.applyOK(t, &oapv1.Intent{Application: "site",
+			Change: &oapv1.Intent_Deploy{Deploy: &oapv1.Deploy{Images: map[string]string{"web": image}}}}))
+		return evs[len(evs)-1].GetOutcome()
+	}
+	images := func() map[string]int {
+		out := map[string]int{}
+		for _, ref := range r.runtime.Running() {
+			out[ref.Release]++
+		}
+		return out
+	}
+	start := images()
+
+	r.runtime.Unhealthy = map[string]bool{"web": true}
+	if o := deploy("reg/site:bad"); o.GetStatus() != oapv1.OutcomeStatus_OUTCOME_STATUS_NOT_ACHIEVED {
+		t.Fatalf("broken deploy: %v", o)
+	}
+	if _, after, _ := r.desired.Get(ctx, "site"); after != before {
+		t.Fatal("the failed deploy left its release as the desired state")
+	}
+	if got := images(); fmt.Sprint(got) != fmt.Sprint(start) {
+		t.Fatalf("after the failed deploy: %v, want %v (the unready instance stays running)", got, start)
+	}
+
+	r.runtime.Unhealthy = nil
+	if o := deploy("reg/site:2"); o.GetStatus() != oapv1.OutcomeStatus_OUTCOME_STATUS_ACHIEVED {
+		t.Fatalf("fix forward: %v", o)
+	}
+	got := images()
+	if len(got) != 1 {
+		t.Fatalf("after fixing forward: %v (instances of more than one release)", got)
+	}
+	for _, n := range got {
+		if n != 3 {
+			t.Fatalf("after fixing forward: %v", got)
+		}
+	}
+}
+
+// applyOK proposes and applies an intent as the owner.
+func (r *rig) applyOK(t *testing.T, in *oapv1.Intent) string {
+	t.Helper()
+	p, err := r.svc.Propose(ctx, Owner, &oapv1.ProposeRequest{Intent: in})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := r.svc.Apply(ctx, Owner, &oapv1.ApplyRequest{ProposalId: p.Proposal.Id})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return a.OperationId
+}

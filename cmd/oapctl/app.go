@@ -258,52 +258,7 @@ func (a *app) runIntent(ctx context.Context, client oapv1connect.AgentServiceCli
 		a.writeJSON(p)
 		return "", host.ExitOwner
 	}
-	applied, err := client.Apply(ctx, connect.NewRequest(&oapv1.ApplyRequest{ProposalId: p.Id}))
-	if err != nil {
-		return "", a.fail(fmt.Errorf("apply: %v", err))
-	}
-	var outcome *oapv1.Outcome
-	err = a.u().Run("Applying to "+target, func(progress func(string)) error {
-		stream, err := client.Await(ctx, connect.NewRequest(&oapv1.AwaitRequest{OperationId: applied.Msg.OperationId, TimeoutSeconds: 900}))
-		if err != nil {
-			return err
-		}
-		for stream.Receive() {
-			e := stream.Msg().Event
-			if a.mode == eventsMode {
-				a.printJSON(e)
-			}
-			if a.mode == jsonMode && e.GetOutcome() != nil {
-				a.printJSON(e)
-			}
-			if pr := e.GetOperationProgress(); pr != nil && int(pr.StepIndex) < len(lines) {
-				progress(fmt.Sprintf("%s: %s", strings.TrimSpace(lines[pr.StepIndex]), strings.ToLower(strings.TrimPrefix(pr.State.String(), "STEP_STATE_"))))
-			}
-			if o := e.GetOutcome(); o != nil {
-				outcome = o
-				a.lastOutcome = o
-			}
-		}
-		if err := stream.Err(); err != nil {
-			return err
-		}
-		if outcome.GetStatus() != oapv1.OutcomeStatus_OUTCOME_STATUS_ACHIEVED {
-			var rs []string
-			for _, r := range outcome.GetReasons() {
-				rs = append(rs, r.Message)
-			}
-			msg := fmt.Sprintf("%s: %s", strings.ToLower(strings.TrimPrefix(outcome.GetStatus().String(), "OUTCOME_STATUS_")), strings.Join(rs, "; "))
-			if rb := p.GetUndo().GetRollback(); rb != nil {
-				msg += fmt.Sprintf("\nRoll back with: %s app rollback %s --to %s", a.cli, in.Application, rb.ToRelease)
-			}
-			return errors.New(msg)
-		}
-		return nil
-	})
-	if err != nil {
-		return applied.Msg.OperationId, a.fail(err)
-	}
-	return applied.Msg.OperationId, host.ExitOK
+	return a.applyAndFollow(ctx, client, p, target, lines)
 }
 
 // appScale scales one component: app scale APP COMPONENT N [ADDR].
@@ -624,6 +579,96 @@ func (a *app) appBuild(ctx context.Context, args []string) int {
 		if img := a.lastOutcome.GetImages()[pos[1]]; img != "" {
 			fmt.Fprintf(a.out, "Image: %s\nDeploy it with: %s app deploy %s %s=%s\n", img, a.cli, pos[0], pos[1], img)
 		}
+	}
+	return code
+}
+
+// applyAndFollow applies a proposal and follows its operation to the
+// outcome. lines are the plan's steps as shown, for progress.
+func (a *app) applyAndFollow(ctx context.Context, client oapv1connect.AgentServiceClient, p *oapv1.Proposal, target string, lines []string) (string, int) {
+	applied, err := client.Apply(ctx, connect.NewRequest(&oapv1.ApplyRequest{ProposalId: p.Id}))
+	if err != nil {
+		if p.Verdict == oapv1.Verdict_VERDICT_NEEDS_APPROVAL {
+			return "", a.fail(fmt.Errorf("apply: %v\nAsk the owner: %s ask --kind approval --proposal %s %q --wait\nThen apply it: %s apply %s",
+				err, a.cli, p.Id, "Approve "+summaryOf(p.GetIntent())+"?", a.cli, p.Id))
+		}
+		return "", a.fail(fmt.Errorf("apply: %v", err))
+	}
+	var outcome *oapv1.Outcome
+	err = a.u().Run("Applying to "+target, func(progress func(string)) error {
+		stream, err := client.Await(ctx, connect.NewRequest(&oapv1.AwaitRequest{OperationId: applied.Msg.OperationId, TimeoutSeconds: 900}))
+		if err != nil {
+			return err
+		}
+		for stream.Receive() {
+			e := stream.Msg().Event
+			if a.mode == eventsMode {
+				a.printJSON(e)
+			}
+			if a.mode == jsonMode && e.GetOutcome() != nil {
+				a.printJSON(e)
+			}
+			if pr := e.GetOperationProgress(); pr != nil && int(pr.StepIndex) < len(lines) {
+				progress(fmt.Sprintf("%s: %s", strings.TrimSpace(lines[pr.StepIndex]), strings.ToLower(strings.TrimPrefix(pr.State.String(), "STEP_STATE_"))))
+			}
+			if o := e.GetOutcome(); o != nil {
+				outcome = o
+				a.lastOutcome = o
+			}
+		}
+		if err := stream.Err(); err != nil {
+			return err
+		}
+		if outcome.GetStatus() != oapv1.OutcomeStatus_OUTCOME_STATUS_ACHIEVED {
+			var rs []string
+			for _, r := range outcome.GetReasons() {
+				rs = append(rs, r.Message)
+			}
+			msg := fmt.Sprintf("%s: %s", strings.ToLower(strings.TrimPrefix(outcome.GetStatus().String(), "OUTCOME_STATUS_")), strings.Join(rs, "; "))
+			if rb := p.GetUndo().GetRollback(); rb != nil {
+				msg += fmt.Sprintf("\nRoll back with: %s app rollback %s --to %s", a.cli, p.GetIntent().GetApplication(), rb.ToRelease)
+			}
+			return errors.New(msg)
+		}
+		return nil
+	})
+	if err != nil {
+		return applied.Msg.OperationId, a.fail(err)
+	}
+	return applied.Msg.OperationId, host.ExitOK
+}
+
+func summaryOf(in *oapv1.Intent) string {
+	if b := strings.TrimSpace(in.GetBecause()); b != "" {
+		return b
+	}
+	return in.GetApplication()
+}
+
+// applyCmd applies a proposal by its id, for example one the owner
+// approved through an ask: apply PROPOSAL_ID [--json|--events].
+func (a *app) applyCmd(ctx context.Context, args []string) int {
+	defer func() { a.mode = human }()
+	pos, _, err := a.intentFlags("apply", args, nil)
+	if err != nil {
+		return 2
+	}
+	if len(pos) != 1 {
+		return a.fail(errors.New("usage: apply PROPOSAL_ID"))
+	}
+	s, err := a.serverFor("")
+	if err != nil {
+		return a.fail(err)
+	}
+	client, stop, err := a.agentClient(ctx, s)
+	if err != nil {
+		return a.fail(err)
+	}
+	defer stop()
+	p := &oapv1.Proposal{Id: pos[0]}
+	opID, code := a.applyAndFollow(ctx, client, p, "proposal "+pos[0], nil)
+	if code == host.ExitOK && a.mode == human {
+		a.u().Success(fmt.Sprintf("Applied %s (operation %s).", pos[0], opID))
 	}
 	return code
 }

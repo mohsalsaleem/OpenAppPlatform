@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,10 +23,13 @@ import (
 // DNSEdge routes OAP's traffic through Caddy without reloading Caddy when
 // route membership changes (ADR 0001). Caddy's configuration holds one
 // route per host, path prefix and port, whose upstreams come from DNS
-// (dynamic_upstreams "a"); the names resolve, through the responder DNSEdge
-// serves, to the instances that are members right now. Adding or removing
-// an instance changes only the DNS answer. Caddy reloads only when the set
-// of hosts, paths or ports changes.
+// (dynamic_upstreams "srv"); the names resolve, through the responder
+// DNSEdge serves, to the instances that are members right now, by their own
+// host names, which Docker's DNS resolves for Caddy. Adding or removing an
+// instance changes only the DNS answer. Caddy reloads only when the set of
+// hosts, paths or ports changes. While oapd is down Caddy keeps routing to
+// the members it last learned (the SRV source's grace period): nothing can
+// change membership then, so they are still right.
 //
 // Membership and the generation are kept in a state file, so they survive
 // oapd restarts. A change is in effect once Caddy's cached answers have
@@ -74,6 +76,11 @@ type cached struct {
 }
 
 const dnsServerID = "oap-dns"
+
+// GracePeriod is how long Caddy keeps using the members it last learned
+// when it can't reach oapd's DNS, before asking again; each failed attempt
+// extends it.
+const GracePeriod = 10 * time.Second
 
 func (e *DNSEdge) now() time.Time {
 	if e.Now != nil {
@@ -214,8 +221,9 @@ func (e *DNSEdge) server(gs []group) map[string]any {
 		hs = append(hs, map[string]any{
 			"handler": "reverse_proxy",
 			"dynamic_upstreams": map[string]any{
-				"source": "a", "name": strings.TrimSuffix(g.Name(), "."), "port": strconv.Itoa(g.Port),
+				"source": "srv", "name": strings.TrimSuffix(g.Name(), "."),
 				"refresh": e.refresh().String(), "resolver": map[string]any{"addresses": []any{e.Resolver}},
+				"grace_period": GracePeriod.String(), "dial_timeout": "1s",
 			},
 			"load_balancing": map[string]any{"selection_policy": map[string]any{"policy": "round_robin"}},
 		})
@@ -346,27 +354,28 @@ func (e *DNSEdge) addresses(ctx context.Context, host string) []net.IP {
 	return ips
 }
 
-// Resolve answers a DNS name: the addresses of the members of its group.
-func (e *DNSEdge) Resolve(ctx context.Context, name string) ([]net.IP, bool) {
+// Resolve answers a DNS name: the members of its group, as SRV targets
+// (their host names and port) and as addresses.
+func (e *DNSEdge) Resolve(ctx context.Context, name string) ([]net.IP, []srvTarget, bool) {
 	e.mu.Lock()
 	if err := e.load(ctx); err != nil {
 		e.mu.Unlock()
-		return nil, false
+		return nil, nil, false
 	}
-	var hosts []string
+	var srvs []srvTarget
 	known := false
 	for _, m := range e.state.Members {
 		if (group{m.Host, m.PathPrefix, m.StripPrefix, m.Port}).Name() == strings.ToLower(name) {
 			known = true
-			hosts = append(hosts, e.Admin.Host(m.Instance))
+			srvs = append(srvs, srvTarget{host: e.Admin.Host(m.Instance), port: uint16(m.Port)})
 		}
 	}
 	e.mu.Unlock()
 	var ips []net.IP
-	for _, h := range hosts {
-		ips = append(ips, e.addresses(ctx, h)...)
+	for _, t := range srvs {
+		ips = append(ips, e.addresses(ctx, t.host)...)
 	}
-	return ips, known
+	return ips, srvs, known
 }
 
 // ServeDNS answers Caddy's queries on conn until ctx ends.
@@ -374,8 +383,8 @@ func (e *DNSEdge) ServeDNS(ctx context.Context, conn net.PacketConn) error {
 	return serveDNS(ctx, conn, e.Resolve)
 }
 
-// InFlight sums Caddy's in-flight request counts for the instance's
-// addresses, on any port.
+// InFlight sums Caddy's in-flight request counts for the instance, on any
+// port: by its host name (SRV upstreams) or its addresses (A upstreams).
 func (e *DNSEdge) InFlight(ctx context.Context, instance ops.InstanceRef) (int, error) {
 	var ups []struct {
 		Address     string `json:"address"`
@@ -384,14 +393,15 @@ func (e *DNSEdge) InFlight(ctx context.Context, instance ops.InstanceRef) (int, 
 	if err := e.Admin.call(ctx, http.MethodGet, "/reverse_proxy/upstreams", nil, &ups); err != nil {
 		return 0, err
 	}
-	ips := map[string]bool{}
-	for _, ip := range e.addresses(ctx, e.Admin.Host(instance)) {
-		ips[ip.String()] = true
+	name := e.Admin.Host(instance)
+	match := map[string]bool{strings.ToLower(name): true}
+	for _, ip := range e.addresses(ctx, name) {
+		match[ip.String()] = true
 	}
 	n := 0
 	for _, u := range ups {
 		host, _, err := net.SplitHostPort(u.Address)
-		if err == nil && ips[host] && u.NumRequests > 0 {
+		if err == nil && match[strings.ToLower(strings.TrimSuffix(host, "."))] && u.NumRequests > 0 {
 			n += u.NumRequests
 		}
 	}

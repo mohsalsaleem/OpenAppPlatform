@@ -27,11 +27,12 @@ func TestDNSResponder(t *testing.T) {
 	}
 	cctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go serveDNS(cctx, conn, func(ctx context.Context, name string) ([]net.IP, bool) {
+	go serveDNS(cctx, conn, func(ctx context.Context, name string) ([]net.IP, []srvTarget, bool) {
 		if name == "gweb.oap." {
-			return []net.IP{net.ParseIP("10.0.0.2"), net.ParseIP("10.0.0.3")}, true
+			return []net.IP{net.ParseIP("10.0.0.2"), net.ParseIP("10.0.0.3")},
+				[]srvTarget{{"oap-t-web-1", 8080}, {"oap-t-web-2", 8081}}, true
 		}
-		return nil, false
+		return nil, nil, false
 	})
 	r := &net.Resolver{PreferGo: true, Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
 		var d net.Dialer
@@ -52,6 +53,46 @@ func TestDNSResponder(t *testing.T) {
 	}
 	if _, err := parseQuery([]byte{1, 2, 3}); err == nil {
 		t.Fatal("short query accepted")
+	}
+	// SRV: each member's host name and port, for Caddy's srv upstreams.
+	_, srvs, err := r.LookupSRV(ctx, "", "", "gweb.oap")
+	if err != nil || len(srvs) != 2 {
+		t.Fatalf("SRV: %v %v", srvs, err)
+	}
+	got := map[string]uint16{}
+	for _, s := range srvs {
+		got[s.Target] = s.Port
+	}
+	if got["oap-t-web-1."] != 8080 || got["oap-t-web-2."] != 8081 {
+		t.Fatalf("SRV targets %v", got)
+	}
+	if _, _, err := r.LookupSRV(ctx, "", "", "nope.oap"); err == nil {
+		t.Fatal("unknown SRV name resolved")
+	}
+}
+
+// TestDNSEdgeKeepsServingWithoutOapd: Caddy's routes take their members
+// from SRV records, with a grace period, so Caddy keeps routing to the
+// last members it learned while oapd (and its DNS) is down; the targets
+// are the instances' own names, which Docker's DNS resolves without oapd.
+func TestDNSEdgeKeepsServingWithoutOapd(t *testing.T) {
+	f := &fakeCaddy{}
+	e := dnsEdge(t, f, filepath.Join(t.TempDir(), "edge.json"))
+	if _, err := e.Apply(ctx, ops.EdgeConfig{Members: []ops.RouteMember{web(1, "site.test"), web(2, "site.test")}}); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := json.Marshal(f.config)
+	for _, want := range []string{`"source":"srv"`, `"grace_period"`} {
+		if !strings.Contains(string(b), want) {
+			t.Fatalf("Caddy's routes have no %s: %s", want, b)
+		}
+	}
+	if strings.Contains(string(b), `"source":"a"`) {
+		t.Fatalf("Caddy's routes still resolve A records: %s", b)
+	}
+	_, srvs, known := e.Resolve(ctx, group{"site.test", "/", false, 8080}.Name())
+	if !known || len(srvs) != 2 || srvs[0].port != 8080 {
+		t.Fatalf("SRV answer: %v %v", srvs, known)
 	}
 }
 
@@ -122,7 +163,7 @@ func TestMembershipChangesDontReload(t *testing.T) {
 		t.Fatalf("first apply: %v, %d loads", err, f.loads)
 	}
 	name := group{"site.test", "/", false, 8080}.Name()
-	if ips, ok := e.Resolve(ctx, name); !ok || len(ips) != 1 || ips[0].String() != "10.0.0.2" {
+	if ips, _, ok := e.Resolve(ctx, name); !ok || len(ips) != 1 || ips[0].String() != "10.0.0.2" {
 		t.Fatalf("resolve %s: %v %v", name, ips, ok)
 	}
 	for _, members := range [][]ops.RouteMember{
@@ -135,7 +176,7 @@ func TestMembershipChangesDontReload(t *testing.T) {
 			t.Fatalf("apply %v: gen %d after %d, %v", members, g, g1, err)
 		}
 		g1 = g
-		ips, _ := e.Resolve(ctx, name)
+		ips, _, _ := e.Resolve(ctx, name)
 		if len(ips) != len(members) {
 			t.Fatalf("resolve after %d members: %v", len(members), ips)
 		}
@@ -146,7 +187,7 @@ func TestMembershipChangesDontReload(t *testing.T) {
 	if _, err := e.Apply(ctx, ops.EdgeConfig{Members: []ops.RouteMember{web(3, "www.site.test")}}); err != nil || f.loads != 2 {
 		t.Fatalf("a new host must reload once: %v, %d loads", err, f.loads)
 	}
-	if _, ok := e.Resolve(ctx, name); ok {
+	if _, _, ok := e.Resolve(ctx, name); ok {
 		t.Fatal("the old host's name still resolves")
 	}
 	// A fixed route (OAP's API) is added once, ahead of the applications.
@@ -195,7 +236,7 @@ func TestDNSEdgeStateSurvivesRestartAndAdoptsStatic(t *testing.T) {
 }
 
 func TestDNSEdgeConfirmedAndInFlight(t *testing.T) {
-	f := &fakeCaddy{counts: map[string]int{"10.0.0.2:8080": 2, "10.0.0.3:8080": 0}}
+	f := &fakeCaddy{counts: map[string]int{"oap-t-web-1.:8080": 2, "oap-t-web-2.:8080": 0}}
 	e := dnsEdge(t, f, filepath.Join(t.TempDir(), "edge.json"))
 	g, _ := e.Apply(ctx, ops.EdgeConfig{Members: []ops.RouteMember{web(1, "site.test")}})
 	start := time.Now()
