@@ -72,7 +72,8 @@ const usage = `Usage:
   %[1]s host check [ADDR]   read-only check of the server [--json]
   %[1]s host fix [ADDR]     apply the fixes the check proposes, each approved by you [--json: show them]
   %[1]s host undo FIX [ADDR] undo a fix OAP applied
-  %[1]s host install [ADDR] --image IMAGE   install oapd and Caddy on the server
+  %[1]s host install [ADDR] [--image IMAGE] install oapd and Caddy on the server (default: the oapd this release pins)
+  %[1]s version                             this oapctl's version and the oapd it installs
   %[1]s host handoff [ADDR]                 remove OAP's SSH key once an owner key works; agents then work only through OAP
   %[1]s host uninstall [ADDR] [--keep-access]   reverse everything OAP did on the server, each step approved by you
   %[1]s app apply FILE [ADDR]               create or update an application from its oap.yaml
@@ -101,6 +102,8 @@ func (a *app) run(ctx context.Context, args []string) int {
 		return a.frontDoor(ctx, len(args) > 0)
 	}
 	switch {
+	case args[0] == "version" || args[0] == "--version":
+		return a.versionCmd()
 	case args[0] == "help" || args[0] == "-h" || args[0] == "--help":
 		fmt.Fprintf(a.out, usage, a.cli)
 		return 0

@@ -48,3 +48,7 @@ gen:
 	tools/install.sh >/dev/null
 	rm -rf gen/oap
 	.local/bin/buf generate
+
+.PHONY: release
+release:
+	scripts/release.sh $(VERSION)

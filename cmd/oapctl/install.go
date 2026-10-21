@@ -68,6 +68,11 @@ func (a *app) shipImage(ctx context.Context, t sshhost.Target, image string) err
 			a.u().Note(fmt.Sprintf("Image %s is on the server (not on this machine); using it.", image))
 			return nil
 		}
+		// A registry reference (a released oapd): the server pulls it.
+		if first, _, ok := strings.Cut(image, "/"); ok && strings.ContainsAny(first, ".:") {
+			a.u().Note(fmt.Sprintf("The server pulls %s from its registry.", image))
+			return nil
+		}
 		return err
 	}
 	archOut, err := a.ssh.Run(ctx, t, "dpkg --print-architecture 2>/dev/null || uname -m")
@@ -122,7 +127,11 @@ func (a *app) shipImage(ctx context.Context, t sshhost.Target, image string) err
 func (a *app) hostInstall(ctx context.Context, args []string) int {
 	fs := flag.NewFlagSet("host install", flag.ContinueOnError)
 	fs.SetOutput(a.errOut)
-	image := fs.String("image", os.Getenv("OAP_OAPD_IMAGE"), "the oapd image to install, on this machine")
+	defImage := os.Getenv("OAP_OAPD_IMAGE")
+	if defImage == "" {
+		defImage = OapdImage
+	}
+	image := fs.String("image", defImage, "the oapd image to install: built on this machine, or pulled by the server from its registry")
 	noTLS := fs.Bool("no-tls", false, "serve routed hosts over plain HTTP")
 	apiHost := fs.String("api-host", "", "public host name for the agent API (default oap.<ip>.sslip.io; \"none\" keeps it private)")
 	asJSON := fs.Bool("json", false, "")
@@ -131,7 +140,7 @@ func (a *app) hostInstall(ctx context.Context, args []string) int {
 		return 2
 	}
 	if *image == "" {
-		return a.fail(fmt.Errorf("name the oapd image with --image (build one with make oapd-image)"))
+		return a.fail(fmt.Errorf("this oapctl is a development build and pins no oapd image; name one with --image (build one with make oapd-image)"))
 	}
 	s, err := a.server(addr)
 	if err != nil {

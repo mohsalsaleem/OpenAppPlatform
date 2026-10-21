@@ -70,7 +70,7 @@ for v in data caddy-data caddy-config caddy-admin; do
   docker volume inspect "oap-$ID-$v" >/dev/null 2>&1 || docker volume create $L --label io.openappplatform.role=volume "oap-$ID-$v" >/dev/null
 done
 docker image inspect "$CADDY" >/dev/null 2>&1 || { docker pull -q "$CADDY" >/dev/null; printf '%%s\n' "$CADDY" >> /var/lib/oap/images; }
-docker image inspect "$OAPD" >/dev/null 2>&1 || { echo "oap: image $OAPD isn't on the server" >&2; exit 3; }
+docker image inspect "$OAPD" >/dev/null 2>&1 || { docker pull -q "$OAPD" >/dev/null || { echo "oap: image $OAPD isn't on the server and couldn't be pulled" >&2; exit 3; }; printf '%%s\n' "$OAPD" >> /var/lib/oap/images; }
 
 # current NAME IMAGE: true when NAME runs IMAGE with this configuration.
 current() {
