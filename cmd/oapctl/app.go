@@ -491,12 +491,16 @@ func (a *app) runAppIntent(ctx context.Context, in *oapv1.Intent, yes bool, done
 // appDeploy rolls out new images: app deploy APP COMPONENT=IMAGE... [--yes].
 func (a *app) appDeploy(ctx context.Context, args []string) int {
 	defer func() { a.mode = human }()
-	pos, yes, err := a.intentFlags("app deploy", args, nil)
+	var repo, commit *string
+	pos, yes, err := a.intentFlags("app deploy", args, func(fs *flag.FlagSet) {
+		repo = fs.String("repo", "", "the repository the images were built from, for change facts")
+		commit = fs.String("commit", "", "the commit they were built from")
+	})
 	if err != nil {
 		return 2
 	}
 	if len(pos) < 2 {
-		return a.fail(errors.New("usage: app deploy APP COMPONENT=IMAGE [COMPONENT=IMAGE]... [--yes]"))
+		return a.fail(errors.New("usage: app deploy APP COMPONENT=IMAGE [COMPONENT=IMAGE]... [--repo URL --commit SHA] [--yes]"))
 	}
 	images := map[string]string{}
 	for _, kv := range pos[1:] {
@@ -506,8 +510,11 @@ func (a *app) appDeploy(ctx context.Context, args []string) int {
 		}
 		images[c] = img
 	}
-	in := &oapv1.Intent{Application: pos[0], Because: "deploy new images",
-		Change: &oapv1.Intent_Deploy{Deploy: &oapv1.Deploy{Images: images}}}
+	d := &oapv1.Deploy{Images: images}
+	if *repo != "" || *commit != "" {
+		d.Source = &oapv1.Source{Repository: *repo, Commit: *commit}
+	}
+	in := &oapv1.Intent{Application: pos[0], Because: "deploy new images", Change: &oapv1.Intent_Deploy{Deploy: d}}
 	return a.runAppIntent(ctx, in, yes, "Deployed "+pos[0])
 }
 
