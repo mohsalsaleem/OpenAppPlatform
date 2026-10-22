@@ -61,6 +61,17 @@ func (a *app) remoteImage(ctx context.Context, t sshhost.Target, image string) (
 // has the same one. No registry is involved: docker save streams into
 // docker load over SSH, and the image id is checked on arrival.
 func (a *app) shipImage(ctx context.Context, t sshhost.Target, image string) error {
+	// A registry reference pinned by digest (a released oapd): the server
+	// pulls it and picks its own architecture, even if this machine has a
+	// copy, which is this machine's architecture.
+	registry := false
+	if first, _, ok := strings.Cut(image, "/"); ok && strings.ContainsAny(first, ".:") {
+		registry = true
+	}
+	if registry && strings.Contains(image, "@sha256:") {
+		a.u().Note(fmt.Sprintf("The server pulls %s from its registry.", image))
+		return nil
+	}
 	id, arch, err := a.localImage(ctx, image)
 	if err != nil {
 		// Not built here: fine if the server already has it (built there).
@@ -68,8 +79,8 @@ func (a *app) shipImage(ctx context.Context, t sshhost.Target, image string) err
 			a.u().Note(fmt.Sprintf("Image %s is on the server (not on this machine); using it.", image))
 			return nil
 		}
-		// A registry reference (a released oapd): the server pulls it.
-		if first, _, ok := strings.Cut(image, "/"); ok && strings.ContainsAny(first, ".:") {
+		// Any other registry reference: the server pulls it.
+		if registry {
 			a.u().Note(fmt.Sprintf("The server pulls %s from its registry.", image))
 			return nil
 		}
