@@ -32,7 +32,9 @@ These hold for every task. Breaking one is a defect, even if all tests pass.
 4. **The old tree is frozen.** No edits under `internal/` packages that exist on
    `main` today, `cmd/platform`, `cmd/oap`, `cmd/oap-mcp`, `cmd/oap-admin`,
    `cmd/oap-build-client` or `web/`, except security fixes the owner approves. The
-   new tree uses new paths (below). R0.3 enforces this.
+   new tree uses new paths (below). R0.3 enforces this. R5.5 retires the old
+   tree in commits marked `Owner-Approved: retire`, which may only delete
+   frozen files (owner decision, 2026-10-28).
 
 ### Tests and acceptance
 

@@ -3,8 +3,11 @@
 
 Guardrail 4 of docs/architecture/rewrite-plan.md: commits on the rewrite branch
 may not change the old tree, except security fixes the owner approved, marked
-with an `Owner-Approved: security` line in the commit message. Commits that
-come from the base branch (normally main) are not checked.
+with an `Owner-Approved: security` line in the commit message. Retiring the
+old tree (R5.5) is the one other exception: a commit with an
+`Owner-Approved: retire` line may delete frozen files, and only delete them
+(owner decision, 2026-10-28). Commits that come from the base branch
+(normally main) are not checked.
 """
 import argparse
 import subprocess
@@ -19,6 +22,7 @@ FROZEN = (
     'web/',
 )
 APPROVAL = 'Owner-Approved: security'
+RETIRE = 'Owner-Approved: retire'
 
 
 def git(*args, cwd=None):
@@ -33,10 +37,13 @@ def violations(base, head='HEAD', cwd=None):
     out = []
     for commit in git('rev-list', '--no-merges', f'{base}..{head}', cwd=cwd).split():
         message = git('log', '-1', '--format=%B', commit, cwd=cwd)
-        if any(line.strip() == APPROVAL for line in message.splitlines()):
+        lines = [line.strip() for line in message.splitlines()]
+        if APPROVAL in lines:
             continue
-        files = git('diff-tree', '--no-commit-id', '--name-only', '-r', '--root', commit, cwd=cwd).split('\n')
-        touched = sorted(f for f in files if f and frozen(f))
+        retire = RETIRE in lines
+        changes = git('diff-tree', '--no-commit-id', '--name-status', '--no-renames', '-r', '--root', commit, cwd=cwd).split('\n')
+        touched = sorted(path for status, _, path in (c.partition('\t') for c in changes if c)
+                         if frozen(path) and not (retire and status == 'D'))
         if touched:
             subject = message.splitlines()[0] if message else ''
             out.append((commit[:12], subject, touched))
@@ -54,7 +61,8 @@ def main():
         for path in touched:
             print(f'  {path}', file=sys.stderr)
     if found:
-        print(f'Frozen old tree changed. Revert, or get owner approval and add "{APPROVAL}".', file=sys.stderr)
+        print(f'Frozen old tree changed. Revert, or get owner approval and add "{APPROVAL}"'
+              f' ("{RETIRE}" allows only deletions).', file=sys.stderr)
         return 1
     print('frozen paths: ok')
     return 0

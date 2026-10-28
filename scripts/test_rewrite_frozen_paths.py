@@ -78,6 +78,28 @@ class FrozenPathsTest(unittest.TestCase):
         self.git('commit', '-q', '-m', 'delete old controller')
         self.assertEqual(len(self.check()), 1)
 
+    def test_retire_allows_deleting_frozen_files(self):
+        self.commit('web/src/app.tsx', 'web', content='x')
+        self.git('rm', '-q', '-r', 'internal/controller', 'web')
+        self.git('commit', '-q', '-m', 'Retire the old tree\n\nOwner-Approved: retire')
+        found = self.check()
+        self.assertEqual([v[1] for v in found], ['web'])  # only the earlier, unmarked add
+
+    def test_retire_doesnt_allow_edits(self):
+        self.git('rm', '-q', 'internal/controller/a.go')
+        Path(self.repo, 'internal/store/s.go').parent.mkdir(parents=True, exist_ok=True)
+        Path(self.repo, 'internal/store/s.go').write_text('new')
+        self.git('add', '-A')
+        self.git('commit', '-q', '-m', 'Retire and sneak an edit\n\nOwner-Approved: retire')
+        found = self.check()
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0][2], ['internal/store/s.go'])
+
+    def test_retire_must_be_its_own_line(self):
+        self.git('rm', '-q', 'internal/controller/a.go')
+        self.git('commit', '-q', '-m', 'Not Owner-Approved: retire really')
+        self.assertEqual(len(self.check()), 1)
+
 
 if __name__ == '__main__':
     unittest.main()
