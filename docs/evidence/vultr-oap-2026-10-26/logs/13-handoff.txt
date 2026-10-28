@@ -1,0 +1,2 @@
+✓ Handed off root@139.180.132.23: OAP's SSH key is removed and the server refuses it. You and your agents now work only through OAP; oapctl host connect root@139.180.132.23 --break-glass gets temporary access back.
+The server still accepts SSH password logins. Once your own SSH key works, consider turning them off (PasswordAuthentication no, PermitRootLogin prohibit-password in /etc/ssh/sshd_config). OAP doesn't change this for you.

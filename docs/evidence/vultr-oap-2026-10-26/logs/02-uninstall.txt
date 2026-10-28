@@ -1,0 +1,39 @@
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Remove OAP: every application, its data volumes, oapd, Caddy, their network  │
+│ and the images OAP brought                                                   │
+│ because the host manifest shows OAP did it                                   │
+│                                                                              │
+│   │ set -eu                                                                  │
+│   │ ID=4ofro33n8i                                                            │
+│   │ F="--filter label=io.openappplatform.install=$ID"                        │
+│   │ docker ps -aq $F | xargs -r docker rm -f >/dev/null                      │
+│   │ docker network ls -q $F | xargs -r docker network rm >/dev/null          │
+│   │ docker volume ls -q $F | xargs -r docker volume rm >/dev/null            │
+│   │ # Images OAP's builder made carry the installation label too.            │
+│   │ docker images -q $F | sort -u | xargs -r docker image rm -f >/dev/null   │
+│   │ # The images OAP brought, unless something else now uses them.           │
+│   │ if [ -f /var/lib/oap/images ]; then                                      │
+│   │   while read -r img; do                                                  │
+│   │     [ -n "$img" ] || continue                                            │
+│   │     if [ -z "$(docker ps -aq --filter "ancestor=$img")" ]; then docker   │
+│     image rm "$img" >/dev/null 2>&1 || true; fi                              │
+│   │   done < /var/lib/oap/images                                             │
+│   │ fi                                                                       │
+│   │ rm -f /var/lib/oap/install-id /var/lib/oap/caddy.json                    │
+│     /var/lib/oap/images                                                      │
+│   │ rm -rf /run/oapd                                                         │
+│   │ echo "removed installation $ID"                                          │
+│   │ set -eu                                                                  │
+│   │ mkdir -p /var/lib/oap                                                    │
+│   │ chmod 700 /var/lib/oap                                                   │
+│   │ printf '%s\n' '{"fix":"install-oap","action":"undo","at":"2026-10-       │
+│     22T14:37:00Z"}' >> /var/lib/oap/host-manifest.jsonl                      │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+? This deletes every application on root@139.180.132.23 and its data. Type the server address to confirm      root@139.180.132.23 
+✓ This deletes every application on root@139.180.132.23 and its data. Type the server address to confirm  root@139.180.132.23
+
+  │ removed installation 4ofro33n8i
+✓ Remove OAP: every application, its data volumes, oapd, Caddy, their network and the images OAP brought (4s)
+Keeping install-docker: it has no undo; removing it could break other software on the host.
+✓ Uninstalled OAP from root@139.180.132.23. 1 change(s) without an undo stay, listed above, with the host manifest in /var/lib/oap. OAP's SSH key is removed.

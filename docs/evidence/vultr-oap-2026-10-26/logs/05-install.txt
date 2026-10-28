@@ -1,0 +1,1 @@
+oapctl: image ghcr.io/mohsalsaleem/oapd:v0.2.0-rc.1@sha256:3f8b3b2d0ce794bf07a1b03b3620195addc1d474b4eaace444a557492221d8dd is arm64 but the server is amd64; build it for linux/amd64

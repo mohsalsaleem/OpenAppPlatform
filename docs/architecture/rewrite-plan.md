@@ -279,6 +279,39 @@ agent a pending ask it doesn't need.
   (`author-app.md`, which would point repository warnings such as committed
   secrets at a notice).
 
+**From R5.3** (proposed 2026-10-28; the [evidence pack](../evidence/vultr-oap-2026-10-26/README.md)
+lists the findings). The owner decides which, if any, go into v0.2.0; the
+recommendation is the first in v0.2.1 and the rest in v0.3.
+
+- **Remove an application, and scale to 0** (findings 5 and 6). Today an
+  application can't be taken away: the journey's 18 containers stay on
+  vultr_oap after hand-off, and a failed create leaves its application in
+  desired state. Add a `remove` change to `propose` (a spec patch that
+  deletes the application: stop and remove its instances, routes, jobs and
+  network; volumes only when the proposal says so, which makes it
+  sensitive), allow `replicas: 0`, and have a failed create offer its own
+  removal in the outcome. Tests: removal under traffic to another app drops
+  none of its requests; data volumes survive a removal that doesn't name
+  them; `explain` shows no gaps afterwards. Then clear vultr_oap's journey
+  applications through OAP and record it.
+- **Honour `ingress.https`** (finding 4). The spec has the field, but oapd
+  with TLS serves every routed host over HTTPS and redirects HTTP. Either
+  route `https: false` hosts over plain HTTP, or remove the field from the
+  schema and the skill. The recommendation is to remove it: every public
+  host should be HTTPS, and a test can prove the schema refuses it.
+- **Onboarding logs and `oapctl logs`** (finding 7). Each `oapctl` onboarding
+  command (connect, check, fix, install, hand-off, uninstall) saves its
+  transcript, scripts it ran and their output under the config folder,
+  with credentials never written; `oapctl logs [STEP]` lists and shows
+  them. For the server, `oapctl logs --oapd` reads oapd's log through the
+  owner API, so it works after hand-off. Tests: each step leaves a log; a
+  typed password never appears in one; `--oapd` works with only the owner
+  key.
+- **Two wording fixes** (findings 3 and 8). The uninstall confirmation
+  shows the exact text to type on its own line; the check's advice on SSH
+  password login says what hand-off actually does (advise, not offer).
+  Tests on the rendered text.
+
 ## Status
 
 | ID | Status | Commit | Evidence |
@@ -332,7 +365,8 @@ agent a pending ask it doesn't need.
 | R4.4–R4.5 | moved to v0.3 | | Owner decision, 2026-10-21 ([release plan](release-plan.md)) |
 | R5.1 | dropped | | Owner decision, 2026-10-19: no install runs today's code |
 | R5.2 | done | `6b9041c` | `TestReleaseJourney` (`OAP_TEST_DOCKER=1`, 365 s) on a Docker-in-Docker host with the real oapd and Caddy, three agents signed in by device login and approved by the owner, each with its own application and hostname. CLI, full: a fixture app (web, api, worker, Redis-style data component with a volume, migration job) created; a deploy that needs approval proposed, approved through an ask and applied with `oapctl apply`; replaying it returns the same operation; deployed with its migration first; a failing migration blocks the rollout; a release whose api never becomes ready is not achieved, drops no api requests, leaves no stray instances and restores the previous desired state; explained; corrected forward to v2; scaled to 3 and back with 0 failed requests; rolled back (the migration skipped); volume data retained. Connect JSON and MCP: smoke runs (create, deploy, serve). Then: the three apps serve side by side behind the shared edge; with oapd stopped for 30 s, 549, 550 and 551 probe requests to them all succeeded; every interface answers after the restart; peak memory 530 MiB, no OOM kills. Receipt: [`docs/evidence/release-journey/2026-10-21-local`](../evidence/release-journey/2026-10-21-local/receipt.json). Found and fixed, each with a failing test first: a deploy that never became ready left its new instances running beside the old ones and its images in desired state (`TestFailedDeployLeavesNoStrays`); with oapd stopped Caddy failed every request, because its A-record upstreams had no grace period: the DNS edge now serves SRV records naming each member's host and port, and Caddy's `srv` source keeps the last members while oapd is down (`TestDNSEdgeKeepsServingWithoutOapd`, and the real-Caddy `TestDNSEdgeScalesWithoutLoss` still passes); `oapctl ask` refused flags before the question (`TestAskEndToEnd`). Noted, not fixed: `explain` for a failed migration job says "0 of 1 instances running". Under a full parallel `go test ./...`, `TestFailuresStayInTheExtension` can exceed its bounds (it did before this task too); alone and in `rewrite-check` it passes |
-| R5.3, R5.5 | not started | | |
+| R5.3 | done | `ed12efc` | On vultr_oap (1 vCPU, 950 MiB), from the root password with released v0.2.0-rc.2: uninstall, connect, fix (`open-web-ports`), install pulling the pinned digest from GHCR, owner enroll. `TestReleaseJourney` with `OAP_JOURNEY_SERVER` failed its first run (the fixture image was built on this Mac's arm64 base; the harness's names didn't resolve) and, after the harness fix, passed its second (587 s): CLI full, Connect JSON and MCP smoke runs by three device-login agents the owner approved; X1 each app on its own HTTPS host name; X2 oapd stopped under traffic with 659 requests and 0 failed; X3 memory peak 452 MiB, at least 498 MiB available, `oom_kill 0`. Nisha Shipping redeployed through OAP from its saved image and serves at www.nishashipping.com. Hand-off (2026-10-28): OAP's key removed and refused (`Permission denied`), owner commands work over HTTPS. Not done as planned: the journey's apps weren't scaled to 0, as OAP can't (owner decision, 2026-10-28: hand off anyway). Evidence pack and eight findings: [docs/evidence/vultr-oap-2026-10-26](../evidence/vultr-oap-2026-10-26/README.md); fixes for findings 1 and 2 are `c18a6ac` and `9385169`, the rest are proposed above |
+| R5.5 | not started | | |
 | R5.4 | moved to v0.3 | | Owner decision, 2026-10-21 |
 | R5.6 | done | `79942bc` | `make release` (`scripts/release.sh`) builds `oapctl` for macOS and Linux on amd64 and arm64 and oapd's image for linux/amd64 and linux/arm64, pins the image by digest in `oapctl`, writes `SHA256SUMS` and drafts a GitHub release; `DRY_RUN=1` publishes nothing. `TestReleaseInstallsPinnedImage` (`OAP_TEST_DOCKER=1`): with a local registry standing in for GHCR, the released `oapctl` pins the pushed digest, and a fresh Docker-in-Docker host given only that reference pulled exactly it and ran it (recorded for uninstall; `oapd -version` names the release); every file matched `SHA256SUMS`. A dry run of v0.2.0-rc.1 built everything in 35 s. Published (owner approved, 2026-10-21): [v0.2.0-rc.1](https://github.com/mohsalsaleem/OpenAppPlatform/releases/tag/v0.2.0-rc.1), a GitHub pre-release of `3193fc0`, with `ghcr.io/mohsalsaleem/oapd:v0.2.0-rc.1@sha256:3f8b3b2d0ce7…` (linux/amd64 and linux/arm64). Checked from a clean directory: `install.sh` (from `rewrite-phase-4`, `OAP_VERSION=v0.2.0-rc.1`) installed `oapctl`, which names v0.2.0-rc.1 and pins that digest; every downloaded file matched `SHA256SUMS`; GHCR's index for the tag has that digest, and a pull by digest ran `oapd -version` → v0.2.0-rc.1. Correction (R5.3, 2026-10-23): that pull and inspection weren't anonymous, though they ran with an empty Docker config (Docker Desktop still had credentials); the package is private, so a server's anonymous pull is refused (`unauthorized`; the registry answers 403 without credentials). An anonymous check is now a plain registry request without credentials |
 | R5.7 | done | `fa6ee7b` | `install.sh` installs `oapctl` for the machine from a release only when it matches `SHA256SUMS`, never with sudo. `TestInstallScript`: a matching release installs a runnable `oapctl`; a tampered binary or one `SHA256SUMS` doesn't list is refused and nothing is installed. Against the dry-run v0.2.0-rc.1 served locally it installed `oapctl`, which named its version and pinned oapd |

@@ -1,0 +1,3 @@
+Downloading oapctl v0.2.0-rc.2 for darwin/arm64
+Installed oapctl v0.2.0-rc.2 to /Users/samsal/.local/bin/oapctl (sha256 2670e29f79561b3f5669aecca4baf815843e360e92f60497cfb571fae7e203dd)
+Next: run oapctl, and have your server's IP address, username and password ready.

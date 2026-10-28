@@ -1,0 +1,1 @@
+✓ This machine holds an owner key for root@139.180.132.23 (<owner machine>, SHA256:BhVxt6Kwr8g5x1CH1Uh/ZZx6hTf5+v3X65yQIdU1N8U). Owner commands now sign in at https://oap.139-180-132-23.sslip.io with it, so they keep working after hand-off.

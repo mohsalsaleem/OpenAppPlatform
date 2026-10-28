@@ -1,0 +1,14 @@
+scripts/release.sh v0.2.0-rc.2
+go: github.com/bufbuild/buf@v1.73.0 requires go >= 1.26.7; switching to go1.26.10
+== binaries for the image
+== oapd image
+   ghcr.io/mohsalsaleem/oapd:v0.2.0-rc.2@sha256:27c9f8737d38ba7ea5a09aada7e8ee14cc33eec259f2bc82a0844275d01cbf68
+== oapctl
+5ff7c93ca4142af5596d069d99b409bdc5ef17b05cc92fb85494a8fd89743bc6  oapctl-darwin-amd64
+2670e29f79561b3f5669aecca4baf815843e360e92f60497cfb571fae7e203dd  oapctl-darwin-arm64
+93143caf3f5c64986af5cf3a012d5493b966513ceecbccc359b2af731f0508d9  oapctl-linux-amd64
+046b2a394eb424a5ea728b3f4b226105d744c359bd098796210cfb4d5fa3a096  oapctl-linux-arm64
+169c19c7f7552e67096613e68f57a662c633060d60a00ce491ab50cf766f2188  oapd-image.txt
+== draft GitHub release
+https://github.com/mohsalsaleem/OpenAppPlatform/releases/tag/untagged-f6a412cd2216336cf036
+Draft release v0.2.0-rc.2 created; publish it on GitHub when ready.
