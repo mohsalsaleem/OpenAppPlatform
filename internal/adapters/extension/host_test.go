@@ -133,8 +133,17 @@ func TestFailuresStayInTheExtension(t *testing.T) {
 			// its own registration so the healthy one stays installed.
 			h2 := newHost(t)
 			install(t, h2, name, c.mode)
+			// Start it first: the bound is on handling the failure, and a
+			// fresh binary's first launch can take seconds on a busy machine.
+			r, err := h2.get(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := h2.start(context.Background(), r); err != nil {
+				t.Fatalf("starting the %s extension: %v", c.message, err)
+			}
 			start := time.Now()
-			err := h2.Notifier(name).Notify(context.Background(), note)
+			err = h2.Notifier(name).Notify(context.Background(), note)
 			took := time.Since(start)
 			var ee *Error
 			if err == nil || !errors.As(err, &ee) {
@@ -142,6 +151,9 @@ func TestFailuresStayInTheExtension(t *testing.T) {
 			}
 			if c.want != nil && !errors.Is(err, c.want) {
 				t.Fatalf("the %s extension's call: %v, want %v", c.message, err, c.want)
+			}
+			if c.want == nil && errors.Is(err, ErrTimeout) {
+				t.Fatalf("the %s extension's call timed out instead of failing: %v", c.message, err)
 			}
 			if took > c.within {
 				t.Fatalf("the %s extension's call took %s", c.message, took)
