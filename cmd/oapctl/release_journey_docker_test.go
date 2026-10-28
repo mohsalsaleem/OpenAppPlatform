@@ -54,18 +54,29 @@ func buildFixture(t *testing.T, h *journeyHost) {
 		if out, err := build.CombinedOutput(); err != nil {
 			t.Fatalf("build fixture %s: %v\n%s", v, err, out)
 		}
-		os.WriteFile(filepath.Join(dir, v, "Dockerfile"), []byte(`FROM busybox:1.37
+		os.WriteFile(filepath.Join(dir, v, "Dockerfile"), []byte(`FROM --platform=linux/`+arch+` busybox:1.37
 COPY journeyfixture /journeyfixture
 LABEL io.openappplatform.install=`+h.install+`
 HEALTHCHECK --interval=5s --timeout=3s --retries=3 CMD ["/journeyfixture", "health"]
 ENTRYPOINT ["/journeyfixture"]
 `), 0o644)
 		if h.ssh != nil {
-			// A Docker config of our own: no desktop credential helper.
-			build := exec.Command("docker", "build", "-q", "--platform", "linux/"+arch, "-t", fixtureImage+":"+v, filepath.Join(dir, v))
-			build.Env = append(os.Environ(), "DOCKER_CONFIG="+t.TempDir())
+			// buildx, which builds every layer for the platform (the classic
+			// builder took this machine's busybox); a Docker config of our
+			// own (no desktop credential helper) with the user's plugins.
+			cfg, home := t.TempDir(), os.Getenv("HOME")
+			os.WriteFile(filepath.Join(cfg, "config.json"), []byte("{}"), 0o600)
+			os.Symlink(filepath.Join(home, ".docker", "cli-plugins"), filepath.Join(cfg, "cli-plugins"))
+			build := exec.Command("docker", "buildx", "build", "-q", "--platform", "linux/"+arch, "--load", "-t", fixtureImage+":"+v, filepath.Join(dir, v))
+			build.Env = append(os.Environ(), "DOCKER_CONFIG="+cfg, "BUILDX_CONFIG="+filepath.Join(home, ".docker", "buildx"))
 			if out, err := build.CombinedOutput(); err != nil {
 				t.Fatalf("docker build fixture %s: %v\n%s", v, err, out)
+			}
+			// The whole image must be the server's: a base image of this
+			// machine's architecture breaks the tools inside it.
+			got, _ := exec.Command("docker", "image", "inspect", "-f", "{{.Architecture}}", fixtureImage+":"+v).Output()
+			if a := strings.TrimSpace(string(got)); a != arch {
+				t.Fatalf("fixture %s built for %s, want %s", v, a, arch)
 			}
 			continue
 		}
@@ -148,9 +159,7 @@ func (h *journeyHost) probe(domain, path string) *trafficProbe {
 				return
 			default:
 			}
-			req, _ := http.NewRequest(http.MethodGet, h.web+path, nil)
-			req.Host = domain
-			res, err := client.Do(req)
+			res, err := client.Do(h.request(domain, path))
 			p.mu.Lock()
 			p.requests++
 			if err != nil || res.StatusCode != 200 {
@@ -330,9 +339,12 @@ func TestReleaseJourney(t *testing.T) {
 		}
 	}
 	get := func(domain, path string) (int, string) {
-		req, _ := http.NewRequest(http.MethodGet, h.web+path, nil)
-		req.Host = domain
-		res, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
+		res, err := (&http.Client{Timeout: 5 * time.Second}).Do(h.request(domain, path))
+		// A new host name's certificate takes Caddy a moment to obtain.
+		for i := 0; err != nil && h.ssh != nil && strings.Contains(err.Error(), "tls") && i < 60; i++ {
+			time.Sleep(2 * time.Second)
+			res, err = (&http.Client{Timeout: 5 * time.Second}).Do(h.request(domain, path))
+		}
 		if err != nil {
 			return 0, err.Error()
 		}
@@ -343,9 +355,9 @@ func TestReleaseJourney(t *testing.T) {
 
 	// ---- CLI run: the full journey.
 	t.Run("cli", func(t *testing.T) {
-		const app, domain = "journey-cli", "cli.journey.test"
-		signIn("journey-cli", app)
-		agent := map[string]string{"OAP_AGENT": "journey-cli"}
+		app, domain := h.app("cli"), h.domain("cli")
+		signIn(h.app("cli"), app)
+		agent := map[string]string{"OAP_AGENT": h.app("cli")}
 		oap := func(args ...string) (int, string) { return cli(t, dir, agent, args...) }
 		spec := journeyApp(app, domain, 1)
 		file := filepath.Join(t.TempDir(), "oap.yaml")
@@ -509,8 +521,8 @@ func TestReleaseJourney(t *testing.T) {
 
 	// ---- Connect run: a smoke run over Connect JSON.
 	t.Run("connect", func(t *testing.T) {
-		const app, domain = "journey-connect", "connect.journey.test"
-		tok := signIn("journey-connect", app)
+		app, domain := h.app("connect"), h.domain("connect")
+		tok := signIn(h.app("connect"), app)
 		c := oapv1connect.NewAgentServiceClient(&http.Client{Transport: withToken{tok, http.DefaultTransport}, Timeout: 10 * time.Minute}, h.public, connect.WithProtoJSON())
 		ctx := context.Background()
 		if _, err := c.Observe(ctx, connect.NewRequest(&oapv1.ObserveRequest{})); err != nil {
@@ -561,7 +573,7 @@ func TestReleaseJourney(t *testing.T) {
 		if ex, err := c.Explain(ctx, connect.NewRequest(&oapv1.ExplainRequest{Application: app})); err != nil || len(ex.Msg.Gaps) != 0 {
 			t.Fatalf("S5 explain: %v %v", ex, err)
 		}
-		if _, err := c.Observe(ctx, connect.NewRequest(&oapv1.ObserveRequest{Application: "journey-cli"})); connect.CodeOf(err) != connect.CodePermissionDenied {
+		if _, err := c.Observe(ctx, connect.NewRequest(&oapv1.ObserveRequest{Application: h.app("cli")})); connect.CodeOf(err) != connect.CodePermissionDenied {
 			t.Fatalf("S6 cross-app: %v", err)
 		}
 		rec.step("connect", "smoke", "passed")
@@ -569,8 +581,8 @@ func TestReleaseJourney(t *testing.T) {
 
 	// ---- MCP run: a smoke run over MCP.
 	t.Run("mcp", func(t *testing.T) {
-		const app, domain = "journey-mcp", "mcp.journey.test"
-		tok := signIn("journey-mcp", app)
+		app, domain := h.app("mcp"), h.domain("mcp")
+		tok := signIn(h.app("mcp"), app)
 		call := func(method string, params any) map[string]any {
 			t.Helper()
 			body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 1, "method": method, "params": params})
@@ -630,7 +642,7 @@ func TestReleaseJourney(t *testing.T) {
 		if ex, _ := tool("explain", map[string]any{"application": app}); ex["gaps"] != nil {
 			t.Fatalf("S5 explain: %v", ex)
 		}
-		if _, denied := tool("observe", map[string]any{"application": "journey-cli"}); !denied {
+		if _, denied := tool("observe", map[string]any{"application": h.app("cli")}); !denied {
 			t.Fatal("S6: the MCP agent observed another agent's application")
 		}
 		rec.step("mcp", "smoke", "passed")
@@ -639,12 +651,12 @@ func TestReleaseJourney(t *testing.T) {
 	// ---- Final checks.
 	t.Run("final", func(t *testing.T) {
 		// X1: each app on its own host name; an unknown host gets nothing.
-		for app, domain := range map[string]string{"journey-cli": "cli.journey.test", "journey-connect": "connect.journey.test", "journey-mcp": "mcp.journey.test"} {
+		for app, domain := range map[string]string{h.app("cli"): h.domain("cli"), h.app("connect"): h.domain("connect"), h.app("mcp"): h.domain("mcp")} {
 			if code, b := get(domain, "/"); code != 200 || !strings.Contains(b, app) {
 				t.Fatalf("X1 %s: %d %s", domain, code, b)
 			}
 		}
-		if code, b := get("unknown.invalid", "/"); code == 200 && strings.Contains(b, "journey") {
+		if code, b := get(h.domain("unknown"), "/"); code == 200 && strings.Contains(b, "journey") {
 			t.Fatalf("X1: an unknown host was served an app: %d %s", code, b)
 		}
 		rec.Final["coexistence"] = true
@@ -654,7 +666,7 @@ func TestReleaseJourney(t *testing.T) {
 		before := hostSh(`docker ps --format '{{.ID}} {{.Names}}' | grep -v oapd | sort`)
 		hostSh(`docker stop ` + h.oapd + ` >/dev/null`)
 		probes := map[string]*trafficProbe{}
-		for _, d := range []string{"cli.journey.test", "connect.journey.test", "mcp.journey.test"} {
+		for _, d := range []string{h.domain("cli"), h.domain("connect"), h.domain("mcp")} {
 			probes[d] = h.probe(d, "/api")
 		}
 		time.Sleep(30 * time.Second)
@@ -680,7 +692,7 @@ func TestReleaseJourney(t *testing.T) {
 			}
 			time.Sleep(200 * time.Millisecond)
 		}
-		if code, out := cli(t, dir, map[string]string{"OAP_AGENT": "journey-cli"}, "observe", "journey-cli"); code != 0 {
+		if code, out := cli(t, dir, map[string]string{"OAP_AGENT": h.app("cli")}, "observe", h.app("cli")); code != 0 {
 			t.Errorf("X2: the CLI after oapd's restart: %s", out)
 		}
 		rec.Final["interfacesAfterRestart"] = true

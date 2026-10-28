@@ -28,6 +28,39 @@ type journeyHost struct {
 	public         string   // api, on a Docker-in-Docker host
 	oapd, install  string   // oapd's container and the installation's id
 	ssh            []string // the ssh command for a real server
+	domains        string   // the domain applications' host names end in
+	run            string   // set: a suffix for this run's applications and agents
+}
+
+// domain is a host name for an application: under journey.test on a
+// Docker-in-Docker host, reached through web with that Host header; on a
+// real server, a name that resolves to it, served over HTTPS with a real
+// certificate as users' applications are.
+func (h *journeyHost) domain(prefix string) string {
+	if h.run != "" {
+		prefix += "-" + h.run
+	}
+	return prefix + "." + h.domains
+}
+
+// app names one of the journey's applications (and its agent); with
+// OAP_JOURNEY_RUN, each run on a real server has its own.
+func (h *journeyHost) app(name string) string {
+	if h.run == "" {
+		return "journey-" + name
+	}
+	return "journey-" + name + "-" + h.run
+}
+
+// request is a GET of path on an application's host name through the edge.
+func (h *journeyHost) request(domain, path string) *http.Request {
+	if h.ssh != nil {
+		req, _ := http.NewRequest(http.MethodGet, "https://"+domain+path, nil)
+		return req
+	}
+	req, _ := http.NewRequest(http.MethodGet, h.web+path, nil)
+	req.Host = domain
+	return req
 }
 
 // sh runs a script on the host.
@@ -44,13 +77,17 @@ func (h *journeyHost) sh(script string) (string, error) {
 // newRemoteJourneyHost uses a real server where OAP is installed and OAP's
 // SSH key still works (before hand-off): OAP_JOURNEY_SERVER (user@host),
 // OAP_JOURNEY_SSH_KEY, OAP_JOURNEY_KNOWN_HOSTS (the host key oapctl
-// pinned) and OAP_JOURNEY_PUBLIC (oapd's public URL).
+// pinned), OAP_JOURNEY_PUBLIC (oapd's public URL) and OAP_JOURNEY_DOMAIN
+// (a domain whose names resolve to the server, such as its sslip.io name);
+// OAP_JOURNEY_RUN names the run, so a rerun doesn't meet an earlier run's
+// applications and agents.
 func newRemoteJourneyHost(t *testing.T) *journeyHost {
 	t.Helper()
 	server, public := os.Getenv("OAP_JOURNEY_SERVER"), os.Getenv("OAP_JOURNEY_PUBLIC")
 	sshArgs := []string{"ssh", "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes", "-o", "StrictHostKeyChecking=yes",
 		"-o", "UserKnownHostsFile=" + os.Getenv("OAP_JOURNEY_KNOWN_HOSTS"), "-i", os.Getenv("OAP_JOURNEY_SSH_KEY"), "-o", "ServerAliveInterval=15"}
-	h := &journeyHost{name: server, public: public, web: "http://" + server[strings.LastIndex(server, "@")+1:], ssh: append(sshArgs, server)}
+	h := &journeyHost{name: server, public: public, web: "http://" + server[strings.LastIndex(server, "@")+1:], ssh: append(sshArgs, server),
+		domains: os.Getenv("OAP_JOURNEY_DOMAIN"), run: os.Getenv("OAP_JOURNEY_RUN")}
 	id, err := h.sh(`cat /var/lib/oap/install-id`)
 	if err != nil || id == "" {
 		t.Fatalf("the server's installation: %v %s", err, id)
@@ -96,7 +133,7 @@ func newJourneyHost(t *testing.T, memory ...string) *journeyHost {
 	const image = "oapd:journey-test"
 	buildOapdImage(t, image)
 
-	h := &journeyHost{name: fmt.Sprintf("oap-journey-%d", time.Now().UnixNano()), oapd: "oap-journey1-oapd", install: "journey1"}
+	h := &journeyHost{name: fmt.Sprintf("oap-journey-%d", time.Now().UnixNano()), oapd: "oap-journey1-oapd", install: "journey1", domains: "journey.test"}
 	run(nil, "env", "DOCKER_CONFIG="+t.TempDir(), "docker", "pull", "-q", "docker:27.5.1-dind")
 	runArgs := []string{"run", "-d", "--privileged", "--name", h.name, "-p", "127.0.0.1::80", "-p", "127.0.0.1::7000"}
 	if len(memory) > 0 { // the host's whole memory, swap included
