@@ -1,0 +1,463 @@
+// Command oapctl is the rewrite's CLI (working name until cutover). With no
+// arguments it shows where onboarding stands and what happens next
+// (docs/architecture/onboarding.md, "First launch"). Other commands are
+// under construction; see docs/architecture/rewrite-plan.md.
+package main
+
+import (
+	"bufio"
+	"context"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	oapv1 "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1"
+	"io"
+	"os"
+	"os/exec"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/sshhost"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/host"
+)
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	a := &app{cli: filepath.Base(os.Args[0]), in: bufio.NewReader(os.Stdin), out: os.Stdout, errOut: os.Stderr,
+		ssh: sshhost.Client{}, now: time.Now}
+	a.terminal = isTerminal
+	if a.terminal() && os.Getenv("OAP_PLAIN") == "" && os.Getenv("TERM") != "dumb" {
+		a.ui = newTUI(a)
+	}
+	os.Exit(a.run(ctx, os.Args[1:]))
+}
+
+// app holds everything a command touches, so tests can replace it.
+type app struct {
+	// lastOutcome is the outcome of the last operation runIntent followed.
+	lastOutcome *oapv1.Outcome
+	cli         string
+	in          *bufio.Reader
+	out, errOut io.Writer
+	ssh         sshhost.Client
+	terminal    func() bool
+	now         func() time.Time
+	configDir   string // overrides the default, for tests
+	ui          ui     // nil: plain text
+	docker      func(ctx context.Context, args ...string) *exec.Cmd
+	mode        mode // human, --json or --events, for agent API commands
+}
+
+// u is the owner's interface: the Charm one when set, else plain text.
+func (a *app) u() ui {
+	if a.mode != human {
+		return quietUI{}
+	}
+	if a.ui != nil {
+		return a.ui
+	}
+	return plainUI{a: a, cli: a.cli}
+}
+
+const usage = `Usage:
+  %[1]s                     where onboarding stands and what happens next
+  %[1]s --json              the same, as JSON for agents
+  %[1]s host connect ADDR   connect a server (user@host[:port]); asks for its password once
+        [--identity FILE]  use a key you already have instead of the password
+        [--fingerprint FP] accept the host key without asking, if it matches FP
+  %[1]s host check [ADDR]   read-only check of the server [--json]
+  %[1]s host fix [ADDR]     apply the fixes the check proposes, each approved by you [--json: show them]
+  %[1]s host undo FIX [ADDR] undo a fix OAP applied
+  %[1]s host install [ADDR] [--image IMAGE] install oapd and Caddy on the server (default: the oapd this release pins)
+  %[1]s version                             this oapctl's version and the oapd it installs
+  %[1]s host handoff [ADDR]                 remove OAP's SSH key once an owner key works; agents then work only through OAP
+  %[1]s host uninstall [ADDR] [--keep-access]   reverse everything OAP did on the server, each step approved by you
+  %[1]s app apply FILE [ADDR]               create or update an application from its oap.yaml
+  %[1]s app scale APP COMPONENT N [ADDR]    run N instances of a component
+  %[1]s app deploy APP COMPONENT=IMAGE...   roll out new images
+  %[1]s app build APP COMPONENT --repo URL --commit REF   build an image from source on the server
+  %[1]s apply PROPOSAL_ID                   apply a proposal by its id, for example once the owner approved it
+  %[1]s app rollback APP --to SPEC_HASH     return to the images of an earlier desired state
+  %[1]s ext install NAME --path P --point notifier [--setting K=V] [--secret S]   install an extension (a sensitive change)
+  %[1]s ext remove NAME                     uninstall an extension
+  %[1]s mcp [ADDR]                          serve OAP's tools over MCP on stdin and stdout
+  %[1]s observe [APP]                       the world: applications, components, routes
+  %[1]s explain APP [COMPONENT]             why an application differs from its desired state
+  %[1]s watch [APP] [--since N] [--limit N] events as they happen
+  %[1]s login URL --agent NAME             sign an agent in; the owner approves it once
+  %[1]s briefing [APP]                      the briefing for agents: what runs, what you may do, house rules
+  %[1]s skill [NAME|schema]                 how to put an application on OAP (author-app), or the oap.yaml schema
+  %[1]s ask QUESTION [--kind K] [--option O]... [--wait]   involve the owner (as an agent)
+  %[1]s owner enroll|keys|secret|logins|approve|deny|agents|revoke|pause|resume|mode|asks|answer|briefing   the owner's control over agents
+  %[1]s owner secret set NAME [--ask ID]   store a secret; the value is read from the terminal (not shown) or piped on stdin
+  With OAP_AGENT=NAME, agent API commands run as that signed-in agent.
+  Agent API commands take --json (the result as JSON) or --events (each event as a JSON line).
+`
+
+func (a *app) run(ctx context.Context, args []string) int {
+	if len(args) == 0 || args[0] == "--json" {
+		return a.frontDoor(ctx, len(args) > 0)
+	}
+	switch {
+	case args[0] == "version" || args[0] == "--version":
+		return a.versionCmd()
+	case args[0] == "help" || args[0] == "-h" || args[0] == "--help":
+		fmt.Fprintf(a.out, usage, a.cli)
+		return 0
+	case len(args) >= 2 && args[0] == "host" && args[1] == "connect":
+		return a.hostConnect(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "host" && args[1] == "check":
+		return a.hostCheck(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "host" && args[1] == "fix":
+		return a.hostFix(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "host" && args[1] == "undo":
+		return a.hostUndo(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "host" && args[1] == "install":
+		return a.hostInstall(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "host" && args[1] == "handoff":
+		return a.hostHandoff(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "host" && args[1] == "uninstall":
+		return a.hostUninstall(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "app" && args[1] == "apply":
+		return a.appApply(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "app" && args[1] == "scale":
+		return a.appScale(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "app" && args[1] == "deploy":
+		return a.appDeploy(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "app" && args[1] == "rollback":
+		return a.appRollback(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "app" && args[1] == "build":
+		return a.appBuild(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "ext" && args[1] == "install":
+		return a.extInstall(ctx, args[2:])
+	case len(args) >= 2 && args[0] == "ext" && args[1] == "remove":
+		return a.extRemove(ctx, args[2:])
+	case args[0] == "apply":
+		return a.applyCmd(ctx, args[1:])
+	case args[0] == "login":
+		return a.loginCmd(ctx, args[1:])
+	case args[0] == "owner":
+		return a.ownerCmd(ctx, args[1:])
+	case args[0] == "briefing":
+		return a.briefingCmd(ctx, args[1:])
+	case args[0] == "skill":
+		return a.skillCmd(ctx, args[1:])
+	case args[0] == "ask":
+		return a.askCmd(ctx, args[1:])
+	case args[0] == "observe":
+		return a.observeCmd(ctx, args[1:])
+	case args[0] == "explain":
+		return a.explainCmd(ctx, args[1:])
+	case args[0] == "watch":
+		return a.watchCmd(ctx, args[1:])
+	case args[0] == "mcp":
+		return a.mcpStdio(ctx, args[1:])
+	}
+	fmt.Fprintf(a.errOut, "%s: unknown command %q\n\n"+usage, a.cli, strings.Join(args, " "), a.cli)
+	return 2
+}
+
+// frontDoor is `oap` with no arguments.
+func (a *app) frontDoor(ctx context.Context, asJSON bool) int {
+	j, err := a.loadJourney()
+	if err != nil {
+		return a.fail(err)
+	}
+	s := j.first()
+	if asJSON || !a.terminal() {
+		st := host.Plan(s, a.cli)
+		a.writeJSON(st)
+		return st.Exit
+	}
+	if s == nil {
+		a.u().Welcome()
+		addr := a.u().Ask("Server address", "")
+		if addr == "" {
+			return a.fail(errors.New("no server address given"))
+		}
+		if !strings.Contains(addr, "@") {
+			addr = a.u().Ask("Username", "root") + "@" + addr
+		}
+		if code := a.connect(ctx, addr, "", "", time.Time{}); code != 0 {
+			return code
+		}
+		return a.check(ctx, addr, false)
+	}
+	switch s.Stage {
+	case host.StageNew:
+		if code := a.connect(ctx, s.Address, "", "", time.Time{}); code != 0 {
+			return code
+		}
+		return a.check(ctx, s.Address, false)
+	case host.StageConnected:
+		return a.check(ctx, s.Address, false)
+	case host.StageChecked:
+		if blocked, stopped := host.Blocking(s.Findings); blocked && !stopped {
+			return a.fix(ctx, s, false)
+		}
+	case host.StageInstalled:
+		if code := a.ownerEnroll(ctx, "", false); code != 0 {
+			return code
+		}
+		next, err := a.server(s.Address)
+		if err != nil {
+			return a.fail(err)
+		}
+		s = next
+	case host.StageOwned:
+		a.u().Status(host.Plan(s, a.cli))
+		if !a.u().Confirm(fmt.Sprintf("Remove OAP's SSH key from %s now?", s.Address)) {
+			a.u().Note("Not handed off yet.")
+			return host.ExitOK
+		}
+		if code := a.hostHandoff(ctx, []string{s.Address}); code != 0 {
+			return code
+		}
+		next, err := a.server(s.Address)
+		if err != nil {
+			return a.fail(err)
+		}
+		s = next
+	}
+	st := host.Plan(s, a.cli)
+	a.u().Status(st)
+	return st.Exit
+}
+
+func (a *app) hostConnect(ctx context.Context, args []string) int {
+	fs := flag.NewFlagSet("host connect", flag.ContinueOnError)
+	fs.SetOutput(a.errOut)
+	identity := fs.String("identity", "", "")
+	fingerprint := fs.String("fingerprint", "", "")
+	breakGlass := fs.Bool("break-glass", false, "return to host access after hand-off, for a limited time")
+	hours := fs.Int("hours", 4, "how long break-glass access lasts, 1 to 24 hours")
+	addr, rest := splitFirst(args)
+	if err := fs.Parse(rest); err != nil {
+		return 2
+	}
+	if addr == "" && fs.NArg() > 0 {
+		addr = fs.Arg(0)
+	}
+	if addr == "" {
+		fmt.Fprintf(a.errOut, usage, a.cli)
+		return 2
+	}
+	if *breakGlass {
+		if *hours < 1 || *hours > 24 {
+			return a.fail(fmt.Errorf("break-glass access lasts 1 to 24 hours, not %d", *hours))
+		}
+		return a.breakGlass(ctx, addr, *identity, *fingerprint, time.Duration(*hours)*time.Hour)
+	}
+	if code := a.connect(ctx, addr, *identity, *fingerprint, time.Time{}); code != 0 {
+		return code
+	}
+	if a.terminal() {
+		return a.check(ctx, addr, false)
+	}
+	return 0
+}
+
+func (a *app) hostCheck(ctx context.Context, args []string) int {
+	fs := flag.NewFlagSet("host check", flag.ContinueOnError)
+	fs.SetOutput(a.errOut)
+	asJSON := fs.Bool("json", false, "")
+	addr, rest := splitFirst(args)
+	if err := fs.Parse(rest); err != nil {
+		return 2
+	}
+	if addr == "" && fs.NArg() > 0 {
+		addr = fs.Arg(0)
+	}
+	if addr == "" {
+		j, err := a.loadJourney()
+		if err != nil {
+			return a.fail(err)
+		}
+		if s := j.first(); s != nil {
+			addr = s.Address
+		}
+	}
+	if addr == "" {
+		return a.fail(fmt.Errorf("no server connected yet; run %s first", a.cli))
+	}
+	return a.check(ctx, addr, *asJSON || !a.terminal())
+}
+
+// connect pins the host key, creates the bootstrap key and installs it.
+func (a *app) connect(ctx context.Context, addr, identity, fingerprint string, until time.Time) int {
+	t, err := a.target(addr)
+	if err != nil {
+		return a.fail(err)
+	}
+	if identity == "" && !a.terminal() {
+		return a.fail(sshhost.ErrNeedsTerminal)
+	}
+	k, err := a.ssh.ScanHostKey(ctx, t)
+	if err != nil {
+		return a.fail(err)
+	}
+	switch {
+	case fingerprint != "":
+		if !strings.HasSuffix(k.Fingerprint, " "+fingerprint) && k.Fingerprint != fingerprint {
+			return a.fail(fmt.Errorf("the server's host key is %s, not %s: refusing to connect", k.Fingerprint, fingerprint))
+		}
+	case a.terminal():
+		if !a.u().Confirm(fmt.Sprintf("Host key: %s\nDoes it match your provider's console?", k.Fingerprint)) {
+			return a.fail(errors.New("host key not confirmed; nothing was changed"))
+		}
+	default:
+		return a.fail(fmt.Errorf("the host key %s needs the owner's confirmation: run this in a terminal, or pass --fingerprint", k.Fingerprint))
+	}
+	if err := sshhost.PinHostKey(t, k); err != nil {
+		return a.fail(err)
+	}
+	laptop, _ := os.Hostname()
+	pub, err := a.ssh.EnsureKey(ctx, t, fmt.Sprintf("oap-bootstrap %s %s", a.now().UTC().Format("2006-01-02"), laptop))
+	if err != nil {
+		return a.fail(err)
+	}
+	if identity != "" {
+		err = a.ssh.InstallKeyWithIdentity(ctx, t, pub, identity, until)
+	} else {
+		a.u().Note(fmt.Sprintf("ssh will ask for the password of %s. It is used once to install OAP's key and never stored.", t.Address()))
+		err = a.ssh.InstallKeyWithPassword(ctx, t, pub, until)
+	}
+	if err != nil {
+		return a.fail(err)
+	}
+	if _, err := a.ssh.Run(ctx, t, "true"); err != nil {
+		return a.fail(fmt.Errorf("the bootstrap key was installed but doesn't log in: %v", err))
+	}
+	if !until.IsZero() {
+		return 0 // break-glass: the journey stays where it is
+	}
+	if err := a.update(host.Server{Address: t.Address(), Stage: host.StageConnected}); err != nil {
+		return a.fail(err)
+	}
+	a.u().Success(fmt.Sprintf("Connected to %s with OAP's bootstrap key. The password is no longer needed.", t.Address()))
+	return 0
+}
+
+// check runs the read-only probe and records the findings.
+func (a *app) check(ctx context.Context, addr string, asJSON bool) int {
+	t, err := a.target(addr)
+	if err != nil {
+		return a.fail(err)
+	}
+	var out string
+	probe := func(func(string)) error {
+		var err error
+		out, err = a.ssh.Run(ctx, t, host.Probe)
+		return err
+	}
+	if asJSON {
+		err = probe(nil)
+	} else {
+		err = a.u().Run("Checking the server (read-only)", probe)
+	}
+	if err != nil {
+		return a.fail(err)
+	}
+	facts, err := host.ParseProbe(out)
+	if err != nil {
+		return a.fail(err)
+	}
+	s := host.Server{Address: t.Address(), Stage: host.StageChecked, Summary: host.Summary(facts), Findings: host.Check(facts)}
+	prev, _ := a.server(t.Address())
+	if prev != nil {
+		s.Install = prev.Install
+	}
+	if blocked, _ := host.Blocking(s.Findings); !blocked {
+		s.Stage = host.StageReady
+		// A check never moves a server back past steps it has done.
+		if prev != nil && later(prev.Stage, host.StageReady) {
+			s.Stage = prev.Stage
+		}
+	}
+	if err := a.update(s); err != nil {
+		return a.fail(err)
+	}
+	st := host.Plan(&s, a.cli)
+	if asJSON {
+		a.writeJSON(st)
+	} else {
+		a.u().Status(st)
+	}
+	return st.Exit
+}
+
+// later reports whether stage a comes after stage b in the journey.
+func later(a, b host.Stage) bool {
+	order := []host.Stage{host.StageNew, host.StageConnected, host.StageChecked, host.StageReady, host.StageInstalled, host.StageOwned, host.StageHandedOff}
+	ia, ib := -1, -1
+	for i, s := range order {
+		if s == a {
+			ia = i
+		}
+		if s == b {
+			ib = i
+		}
+	}
+	return ia > ib
+}
+
+func (a *app) target(addr string) (sshhost.Target, error) {
+	user, h, port, err := sshhost.ParseAddress(addr)
+	if err != nil {
+		return sshhost.Target{}, err
+	}
+	dirName := h
+	if port != 22 {
+		dirName = fmt.Sprintf("%s_%d", h, port)
+	}
+	dirName = strings.ReplaceAll(dirName, ":", "_")
+	return sshhost.Target{User: user, Host: h, Port: port, Dir: filepath.Join(a.dir(), "hosts", dirName)}, nil
+}
+
+func (a *app) writeJSON(v any) {
+	b, _ := json.MarshalIndent(v, "", "  ")
+	fmt.Fprintf(a.out, "%s\n", b)
+}
+
+func (a *app) fail(err error) int {
+	fmt.Fprintf(a.errOut, "%s: %v\n", a.cli, err)
+	return 1
+}
+
+// splitFirst separates a leading positional argument from flags.
+func splitFirst(args []string) (string, []string) {
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		return args[0], args[1:]
+	}
+	return "", args
+}
+
+func isTerminal() bool {
+	in, err1 := os.Stdin.Stat()
+	out, err2 := os.Stdout.Stat()
+	return err1 == nil && err2 == nil && in.Mode()&os.ModeCharDevice != 0 && out.Mode()&os.ModeCharDevice != 0
+}
+
+// breakGlass returns the owner to host access for a limited time: OAP's key
+// is installed with an expiry that sshd enforces, and the access is
+// recorded in the host manifest. It needs the owner, like connecting.
+func (a *app) breakGlass(ctx context.Context, addr, identity, fingerprint string, d time.Duration) int {
+	until := a.now().Add(d).UTC().Truncate(time.Minute)
+	if code := a.connect(ctx, addr, identity, fingerprint, until); code != 0 {
+		return code
+	}
+	t, err := a.target(addr)
+	if err != nil {
+		return a.fail(err)
+	}
+	if _, err := a.ssh.Run(ctx, t, host.RecordUntil("break-glass", "apply", a.now(), until)); err != nil {
+		return a.fail(fmt.Errorf("break-glass access works, but couldn't be recorded in the host manifest: %v", err))
+	}
+	a.u().Success(fmt.Sprintf("Break-glass access to %s until %s UTC, recorded in %s. The key stops working then.",
+		t.Address(), until.Format("2006-01-02 15:04"), host.ManifestPath))
+	return 0
+}

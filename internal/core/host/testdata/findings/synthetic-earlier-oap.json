@@ -1,0 +1,19 @@
+{
+  "summary": "Debian GNU/Linux 12 (bookworm), aarch64, 2 CPUs, 3931 MiB memory, 28.6 GiB disk free",
+  "blocked": false,
+  "stopped": false,
+  "findings": [
+    {
+      "why": "host.oap.present",
+      "severity": "info",
+      "observed": "2 OAP containers from an earlier install: oap-a1-caddy, oap-a1-site-web-1-r-1",
+      "remedy": "Remove the earlier install with oap host uninstall, or keep it running alongside."
+    },
+    {
+      "why": "host.foreign.present",
+      "severity": "info",
+      "observed": "container redis (running)",
+      "remedy": "Nothing to do. OAP leaves software it didn't install alone."
+    }
+  ]
+}

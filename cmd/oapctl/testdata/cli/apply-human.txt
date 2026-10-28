@@ -1,0 +1,12 @@
+$ oapctl app apply oap.yaml --yes
+exit 0
+Plan for site on $OAP_AGENT_URL (5 steps)
+  Because: needs_approval; risk sensitive; changes domains, which the envelope treats as sensitive.
+  Commands:
+     0 write_desired 
+     1 start_instance web#1
+     2 await_ready web#1
+     3 route_add web#1
+     4 edge_reload_confirmed web#1
+Applying to site…
+✓ site is live at http://site.example.com (operation op_73c9fc1d6c14f188b45180ddac27154c).

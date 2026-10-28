@@ -1,0 +1,78 @@
+Mon Oct 26 04:35:55 PM UTC 2026
+ 16:35:55 up 6 days, 21:01,  1 user,  load average: 2.23, 2.05, 1.27
+               total        used        free      shared  buff/cache   available
+Mem:
+Swap:
+oom_kill 0
+oap-xs2zxmlcep-nisha-shipping-website-1-r-0e54aac00d49	nisha-shipping-website:v1	Up 35 seconds (healthy)
+oap-xs2zxmlcep-journey-mcp-r2-worker-1-r-7de6a9a0e6b8	journey-fixture:v1	Up 4 minutes (healthy)
+oap-xs2zxmlcep-journey-mcp-r2-web-1-r-46d1b5a14cf3	journey-fixture:v1	Up 5 minutes (healthy)
+oap-xs2zxmlcep-journey-mcp-r2-notes-1-r-642f841121c6	journey-fixture:v1	Up 5 minutes (healthy)
+oap-xs2zxmlcep-journey-mcp-r2-api-1-r-d3d2099f5367	journey-fixture:v1	Up 5 minutes (healthy)
+oap-xs2zxmlcep-journey-mcp-r2-kv-1-r-34fe5b751f58	journey-fixture:v1	Up 5 minutes (healthy)
+oap-xs2zxmlcep-journey-connect-r2-worker-1-r-c60a39b29ec1	journey-fixture:v1	Up 5 minutes (healthy)
+oap-xs2zxmlcep-journey-connect-r2-web-1-r-45bd1459ef90	journey-fixture:v1	Up 6 minutes (healthy)
+oap-xs2zxmlcep-journey-connect-r2-notes-1-r-4fac7e1d7ea1	journey-fixture:v1	Up 6 minutes (healthy)
+oap-xs2zxmlcep-journey-connect-r2-api-1-r-6395a60228b0	journey-fixture:v1	Up 6 minutes (healthy)
+oap-xs2zxmlcep-journey-connect-r2-kv-1-r-a29c866e60ed	journey-fixture:v1	Up 6 minutes (healthy)
+oap-xs2zxmlcep-journey-cli-r2-notes-1-r-a91d1820aea4	journey-fixture:v1	Up 7 minutes (healthy)
+oap-xs2zxmlcep-journey-cli-r2-api-1-r-58d04752852f	journey-fixture:v1	Up 7 minutes (healthy)
+oap-xs2zxmlcep-journey-cli-r2-worker-1-r-3645c892a288	journey-fixture:v1	Up 10 minutes (healthy)
+oap-xs2zxmlcep-journey-cli-r2-web-1-r-69aaf785b14b	journey-fixture:v1	Up 10 minutes (healthy)
+oap-xs2zxmlcep-journey-cli-r2-kv-1-r-63433b999b86	journey-fixture:v1	Up 11 minutes (healthy)
+oap-xs2zxmlcep-journey-mcp-kv-1-r-29e9942ad99d	a9100e32e4e9	Up 15 minutes (healthy)
+oap-xs2zxmlcep-journey-connect-kv-1-r-c35079460db1	a9100e32e4e9	Up 16 minutes (healthy)
+oap-xs2zxmlcep-journey-cli-kv-1-r-cb717bdb25d2	a9100e32e4e9	Up 17 minutes (healthy)
+oap-xs2zxmlcep-oapd	ghcr.io/mohsalsaleem/oapd:v0.2.0-rc.2	Up About a minute
+oap-xs2zxmlcep-caddy	caddy:2.10.2-alpine	Up 19 minutes
+oap-xs2zxmlcep-nisha-shipping-website-1-r-0e54aac00d49	11.45MiB / 64MiB
+oap-xs2zxmlcep-journey-mcp-r2-worker-1-r-7de6a9a0e6b8	1.09MiB / 950.5MiB
+oap-xs2zxmlcep-journey-mcp-r2-web-1-r-46d1b5a14cf3	4.344MiB / 950.5MiB
+oap-xs2zxmlcep-journey-mcp-r2-notes-1-r-642f841121c6	1.277MiB / 950.5MiB
+oap-xs2zxmlcep-journey-mcp-r2-api-1-r-d3d2099f5367	1.887MiB / 950.5MiB
+oap-xs2zxmlcep-journey-mcp-r2-kv-1-r-34fe5b751f58	1.395MiB / 950.5MiB
+oap-xs2zxmlcep-journey-connect-r2-worker-1-r-c60a39b29ec1	2.465MiB / 950.5MiB
+oap-xs2zxmlcep-journey-connect-r2-web-1-r-45bd1459ef90	1.508MiB / 950.5MiB
+oap-xs2zxmlcep-journey-connect-r2-notes-1-r-4fac7e1d7ea1	1.32MiB / 950.5MiB
+oap-xs2zxmlcep-journey-connect-r2-api-1-r-6395a60228b0	1.895MiB / 950.5MiB
+oap-xs2zxmlcep-journey-connect-r2-kv-1-r-a29c866e60ed	1.672MiB / 950.5MiB
+oap-xs2zxmlcep-journey-cli-r2-notes-1-r-a91d1820aea4	1.395MiB / 950.5MiB
+oap-xs2zxmlcep-journey-cli-r2-api-1-r-58d04752852f	1.957MiB / 950.5MiB
+oap-xs2zxmlcep-journey-cli-r2-worker-1-r-3645c892a288	1.098MiB / 950.5MiB
+oap-xs2zxmlcep-journey-cli-r2-web-1-r-69aaf785b14b	2.34MiB / 950.5MiB
+oap-xs2zxmlcep-journey-cli-r2-kv-1-r-63433b999b86	3.914MiB / 950.5MiB
+oap-xs2zxmlcep-journey-mcp-kv-1-r-29e9942ad99d	2.27MiB / 950.5MiB
+oap-xs2zxmlcep-journey-connect-kv-1-r-c35079460db1	1.773MiB / 950.5MiB
+oap-xs2zxmlcep-journey-cli-kv-1-r-cb717bdb25d2	1.828MiB / 950.5MiB
+oap-xs2zxmlcep-oapd	22.05MiB / 160MiB
+oap-xs2zxmlcep-caddy	45.11MiB / 160MiB
+
+== oapd log (warnings and errors)
+== host manifest
+{"fix":"install-docker","action":"apply","at":"2026-10-19T20:02:20Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-19T20:52:50Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-19T20:53:05Z"}
+{"fix":"open-web-ports","action":"apply","at":"2026-10-19T20:56:03Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-19T20:56:36Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-19T20:59:12Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T06:06:18Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T06:14:55Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T06:27:49Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T06:41:16Z"}
+{"fix":"break-glass","action":"apply","at":"2026-10-20T06:45:33Z","until":"2026-10-20T07:45:00Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T07:13:52Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T07:57:38Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T09:26:13Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T11:09:16Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T11:37:33Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T12:18:07Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T12:29:25Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T12:29:37Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T19:46:05Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T21:11:48Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-20T21:54:53Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-21T05:16:41Z"}
+{"fix":"open-web-ports","action":"undo","at":"2026-10-21T13:48:05Z"}
+{"fix":"install-oap","action":"undo","at":"2026-10-22T14:37:00Z"}
+{"fix":"open-web-ports","action":"apply","at":"2026-10-22T18:03:15Z"}
+{"fix":"install-oap","action":"apply","at":"2026-10-26T16:16:18Z"}

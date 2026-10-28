@@ -1,0 +1,6 @@
+ 0 write-desired         
+ 1 snapshot-volume        db volume=pgdata after [0]
+ 2 stop                   db#1 @old after [1]
+ 3 delete-volume          db volume=pgdata after [2]
+blast radius: [db], downtime none-expected
+irreversible: deletes volume pgdata of db

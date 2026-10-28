@@ -1,0 +1,20 @@
+exit 0
+{
+  "state": "connected",
+  "server": "root@203.0.113.5",
+  "next": {
+    "step": "check",
+    "by": "agent",
+    "why": "The check only reads the server, so an agent may run it.",
+    "command": "oap host check root@203.0.113.5",
+    "then": "oap --json"
+  },
+  "journey": [
+    "connect",
+    "check",
+    "fix",
+    "install",
+    "owner",
+    "hand-off"
+  ]
+}

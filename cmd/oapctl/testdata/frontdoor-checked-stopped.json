@@ -1,0 +1,62 @@
+exit 4
+{
+  "state": "checked",
+  "server": "root@203.0.113.5",
+  "summary": "Ubuntu 18.04.2 LTS, x86_64, 1 CPU, 985 MiB memory, 12.1 GiB disk free",
+  "next": {
+    "step": "check",
+    "by": "owner",
+    "why": "The server can't run OAP until something outside OAP changes.",
+    "ask_owner": "Reinstall the server with Ubuntu 26.04 from your provider's console, then run oap again. OAP doesn't upgrade an operating system in place.",
+    "command": "oap host check root@203.0.113.5",
+    "then": "oap --json"
+  },
+  "journey": [
+    "connect",
+    "check",
+    "fix",
+    "install",
+    "owner",
+    "hand-off"
+  ],
+  "findings": [
+    {
+      "why": "host.os.unsupported",
+      "severity": "stop",
+      "observed": "Ubuntu 18.04.2 LTS",
+      "required": "Ubuntu 22.04, 24.04 or 26.04, or Debian 12 or 13",
+      "remedy": "Reinstall the server with Ubuntu 26.04 from your provider's console, then run oap again. OAP doesn't upgrade an operating system in place."
+    },
+    {
+      "why": "host.swap.missing",
+      "severity": "fix",
+      "observed": "985 MiB memory, no swap",
+      "required": "swap on servers under 2 GB",
+      "remedy": "Add a 1 GiB swap file so a memory spike slows the server instead of stopping apps.",
+      "fix": {
+        "id": "swap-file",
+        "tier": "routine",
+        "summary": "Create /swapfile (1 GiB), enable it and add it to /etc/fstab",
+        "undoable": true
+      }
+    },
+    {
+      "why": "host.docker.unmanaged",
+      "severity": "advice",
+      "observed": "Docker 27.5.1 runs from /opt/docker-27.5.1/docker/dockerd, which no package manages; systemd drop-ins: oap-test-engine.conf",
+      "remedy": "OAP works with it, but it gets no security updates. Consider Docker Engine from Docker's package repository."
+    },
+    {
+      "why": "host.foreign.present",
+      "severity": "info",
+      "observed": "container tura (exited); mysqld on 127.0.0.1:3306",
+      "remedy": "Nothing to do. OAP leaves software it didn't install alone."
+    },
+    {
+      "why": "host.ssh.password_login",
+      "severity": "advice",
+      "observed": "SSH accepts passwords, including for root",
+      "remedy": "At hand-off, OAP offers to turn off password login once your own key works."
+    }
+  ]
+}

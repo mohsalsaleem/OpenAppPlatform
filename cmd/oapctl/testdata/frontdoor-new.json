@@ -1,0 +1,20 @@
+exit 3
+{
+  "state": "new",
+  "server": "root@203.0.113.5",
+  "next": {
+    "step": "connect",
+    "by": "owner",
+    "why": "Connecting needs the server password, which agents must not handle.",
+    "ask_owner": "Please run `oap host connect root@203.0.113.5` in a terminal on this machine. Tell me when it says Connected.",
+    "then": "oap --json"
+  },
+  "journey": [
+    "connect",
+    "check",
+    "fix",
+    "install",
+    "owner",
+    "hand-off"
+  ]
+}

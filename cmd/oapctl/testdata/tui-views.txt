@@ -1,0 +1,72 @@
+== welcome
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ OAP  runs your apps on your own server, operated by your AI agent.           │
+│                                                                              │
+│ No server is connected yet. Setup takes about 10 minutes and needs the       │
+│ server's IP address, its username and its password.                          │
+│                                                                              │
+│ ● connect   ○ check   ○ fix   ○ install   ○ owner   ○ hand off               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+== stopped
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ OAP  root@139.180.132.23                                                     │
+│ Ubuntu 18.04.2 LTS · x86_64 · 1 CPU · 985 MiB memory · 12.1 GiB disk free    │
+│                                                                              │
+│ ✓ connect   ✗ check   ○ fix   ○ install   ○ owner   ○ hand off               │
+│                                                                              │
+│ ✗ Ubuntu 18.04.2 LTS                                                         │
+│   needs Ubuntu 22.04, 24.04 or 26.04, or Debian 12 or 13                     │
+│   Reinstall the server with Ubuntu 26.04 from your provider's console, then  │
+│   run oap again. OAP doesn't upgrade an operating system in place.           │
+│                                                                              │
+│ ! 985 MiB memory, no swap  [routine]                                         │
+│   Add a 1 GiB swap file so a memory spike slows the server instead of        │
+│   stopping apps.                                                             │
+│                                                                              │
+│ · Docker 27.5.1 runs from /opt/docker-27.5.1/docker/dockerd, which no        │
+│   package manages; systemd drop-ins: oap-test-engine.conf                    │
+│ · Container tura (exited); mysqld on 127.0.0.1:3306                          │
+│ · SSH accepts passwords, including for root                                  │
+│                                                                              │
+│ Stopped. Make the change marked ✗, then run oapctl again.                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+== fixes
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ OAP  root@139.180.132.23                                                     │
+│ Ubuntu 26.04.1 LTS · x86_64 · 1 CPU · 950 MiB memory · 15.7 GiB disk free    │
+│                                                                              │
+│ ✓ connect   ✓ check   ● fix   ○ install   ○ owner   ○ hand off               │
+│                                                                              │
+│ ! Docker isn't running  [sensitive]                                          │
+│   Install Docker Engine from Docker's official package repository.           │
+│                                                                              │
+│ · SSH accepts passwords, including for root                                  │
+│                                                                              │
+│ Next fix · by you. Run oapctl to continue.                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+== ready
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ OAP  root@139.180.132.23                                                     │
+│ Ubuntu 26.04.1 LTS · x86_64 · 1 CPU · 950 MiB memory · 15.2 GiB disk free    │
+│                                                                              │
+│ ✓ connect   ✓ check   ✓ fix   ● install   ○ owner   ○ hand off               │
+│                                                                              │
+│ Next install · run oapctl host install root@139.180.132.23                   │
+╰──────────────────────────────────────────────────────────────────────────────╯
+== change
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Add a 1 GiB swap file (routine; undo with `oapctl host undo swap-file`)      │
+│ because 985 MiB memory, no swap                                              │
+│                                                                              │
+│   │ set -eu                                                                  │
+│   │ if [ -e /swapfile ]; then echo "oap: /swapfile already exists and OAP    │
+│     didn't create it" >&2; exit 3; fi                                        │
+│   │ fallocate -l 1G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile    │
+│     bs=1M count=1024 status=none                                             │
+│   │ chmod 600 /swapfile                                                      │
+│   │ mkswap /swapfile >/dev/null                                              │
+│   │ swapon /swapfile                                                         │
+│   │ grep -qxF '/swapfile none swap sw 0 0 # added by oap (swap-file)'        │
+│     /etc/fstab || printf '%s\n' '/swapfile none swap sw 0 0 # added by oap   │
+│     (swap-file)' >> /etc/fstab                                               │
+╰──────────────────────────────────────────────────────────────────────────────╯

@@ -1,0 +1,37 @@
+root@139.180.132.23 needs 1 change. Each runs only if you approve it.
+
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ Allow 80/tcp, 443/tcp and 443/udp in ufw (sensitive; undo with `oapctl host  │
+│ undo open-web-ports`)                                                        │
+│ because ufw blocks 80/tcp and 443/tcp                                        │
+│                                                                              │
+│   │ set -eu                                                                  │
+│   │ ufw allow 80/tcp                                                         │
+│   │ ufw allow 443/tcp                                                        │
+│   │ ufw allow 443/udp                                                        │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+? Apply this?  y / N
+✓ Apply this?  yes
+
+  │ Rule added
+  │ Rule added (v6)
+
+  │ Rule added (v6)
+  │ Rule added
+  │ Rule added (v6)
+
+✓ Applying open-web-ports (3s)
+✓ open-web-ports applied and recorded in /var/lib/oap/host-manifest.jsonl
+
+✓ Checking the server (read-only) (2s)
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ OAP  root@139.180.132.23                                                     │
+│ Ubuntu 26.04.1 LTS · x86_64 · 1 CPU · 950 MiB memory · 13.2 GiB disk free    │
+│                                                                              │
+│ ✓ connect   ✓ check   ✓ fix   ● install   ○ owner   ○ hand off               │
+│                                                                              │
+│ · SSH accepts passwords, including for root                                  │
+│                                                                              │
+│ Next install · run oapctl host install root@139.180.132.23                   │
+╰──────────────────────────────────────────────────────────────────────────────╯

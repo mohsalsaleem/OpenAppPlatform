@@ -1,0 +1,22 @@
+Host key: ED25519 SHA256:q4o22FBvrWT5o9DZuAtkNHbXIQCjJdVQxZQplLRtP4w
+? Does it match your provider's console?  y / N
+✓ Does it match your provider's console?  yes
+ssh will ask for the password of root@139.180.132.23. It is used once to install OAP's key and never stored.
+
+root@139.180.132.23's password:
+✓ Connected to root@139.180.132.23 with OAP's bootstrap key. The password is no longer needed.
+
+✓ Checking the server (read-only) (3s)
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ OAP  root@139.180.132.23                                                     │
+│ Ubuntu 26.04.1 LTS · x86_64 · 1 CPU · 950 MiB memory · 13.2 GiB disk free    │
+│                                                                              │
+│ ✓ connect   ✓ check   ● fix   ○ install   ○ owner   ○ hand off               │
+│                                                                              │
+│ ! Ufw blocks 80/tcp and 443/tcp  [sensitive]                                 │
+│   Allow ports 80 and 443 in ufw so the web can reach OAP's Caddy.            │
+│                                                                              │
+│ · SSH accepts passwords, including for root                                  │
+│                                                                              │
+│ Next fix · by you. Run oapctl to continue.                                   │
+╰──────────────────────────────────────────────────────────────────────────────╯

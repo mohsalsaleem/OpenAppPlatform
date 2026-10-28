@@ -1,0 +1,26 @@
+{
+  "summary": "Ubuntu 26.04.1 LTS, x86_64, 1 CPU, 950 MiB memory, 15.7 GiB disk free",
+  "blocked": true,
+  "stopped": false,
+  "findings": [
+    {
+      "why": "host.docker.missing",
+      "severity": "fix",
+      "observed": "Docker isn't running",
+      "required": "Docker Engine 24 or later",
+      "remedy": "Install Docker Engine from Docker's official package repository.",
+      "fix": {
+        "id": "install-docker",
+        "tier": "sensitive",
+        "summary": "Install Docker Engine from Docker's apt repository and start it",
+        "undoable": false
+      }
+    },
+    {
+      "why": "host.ssh.password_login",
+      "severity": "advice",
+      "observed": "SSH accepts passwords, including for root",
+      "remedy": "At hand-off, OAP offers to turn off password login once your own key works."
+    }
+  ]
+}

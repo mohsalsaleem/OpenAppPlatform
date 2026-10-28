@@ -1,0 +1,14 @@
+1d9811307f7c0945582c02cead0de3f05037954b43f211aaf1977d51dfda6675  /root/nisha-shipping-website-v1.tar.gz
+Loaded image: nisha-shipping-website:v1
+sha256:d2ba19ec094d353da6e3faec596a4a461342bcce85bba132e95e4a3fd88ffd0c
+Image nisha-shipping-website:v1 is already on the server.
+Plan for nisha-shipping on root@139.180.132.23 (5 steps)
+  Because: needs_approval; risk sensitive; changes domains, which the envelope treats as sensitive.
+  Commands:
+     0 write_desired
+     1 start_instance website#1
+     2 await_ready website#1
+     3 route_add website#1
+     4 edge_reload_confirmed website#1
+Applying to nisha-shipping…
+✓ nisha-shipping is live at https://www.nishashipping.com (operation op_031233dd7b8da32d747e4effc21fc572).

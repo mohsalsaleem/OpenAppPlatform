@@ -1,0 +1,29 @@
+{
+  "event": {
+    "revision": "57",
+    "at": "2026-10-19T14:05:00Z",
+    "outcome": {
+      "operation_id": "op_1",
+      "status": "OUTCOME_STATUS_NOT_ACHIEVED",
+      "reasons": [
+        {
+          "why": "traffic.requests_failed",
+          "message": "2 requests failed during scale-down"
+        }
+      ],
+      "evidence": {
+        "traffic": {
+          "requests": 277,
+          "failures": 2,
+          "failed": [
+            {
+              "at": "2026-10-19T14:05:00Z",
+              "target": "api-3",
+              "reason": "connection reset"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

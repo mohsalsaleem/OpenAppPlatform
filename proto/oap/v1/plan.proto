@@ -1,0 +1,111 @@
+syntax = "proto3";
+
+package oap.v1;
+
+import "oap/v1/errors.proto";
+import "oap/v1/intent.proto";
+import "oap/v1/world.proto";
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1";
+
+enum Risk {
+  RISK_UNSPECIFIED = 0;
+  RISK_ROUTINE = 1;
+  RISK_SENSITIVE = 2;
+  RISK_IRREVERSIBLE = 3;
+}
+
+// Proposal is a compiled, policy-checked plan. Its id is a content hash over
+// everything the plan and verdict depend on: the base revision and desired
+// state, the agent, the intent, the steps, the change-fact snapshot, the
+// envelope version and the policy context. Apply commits exactly that
+// proposal, and replaying it reproduces the same verdict.
+message Proposal {
+  string id = 1;
+  uint64 base_revision = 2;
+  Intent intent = 3;
+  Verdict verdict = 4;
+  repeated Reason reasons = 5;
+  // Computed by OAP, never declared by the agent.
+  Risk risk = 6;
+  repeated Step steps = 7;
+  BlastRadius blast_radius = 8;
+  // Absent when the change is irreversible.
+  Intent undo = 9;
+  // Actions the caller may take next, already filtered by policy.
+  repeated string next = 10;
+  string envelope_version = 11;
+  ChangeFacts change_facts = 12;
+  // The agent the proposal was judged for.
+  string agent = 13;
+  // Content hash of the application's desired state the plan starts from.
+  string base_spec_hash = 14;
+  PolicyContext context = 15;
+  // Why the plan can't be undone; empty when it can.
+  repeated string irreversible = 16;
+}
+
+// PolicyContext is the recent activity a verdict depended on, recorded so a
+// stored proposal can be re-judged exactly.
+message PolicyContext {
+  bool paused = 1;
+  int32 failed_applies_last_hour = 2;
+  int32 releases_last_hour = 3;
+  int32 memory_budget_mib = 4;
+}
+
+enum StepKind {
+  STEP_KIND_UNSPECIFIED = 0;
+  STEP_KIND_START_INSTANCE = 1;
+  STEP_KIND_AWAIT_READY = 2;
+  STEP_KIND_ROUTE_ADD = 3;
+  STEP_KIND_ROUTE_REMOVE = 4;
+  // The edge has applied a configuration change.
+  STEP_KIND_EDGE_RELOAD_CONFIRMED = 5;
+  STEP_KIND_DRAIN = 6;
+  STEP_KIND_STOP = 7;
+  STEP_KIND_RUN_JOB = 8;
+  STEP_KIND_SNAPSHOT_VOLUME = 9;
+  STEP_KIND_SWAP_RELEASE = 10;
+  STEP_KIND_DELETE_VOLUME = 11;
+  STEP_KIND_WRITE_DESIRED = 12;
+  // An extension is started and its manifest checked against its grants;
+  // the step's component is the extension's name.
+  STEP_KIND_START_EXTENSION = 13;
+  // An extension is stopped.
+  STEP_KIND_STOP_EXTENSION = 14;
+  // A component's image is built from source through the build queue.
+  STEP_KIND_BUILD = 15;
+}
+
+// Step is one typed unit of work. Every operation compiles to steps.
+message Step {
+  StepKind kind = 1;
+  string component = 2;
+  int32 ordinal = 3;
+  string release = 4;
+  string image = 5;
+  string volume = 6;
+  // Indexes of steps that must succeed first.
+  repeated int32 after = 7;
+}
+
+message BlastRadius {
+  repeated string components = 1;
+  // "none-expected", "partial" or "full".
+  string downtime = 2;
+}
+
+// ChangeFacts are facts about the code change, from a code host extension.
+message ChangeFacts {
+  string repository = 1;
+  string commit = 2;
+  repeated string files_changed = 3;
+  bool migrations_changed = 4;
+  bool lockfile_changed = 5;
+  bool docs_only = 6;
+  // "green", "red", "pending" or "unknown".
+  string ci = 7;
+  bool reviewed = 8;
+  bool signed = 9;
+}

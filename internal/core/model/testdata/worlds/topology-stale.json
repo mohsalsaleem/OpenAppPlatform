@@ -1,0 +1,91 @@
+{
+  "revision": "44",
+  "host": {
+    "name": "vps-1",
+    "capacity": {
+      "memory_total_mib": 985,
+      "memory_available_mib": 412,
+      "memory_reserved_mib": 448,
+      "cpu_millis_total": 1000
+    },
+    "freshness": {
+      "observed_at": "2026-10-19T13:55:00Z",
+      "stale": true
+    }
+  },
+  "applications": [
+    {
+      "name": "topology-example",
+      "spec_hash": "sha256:566c4be0399012dd1b4625ae7d41fd02862e51fd7bdff7fc86617d798010ea81",
+      "health": {
+        "status": "HEALTH_STATUS_UNKNOWN",
+        "freshness": {
+          "observed_at": "2026-10-19T13:55:00Z",
+          "stale": true
+        }
+      },
+      "components": [
+        {
+          "name": "web",
+          "kind": "COMPONENT_KIND_WEB",
+          "desired": {
+            "image": "example/web:2",
+            "release": "r-bb461c12ea14",
+            "instances": 1
+          },
+          "actual": {
+            "image": "example/web:1",
+            "release": "r-previous",
+            "instances": 1
+          },
+          "health": {
+            "status": "HEALTH_STATUS_UNKNOWN",
+            "freshness": {
+              "observed_at": "2026-10-19T13:55:00Z",
+              "stale": true
+            },
+            "missing_evidence": [
+              "fresh observation"
+            ]
+          },
+          "instances": [
+            {
+              "id": "c-web-1",
+              "ordinal": 1,
+              "release": "r-previous",
+              "health": {
+                "status": "HEALTH_STATUS_UNKNOWN",
+                "freshness": {
+                  "observed_at": "2026-10-19T13:55:00Z",
+                  "stale": true
+                },
+                "missing_evidence": [
+                  "fresh observation"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "worker",
+          "kind": "COMPONENT_KIND_WORKER",
+          "desired": {
+            "image": "example/worker:2",
+            "release": "r-b50a2ccf5e34",
+            "instances": 1
+          },
+          "health": {
+            "status": "HEALTH_STATUS_UNKNOWN",
+            "freshness": {
+              "observed_at": "2026-10-19T13:55:00Z",
+              "stale": true
+            },
+            "missing_evidence": [
+              "fresh observation"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

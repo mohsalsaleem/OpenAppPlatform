@@ -1,0 +1,5 @@
+exit 0
+Server root@203.0.113.5: Debian GNU/Linux 12 (bookworm), aarch64, 2 CPUs, 3931 MiB memory, 28.6 GiB disk free
+  ✓ connect   ✓ check   ✓ fix   → install   · owner key   · hand off
+
+Next: install. Run `oap host install root@203.0.113.5`.

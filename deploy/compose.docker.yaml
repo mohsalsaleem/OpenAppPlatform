@@ -1,5 +1,0 @@
-services:
-  platform:
-    group_add: ['${OAP_DOCKER_GID:?}']
-    volumes:
-      - '${OAP_DOCKER_SOCKET:?}:/var/run/docker.sock'

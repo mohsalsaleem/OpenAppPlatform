@@ -1,0 +1,6 @@
+$ oapctl watch site --since 1 --limit 4 --events
+exit 0
+{"revision":"2","at":"2026-10-20T02:00:00Z","journal_entry":{"id":"apply_73c9fc1d6c14f188b45180ddac27154c","parent_id":"prop_73c9fc1d6c14f188b45180ddac27154c","kind":"ENTRY_KIND_APPLY","actor":{"owner":"owner"},"base_revision":"1","summary":"apply oap.yaml","operation_id":"op_73c9fc1d6c14f188b45180ddac27154c"}}
+{"revision":"3","at":"2026-10-20T02:00:00Z","operation_progress":{"operation_id":"op_73c9fc1d6c14f188b45180ddac27154c","step":{"kind":"STEP_KIND_WRITE_DESIRED"},"state":"STEP_STATE_STARTED"}}
+{"revision":"4","at":"2026-10-20T02:00:00Z","operation_progress":{"operation_id":"op_73c9fc1d6c14f188b45180ddac27154c","step":{"kind":"STEP_KIND_WRITE_DESIRED"},"state":"STEP_STATE_SUCCEEDED"}}
+{"revision":"5","at":"2026-10-20T02:00:00Z","operation_progress":{"operation_id":"op_73c9fc1d6c14f188b45180ddac27154c","step_index":1,"step":{"kind":"STEP_KIND_START_INSTANCE","component":"web","ordinal":1,"release":"r-a391b9827fb5","image":"reg/site:1","after":[0]},"state":"STEP_STATE_STARTED"}}

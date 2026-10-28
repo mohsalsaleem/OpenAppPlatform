@@ -1,0 +1,17 @@
+ 0 write-desired         
+ 1 start-instance         api#1 @new after [0]
+ 2 await-ready            api#1 @new after [1]
+ 3 route-add              api#1 @new after [2]
+ 4 route-remove           api#1 @old after [2]
+ 5 edge-reload-confirmed  api#1 @new after [3 4]
+ 6 drain                  api#1 @old after [5]
+ 7 stop                   api#1 @old after [6]
+ 8 start-instance         api#2 @new after [0 7]
+ 9 await-ready            api#2 @new after [8]
+10 route-add              api#2 @new after [9]
+11 route-remove           api#2 @old after [9]
+12 edge-reload-confirmed  api#2 @new after [10 11]
+13 drain                  api#2 @old after [12]
+14 stop                   api#2 @old after [13]
+blast radius: [api], downtime none-expected
+undo: {"Rollback":{"to_release":"sha256:5a0ded7bbccec492318f91a9db5a4ef5afc1dd8c9f396c5344413fbf1d15be76"}}

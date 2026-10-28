@@ -1,0 +1,14 @@
+api_version: oap.dev/v1
+components:
+  web:
+    host_port: 8791
+    image: oap-hello-api:dev
+    instances: 1
+    kind: web
+    port: 8080
+    readiness:
+      require_healthy: true
+      timeout_seconds: 120
+environment: staging
+kind: Application
+name: docker-hello

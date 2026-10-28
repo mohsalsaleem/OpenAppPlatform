@@ -1,0 +1,3 @@
+$ oapctl app apply oap.yaml --yes
+exit 0
+✓ site is already as oap.yaml describes.

@@ -1,0 +1,363 @@
+6  proposal apply oap.yaml
+    7  ask      Create journey-cli with its domain?
+    8  event
+    9  apply    apply oap.yaml
+   10  step 0   write_desired                       started
+   11  step 0   write_desired                       succeeded
+   12  step 1   start_instance         kv#1         started
+   13  step 1   start_instance         kv#1         succeeded
+   14  step 2   await_ready            kv#1         started
+   15  step 2   await_ready            kv#1         succeeded
+   16  step 3   run_job                migrate#1    started
+   17  step 3   run_job                migrate#1    succeeded
+   18  step 4   start_instance         api#1        started
+   19  step 4   start_instance         api#1        succeeded
+   20  step 5   await_ready            api#1        started
+   21  step 5   await_ready            api#1        failed
+   22  outcome  op_f53ae76059a7084f2cab9afe7dc4aefa not_achieved
+   25  proposal spec-patch journey-connect
+   26  ask      Create journey-connect?
+   27  event
+   28  apply    spec-patch journey-connect
+   29  step 0   write_desired                       started
+   30  step 0   write_desired                       succeeded
+   31  step 1   start_instance         kv#1         started
+   32  step 1   start_instance         kv#1         succeeded
+   33  step 2   await_ready            kv#1         started
+   34  step 2   await_ready            kv#1         succeeded
+   35  step 3   run_job                migrate#1    started
+   36  step 3   run_job                migrate#1    succeeded
+   37  step 4   start_instance         api#1        started
+   38  step 4   start_instance         api#1        succeeded
+   39  step 5   await_ready            api#1        started
+   40  step 5   await_ready            api#1        failed
+   41  outcome  op_fd440ce5521954fca33fb623949f88be not_achieved
+   44  proposal spec-patch journey-mcp
+   45  ask      Create journey-mcp?
+   46  event
+   47  apply    spec-patch journey-mcp
+   48  step 0   write_desired                       started
+   49  step 0   write_desired                       succeeded
+   50  step 1   start_instance         kv#1         started
+   51  step 1   start_instance         kv#1         succeeded
+   52  step 2   await_ready            kv#1         started
+   53  step 2   await_ready            kv#1         succeeded
+   54  step 3   run_job                migrate#1    started
+   55  step 3   run_job                migrate#1    succeeded
+   56  step 4   start_instance         api#1        started
+   57  step 4   start_instance         api#1        succeeded
+   58  step 5   await_ready            api#1        started
+   59  step 5   await_ready            api#1        failed
+   60  outcome  op_6161d233353d92b0ff2d41a2392c6dbb not_achieved
+   66  proposal apply oap.yaml
+   67  ask      Create journey-cli with its domain?
+   68  event
+   69  apply    apply oap.yaml
+   70  step 0   write_desired                       started
+   71  step 0   write_desired                       succeeded
+   72  step 1   start_instance         kv#1         started
+   73  step 1   start_instance         kv#1         succeeded
+   74  step 2   await_ready            kv#1         started
+   75  step 2   await_ready            kv#1         succeeded
+   76  step 3   run_job                migrate#1    started
+   77  step 3   run_job                migrate#1    succeeded
+   78  step 4   start_instance         api#1        started
+   79  step 4   start_instance         api#1        succeeded
+   80  step 5   await_ready            api#1        started
+   81  step 5   await_ready            api#1        succeeded
+   82  step 6   route_add              api#1        started
+   83  step 6   route_add              api#1        succeeded
+   84  step 7   edge_reload_confirmed  api#1        started
+   85  step 7   edge_reload_confirmed  api#1        succeeded
+   86  step 8   start_instance         notes#1      started
+   87  step 8   start_instance         notes#1      succeeded
+   88  step 9   await_ready            notes#1      started
+   89  step 9   await_ready            notes#1      succeeded
+   90  step 10  route_add              notes#1      started
+   91  step 10  route_add              notes#1      succeeded
+   92  step 11  edge_reload_confirmed  notes#1      started
+   93  step 11  edge_reload_confirmed  notes#1      succeeded
+   94  step 12  start_instance         web#1        started
+   95  step 12  start_instance         web#1        succeeded
+   96  step 13  await_ready            web#1        started
+   97  step 13  await_ready            web#1        succeeded
+   98  step 14  route_add              web#1        started
+   99  step 14  route_add              web#1        succeeded
+  100  step 15  edge_reload_confirmed  web#1        started
+  101  step 15  edge_reload_confirmed  web#1        succeeded
+  102  step 16  start_instance         worker#1     started
+  103  step 16  start_instance         worker#1     succeeded
+  104  step 17  await_ready            worker#1     started
+  105  step 17  await_ready            worker#1     succeeded
+  106  outcome  op_43f09caedef022e4ae801fe46d6c665b achieved
+  107  proposal scale api to 3
+  108  apply    scale api to 3
+  109  step 0   write_desired                       started
+  110  step 0   write_desired                       succeeded
+  111  step 1   start_instance         api#2        started
+  112  step 1   start_instance         api#2        succeeded
+  113  step 2   await_ready            api#2        started
+  114  step 2   await_ready            api#2        succeeded
+  115  step 3   route_add              api#2        started
+  116  step 3   route_add              api#2        succeeded
+  117  step 4   edge_reload_confirmed  api#2        started
+  118  step 4   edge_reload_confirmed  api#2        succeeded
+  119  step 5   start_instance         api#3        started
+  120  step 5   start_instance         api#3        succeeded
+  121  step 6   await_ready            api#3        started
+  122  step 6   await_ready            api#3        succeeded
+  123  step 7   route_add              api#3        started
+  124  step 7   route_add              api#3        succeeded
+  125  step 8   edge_reload_confirmed  api#3        started
+  126  step 8   edge_reload_confirmed  api#3        succeeded
+  127  outcome  op_9ac954076f9b9dd5760c5bf33b626e4f achieved
+  128  proposal apply oap.yaml
+  129  apply    apply oap.yaml
+  130  step 0   write_desired                       started
+  131  step 0   write_desired                       succeeded
+  132  step 1   run_job                migrate#1    started
+  133  step 1   run_job                migrate#1    failed
+  134  outcome  op_c773eb269000441c562da1595a2d8ed6 not_achieved
+  135  proposal deploy new images
+  136  apply    deploy new images
+  137  step 0   write_desired                       started
+  138  step 0   write_desired                       succeeded
+  139  step 1   start_instance         api#1        started
+  140  step 1   start_instance         api#1        succeeded
+  141  step 2   await_ready            api#1        started
+  142  step 2   await_ready            api#1        failed
+  143  outcome  op_94b202a0b1d56e5bc4e2ee28eb10e713 not_achieved
+  144  proposal deploy new images
+  145  apply    deploy new images
+  146  step 0   write_desired                       started
+  147  step 0   write_desired                       succeeded
+  148  step 1   start_instance         api#1        started
+  149  step 1   start_instance         api#1        succeeded
+  150  step 2   await_ready            api#1        started
+  151  step 2   await_ready            api#1        succeeded
+  152  step 3   route_add              api#1        started
+  153  step 3   route_add              api#1        succeeded
+  154  step 4   route_remove           api#1        started
+  155  step 4   route_remove           api#1        succeeded
+  156  step 5   edge_reload_confirmed  api#1        started
+  157  step 5   edge_reload_confirmed  api#1        succeeded
+  158  step 6   drain                  api#1        started
+  159  step 6   drain                  api#1        succeeded
+  160  step 7   stop                   api#1        started
+  161  step 7   stop                   api#1        succeeded
+  162  step 8   start_instance         api#2        started
+  163  step 8   start_instance         api#2        succeeded
+  164  step 9   await_ready            api#2        started
+  165  step 9   await_ready            api#2        succeeded
+  166  step 10  route_add              api#2        started
+  167  step 10  route_add              api#2        succeeded
+  168  step 11  route_remove           api#2        started
+  169  step 11  route_remove           api#2        succeeded
+  170  step 12  edge_reload_confirmed  api#2        started
+  171  step 12  edge_reload_confirmed  api#2        succeeded
+  172  step 13  drain                  api#2        started
+  173  step 13  drain                  api#2        succeeded
+  174  step 14  stop                   api#2        started
+  175  step 14  stop                   api#2        succeeded
+  176  step 15  start_instance         api#3        started
+  177  step 15  start_instance         api#3        succeeded
+  178  step 16  await_ready            api#3        started
+  179  step 16  await_ready            api#3        succeeded
+  180  step 17  route_add              api#3        started
+  181  step 17  route_add              api#3        succeeded
+  182  step 18  route_remove           api#3        started
+  183  step 18  route_remove           api#3        succeeded
+  184  step 19  edge_reload_confirmed  api#3        started
+  185  step 19  edge_reload_confirmed  api#3        succeeded
+  186  step 20  drain                  api#3        started
+  187  step 20  drain                  api#3        succeeded
+  188  step 21  stop                   api#3        started
+  189  step 21  stop                   api#3        succeeded
+  190  step 22  snapshot_volume        notes        started
+  191  step 22  snapshot_volume        notes        succeeded
+  192  step 23  route_remove           notes#1      started
+  193  step 23  route_remove           notes#1      succeeded
+  194  step 24  edge_reload_confirmed  notes#1      started
+  195  step 24  edge_reload_confirmed  notes#1      succeeded
+  196  step 25  drain                  notes#1      started
+  197  step 25  drain                  notes#1      succeeded
+  198  step 26  stop                   notes#1      started
+  199  step 26  stop                   notes#1      succeeded
+  200  step 27  start_instance         notes#1      started
+  201  step 27  start_instance         notes#1      succeeded
+  202  step 28  await_ready            notes#1      started
+  203  step 28  await_ready            notes#1      succeeded
+  204  step 29  route_add              notes#1      started
+  205  step 29  route_add              notes#1      succeeded
+  206  step 30  edge_reload_confirmed  notes#1      started
+  207  step 30  edge_reload_confirmed  notes#1      succeeded
+  208  outcome  op_8ffc51216b6597c223c86deaa749c1d8 achieved
+  209  proposal roll back to sha256:ed378c224062996dbb1400f83b361841268528a2a025a6cff271023bae0be37b
+  210  apply    roll back to sha256:ed378c224062996dbb1400f83b361841268528a2a025a6cff271023bae0be37b
+  211  step 0   write_desired                       started
+  212  step 0   write_desired                       succeeded
+  213  step 1   start_instance         api#1        started
+  214  step 1   start_instance         api#1        succeeded
+  215  step 2   await_ready            api#1        started
+  216  step 2   await_ready            api#1        succeeded
+  217  step 3   route_add              api#1        started
+  218  step 3   route_add              api#1        succeeded
+  219  step 4   route_remove           api#1        started
+  220  step 4   route_remove           api#1        succeeded
+  221  step 5   edge_reload_confirmed  api#1        started
+  222  step 5   edge_reload_confirmed  api#1        succeeded
+  223  step 6   drain                  api#1        started
+  224  step 6   drain                  api#1        succeeded
+  225  step 7   stop                   api#1        started
+  226  step 7   stop                   api#1        succeeded
+  227  step 8   start_instance         api#2        started
+  228  step 8   start_instance         api#2        succeeded
+  229  step 9   await_ready            api#2        started
+  230  step 9   await_ready            api#2        succeeded
+  231  step 10  route_add              api#2        started
+  232  step 10  route_add              api#2        succeeded
+  233  step 11  route_remove           api#2        started
+  234  step 11  route_remove           api#2        succeeded
+  235  step 12  edge_reload_confirmed  api#2        started
+  236  step 12  edge_reload_confirmed  api#2        succeeded
+  237  step 13  drain                  api#2        started
+  238  step 13  drain                  api#2        succeeded
+  239  step 14  stop                   api#2        started
+  240  step 14  stop                   api#2        succeeded
+  241  step 15  start_instance         api#3        started
+  242  step 15  start_instance         api#3        succeeded
+  243  step 16  await_ready            api#3        started
+  244  step 16  await_ready            api#3        succeeded
+  245  step 17  route_add              api#3        started
+  246  step 17  route_add              api#3        succeeded
+  247  step 18  route_remove           api#3        started
+  248  step 18  route_remove           api#3        succeeded
+  249  step 19  edge_reload_confirmed  api#3        started
+  250  step 19  edge_reload_confirmed  api#3        succeeded
+  251  step 20  drain                  api#3        started
+  252  step 20  drain                  api#3        succeeded
+  253  step 21  stop                   api#3        started
+  254  step 21  stop                   api#3        succeeded
+  255  step 22  snapshot_volume        notes        started
+  256  step 22  snapshot_volume        notes        succeeded
+  257  step 23  route_remove           notes#1      started
+  258  step 23  route_remove           notes#1      succeeded
+  259  step 24  edge_reload_confirmed  notes#1      started
+  260  step 24  edge_reload_confirmed  notes#1      succeeded
+  261  step 25  drain                  notes#1      started
+  262  step 25  drain                  notes#1      succeeded
+  263  step 26  stop                   notes#1      started
+  264  step 26  stop                   notes#1      succeeded
+  265  step 27  start_instance         notes#1      started
+  266  step 27  start_instance         notes#1      succeeded
+  267  step 28  await_ready            notes#1      started
+  268  step 28  await_ready            notes#1      succeeded
+  269  step 29  route_add              notes#1      started
+  270  step 29  route_add              notes#1      succeeded
+  271  step 30  edge_reload_confirmed  notes#1      started
+  272  step 30  edge_reload_confirmed  notes#1      succeeded
+  273  outcome  op_4f1f4de4d15024773fb4c463a88e8785 achieved
+  274  proposal scale api to 1
+  275  apply    scale api to 1
+  276  step 0   write_desired                       started
+  277  step 0   write_desired                       succeeded
+  278  step 1   route_remove           api#3        started
+  279  step 1   route_remove           api#3        succeeded
+  280  step 2   edge_reload_confirmed  api#3        started
+  281  step 2   edge_reload_confirmed  api#3        succeeded
+  282  step 3   drain                  api#3        started
+  283  step 3   drain                  api#3        succeeded
+  284  step 4   stop                   api#3        started
+  285  step 4   stop                   api#3        succeeded
+  286  step 5   route_remove           api#2        started
+  287  step 5   route_remove           api#2        succeeded
+  288  step 6   edge_reload_confirmed  api#2        started
+  289  step 6   edge_reload_confirmed  api#2        succeeded
+  290  step 7   drain                  api#2        started
+  291  step 7   drain                  api#2        succeeded
+  292  step 8   stop                   api#2        started
+  293  step 8   stop                   api#2        succeeded
+  294  outcome  op_d44ea8bfac4488d171c3b2cade897782 achieved
+  297  proposal spec-patch journey-connect-r2
+  298  ask      Create journey-connect?
+  299  event
+  300  apply    spec-patch journey-connect-r2
+  301  step 0   write_desired                       started
+  302  step 0   write_desired                       succeeded
+  303  step 1   start_instance         kv#1         started
+  304  step 1   start_instance         kv#1         succeeded
+  305  step 2   await_ready            kv#1         started
+  306  step 2   await_ready            kv#1         succeeded
+  307  step 3   run_job                migrate#1    started
+  308  step 3   run_job                migrate#1    succeeded
+  309  step 4   start_instance         api#1        started
+  310  step 4   start_instance         api#1        succeeded
+  311  step 5   await_ready            api#1        started
+  312  step 5   await_ready            api#1        succeeded
+  313  step 6   route_add              api#1        started
+  314  step 6   route_add              api#1        succeeded
+  315  step 7   edge_reload_confirmed  api#1        started
+  316  step 7   edge_reload_confirmed  api#1        succeeded
+  317  step 8   start_instance         notes#1      started
+  318  step 8   start_instance         notes#1      succeeded
+  319  step 9   await_ready            notes#1      started
+  320  step 9   await_ready            notes#1      succeeded
+  321  step 10  route_add              notes#1      started
+  322  step 10  route_add              notes#1      succeeded
+  323  step 11  edge_reload_confirmed  notes#1      started
+  324  step 11  edge_reload_confirmed  notes#1      succeeded
+  325  step 12  start_instance         web#1        started
+  326  step 12  start_instance         web#1        succeeded
+  327  step 13  await_ready            web#1        started
+  328  step 13  await_ready            web#1        succeeded
+  329  step 14  route_add              web#1        started
+  330  step 14  route_add              web#1        succeeded
+  331  step 15  edge_reload_confirmed  web#1        started
+  332  step 15  edge_reload_confirmed  web#1        succeeded
+  333  step 16  start_instance         worker#1     started
+  334  step 16  start_instance         worker#1     succeeded
+  335  step 17  await_ready            worker#1     started
+  336  step 17  await_ready            worker#1     succeeded
+  337  outcome  op_f66fe4cf38fac8361b118d40ceffd1e8 achieved
+  340  proposal spec-patch journey-mcp-r2
+  341  ask      Create journey-mcp?
+  342  event
+  343  apply    spec-patch journey-mcp-r2
+  344  step 0   write_desired                       started
+  345  step 0   write_desired                       succeeded
+  346  step 1   start_instance         kv#1         started
+  347  step 1   start_instance         kv#1         succeeded
+  348  step 2   await_ready            kv#1         started
+  349  step 2   await_ready            kv#1         succeeded
+  350  step 3   run_job                migrate#1    started
+  351  step 3   run_job                migrate#1    succeeded
+  352  step 4   start_instance         api#1        started
+  353  step 4   start_instance         api#1        succeeded
+  354  step 5   await_ready            api#1        started
+  355  step 5   await_ready            api#1        succeeded
+  356  step 6   route_add              api#1        started
+  357  step 6   route_add              api#1        succeeded
+  358  step 7   edge_reload_confirmed  api#1        started
+  359  step 7   edge_reload_confirmed  api#1        succeeded
+  360  step 8   start_instance         notes#1      started
+  361  step 8   start_instance         notes#1      succeeded
+  362  step 9   await_ready            notes#1      started
+  363  step 9   await_ready            notes#1      succeeded
+  364  step 10  route_add              notes#1      started
+  365  step 10  route_add              notes#1      succeeded
+  366  step 11  edge_reload_confirmed  notes#1      started
+  367  step 11  edge_reload_confirmed  notes#1      succeeded
+  368  step 12  start_instance         web#1        started
+  369  step 12  start_instance         web#1        succeeded
+  370  step 13  await_ready            web#1        started
+  371  step 13  await_ready            web#1        succeeded
+  372  step 14  route_add              web#1        started
+  373  step 14  route_add              web#1        succeeded
+  374  step 15  edge_reload_confirmed  web#1        started
+  375  step 15  edge_reload_confirmed  web#1        succeeded
+  376  step 16  start_instance         worker#1     started
+  377  step 16  start_instance         worker#1     succeeded
+  378  step 17  await_ready            worker#1     started
+  379  step 17  await_ready            worker#1     succeeded
+  380  outcome  op_485c5c2a815efec1dd6d6d39c56deeb3 achieved
+oapctl: internal: stream error: stream ID 1; INTERNAL_ERROR; received from peer

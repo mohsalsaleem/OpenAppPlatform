@@ -1,0 +1,24 @@
+The server pulls ghcr.io/mohsalsaleem/oapd:v0.2.0-rc.2@sha256:27c9f8737d38ba7ea5a09aada7e8ee14cc33eec259f2bc82a0844275d01cbf68 from its registry.
+
+✗ Installing oapd and Caddy (3s)
+oapctl: install failed: sshhost: running on root@139.180.132.23 failed: exit status 3 oap: image ghcr.io/mohsalsaleem/oapd:v0.2.0-rc.2@sha256:27c9f8737d38ba7ea5a09aada7e8ee14cc33eec259f2bc82a0844275d01cbf68 isn't on the server and couldn't be pulled
+The server pulls ghcr.io/mohsalsaleem/oapd:v0.2.0-rc.2@sha256:27c9f8737d38ba7ea5a09aada7e8ee14cc33eec259f2bc82a0844275d01cbf68 from its registry.
+
+  │ caddy started
+
+  │ caddy started
+  │ oapd started
+
+✓ Installing oapd and Caddy (12s)
+  caddy started
+  oapd started
+  oapd ready
+✓ OAP is installed on root@139.180.132.23 (installation xs2zxmlcep).
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ OAP  root@139.180.132.23                                                     │
+│ Ubuntu 26.04.1 LTS · x86_64 · 1 CPU · 950 MiB memory · 13.2 GiB disk free    │
+│                                                                              │
+│ ✓ connect   ✓ check   ✓ fix   ✓ install   ● owner   ○ hand off               │
+│                                                                              │
+│ Next owner · by you. Run oapctl to continue.                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯

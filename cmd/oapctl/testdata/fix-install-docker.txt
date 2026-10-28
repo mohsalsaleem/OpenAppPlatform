@@ -1,0 +1,36 @@
+root@203.0.113.5 needs 1 change. Each runs only if you approve it.
+
+Install Docker Engine from Docker's apt repository and start it (sensitive; can't be undone)
+  Because: Docker isn't running.
+  Commands:
+    set -eu
+    export DEBIAN_FRONTEND=noninteractive
+    if pidof dockerd >/dev/null 2>&1; then echo "oap: a Docker daemon is already running; OAP doesn't replace it" >&2; exit 3; fi
+    . /etc/os-release
+    case "$ID" in ubuntu|debian) ;; *) echo "oap: no Docker install for $ID" >&2; exit 3 ;; esac
+    apt-get update -q
+    apt-get install -y -q ca-certificates curl
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL "https://download.docker.com/linux/$ID/gpg" -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    printf 'deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/%s %s stable\n' \
+      "$(dpkg --print-architecture)" "$ID" "$VERSION_CODENAME" > /etc/apt/sources.list.d/docker.list
+    apt-get update -q
+    apt-get install -y -q docker-ce docker-ce-cli containerd.io
+    systemctl enable --now docker
+    docker version --format '{{.Server.Version}}'
+Apply this? [y/N] Applying install-docker…
+✓ install-docker applied and recorded in /var/lib/oap/host-manifest.jsonl
+
+Checking the server (read-only)…
+Server root@203.0.113.5: Ubuntu 26.04.1 LTS, x86_64, 1 CPU, 950 MiB memory, 15.7 GiB disk free
+  ✓ connect   ✓ check   → fix   · install   · owner key   · hand off
+
+! Docker isn't running: needs Docker Engine 24 or later.
+  Install Docker Engine from Docker's official package repository.
+  Fix (sensitive): Install Docker Engine from Docker's apt repository and start it.
+~ SSH accepts passwords, including for root.
+  At hand-off, OAP offers to turn off password login once your own key works.
+
+Next: fix, by you. Fixes change the server, so the owner approves each one.
+Run `oap` to continue.

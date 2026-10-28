@@ -1,0 +1,127 @@
+syntax = "proto3";
+
+package oap.v1;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1";
+
+// Intent is the outcome an agent wants. OAP compiles it into a plan.
+message Intent {
+  string application = 1;
+  // Why the agent wants this; recorded in the journal.
+  string because = 2;
+  oneof change {
+    Scale scale = 10;
+    Deploy deploy = 11;
+    Rollback rollback = 12;
+    Configure configure = 13;
+    AddComponent add_component = 14;
+    RemoveComponent remove_component = 15;
+    SpecPatch spec_patch = 16;
+    InstallExtension install_extension = 17;
+    RemoveExtension remove_extension = 18;
+    Build build = 19;
+  }
+}
+
+message Scale {
+  string component = 1;
+  int32 instances = 2;
+}
+
+// Deploy rolls out a new release of one or more components.
+message Deploy {
+  // Component name to image reference (digest preferred).
+  map<string, string> images = 1;
+  // Where the images were built from; enables change facts.
+  Source source = 2;
+}
+
+// Rollback returns the application's workloads to the images of an earlier
+// desired-state version, named by its spec hash. Configuration, connections
+// and volumes stay as they are; jobs are not re-run.
+message Rollback {
+  string to_release = 1;
+}
+
+message Configure {
+  string component = 1;
+  // Environment variables to set. Secret values are never passed here; use
+  // secret references.
+  map<string, string> set_env = 2;
+  repeated string unset_env = 3;
+  optional int32 memory_limit_mib = 4;
+  optional int32 cpu_millis = 5;
+}
+
+message AddComponent {
+  // The component's spec in the desired-state format, as JSON.
+  google.protobuf.Struct spec = 1;
+  // The new component's name.
+  string name = 2;
+}
+
+message RemoveComponent {
+  string component = 1;
+  // Also delete the component's volumes. Irreversible; always needs the owner.
+  bool delete_volumes = 2;
+}
+
+// SpecPatch applies a JSON merge patch (RFC 7386) to the application's
+// desired spec.
+message SpecPatch {
+  google.protobuf.Struct merge_patch = 1;
+}
+
+// InstallExtension installs or upgrades an extension (R4.1), with the
+// grants the owner gives it. Extensions are server-wide: the intent's
+// application is empty, and the envelope treats the change as sensitive
+// unless the owner says otherwise.
+message InstallExtension {
+  // Lowercase letters, digits and dashes.
+  string name = 1;
+  // The extension's binary on the server, and its sha256 (hex). The host
+  // refuses a binary that doesn't match.
+  string path = 2;
+  string sha256 = 3;
+  // The extension points the core may use it for, for example "notifier".
+  repeated string points = 4;
+  // Granted settings by name, and granted secrets by name. The extension
+  // receives these and nothing else.
+  map<string, string> settings = 5;
+  repeated string secrets = 6;
+  // Its memory cap; 64 MiB when zero.
+  int32 memory_mib = 7;
+}
+
+// Build builds a component's image from a source commit (R4.2), through
+// the server's build queue and a builder extension. It changes no desired
+// state: the operation's outcome names the image, which a deploy then
+// rolls out.
+message Build {
+  string component = 1;
+  // A git repository URL, and the commit, branch or tag to build.
+  string repository = 2;
+  string commit = 3;
+  // The build context's directory in the repository (default "."), and
+  // the Dockerfile in it (default "Dockerfile").
+  string context = 4;
+  string dockerfile = 5;
+  // The memory the build may use, in MiB (default 512).
+  int32 memory_mib = 6;
+  // The builder extension to use; empty when only one is installed.
+  string builder = 7;
+}
+
+// RemoveExtension stops and uninstalls an extension.
+message RemoveExtension {
+  string name = 1;
+}
+
+message Source {
+  // owner/name on the code host.
+  string repository = 1;
+  string commit = 2;
+  optional int32 pull_request = 3;
+}

@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://oap.dev/schemas/v1/envelope.json",
+  "title": "OAP autonomy envelope",
+  "description": "What agents may do without the owner. Stored as policy/envelope.yaml.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "agents": {
+      "type": "object",
+      "maxProperties": 64,
+      "propertyNames": {"$ref": "#/$defs/name"},
+      "additionalProperties": {
+        "type": "object",
+        "required": ["scope", "may"],
+        "additionalProperties": false,
+        "properties": {
+          "scope": {
+            "type": "object",
+            "required": ["applications"],
+            "additionalProperties": false,
+            "properties": {
+              "applications": {"$ref": "#/$defs/names"},
+              "components": {"$ref": "#/$defs/names"}
+            }
+          },
+          "may": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {"type": "string", "enum": ["scale", "deploy", "rollback", "configure", "add-component", "remove-component", "spec-patch", "install-extension", "remove-extension", "build"]}
+          }
+        }
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "maxProperties": 1,
+        "properties": {
+          "min_healthy": {
+            "type": "object",
+            "required": ["application", "component", "instances"],
+            "additionalProperties": false,
+            "properties": {
+              "application": {"$ref": "#/$defs/name"},
+              "component": {"$ref": "#/$defs/name"},
+              "instances": {"type": "integer", "minimum": 1, "maximum": 4}
+            }
+          },
+          "snapshot_before_volume_change": {"type": "boolean"},
+          "max_releases": {
+            "type": "object",
+            "required": ["per_application_per_hour"],
+            "additionalProperties": false,
+            "properties": {"per_application_per_hour": {"type": "integer", "minimum": 1, "maximum": 1000}}
+          },
+          "within_quotas": {"type": "boolean"}
+        }
+      }
+    },
+    "risk": {
+      "description": "Risk tier by change category. Irreversible changes always need the owner and can't be listed here.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "routine": {"$ref": "#/$defs/categories"},
+        "sensitive": {"$ref": "#/$defs/categories"}
+      }
+    },
+    "change_facts": {
+      "type": "object",
+      "propertyNames": {"type": "string", "enum": ["migrations-changed", "lockfile-changed", "docs-only", "ci-not-green", "unreviewed", "unsigned", "no-change-facts"]},
+      "additionalProperties": {"type": "string", "enum": ["routine", "sensitive", "deny"]}
+    },
+    "breakers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "failed_applies_per_hour": {"type": "integer", "minimum": 1, "maximum": 100}
+      }
+    }
+  },
+  "$defs": {
+    "name": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,47}$"},
+    "names": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {"type": "string", "pattern": "^(\\*|[a-z][a-z0-9-]{0,47})$"}
+    },
+    "categories": {
+      "type": "array",
+      "items": {"type": "string", "enum": ["images", "instances", "env", "resources", "secret-bindings", "connections", "ordering", "routes", "domains", "volumes", "host-ports", "health", "components-added", "components-removed", "job-flags", "security", "extensions", "builds"]}
+    }
+  }
+}

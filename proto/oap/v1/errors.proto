@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package oap.v1;
+
+import "oap/v1/intent.proto";
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1";
+
+// Reason explains a verdict, a refusal or an outcome. `why` is a stable code
+// agents can branch on, for example "scope.component_not_allowed"; `message`
+// is for people and may change.
+message Reason {
+  string why = 1;
+  string message = 2;
+}
+
+// ErrorDetail is attached to every error as a rich error detail. Errors always
+// carry a remedy when one exists.
+message ErrorDetail {
+  string why = 1;
+  string message = 2;
+  Remedy remedy = 3;
+}
+
+// Remedy is what the caller can do next.
+message Remedy {
+  oneof action {
+    // A suggested intent to propose instead.
+    Intent intent = 1;
+    // A request to involve the owner.
+    AskRequest ask = 2;
+    // Re-read state and retry, for example after a revision conflict.
+    bool refresh = 3;
+    // Correct the request: the fields named here are wrong or missing.
+    InputFix fix = 4;
+  }
+}
+
+// InputFix names the fields of a request, or of the spec it would produce, to
+// correct before trying again.
+message InputFix {
+  repeated FieldProblem fields = 1;
+}
+
+message FieldProblem {
+  // A dotted path, for example "components.api.instances" or "change".
+  string path = 1;
+  string why = 2;
+  string message = 3;
+}
+
+enum AskKind {
+  ASK_KIND_UNSPECIFIED = 0;
+  ASK_KIND_APPROVAL = 1;
+  ASK_KIND_SECRET = 2;
+  ASK_KIND_DECISION = 3;
+  ASK_KIND_BLOCKER = 4;
+}
+
+// AskRequest is an agent's structured way to involve the owner.
+message AskRequest {
+  AskKind kind = 1;
+  string question = 2;
+  // For approvals: the proposal to approve.
+  string proposal_id = 3;
+  // For decisions: the options offered.
+  repeated string options = 4;
+  // For secrets: the secret reference to fill. The value never passes
+  // through the agent.
+  string secret_ref = 5;
+  // Seconds until the ask expires.
+  int32 expires_in_seconds = 6;
+}

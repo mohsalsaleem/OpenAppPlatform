@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package oap.v1;
+
+import "oap/v1/plan.proto";
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1";
+
+// Envelope is the typed form of policy/envelope.yaml: what agents may do
+// without the owner (rewrite doc, section 7).
+message Envelope {
+  // Content hash of the canonical envelope.
+  string version = 1;
+  repeated AgentPolicy agents = 2;
+  repeated Invariant invariants = 3;
+  repeated RiskRule risk = 4;
+  repeated FactRule change_facts = 5;
+  Breakers breakers = 6;
+}
+
+message AgentPolicy {
+  string agent = 1;
+  Scope scope = 2;
+  // Intent kinds the agent may propose, for example "scale".
+  repeated string may = 3;
+}
+
+// Scope limits an agent by C4 level. "*" matches every name. Applications must
+// be listed; leaving components empty puts every component of the listed
+// applications in scope.
+message Scope {
+  repeated string applications = 1;
+  repeated string components = 2;
+}
+
+// Invariant is something that must stay true after a change.
+message Invariant {
+  oneof rule {
+    MinHealthy min_healthy = 1;
+    // Changes to a component with a volume need a fresh snapshot first.
+    bool snapshot_before_volume_change = 2;
+    MaxReleases max_releases = 3;
+    // Stay within host and application quotas.
+    bool within_quotas = 4;
+  }
+}
+
+message MinHealthy {
+  string application = 1;
+  string component = 2;
+  int32 instances = 3;
+}
+
+message MaxReleases {
+  int32 per_application_per_hour = 1;
+}
+
+// RiskRule assigns a risk tier to a category of change, for example
+// "routes" or "secret-bindings".
+message RiskRule {
+  string category = 1;
+  Risk risk = 2;
+}
+
+enum FactAction {
+  FACT_ACTION_UNSPECIFIED = 0;
+  FACT_ACTION_ROUTINE = 1;
+  FACT_ACTION_SENSITIVE = 2;
+  FACT_ACTION_DENY = 3;
+}
+
+// FactRule maps a change fact, for example "migrations-changed" or
+// "ci-not-green", to an action.
+message FactRule {
+  string fact = 1;
+  FactAction action = 2;
+}
+
+message Breakers {
+  // After this many failed applies in an hour, pause the agent and notify.
+  int32 failed_applies_per_hour = 1;
+}

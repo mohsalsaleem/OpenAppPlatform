@@ -1,0 +1,12 @@
+probe.version=1
+uid=0
+os.id=debian
+os.version=12
+os.name=Debian GNU/Linux 12 (bookworm)
+arch=aarch64
+kernel=6.12.76-linuxkit
+cpus=12
+mem.total_kib=8024196
+swap.total_kib=1048572
+disk.free_kib=48699980
+probe.done=1

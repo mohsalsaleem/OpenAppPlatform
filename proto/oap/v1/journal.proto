@@ -1,0 +1,148 @@
+syntax = "proto3";
+
+package oap.v1;
+
+import "google/protobuf/timestamp.proto";
+import "oap/v1/errors.proto";
+import "oap/v1/intent.proto";
+import "oap/v1/plan.proto";
+import "oap/v1/world.proto";
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1;oapv1";
+
+// Event is the one event format shared by Watch and Await (rewrite doc,
+// section 11). Revisions increase monotonically per server.
+message Event {
+  uint64 revision = 1;
+  google.protobuf.Timestamp at = 2;
+  oneof kind {
+    WorldChanged world_changed = 10;
+    JournalEntry journal_entry = 11;
+    OperationProgress operation_progress = 12;
+    Outcome outcome = 13;
+    AskAnswered ask_answered = 14;
+  }
+}
+
+// WorldChanged names the nodes that changed; read them with Observe.
+message WorldChanged {
+  repeated string paths = 1;
+}
+
+// Actor identifies who did something.
+message Actor {
+  oneof who {
+    string owner = 1;
+    // A named agent, as approved at device login.
+    string agent = 2;
+    // OAP itself, for example during recovery.
+    bool system = 3;
+  }
+}
+
+enum EntryKind {
+  ENTRY_KIND_UNSPECIFIED = 0;
+  ENTRY_KIND_PROPOSAL = 1;
+  ENTRY_KIND_ASK = 2;
+  ENTRY_KIND_ASK_ANSWER = 3;
+  ENTRY_KIND_APPLY = 4;
+  ENTRY_KIND_OUTCOME = 5;
+  // A summary that stands in for older entries; originals are kept.
+  ENTRY_KIND_SUMMARY = 6;
+}
+
+// JournalEntry is one append-only record. Entries form a tree through
+// parent_id; nothing is ever rewritten.
+message JournalEntry {
+  string id = 1;
+  string parent_id = 2;
+  EntryKind kind = 3;
+  Actor actor = 4;
+  // The desired-state revision the entry was based on.
+  uint64 base_revision = 5;
+  // The desired-state commit the entry produced, if any.
+  string desired_commit = 6;
+  string summary = 7;
+  oneof detail {
+    Proposal proposal = 10;
+    AskRequest ask = 11;
+    string answer = 12;
+    string operation_id = 13;
+    Outcome outcome = 14;
+  }
+}
+
+message OperationProgress {
+  string operation_id = 1;
+  int32 step_index = 2;
+  Step step = 3;
+  StepState state = 4;
+}
+
+enum StepState {
+  STEP_STATE_UNSPECIFIED = 0;
+  // Intent recorded, effect not yet confirmed.
+  STEP_STATE_STARTED = 1;
+  STEP_STATE_SUCCEEDED = 2;
+  STEP_STATE_FAILED = 3;
+  // Outcome unknown, for example after a crash; resolved by observation.
+  STEP_STATE_UNCERTAIN = 4;
+}
+
+enum OutcomeStatus {
+  OUTCOME_STATUS_UNSPECIFIED = 0;
+  OUTCOME_STATUS_ACHIEVED = 1;
+  OUTCOME_STATUS_NOT_ACHIEVED = 2;
+  OUTCOME_STATUS_UNCERTAIN = 3;
+}
+
+// Outcome is what Await returns: not a status, a result with evidence.
+message Outcome {
+  string operation_id = 1;
+  OutcomeStatus status = 2;
+  repeated Reason reasons = 3;
+  // Suggested next intents when not achieved.
+  repeated Intent next = 4;
+  Evidence evidence = 5;
+  // Images an operation produced, by component (builds).
+  map<string, string> images = 6;
+  // The commit each built image came from, by component.
+  map<string, string> commits = 7;
+}
+
+message Evidence {
+  repeated Health health = 1;
+  repeated CheckResult checks = 2;
+  TrafficSummary traffic = 3;
+  // Paths where actual still differs from desired.
+  repeated string unconverged = 4;
+}
+
+message CheckResult {
+  string name = 1;
+  bool passed = 2;
+  string detail = 3;
+  google.protobuf.Timestamp at = 4;
+}
+
+// TrafficSummary records request outcomes during an operation, with each
+// failure listed so outcomes are diagnosable from the evidence alone.
+message TrafficSummary {
+  int32 requests = 1;
+  int32 failures = 2;
+  repeated RequestFailure failed = 3;
+}
+
+message RequestFailure {
+  google.protobuf.Timestamp at = 1;
+  string target = 2;
+  string reason = 3;
+}
+
+message AskAnswered {
+  string ask_id = 1;
+  string answer = 2;
+  Actor by = 3;
+  // The ask expired unanswered; it can't be answered any more.
+  bool expired = 4;
+}

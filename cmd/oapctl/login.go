@@ -1,0 +1,615 @@
+package main
+
+import (
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"connectrpc.com/connect"
+	oapv1 "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1"
+	"github.com/mohsalsaleem/OpenAppPlatform/gen/oap/v1/oapv1connect"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/host"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/service"
+	"google.golang.org/protobuf/proto"
+)
+
+// creds is an agent's saved session: ~/.config/oap/agents/NAME/credentials.json.
+type creds struct {
+	URL          string   `json:"url"`
+	Agent        string   `json:"agent"`
+	Token        string   `json:"token"`
+	ExpiresAt    string   `json:"expires_at"`
+	Applications []string `json:"applications,omitempty"`
+	May          []string `json:"may,omitempty"`
+}
+
+func (a *app) agentDir(name string) string { return filepath.Join(a.dir(), "agents", name) }
+
+// identityKey loads or creates the Ed25519 key (0600) kept in dir: an
+// agent's, or the owner's for one server.
+func (a *app) identityKey(dir string) (ed25519.PrivateKey, string, error) {
+	path := filepath.Join(dir, "identity")
+	if b, err := os.ReadFile(path); err == nil {
+		seed, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(b)))
+		if err != nil || len(seed) != ed25519.SeedSize {
+			return nil, "", fmt.Errorf("the identity key %s is damaged", path)
+		}
+		priv := ed25519.NewKeyFromSeed(seed)
+		return priv, "ed25519:" + base64.StdEncoding.EncodeToString(priv.Public().(ed25519.PublicKey)), nil
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, "", err
+	}
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, "", err
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, "", err
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return nil, "", err
+	}
+	defer f.Close()
+	if _, err := f.WriteString(base64.StdEncoding.EncodeToString(priv.Seed()) + "\n"); err != nil {
+		return nil, "", err
+	}
+	return priv, "ed25519:" + base64.StdEncoding.EncodeToString(priv.Public().(ed25519.PublicKey)), nil
+}
+
+func (a *app) saveCreds(dir string, c creds) error {
+	b, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(dir, ".credentials-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(append(b, '\n')); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), filepath.Join(dir, "credentials.json"))
+}
+
+// credentials returns an agent's session, signing in again when the token
+// has expired: a trusted identity is approved at once.
+func (a *app) credentials(ctx context.Context, name string) (creds, error) {
+	var c creds
+	b, err := os.ReadFile(filepath.Join(a.agentDir(name), "credentials.json"))
+	if err != nil {
+		return c, fmt.Errorf("agent %s isn't signed in; run %s login URL --agent %s", name, a.cli, name)
+	}
+	if err := json.Unmarshal(b, &c); err != nil {
+		return c, err
+	}
+	if exp, err := time.Parse(time.RFC3339, c.ExpiresAt); err == nil && a.now().Add(time.Minute).Before(exp) {
+		return c, nil
+	}
+	fresh, err := a.signIn(ctx, a.agentDir(name), c.URL, name, false)
+	if err != nil {
+		return c, fmt.Errorf("agent %s's token expired and signing in again failed: %v", name, err)
+	}
+	return fresh, nil
+}
+
+// signIn runs a device login with the key in dir, and saves the session
+// there. With wait, a login that needs the owner shows its code and
+// waits; without, it fails instead.
+func (a *app) signIn(ctx context.Context, dir, url, name string, wait bool) (creds, error) {
+	priv, pub, err := a.identityKey(dir)
+	if err != nil {
+		return creds{}, err
+	}
+	signedAt := a.now().UTC().Format(time.RFC3339)
+	nonce := make([]byte, 18)
+	rand.Read(nonce)
+	n := base64.RawURLEncoding.EncodeToString(nonce)
+	req := &oapv1.LoginRequest{Agent: name, PublicKey: pub, SignedAt: signedAt, Nonce: n,
+		Signature: ed25519.Sign(priv, service.LoginPayload(name, pub, signedAt, n))}
+	client := oapv1connect.NewAgentServiceClient(http.DefaultClient, url)
+	cctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	stream, err := client.Login(cctx, connect.NewRequest(req))
+	if err != nil {
+		return creds{}, err
+	}
+	defer stream.Close()
+	for stream.Receive() {
+		switch st := stream.Msg().State.(type) {
+		case *oapv1.LoginResponse_Pending:
+			if !wait {
+				return creds{}, errors.New("the owner must approve this login; run " + a.cli + " login")
+			}
+			p := st.Pending
+			a.u().Note(fmt.Sprintf("Waiting for the owner. Code: %s\nThe owner approves with: %s owner approve %s --app APP --may scale,deploy\n(expires in %s)",
+				p.UserCode, a.cli, p.UserCode, time.Duration(p.ExpiresInSeconds)*time.Second))
+			if a.mode != human {
+				a.printJSON(stream.Msg())
+			}
+		case *oapv1.LoginResponse_Approved:
+			ap := st.Approved
+			c := creds{URL: url, Agent: name, Token: ap.Token, ExpiresAt: a.now().Add(time.Duration(ap.ExpiresInSeconds) * time.Second).UTC().Format(time.RFC3339),
+				Applications: ap.GetScope().GetApplications(), May: ap.GetScope().GetMay()}
+			return c, a.saveCreds(dir, c)
+		case *oapv1.LoginResponse_Refused:
+			return creds{}, fmt.Errorf("%s: %s", st.Refused.Why, st.Refused.Message)
+		}
+	}
+	if err := stream.Err(); err != nil {
+		return creds{}, err
+	}
+	return creds{}, errors.New("the login ended without an answer")
+}
+
+// loginCmd: login URL --agent NAME.
+func (a *app) loginCmd(ctx context.Context, args []string) int {
+	fs := flag.NewFlagSet("login", flag.ContinueOnError)
+	fs.SetOutput(a.errOut)
+	agent := fs.String("agent", os.Getenv("OAP_AGENT"), "the name to sign in as, for example claude-laptop")
+	asJSON := fs.Bool("json", false, "")
+	url, rest := splitFirst(args)
+	if err := fs.Parse(rest); err != nil {
+		return 2
+	}
+	if url == "" || *agent == "" {
+		return a.fail(errors.New("usage: login URL --agent NAME"))
+	}
+	if !strings.Contains(url, "://") {
+		url = "https://" + url
+	}
+	if *asJSON {
+		a.mode = jsonMode
+		defer func() { a.mode = human }()
+	}
+	c, err := a.signIn(ctx, a.agentDir(*agent), url, *agent, true)
+	if err != nil {
+		return a.fail(err)
+	}
+	if *asJSON {
+		out, _ := json.Marshal(map[string]any{"agent": c.Agent, "url": c.URL, "expires_at": c.ExpiresAt, "applications": c.Applications, "may": c.May})
+		fmt.Fprintf(a.out, "%s\n", out)
+		return 0
+	}
+	a.u().Success(fmt.Sprintf("Signed in to %s as %s until %s; it may %s on %s. Use it with OAP_AGENT=%s.",
+		c.URL, c.Agent, c.ExpiresAt, strings.Join(c.May, ", "), strings.Join(c.Applications, ", "), c.Agent))
+	return 0
+}
+
+// ownerCmd: owner logins|approve|deny|agents|revoke|pause|resume|mode.
+func (a *app) ownerCmd(ctx context.Context, args []string) int {
+	if len(args) == 0 {
+		return a.fail(errors.New("usage: owner enroll [--label NAME]|keys [remove FINGERPRINT]|secret set NAME [--ask ID]|secret list|secret delete NAME|logins|approve CODE --app APP [--may ACTIONS] [--trust=false]|deny CODE|agents|revoke AGENT [--forget]|pause [AGENT]|resume [AGENT]|mode trusted|every-session"))
+	}
+	sub, rest := args[0], args[1:]
+	fs := flag.NewFlagSet("owner "+sub, flag.ContinueOnError)
+	fs.SetOutput(a.errOut)
+	apps := fs.String("app", "", "applications the agent may act on, comma-separated, or *")
+	may := fs.String("may", "scale,deploy,rollback,configure", "intent kinds the agent may propose, comma-separated")
+	trust := fs.Bool("trust", true, "trust the agent's key, so later sessions sign in without asking")
+	forget := fs.Bool("forget", false, "also forget the agent's trusted identity")
+	file := fs.String("file", "", "briefing: the Markdown file with the house rules")
+	clear := fs.Bool("clear", false, "briefing: remove the house rules")
+	label := fs.String("label", "", "enroll: names this machine, for example laptop (default: its host name)")
+	askID := fs.String("ask", "", "secret set: the secret ask this answers")
+	asJSON := fs.Bool("json", false, "")
+	arg, rest := splitFirst(rest)
+	if err := fs.Parse(rest); err != nil {
+		return 2
+	}
+	// Flags may follow positional arguments: owner secret set NAME --ask ID.
+	// An answer is free text, so it keeps everything after the ask's id.
+	var pos []string
+	for sub != "answer" && fs.NArg() > 0 {
+		pos = append(pos, fs.Arg(0))
+		if err := fs.Parse(fs.Args()[1:]); err != nil {
+			return 2
+		}
+	}
+	posArg := func(i int) string {
+		if i < len(pos) {
+			return pos[i]
+		}
+		return ""
+	}
+	if sub == "enroll" {
+		return a.ownerEnroll(ctx, *label, *asJSON)
+	}
+	s, err := a.serverFor("")
+	if err != nil {
+		return a.fail(err)
+	}
+	transport := a.transport
+	if sub == "keys" && arg == "remove" {
+		// Keys are removed only over SSH, never with an owner session.
+		if s, err = a.server(""); err != nil {
+			return a.fail(err)
+		}
+		transport = a.localTransport
+	}
+	hc, base, stop, err := transport(ctx, s)
+	if err != nil {
+		return a.fail(err)
+	}
+	defer stop()
+	c := oapv1connect.NewOwnerServiceClient(hc, base)
+	var out proto.Message
+	switch sub {
+	case "logins":
+		res, e := c.ListLogins(ctx, connect.NewRequest(&oapv1.ListLoginsRequest{}))
+		err = e
+		if e == nil {
+			out = res.Msg
+			if !*asJSON {
+				if len(res.Msg.Logins) == 0 {
+					fmt.Fprintln(a.out, "No logins are waiting.")
+				}
+				for _, l := range res.Msg.Logins {
+					fmt.Fprintf(a.out, "%s  %s  key %s\n", l.UserCode, l.Agent, or(l.KeyFingerprint, "none"))
+				}
+				return 0
+			}
+		}
+	case "approve":
+		if *apps == "" {
+			return a.fail(errors.New("name the applications with --app (comma-separated, or *)"))
+		}
+		res, e := c.ApproveLogin(ctx, connect.NewRequest(&oapv1.ApproveLoginRequest{UserCode: arg, Applications: split(*apps), May: split(*may), Trust: *trust}))
+		err = e
+		if e == nil {
+			out = res.Msg
+			if !*asJSON {
+				ag := res.Msg.Agent
+				fmt.Fprintf(a.out, "✓ Approved %s for %s; it may %s. Trusted identity: %t.\n", ag.Name, strings.Join(ag.Applications, ", "), strings.Join(ag.May, ", "), ag.Trusted)
+				return 0
+			}
+		}
+	case "deny":
+		_, err = c.DenyLogin(ctx, connect.NewRequest(&oapv1.DenyLoginRequest{UserCode: arg}))
+	case "agents":
+		res, e := c.ListAgents(ctx, connect.NewRequest(&oapv1.ListAgentsRequest{}))
+		err = e
+		if e == nil {
+			out = res.Msg
+			if !*asJSON {
+				fmt.Fprintf(a.out, "approval mode: %s%s\n", strings.ToLower(strings.TrimPrefix(res.Msg.Mode.String(), "APPROVAL_MODE_")), map[bool]string{true: " · ALL PAUSED"}[res.Msg.AllPaused])
+				for _, ag := range res.Msg.Agents {
+					state := "active"
+					if ag.Paused {
+						state = "paused"
+					}
+					fmt.Fprintf(a.out, "%-20s %-7s apps %-20s may %-30s trusted %-5t tokens %d\n", ag.Name, state, strings.Join(ag.Applications, ","), strings.Join(ag.May, ","), ag.Trusted, ag.ActiveTokens)
+				}
+				return 0
+			}
+		}
+	case "revoke":
+		res, e := c.Revoke(ctx, connect.NewRequest(&oapv1.RevokeRequest{Agent: arg, ForgetIdentity: *forget}))
+		err = e
+		if e == nil {
+			out = res.Msg
+			if !*asJSON {
+				fmt.Fprintf(a.out, "✓ Revoked %d tokens of %s.\n", res.Msg.RevokedTokens, arg)
+				return 0
+			}
+		}
+	case "pause":
+		_, err = c.Pause(ctx, connect.NewRequest(&oapv1.PauseRequest{Agent: arg}))
+	case "resume":
+		_, err = c.Resume(ctx, connect.NewRequest(&oapv1.ResumeRequest{Agent: arg}))
+	case "asks":
+		res, e := c.ListAsks(ctx, connect.NewRequest(&oapv1.ListAsksRequest{}))
+		err = e
+		if e == nil {
+			out = res.Msg
+			if !*asJSON {
+				if len(res.Msg.Asks) == 0 {
+					fmt.Fprintln(a.out, "No asks are waiting.")
+				}
+				for _, q := range res.Msg.Asks {
+					kind := strings.ToLower(strings.TrimPrefix(q.Request.GetKind().String(), "ASK_KIND_"))
+					line := fmt.Sprintf("%s  %-8s %s asks: %s", q.AskId, kind, q.Agent, q.Request.GetQuestion())
+					if o := q.Request.GetOptions(); len(o) > 0 {
+						line += "  [" + strings.Join(o, " | ") + "]"
+					}
+					if p := q.Request.GetProposalId(); p != "" {
+						line += "  proposal " + p
+					}
+					fmt.Fprintf(a.out, "%s  (expires %s)\n", line, q.ExpiresAt.AsTime().UTC().Format("15:04 UTC"))
+				}
+				return 0
+			}
+		}
+	case "answer":
+		answer := strings.Join(fs.Args(), " ")
+		if arg == "" || answer == "" {
+			return a.fail(errors.New("usage: owner answer ASK_ID ANSWER"))
+		}
+		_, err = c.AnswerAsk(ctx, connect.NewRequest(&oapv1.AnswerAskRequest{AskId: arg, Answer: answer}))
+		if err == nil {
+			fmt.Fprintf(a.out, "✓ Answered %s: %s\n", arg, answer)
+			return 0
+		}
+	case "briefing":
+		md := ""
+		if !*clear {
+			if *file == "" {
+				return a.fail(errors.New("usage: owner briefing [APP] --file FILE, or --clear"))
+			}
+			b, e := os.ReadFile(*file)
+			if e != nil {
+				return a.fail(e)
+			}
+			md = string(b)
+		}
+		_, err = c.SetBriefing(ctx, connect.NewRequest(&oapv1.SetBriefingRequest{Application: arg, Markdown: md}))
+		if err == nil {
+			scope := arg
+			if scope == "" {
+				scope = "the server"
+			}
+			fmt.Fprintf(a.out, "✓ House rules for %s %s.\n", scope, map[bool]string{true: "removed", false: "saved"}[*clear])
+			return 0
+		}
+	case "secret":
+		switch arg {
+		case "set":
+			name := posArg(0)
+			if name == "" {
+				return a.fail(errors.New("usage: owner secret set NAME [--ask ASK_ID]; the value is read from the terminal, or from stdin when piped"))
+			}
+			value, e := a.readSecret(name)
+			if e != nil {
+				return a.fail(e)
+			}
+			_, err = c.SetSecret(ctx, connect.NewRequest(&oapv1.SetSecretRequest{Name: name, Value: value, AskId: *askID}))
+			if err == nil {
+				msg := fmt.Sprintf("✓ Stored secret %s. Specs reference it by name; containers started from now on get it.", name)
+				if *askID != "" {
+					msg += " Answered " + *askID + " with provided."
+				}
+				fmt.Fprintln(a.out, msg)
+				return 0
+			}
+		case "list":
+			res, e := c.ListSecrets(ctx, connect.NewRequest(&oapv1.ListSecretsRequest{}))
+			err = e
+			if e == nil {
+				out = res.Msg
+				if !*asJSON {
+					if len(res.Msg.Names) == 0 {
+						fmt.Fprintln(a.out, "No secrets are stored.")
+					}
+					for _, n := range res.Msg.Names {
+						fmt.Fprintln(a.out, n)
+					}
+					return 0
+				}
+			}
+		case "delete":
+			_, err = c.DeleteSecret(ctx, connect.NewRequest(&oapv1.DeleteSecretRequest{Name: posArg(0)}))
+			if err == nil {
+				fmt.Fprintf(a.out, "✓ Deleted secret %s.\n", posArg(0))
+				return 0
+			}
+		default:
+			return a.fail(errors.New("usage: owner secret set NAME [--ask ASK_ID] | list | delete NAME"))
+		}
+	case "keys":
+		switch arg {
+		case "":
+			res, e := c.ListOwnerKeys(ctx, connect.NewRequest(&oapv1.ListOwnerKeysRequest{}))
+			err = e
+			if e == nil {
+				out = res.Msg
+				if !*asJSON {
+					if len(res.Msg.Keys) == 0 {
+						fmt.Fprintln(a.out, "No owner keys are enrolled.")
+					}
+					for _, k := range res.Msg.Keys {
+						fmt.Fprintf(a.out, "%s  %s  enrolled %s\n", k.KeyFingerprint, or(k.Label, "-"), k.EnrolledAt.AsTime().UTC().Format(time.RFC3339))
+					}
+					return 0
+				}
+			}
+		case "remove":
+			res, e := c.RemoveOwnerKey(ctx, connect.NewRequest(&oapv1.RemoveOwnerKeyRequest{KeyFingerprint: posArg(0)}))
+			err = e
+			if e == nil {
+				out = res.Msg
+				if !*asJSON {
+					fmt.Fprintf(a.out, "✓ Removed owner key %s and ended %d of its sessions.\n", posArg(0), res.Msg.RevokedTokens)
+					return 0
+				}
+			}
+		default:
+			return a.fail(errors.New("usage: owner keys [remove FINGERPRINT]"))
+		}
+	case "mode":
+		m := map[string]oapv1.ApprovalMode{"trusted": oapv1.ApprovalMode_APPROVAL_MODE_TRUSTED_IDENTITY, "every-session": oapv1.ApprovalMode_APPROVAL_MODE_EVERY_SESSION}[arg]
+		if m == 0 {
+			return a.fail(errors.New("mode is trusted or every-session"))
+		}
+		_, err = c.SetApprovalMode(ctx, connect.NewRequest(&oapv1.SetApprovalModeRequest{Mode: m}))
+	default:
+		return a.fail(fmt.Errorf("unknown owner command %q", sub))
+	}
+	if err != nil {
+		return a.fail(err)
+	}
+	switch {
+	case out != nil && *asJSON:
+		a.printJSON(out)
+	default:
+		target := arg
+		if target == "" {
+			target = "every agent"
+		}
+		fmt.Fprintf(a.out, "✓ %s %s\n", map[string]string{"deny": "Denied", "pause": "Paused", "resume": "Resumed", "mode": "Approval mode set to"}[sub], target)
+	}
+	return 0
+}
+
+func split(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func or(s, def string) string {
+	if s == "" {
+		return def
+	}
+	return s
+}
+
+// ownerDir holds the owner's key and session for one server.
+func (a *app) ownerDir(s *host.Server) string {
+	safe := strings.Map(func(r rune) rune {
+		if r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '.' || r == '-' {
+			return r
+		}
+		return '_'
+	}, s.Address)
+	return filepath.Join(a.dir(), "owner", safe)
+}
+
+// hasOwnerKey reports whether this machine enrolled an owner key for the
+// server.
+func (a *app) hasOwnerKey(s *host.Server) bool {
+	_, err := os.Stat(filepath.Join(a.ownerDir(s), "credentials.json"))
+	return err == nil
+}
+
+// ownerSession returns the owner's session on the public API, signing in
+// again with the owner key when the token has expired.
+func (a *app) ownerSession(ctx context.Context, s *host.Server) (creds, error) {
+	dir := a.ownerDir(s)
+	var c creds
+	b, err := os.ReadFile(filepath.Join(dir, "credentials.json"))
+	if err != nil {
+		return c, fmt.Errorf("no owner key is enrolled for %s from this machine; run %s owner enroll", s.Address, a.cli)
+	}
+	if err := json.Unmarshal(b, &c); err != nil {
+		return c, err
+	}
+	if exp, err := time.Parse(time.RFC3339, c.ExpiresAt); err == nil && a.now().Add(time.Minute).Before(exp) {
+		return c, nil
+	}
+	fresh, err := a.signIn(ctx, dir, c.URL, "owner", false)
+	if err != nil {
+		return c, fmt.Errorf("signing in as the owner with the owner key failed: %v", err)
+	}
+	return fresh, nil
+}
+
+// ownerEnroll makes a key on this machine the owner's for the server, over
+// SSH, then signs in with it on the public API to prove it works. From
+// then on owner commands use that session, so the owner keeps access
+// after hand-off removes SSH.
+func (a *app) ownerEnroll(ctx context.Context, label string, asJSON bool) int {
+	if os.Getenv("OAP_AGENT") != "" {
+		return a.fail(errors.New("only the owner enrolls an owner key; unset OAP_AGENT"))
+	}
+	s, err := a.server("")
+	if err != nil {
+		return a.fail(err)
+	}
+	if s.API == "" {
+		return a.fail(fmt.Errorf("%s has no public API address, so there is nothing to sign in to; run %s host install with --api-host", s.Address, a.cli))
+	}
+	if label == "" {
+		label, _ = os.Hostname()
+	}
+	dir := a.ownerDir(s)
+	_, pub, err := a.identityKey(dir)
+	if err != nil {
+		return a.fail(err)
+	}
+	hc, base, stop, err := a.localTransport(ctx, s)
+	if err != nil {
+		return a.fail(err)
+	}
+	defer stop()
+	res, err := oapv1connect.NewOwnerServiceClient(hc, base).EnrollOwnerKey(ctx,
+		connect.NewRequest(&oapv1.EnrollOwnerKeyRequest{PublicKey: pub, Label: label}))
+	if err != nil {
+		return a.fail(err)
+	}
+	c, err := a.signIn(ctx, dir, s.API, "owner", false)
+	if err != nil {
+		return a.fail(fmt.Errorf("the key is enrolled, but signing in with it at %s failed: %v", s.API, err))
+	}
+	next := *s
+	if next.Stage == host.StageInstalled {
+		next.Stage = host.StageOwned
+	}
+	if err := a.update(next); err != nil {
+		return a.fail(err)
+	}
+	if asJSON {
+		out, _ := json.Marshal(map[string]any{"key_fingerprint": res.Msg.KeyFingerprint, "label": label, "url": c.URL, "expires_at": c.ExpiresAt})
+		fmt.Fprintf(a.out, "%s\n", out)
+		return 0
+	}
+	a.u().Success(fmt.Sprintf("This machine holds an owner key for %s (%s, %s). Owner commands now sign in at %s with it, so they keep working after hand-off.",
+		s.Address, label, res.Msg.KeyFingerprint, c.URL))
+	return 0
+}
+
+// readSecret reads a secret value: from the terminal with echo off, or
+// from stdin when it is piped (one trailing newline is dropped). There is
+// deliberately no flag for it, so values stay out of shell history and
+// process lists.
+func (a *app) readSecret(name string) (string, error) {
+	if a.terminal() {
+		fmt.Fprintf(a.out, "Value for %s (not shown): ", name)
+		off := exec.Command("stty", "-echo")
+		off.Stdin = os.Stdin
+		echoOff := off.Run() == nil
+		line, err := a.in.ReadString('\n')
+		if echoOff {
+			on := exec.Command("stty", "echo")
+			on.Stdin = os.Stdin
+			on.Run()
+		}
+		fmt.Fprintln(a.out)
+		if err != nil && line == "" {
+			return "", errors.New("no value given")
+		}
+		return strings.TrimRight(line, "\r\n"), nil
+	}
+	b, err := io.ReadAll(io.LimitReader(a.in, service.MaxSecretSize+2))
+	if err != nil {
+		return "", err
+	}
+	v := strings.TrimSuffix(strings.TrimSuffix(string(b), "\n"), "\r")
+	if v == "" {
+		return "", errors.New("no value on stdin; pipe it in, or run this in a terminal")
+	}
+	return v, nil
+}

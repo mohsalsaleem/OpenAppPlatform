@@ -1,0 +1,41 @@
+{
+  "runs": {
+    "cli": {
+      "brokenReleaseApiFailures": 0,
+      "brokenReleaseNotCompleted": true,
+      "correctedToV2": true,
+      "deployWithMigrationFirst": true,
+      "desiredRestoredAfterFailure": true,
+      "failingMigrationBlocksRollout": true,
+      "outcomeNamesApi": true,
+      "proposeNeedsApproval": true,
+      "replaySameOperation": true,
+      "rollbackSkippedMigration": true,
+      "scaleDownFailures": 0,
+      "scaleUpFailures": 0,
+      "scaleUpTo3": true,
+      "serving": true,
+      "volumeDataRetained": true
+    },
+    "connect": {
+      "smoke": "passed"
+    },
+    "mcp": {
+      "smoke": "passed"
+    }
+  },
+  "final": {
+    "coexistence": true,
+    "interfacesAfterRestart": true,
+    "memoryMinAvailableMiB": 498,
+    "memoryPeakMiB": "452",
+    "oomKills": "oom_kill 0",
+    "outageProbeFailures": 0
+  },
+  "observations": [
+    "E1 explain: journey-cli-r2 is as desired (revision 134).",
+    "X2 cli-r2.139-180-132-23.sslip.io while oapd was down: 218 requests, 0 failed, versions map[v1:218], 1 instances",
+    "X2 connect-r2.139-180-132-23.sslip.io while oapd was down: 222 requests, 0 failed, versions map[v1:222], 1 instances",
+    "X2 mcp-r2.139-180-132-23.sslip.io while oapd was down: 219 requests, 0 failed, versions map[v1:219], 1 instances"
+  ]
+}

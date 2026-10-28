@@ -1,0 +1,14 @@
+{
+  "summary": "Ubuntu 24.04.3 LTS, x86_64, 2 CPUs, 3931 MiB memory, 38.1 GiB disk free",
+  "blocked": true,
+  "stopped": true,
+  "findings": [
+    {
+      "why": "host.docker.unreachable",
+      "severity": "stop",
+      "observed": "dockerd runs (/usr/bin/dockerd) but doesn't answer",
+      "required": "Docker Engine 24 or later",
+      "remedy": "Check the daemon with systemctl status docker and docker info, then run oap again."
+    }
+  ]
+}

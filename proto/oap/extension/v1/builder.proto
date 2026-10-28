@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package oap.extension.v1;
+
+option go_package = "github.com/mohsalsaleem/OpenAppPlatform/gen/oap/extension/v1;extensionv1";
+
+// BuilderService is the builder extension point (R4.2): it turns a source
+// commit into a container image, or finds the image a registry already has
+// for it. The host queues builds and runs one at a time by default; a
+// builder runs each build within the memory the request names.
+service BuilderService {
+  rpc Build(BuildRequest) returns (BuildResponse);
+}
+
+message BuildRequest {
+  string application = 1;
+  string component = 2;
+  // A git repository URL, and the commit (or branch or tag) to build.
+  string repository = 3;
+  string commit = 4;
+  // The build context's directory in the repository ("." for its root),
+  // and the Dockerfile's path in that context.
+  string context = 5;
+  string dockerfile = 6;
+  // The image name to give the result, without a tag; the builder tags it
+  // with the commit it built.
+  string image = 7;
+  // The memory the build may use, in MiB; the builder enforces it.
+  int32 memory_mib = 8;
+}
+
+message BuildResponse {
+  // The image reference built or found, for example
+  // oap-build/notes-web:3f2a9c1e0b7d.
+  string image = 1;
+  // The full commit that was built.
+  string commit = 2;
+  // The last lines of the build's output, for the journal.
+  string log_tail = 3;
+}
