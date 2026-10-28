@@ -238,8 +238,10 @@ func TestDNSEdgeStateSurvivesRestartAndAdoptsStatic(t *testing.T) {
 func TestDNSEdgeConfirmedAndInFlight(t *testing.T) {
 	f := &fakeCaddy{counts: map[string]int{"oap-t-web-1.:8080": 2, "oap-t-web-2.:8080": 0}}
 	e := dnsEdge(t, f, filepath.Join(t.TempDir(), "edge.json"))
-	g, _ := e.Apply(ctx, ops.EdgeConfig{Members: []ops.RouteMember{web(1, "site.test")}})
+	// The settle time runs from the change, which Apply makes, so the clock
+	// starts before it.
 	start := time.Now()
+	g, _ := e.Apply(ctx, ops.EdgeConfig{Members: []ops.RouteMember{web(1, "site.test")}})
 	if err := e.Confirmed(ctx, g); err != nil || time.Since(start) < e.Settle()-5*time.Millisecond {
 		t.Fatalf("confirmed after %s, settle %s: %v", time.Since(start), e.Settle(), err)
 	}
