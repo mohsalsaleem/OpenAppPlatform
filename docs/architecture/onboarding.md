@@ -3,8 +3,8 @@
 Status: **accepted** by the owner (2026-10-19). Tasks R3.10–R3.14 in the
 [rewrite plan](rewrite-plan.md).
 
-This replaces the bootstrap half of [zero to live](../zero-to-live.md) and the
-Python and Compose installer in [headless bootstrap](../headless-bootstrap.md)
+This replaces the bootstrap half of [zero to live](https://github.com/mohsalsaleem/OpenAppPlatform/blob/4020bf4912936b1ef119d0b315d7b78abca3c606/docs/zero-to-live.md) and the
+Python and Compose installer in [headless bootstrap](https://github.com/mohsalsaleem/OpenAppPlatform/blob/4020bf4912936b1ef119d0b315d7b78abca3c606/docs/headless-bootstrap.md)
 for the rewrite.
 
 ## Starting point

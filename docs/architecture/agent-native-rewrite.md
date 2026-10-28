@@ -1,10 +1,10 @@
 # Agent-native OAP: architecture rewrite
 
-Status: **proposed, for owner review.** This document describes the target
-architecture for rethinking OAP's interface, operating model, guardrails and
-state. It does not change what is built today; the current system is described in
-[system design](system-design.md). v0.1 may be delayed to adopt this direction.
-This is a **full rewrite**: new internals and a new API, carrying over proven
+Status: **built**, as v0.2.0, by the [rewrite plan](rewrite-plan.md), which
+records where the build departed from this design. This document describes
+OAP's interface, operating model, guardrails and state. It replaced v0.1's
+[system design](https://github.com/mohsalsaleem/OpenAppPlatform/blob/4020bf4912936b1ef119d0b315d7b78abca3c606/docs/architecture/system-design.md)
+as a **full rewrite**: new internals and a new API, carrying over proven
 behavior and tests rather than code structure or wire compatibility.
 
 ![Agent-native OAP target architecture](../images/rewrite-c4.svg)
@@ -261,7 +261,7 @@ it, so a release's evidence includes commit, pull request and CI result.
 5. **Pause and revoke** remain instant in every mode.
 
 Host access (SSH, root) exists only during an owner-present bootstrap and is
-handed back at the end of installation ([zero to live](../zero-to-live.md)).
+handed back at the end of installation ([zero to live](https://github.com/mohsalsaleem/OpenAppPlatform/blob/4020bf4912936b1ef119d0b315d7b78abca3c606/docs/zero-to-live.md)).
 
 ## 9. State and storage
 
@@ -293,7 +293,7 @@ Four kinds of state on each server, plus the agent's own store:
 - **Discipline:** JSON Schema validation, a canonical stored form with a content
   hash, and a strict YAML subset (no implicit booleans or floats). JSON is
   accepted wherever YAML is.
-- This refines [spec ownership](../spec-ownership.md): OAP still owns the spec and
+- This refines [spec ownership](https://github.com/mohsalsaleem/OpenAppPlatform/blob/4020bf4912936b1ef119d0b315d7b78abca3c606/docs/spec-ownership.md): OAP still owns the spec and
   remains the single writer; the repo is OAP's storage format, not a second
   writable source.
 

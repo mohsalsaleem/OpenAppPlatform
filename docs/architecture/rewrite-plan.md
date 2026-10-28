@@ -193,7 +193,7 @@ Depends on phase 3.
 | R4.2 | Builders: on-host build queue (one build at a time by default, with memory admission) and registry-only | Two concurrent build requests on a 1 GB-class memory limit run one after another; the host never runs out of memory in the test |
 | R4.3 | GitHub change facts (read-only GitHub App) | Facts for a recorded fixture repository map to the envelope's risk tiers; CI-not-green is denied |
 | R4.4 | Notifications: webhook and email | Ask and digest delivery with retries; failures surface in `observe` |
-| R4.5 | Compose import | The examples from [Compose import](../compose-import.md) convert to valid applications with the documented warnings |
+| R4.5 | Compose import | The examples from [Compose import](https://github.com/mohsalsaleem/OpenAppPlatform/blob/4020bf4912936b1ef119d0b315d7b78abca3c606/docs/compose-import.md) convert to valid applications with the documented warnings |
 
 ## Phase 5: Cutover
 
@@ -280,8 +280,11 @@ agent a pending ask it doesn't need.
   secrets at a notice).
 
 **From R5.3** (proposed 2026-10-28; the [evidence pack](../evidence/vultr-oap-2026-10-26/README.md)
-lists the findings). The owner decides which, if any, go into v0.2.0; the
-recommendation is the first in v0.2.1 and the rest in v0.3.
+lists the findings). Owner decision, 2026-10-28: v0.2.0 ships without
+them. Removing an application and scaling to 0 come in v0.2.1, which also
+clears vultr_oap's journey applications; the rest are v0.3 candidates.
+Each still needs the owner's approval of its scope below before code
+relies on it.
 
 - **Remove an application, and scale to 0** (findings 5 and 6). Today an
   application can't be taken away: the journey's 18 containers stay on
