@@ -24,10 +24,11 @@ var notCarriedOver = map[string]bool{
 	"coolify-connected/application.json":         true,
 }
 
-// legacySpecs returns every application spec under examples/, keyed by path.
+// legacySpecs returns every application spec in v0.1's examples, kept in
+// testdata/legacy when v0.1 was retired, keyed by path.
 func legacySpecs(t *testing.T) map[string][]byte {
 	t.Helper()
-	root := filepath.Join("..", "..", "..", "examples")
+	root := filepath.Join("testdata", "legacy")
 	out := map[string][]byte{}
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".json") {
@@ -173,7 +174,7 @@ name: shop
 	}
 }
 
-// The pre-deploy job pattern from examples/pre-deploy-jobs/README.md: the API
+// The pre-deploy job pattern from v0.1's examples/pre-deploy-jobs/README.md: the API
 // depends on a migration job. dependsOn is ordering, so it becomes after.
 func TestConvertLegacyPreDeployJob(t *testing.T) {
 	tree, _, problems := spec.ConvertLegacy([]byte(`{"name":"shop","environment":"staging","targetId":"local-docker",
