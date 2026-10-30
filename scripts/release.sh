@@ -32,11 +32,14 @@ fi
 rm -rf "$DIST" && mkdir -p "$DIST/context"
 
 # A Docker config of our own: no desktop credential helper, which can hang
-# waiting for the keychain; buildx comes from the user's plugins.
+# waiting for the keychain or fail when it is locked; buildx comes from the
+# user's plugins. With no auths at all, Docker on macOS falls back to the
+# keychain helper anyway, so an empty ghcr.io entry keeps the login in this
+# file, which only the user can read and which is removed on exit.
 export BUILDX_CONFIG="${BUILDX_CONFIG:-$HOME/.docker/buildx}" # builders persist across runs
 export DOCKER_CONFIG="$(mktemp -d)"
 trap 'rm -rf "$DOCKER_CONFIG"' EXIT
-echo '{}' > "$DOCKER_CONFIG/config.json"
+echo '{"auths":{"ghcr.io":{}}}' > "$DOCKER_CONFIG/config.json"
 [ -d "$HOME/.docker/cli-plugins" ] && ln -s "$HOME/.docker/cli-plugins" "$DOCKER_CONFIG/cli-plugins"
 docker buildx inspect "$BUILDER" >/dev/null 2>&1 || docker buildx create --name "$BUILDER" --driver docker-container >/dev/null
 
