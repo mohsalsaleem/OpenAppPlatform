@@ -317,6 +317,24 @@ relies on it.
   password login says what hand-off actually does (advise, not offer).
   Tests on the rendered text.
 
+**Application logs with VictoriaLogs** (proposed 2026-11-05;
+[ADR 0002](adr/0002-application-logs.md)). Owner decisions, 2026-11-05:
+VictoriaLogs runs on the server, optional; agents read their applications'
+logs and the owner reads everything; target v0.3. The design and these tasks
+still need the owner's approval before code relies on them.
+
+| ID | Task | Acceptance |
+|---|---|---|
+| L1 | **Bounded local logs.** Every container OAP creates, oapd and Caddy included, uses `json-file` with `max-size` and `max-file` | A container writing 100 MiB of output keeps at most the configured size on disk (real Docker, `OAP_TEST_DOCKER=1`); the Runtime contract suite checks the log options on started instances |
+| L2 | **VictoriaLogs host service.** `oapctl host logs enable` / `disable [--delete-data]` (owner only): pinned by digest, internal network only, memory limit, retention and disk limit as owner settings; uninstall removes it | It is not reachable from the host's public interface; its memory stays under its limit while ingesting at the journey's log rate; `disable` keeps data and `--delete-data` removes it; uninstall leaves no VictoriaLogs container, volume or network |
+| L3 | **Shipper in oapd.** Follow OAP-labelled containers' stdout and stderr, positions in SQLite, batched JSON-lines ingestion with stream fields `application`, `component`, `release`, `ordinal`, `instance`, `stream` | In simulation and against real VictoriaLogs: every line written while VictoriaLogs and oapd are both up arrives; after VictoriaLogs is down for a minute, or oapd is killed, shipping resumes from the saved position with no loss of lines still on disk; dropped lines under pressure are counted in `observe`; containers without a full OAP label set are never followed |
+| L4 | **Reading logs through `observe`.** A `logs` selector on `ObserveRequest` (component, instance or release, time range, stream, text, line limit), the same over Connect, MCP and `oapctl logs`; raw LogsQL on the owner API only | An agent can't read another application's logs by any selector or text (tests try LogsQL in the text field); known secret values come back as `[secret: NAME]`; lines are marked untrusted; limits on lines, bytes and range hold; the owner reads unredacted |
+| L5 | **Error lines in `explain`.** For each component `explain` names as a gap, the most recent stderr or error-level lines, redacted and limited | In the phase 3 journey's failing deploy, `explain` shows the image's error output; the briefing tells agents logs exist and how to read them |
+| L6 | **Journey and footprint.** The release journey runs with logs on: agents read their app's logs through the CLI and MCP; the host's memory and disk are recorded | Passes on vultr_oap with logs on; memory peak and minimum available are recorded next to R5.3's (452 MiB peak, 498 MiB available) and VictoriaLogs stays under its limit; `oom_kill 0` |
+
+Order: L1 first (it fixes the disk risk on its own), then L2 and L3, then
+L4 and L5, then L6.
+
 ## Status
 
 | ID | Status | Commit | Evidence |

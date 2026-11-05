@@ -21,6 +21,11 @@ deploys without dropped requests, extensions. See the
 
 ## v0.3 candidates
 
+- **Application logs with VictoriaLogs**: bounded container logs, an
+  optional VictoriaLogs on the server, and agents reading their
+  applications' logs through `observe` and `explain`
+  ([ADR 0002](docs/architecture/adr/0002-application-logs.md), proposed).
+
 - **Notifications by email**, and digests (R4.4).
 - **Compose import**: an `oap.yaml` from a `compose.yaml` (R4.5).
 - **The agent store and harness packages**: an agent resumes on a new
