@@ -317,11 +317,11 @@ relies on it.
   password login says what hand-off actually does (advise, not offer).
   Tests on the rendered text.
 
-**Rootless Docker, least privilege and zero trust** (proposed 2026-11-05;
-[ADR 0003](adr/0003-rootless-least-privilege.md)). Owner decision,
-2026-11-05: rootless, least privilege, zero trust, with no standing root.
-The design and these tasks still need the owner's approval before code
-relies on them.
+### Rootless Docker, least privilege and zero trust
+
+Approved by the owner, 2026-11-05 ([ADR 0003](adr/0003-rootless-least-privilege.md)):
+rootless, least privilege, zero trust, with no standing root. H1 targets
+v0.2.1; the rest targets v0.3.
 
 | ID | Task | Acceptance |
 |---|---|---|
