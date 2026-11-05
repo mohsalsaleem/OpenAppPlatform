@@ -353,3 +353,15 @@ func TestAffordances(t *testing.T) {
 		t.Error("unknown agents may do nothing")
 	}
 }
+
+// Hardening exceptions (ADR 0003) are sensitive by default: they fall in the
+// security and resources categories.
+func TestHardeningExceptionsAreSensitive(t *testing.T) {
+	for _, path := range []string{"components.web.security.capabilities", "components.web.security.writable_root",
+		"components.web.security.allow_privilege_escalation", "components.web.resources.pids"} {
+		cat := Category(spec.Change{Path: path, Op: spec.OpAdd})
+		if defaultTiers[cat] != oapv1.Risk_RISK_SENSITIVE {
+			t.Errorf("%s is %s (%v), want sensitive", path, cat, defaultTiers[cat])
+		}
+	}
+}

@@ -16,9 +16,16 @@ func TestInstallScript(t *testing.T) {
 		"io.openappplatform.install=$ID", "io.openappplatform.role=system", "io.openappplatform.role=network",
 		`--restart unless-stopped`, "-p 80:80 -p 443:443", OapdSocket, "OAPD_TLS=$TLS", "TLS=true",
 		`echo "caddy unchanged"`, `echo "oapd unchanged"`, "grace_period", "--memory 160m",
+		"--cap-drop ALL", "no-new-privileges:true", "--read-only", "--pids-limit",
+		"--cap-add NET_BIND_SERVICE", "--cap-add SETUID --cap-add SETGID --cap-add KILL", `"oap-$ID-tmp:/tmp"`,
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("install script lacks %q", want)
+		}
+	}
+	for _, bad := range []string{"--privileged", "--cap-add ALL", "seccomp=unconfined", "--pid host", "--network host", "SYS_ADMIN"} {
+		if strings.Contains(s, bad) {
+			t.Errorf("install script uses %q", bad)
 		}
 	}
 	if strings.Contains(s, "docker rm -f $(") || strings.Contains(s, "prune") {

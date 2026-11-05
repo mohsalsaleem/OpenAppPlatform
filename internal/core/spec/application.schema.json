@@ -112,7 +112,8 @@
           "additionalProperties": false,
           "properties": {
             "memory_mib": {"type": "integer", "minimum": 64, "maximum": 65536},
-            "cpu_millis": {"type": "integer", "minimum": 50, "maximum": 64000}
+            "cpu_millis": {"type": "integer", "minimum": 50, "maximum": 64000},
+            "pids": {"description": "Most processes and threads the container may run (default 256).", "type": "integer", "minimum": 16, "maximum": 32768}
           }
         },
         "health": {
@@ -140,8 +141,15 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "allow_privilege_escalation": {"type": "boolean"},
-            "exception_reason": {"type": "string", "minLength": 12, "maxLength": 240, "pattern": "^[^\\n\\r\\x00]*$"}
+            "allow_privilege_escalation": {"description": "Exception: allow setuid binaries and similar to gain privileges (no-new-privileges is set otherwise).", "type": "boolean"},
+            "capabilities": {
+              "description": "Exception: Linux capabilities to keep; every other one is dropped. Only Docker's default set can be kept.",
+              "type": "array",
+              "maxItems": 14,
+              "items": {"type": "string", "enum": ["AUDIT_WRITE", "CHOWN", "DAC_OVERRIDE", "FOWNER", "FSETID", "KILL", "MKNOD", "NET_BIND_SERVICE", "NET_RAW", "SETFCAP", "SETGID", "SETPCAP", "SETUID", "SYS_CHROOT"]}
+            },
+            "writable_root": {"description": "Exception: a writable root filesystem (it is read-only otherwise, with a writable /tmp).", "type": "boolean"},
+            "exception_reason": {"description": "Why the exceptions are needed. Required with any exception.", "type": "string", "minLength": 12, "maxLength": 240, "pattern": "^[^\\n\\r\\x00]*$"}
           }
         }
       }

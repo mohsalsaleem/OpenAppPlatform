@@ -55,6 +55,10 @@ process. Otherwise write one:
 - Multi-stage: build in one stage, copy only what runs into a slim runtime
   stage. Pin base images to a version tag (a digest is better).
 - Run as a non-root user. Listen on `0.0.0.0` and the port you chose.
+- Write only to `/tmp` and to volumes. OAP runs every container with a
+  read-only root filesystem, no Linux capabilities and no way to gain
+  privileges (see "Hardening" below), so an image that writes into its own
+  directories, `chown`s files or switches users at start fails there.
 - No secrets in the image: no `ARG`/`ENV` with values, no copied `.env`.
   Add a `.dockerignore` that excludes `.env*`, `.git` and build output.
 - One image may serve several components (web and worker with different
@@ -133,6 +137,54 @@ Other fields you'll need:
 - `instances` is 1 to 4. Only stateless web and worker components should
   run more than one.
 
+### Hardening and its exceptions
+
+Every container OAP runs drops all Linux capabilities, can't gain
+privileges (setuid binaries don't elevate), has a read-only root with a
+64 MiB writable `/tmp`, at most 256 processes, and a memory limit (256 MiB
+when `resources` sets none). Plan for that; don't ask for exceptions by
+default.
+
+If an image really needs more, say exactly what under the component's
+`security`, with a reason. Each exception is sensitive, so the owner
+usually has to approve it:
+
+```yaml
+api_version: oap.dev/v1
+kind: Application
+name: shop
+environment: production
+components:
+  db:
+    kind: data
+    image: postgres:17-alpine
+    port: 5432
+    volumes:
+      pgdata: /var/lib/postgresql/data
+      pgrun: /var/run/postgresql
+    security:
+      capabilities: [CHOWN, SETUID, SETGID]
+      exception_reason: "the official image chowns its data and drops to its own user at start"
+```
+
+This is the official PostgreSQL image under OAP's defaults: it needs those
+three capabilities to switch to its own user, and a volume for its socket
+directory instead of a writable root.
+
+- `capabilities` keeps those capabilities only; anything outside Docker's
+  default set (such as `SYS_ADMIN`) is refused. Write names without `CAP_`.
+- `writable_root` gives a writable root filesystem. Prefer a volume or
+  `/tmp` for what the process writes.
+- `allow_privilege_escalation` lets setuid binaries elevate. Almost nothing
+  needs it.
+- `resources.pids` changes the process limit.
+
+A common case: official images that start as root and switch to their own
+user in the entrypoint (many database images) need `CHOWN`, `SETUID` and
+`SETGID`, and sometimes `DAC_OVERRIDE` or `FOWNER`. If an instance never
+becomes ready, read `explain`: a permission error points at a missing
+exception.
+
 Secret names are lowercase letters, digits and dashes. Prefix them with the
 application's name (`shop-database-url`, `shop-stripe-key`) so they don't
 collide.
@@ -197,6 +249,9 @@ Later changes use the narrow intents: `deploy` (new images), `scale`,
 - [ ] `data` components have a volume; nothing else writes data it needs
       to keep outside a volume.
 - [ ] The image can be pulled without credentials.
+- [ ] The image writes only to `/tmp` and volumes, or the spec has
+      `writable_root` with a reason; any `capabilities` are the fewest it
+      needs.
 - [ ] Memory fits: the components' `resources` add up to less than the
       host's available memory in `observe` (or, if that is unknown, its
       total less what already runs).

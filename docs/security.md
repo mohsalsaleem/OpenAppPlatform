@@ -41,6 +41,15 @@ the pre-release review that checked it is R5.8 in
   (`oapctl owner secret set`); oapd passes them to the containers whose
   spec references them. Agents see names only.
 - **Pause and revoke take effect at once.**
+- **Containers are hardened by default.** Every container OAP creates drops
+  all Linux capabilities, can't gain privileges (`no-new-privileges`), keeps
+  Docker's default seccomp profile, has a read-only root with a small
+  writable `/tmp`, a process limit and a memory limit. A component that
+  needs more names it in `security` with a reason (capabilities only from
+  Docker's default set, a writable root, privilege escalation), and the
+  envelope treats it as sensitive. Caddy keeps only `NET_BIND_SERVICE` and
+  oapd only `SETUID`, `SETGID` and `KILL`, which it needs to run extensions
+  as `nobody`.
 - **Extensions run out of process**, with memory caps, as `nobody` unless
   granted Docker's socket. A crashing or hanging extension fails only its
   own calls.
@@ -51,12 +60,13 @@ the pre-release review that checked it is R5.8 in
 
 ## Known limitations
 
-- Containers run with Docker's default privileges: no capabilities are
-  dropped, `no-new-privileges` isn't set, and the spec's
-  `security.allow_privilege_escalation` is checked but not applied. Docker
-  runs as root, and applications share one network with oapd and Caddy.
-  [ADR 0003](architecture/adr/0003-rootless-least-privilege.md) proposes the
-  fix.
+- Docker runs as root, oapd holds its socket, applications share one
+  network with oapd and Caddy, and secrets reach containers as environment
+  variables. [ADR 0003](architecture/adr/0003-rootless-least-privilege.md)
+  moves OAP to rootless Docker, a network per application and secrets as
+  files (v0.3).
+- Containers created before an upgrade to these defaults keep their old
+  settings until their next release.
 
 - Releases aren't signed. `SHA256SUMS` catches a corrupted or swapped
   download, not a compromised release.
