@@ -21,8 +21,8 @@ deploys without dropped requests, extensions. See the
 
 ## v0.3 candidates
 
-- **Application logs with VictoriaLogs**: bounded container logs, an
-  optional VictoriaLogs on the server, and agents reading their
+- **Application logs with VictoriaLogs**: bounded container logs,
+  VictoriaLogs as part of the OAP stack, and agents reading their
   applications' logs through `observe` and `explain`
   ([ADR 0002](docs/architecture/adr/0002-application-logs.md), proposed).
 
