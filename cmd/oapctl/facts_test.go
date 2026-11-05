@@ -162,6 +162,7 @@ func TestChangeFactsFromRecordedRepository(t *testing.T) {
 	gh, commits := fakeGitHub(t, &key.PublicKey)
 
 	bin := filepath.Join(t.TempDir(), "github")
+	reachableByNobody(filepath.Dir(bin))
 	if out, err := exec.Command("go", "build", "-o", bin, "../oap-ext-github").CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}

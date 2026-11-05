@@ -27,6 +27,7 @@ import (
 // returns at once: extensions never hold up the core.
 func TestExtensionInstallThroughTheCLI(t *testing.T) {
 	bin := t.TempDir()
+	reachableByNobody(bin)
 	for mode, name := range map[string]string{"good": "testext", "hang": "slow"} {
 		out, err := exec.Command("go", "build", "-ldflags", "-X main.mode="+mode+" -X main.name="+name, "-o", filepath.Join(bin, mode),
 			"../../internal/adapters/extension/testdata/testext").CombinedOutput()
