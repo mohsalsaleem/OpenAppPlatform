@@ -89,11 +89,14 @@ flowchart TB
   limits, so H2 picks the network and port driver (`pasta` or
   `slirp4netns`) that does, measured on the 1 GB host.
 - **Host requirements.** cgroup v2 with systemd, a kernel that supports
-  unprivileged overlay (5.11 or newer, else `fuse-overlayfs`), `uidmap` and
-  `dbus-user-session`: in practice Ubuntu 22.04 or newer, or Debian 12 or
-  newer. `oapctl host check` reports anything missing and `fix` installs it;
-  a host that can't meet them is refused with the reason. **vultr_oap
-  (Ubuntu 18.04, cgroup v1) must be rebuilt on a supported release.**
+  unprivileged overlay (5.11 or newer), `uidmap` and `dbus-user-session`.
+  Every release OAP already supports (Ubuntu 22.04, 24.04 and 26.04,
+  Debian 12 and 13) uses cgroup v2 by default and meets the kernel
+  requirement, so rootless narrows nothing. `oapctl host check` reports a
+  host booted into cgroup v1 on purpose (for example with
+  `systemd.unified_cgroup_hierarchy=0`) and refuses it with the reason, and
+  `fix` installs the missing packages. vultr_oap (Ubuntu 26.04.1 LTS, kernel
+  7.0) qualifies as it is.
 - **Coexistence.** A root Docker daemon already on the host is left alone
   and never used; OAP's rootless daemon has its own data directory.
 
@@ -200,8 +203,8 @@ can only read the environment asks for it per variable
 - A breakout from a container reaches the `oap` user's subordinate IDs, not
   root; a bug in oapd reaches the rootless daemon through the proxy's
   allowlist, not the host.
-- Hosts on older releases (cgroup v1) are refused. vultr_oap needs a
-  rebuild.
+- A supported host booted into cgroup v1 is refused until it boots with
+  cgroup v2; the supported releases all do by default.
 - Rootless networking costs some throughput; H2 measures it on the 1 GB host
   and records it.
 - Some images need exceptions or replacements; each is visible in the spec

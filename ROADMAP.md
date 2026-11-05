@@ -26,7 +26,7 @@ deploys without dropped requests, extensions. See the
   rootless as a dedicated user with no standing root; a network per
   application; secrets as files
   ([ADR 0003](docs/architecture/adr/0003-rootless-least-privilege.md),
-  proposed). Hosts need cgroup v2 (Ubuntu 22.04+, Debian 12+).
+  proposed). Every supported release already meets its cgroup v2 requirement.
 
 - **Notifications by email**, and digests (R4.4).
 - **Compose import**: an `oap.yaml` from a `compose.yaml` (R4.5).
