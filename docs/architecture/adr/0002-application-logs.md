@@ -28,27 +28,28 @@ over SSH, which hand-off removes. Two gaps follow:
 
 ## Options for collecting logs
 
-1. **oapd tails container logs through the Docker API and ships them.**
-   For each OAP-labelled container, oapd follows `GET /containers/{id}/logs`
-   from a saved position and sends batches to VictoriaLogs' JSON-lines
-   ingestion with the OAP labels as stream fields. No extra process; the
-   local `json-file` log, now rotated, is the buffer, so VictoriaLogs being
-   down or restarting loses nothing that is still on disk, and never slows an
-   application. `docker logs` keeps working.
-2. **A Docker logging driver pointing at VictoriaLogs** (syslog or GELF).
-   Nothing to tail, but with most drivers `docker logs` stops working; a
-   blocking driver stalls an application when VictoriaLogs is down, and a
-   non-blocking one drops lines silently; and a driver can't add OAP's
-   labels as stream fields without the logging options of every container
-   naming a release.
-3. **A collector container** (Vector, Fluent Bit or similar) reading
-   Docker's log files. Mature, but another always-on process on a 1 GB host,
-   another image to pin, and broad read access to every container's logs,
-   including ones OAP doesn't own.
+The container-native pattern is a forwarder between applications and the
+store: applications write only to stdout and stderr, the runtime captures
+it, and a node-level forwarder (in Kubernetes a DaemonSet running Fluent
+Bit, Vector or an OpenTelemetry Collector) adds metadata, buffers and sends
+to the store. Applications and the store never depend on each other. In
+Docker, the forwarder can get the logs four ways:
 
-**Proposal: option 1.** It adds no process and keeps OAP's rule that it
-only touches OAP-labelled resources (the shipper never follows a container
-without a complete OAP label set).
+| | How it collects | Access it needs | Fit for OAP |
+|---|---|---|---|
+| 1. **Docker's `fluentd` log driver → Fluent Bit** | OAP sets the driver on each container it creates; Docker pushes lines over a Unix socket with OAP's labels attached | None: no Docker socket, no host mounts. Only containers OAP configured are sent | Best |
+| 2. Vector reading the Docker API | `docker_logs` source filtered by OAP labels | Docker's socket, which is root on the host and today only oapd holds | Widens trust to a third-party process |
+| 3. Fluent Bit tailing host files | Reads `/var/lib/docker/containers/*` | Every container's logs on the host | Breaks "only touch OAP-labelled resources" |
+| 4. oapd as the shipper | Follows each container through the Docker API | Nothing new | Puts log volume, buffering and parsing in the control plane, and couples shipping to oapd's restarts and upgrades |
+
+**Proposal: option 1.** It is the container-native forwarder pattern
+without handing the forwarder any privilege, and it keeps shipping
+independent of oapd. Fluent Bit is a small C binary (a few MiB in typical
+use) from the CNCF Fluentd project, which VictoriaLogs documents as a
+supported sender; it buffers to disk while VictoriaLogs is down and also
+accepts OpenTelemetry (OTLP) logs, which keeps OTLP-emitting applications
+and later traces open without a new design. Since Docker 20.10, dual logging
+keeps a local copy for `docker logs` when a remote driver is in use.
 
 ## Options for reading logs
 
@@ -73,82 +74,85 @@ change.
 
 ### The stack
 
-VictoriaLogs becomes the stack's third service. `oapctl host install`
-creates it with oapd and Caddy, `install` with a newer `oapctl` upgrades it,
-and uninstall removes it, its network and its volume with everything else
-OAP installed.
+The stack becomes four services, installed, upgraded and removed together by
+`oapctl host install` and uninstall, each pinned by digest in `oapctl` like
+Caddy, labelled `io.openappplatform.role=system`, and restarted
+`unless-stopped`.
 
 ```mermaid
 flowchart LR
   subgraph host["Server (Docker)"]
+    docker[["Docker engine<br/>log driver: fluentd (async)"]]
     subgraph appnet["network oap-ID (apps, edge, control plane)"]
-      caddy["oap-ID-caddy<br/>Caddy, :80 :443 public<br/>--memory 160m"]
-      oapd["oap-ID-oapd<br/>control plane + log shipper<br/>--memory 160m"]
-      apps["application containers<br/>OAP-labelled<br/>json-file, rotated"]
+      caddy["oap-ID-caddy<br/>Caddy, :80 :443 public<br/>160 MiB"]
+      oapd["oap-ID-oapd<br/>control plane, log read path<br/>160 MiB"]
+      apps["application containers<br/>stdout / stderr only"]
     end
+    sock[/"unix socket<br/>/run/oap-ID/logfwd.sock"/]
     subgraph lognet["network oap-ID-logs (internal: no route out, no published port)"]
-      vl["oap-ID-logs<br/>VictoriaLogs, :9428 internal<br/>--memory 128m, retention, disk cap"]
+      fwd["oap-ID-logfwd<br/>Fluent Bit forwarder<br/>32 MiB, disk buffer"]
+      vl["oap-ID-logs<br/>VictoriaLogs :9428<br/>128 MiB, retention, disk cap"]
     end
-    vol[("volume oap-ID-logs-data")]
-    docker[["Docker engine<br/>/var/run/docker.sock"]]
+    vol[("volumes oap-ID-logs-data,<br/>oap-ID-logfwd-buffer")]
   end
   users((users)) -->|HTTPS| caddy --> apps
-  agents((agents and owner)) -->|"Connect / MCP / CLI<br/>(SSH forward or HTTPS)"| oapd
+  agents((agents and owner)) -->|"Connect / MCP / CLI"| oapd
   apps -. stdout/stderr .-> docker
-  oapd -->|"follow logs<br/>OAP-labelled only"| docker
-  oapd -->|"JSON lines in<br/>LogsQL out"| vl
+  docker -->|"forward protocol<br/>with OAP labels"| sock --> fwd
+  fwd -->|"HTTP JSON lines"| vl
+  oapd -->|"LogsQL, scoped + redacted"| vl
+  oapd -. "writes config,<br/>sets log options" .-> fwd
   vl --- vol
-  oapd --- lognet
+  fwd --- vol
 ```
 
-- **oapd is the only thing that talks to VictoriaLogs.** It joins both
-  networks; applications and Caddy are on `oap-ID` only, so no application
-  can reach VictoriaLogs, read another application's logs or flood it
-  directly. `oap-ID-logs` is created with `--internal`, and VictoriaLogs
-  publishes no port.
-- **Same lifecycle as Caddy.** Its image is pinned by digest in `oapctl`
-  (a `VictoriaLogsImage` constant next to `CaddyImage`), recorded in
-  `/var/lib/oap/images` for uninstall, labelled `io.openappplatform.role=system`
-  and `component=logs`, and restarted `unless-stopped`. The install script's
-  "unchanged" check covers it, so re-running install changes nothing.
-- **Owner settings, not proposals.** Memory limit (128 MiB proposed),
-  retention (7 days) and disk cap (the smaller of 2 GiB and 10% of the disk)
-  are install settings; `oapctl host install --logs-retention 14d` and so on
-  change them. The exact VictoriaLogs flags are confirmed against the pinned
-  version when L2 starts.
+- **Roles.** Docker captures output, Fluent Bit forwards it, VictoriaLogs
+  stores and answers queries, and oapd configures the forwarder, sets every
+  container's log options, and is the only read path. oapd no longer ships
+  logs itself.
+- **Isolation.** Fluent Bit and VictoriaLogs sit on `oap-ID-logs`, created
+  `--internal`, which only oapd also joins. Applications and Caddy are on
+  `oap-ID` only, so no application can reach the forwarder's network
+  listener or the store. Docker reaches the forwarder through a Unix socket
+  on the host, not a port.
+- **Owner settings, not proposals.** Memory limits (128 MiB for
+  VictoriaLogs, 32 MiB for Fluent Bit), retention (7 days) and the disk cap
+  (the smaller of 2 GiB and 10% of the disk) are install settings, for
+  example `oapctl host install --logs-retention 14d`. Exact flags are
+  confirmed against the pinned versions when L2 starts.
 
 ### Collection
 
 ```mermaid
 sequenceDiagram
   participant App as App container
-  participant D as Docker (json-file, rotated)
-  participant O as oapd shipper
-  participant S as SQLite (positions)
+  participant D as Docker engine
+  participant F as Fluent Bit (oap-ID-logfwd)
   participant V as VictoriaLogs
   App->>D: stdout / stderr
-  O->>D: list OAP-labelled containers (full label set only)
-  O->>S: read position for container
-  O->>D: GET /containers/ID/logs?follow&timestamps&since=position
-  D-->>O: lines
-  O->>V: POST /insert/jsonline (batch, stream fields)
-  V-->>O: 200
-  O->>S: save position
-  Note over O,V: VictoriaLogs down: keep the position, retry with backoff;<br/>lines wait in the rotated json-file on disk
-  Note over O: buffer full: drop oldest, count drops, show in observe
+  Note over D: dual logging: local copy kept for docker logs
+  D->>F: forward protocol over the Unix socket (async),<br/>record carries the OAP labels
+  F->>F: map labels to stream fields
+  F->>V: POST /insert/jsonline (batched)
+  Note over F,V: VictoriaLogs down: Fluent Bit buffers to its disk volume and retries
+  Note over D,F: Fluent Bit down: Docker's async buffer holds lines up to its limit,<br/>then drops; the local copy still has them
 ```
 
-- **Bounded local logs, always.** Every container OAP creates, oapd, Caddy
-  and VictoriaLogs included, gets `json-file` with `max-size` and `max-file`
-  (for example 10 MiB × 3). The rotated file is the shipper's buffer, and on
-  its own fixes the unbounded-disk gap.
-- **What a line carries.** Stream fields `application`, `component`,
-  `release`, `ordinal`, `instance` and `stream` (stdout or stderr), the
-  message, Docker's timestamp and the container ID. Delivery is at least
-  once; the container ID and timestamp tell a reader a resend.
-- **Caddy's access log** can be shipped the same way as component `edge` of
-  each application, so an agent can see the requests behind a failure. This
-  is a follow-up, not part of L1–L6.
+- **Log options on every container OAP creates.** Driver `fluentd` with the
+  socket address, `fluentd-async`, a bounded `fluentd-buffer-limit`, and
+  `labels` naming the OAP labels so every record carries `application`,
+  `component`, `release`, `ordinal` and `instance`; the record's `source`
+  gives stdout or stderr. The dual-logging local copy is size-capped too. A
+  container's driver is fixed at creation, so existing applications pick it
+  up on their next release; the stack's own containers get it at install.
+- **Never blocking an application.** Async mode means a slow or missing
+  forwarder can't stall writes. The cost is loss when Fluent Bit stays down
+  past Docker's buffer; Fluent Bit restarts automatically, and oapd reports
+  drops it learns of (Fluent Bit's metrics and Docker's) in `observe`.
+- **Only OAP's containers.** The forwarder receives only what Docker sends
+  it, and Docker sends only for containers OAP created with these options.
+- **Caddy's access log** can later be sent the same way as component `edge`
+  of each application. A follow-up, not part of L1–L6.
 
 ### Reading
 
@@ -198,8 +202,11 @@ sequenceDiagram
   1 GB host R5.3 peaked at 452 MiB with at least 498 MiB available, so the
   margin shrinks; L6 measures it under the release journey, and the memory
   limit is an install setting if a host needs less.
-- oapd gains a second network and a long-running follower per container;
-  its own memory under many chatty containers is measured in L3 and L6.
+- The stack's memory limits become 160 + 160 + 128 + 32 MiB, and oapd gains
+  a second network; L6 measures both under load.
+- Logs can be lost if the forwarder is down for longer than Docker's async
+  buffer covers; the local copy keeps them for `docker logs`, and drops are
+  reported, not silent.
 - Redaction catches only values OAP knows; secrets an application derives
   or loads elsewhere can still appear. This is recorded as a known
   limitation.
