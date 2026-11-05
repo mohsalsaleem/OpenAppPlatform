@@ -15,12 +15,28 @@ deploys without dropped requests, extensions. See the
 
 ## v0.2.1
 
+- **Container defaults (H1).** Every container OAP creates drops all
+  capabilities, can't escalate privileges, has a read-only root and a
+  process limit, with named exceptions in the spec. This also enforces
+  `security.allow_privilege_escalation`, which v0.2.0 checks but doesn't
+  apply ([ADR 0003](docs/architecture/adr/0003-rootless-least-privilege.md)).
+
 - **Remove an application, and scale a component to 0.** A failed create
   offers its own removal. Proposed in the
   [rewrite plan](docs/architecture/rewrite-plan.md#proposals-awaiting-the-owner).
 
 ## v0.3 candidates
 
+- **Application logs with VictoriaLogs**: bounded container logs,
+  VictoriaLogs as part of the OAP stack, and agents reading their
+  applications' logs through `observe` and `explain`
+  ([ADR 0002](docs/architecture/adr/0002-application-logs.md), accepted).
+- **Rootless Docker, least privilege and zero trust**: containers with no
+  capabilities, no privilege escalation and read-only roots; Docker
+  rootless as a dedicated user with no standing root; a network per
+  application; secrets as files
+  ([ADR 0003](docs/architecture/adr/0003-rootless-least-privilege.md),
+  accepted; H1 ships in v0.2.1). Every supported release already meets its cgroup v2 requirement.
 - **Notifications by email**, and digests (R4.4).
 - **Compose import**: an `oap.yaml` from a `compose.yaml` (R4.5).
 - **The agent store and harness packages**: an agent resumes on a new

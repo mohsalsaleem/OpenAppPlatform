@@ -317,6 +317,51 @@ relies on it.
   password login says what hand-off actually does (advise, not offer).
   Tests on the rendered text.
 
+## Approved after v0.2.0
+
+Tasks the owner approved for v0.2.1 and v0.3. They follow the guardrails
+and definition of done above.
+
+### Application logs with VictoriaLogs
+
+Approved by the owner, 2026-11-05 ([ADR 0002](adr/0002-application-logs.md)):
+VictoriaLogs and a Fluent Bit forwarder as part of the OAP stack; agents read
+their applications' logs and the owner reads everything; v0.3.
+
+| ID | Task | Acceptance |
+|---|---|---|
+| L1 | **Bounded local logs and log options.** Every container OAP creates, the stack included, gets the `fluentd` log driver (Unix socket, async, bounded buffer, OAP labels) with a size-capped dual-logging copy; until L2 lands, `json-file` with `max-size` and `max-file` | A container writing 100 MiB keeps at most the configured size on disk (real Docker, `OAP_TEST_DOCKER=1`); `docker logs` still works; the Runtime contract suite checks the log options on started instances |
+| L2 | **VictoriaLogs and Fluent Bit in the stack.** `oapctl host install` creates `oap-ID-logs` (VictoriaLogs) and `oap-ID-logfwd` (Fluent Bit) with oapd and Caddy: images pinned by digest, an `--internal` network `oap-ID-logs` that only oapd also joins, the forwarder listening on a host Unix socket, volumes for data and the forwarder's buffer, memory limits, retention and disk cap as install settings; upgrade and uninstall handle both like Caddy | Re-running install changes nothing; an upgrade keeps data; no application container can reach either service (tested from one) and neither publishes a port; memory stays under each limit at the journey's log rate; uninstall leaves no container, network, volume, socket or image of either |
+| L3 | **Forwarding.** oapd writes Fluent Bit's configuration (labels to stream fields `application`, `component`, `release`, `ordinal`, `instance`, `stream`; JSON-lines output to VictoriaLogs; disk buffering) and reports forwarding health and drops in `observe` | Against real Docker, Fluent Bit and VictoriaLogs: every line written while all are up arrives with its stream fields; with VictoriaLogs down for a minute nothing is lost (disk buffer); with Fluent Bit down, applications keep running unblocked and the loss is reported; a container OAP didn't create sends nothing |
+| L4 | **Reading logs through `observe`.** A `logs` selector on `ObserveRequest` (component, instance or release, time range, stream, text, line limit), the same over Connect, MCP and `oapctl logs`; raw LogsQL on the owner API only | An agent can't read another application's logs by any selector or text (tests try LogsQL in the text field); known secret values come back as `[secret: NAME]`; lines are marked untrusted; limits on lines, bytes and range hold; the owner reads unredacted |
+| L5 | **Error lines in `explain`.** For each component `explain` names as a gap, the most recent stderr or error-level lines, redacted and limited | In the phase 3 journey's failing deploy, `explain` shows the image's error output; the briefing tells agents logs exist and how to read them |
+| L6 | **Journey and footprint.** The release journey runs with logs on: agents read their app's logs through the CLI and MCP; the host's memory and disk are recorded | Passes on vultr_oap with logs on; memory peak and minimum available are recorded next to R5.3's (452 MiB peak, 498 MiB available) and VictoriaLogs stays under its limit; `oom_kill 0` |
+
+Order: L1 first (with `json-file` caps it fixes the disk risk on its own),
+then L2 and L3, then L4 and L5, then L6.
+
+### Rootless Docker, least privilege and zero trust
+
+Approved by the owner, 2026-11-05 ([ADR 0003](adr/0003-rootless-least-privilege.md)):
+rootless, least privilege, zero trust, with no standing root. H1 targets
+v0.2.1; the rest targets v0.3.
+
+| ID | Task | Acceptance |
+|---|---|---|
+| H1 | **Container defaults.** Every container OAP creates gets `--cap-drop ALL`, `no-new-privileges` (enforcing the existing `allow_privilege_escalation` field), Docker's default seccomp, a read-only root with `tmpfs` `/tmp`, `--pids-limit` and a memory limit; never `--privileged`, host namespaces, devices, host paths or the Docker socket. Works on today's root Docker too | Real Docker (`OAP_TEST_DOCKER=1`): a fixture tries `setuid` escalation, a write outside `/tmp` and volumes, a capability it lacks, and a fork bomb, and each fails; the Runtime contract suite checks every setting on started instances; the release journey's fixtures pass unchanged or with documented spec changes |
+| H2 | **Rootless host.** Onboarding creates user `oap` (no password, no sudo, not in `docker`), subuid/subgid, lingering, systemd delegation for `cpu cpuset io memory pids`, low-port access (sysctl or `rootlesskit` capability, chosen by test) and a port driver that preserves client addresses; installs the rootless daemon; `check` reports and refuses a host booted into cgroup v1 | On a fresh Ubuntu 24.04 and Debian 12 host: no OAP process runs as root after hand-off (`ps`), `oap` has no sudo and no `docker` group, the socket is 0600 and owned by `oap`, memory and pids limits are enforced (a container over its limit is killed), Caddy sees real client addresses, and a host booted with `systemd.unified_cgroup_hierarchy=0` is refused with the reason |
+| H3 | **Non-root stack.** oapd, Caddy, VictoriaLogs and Fluent Bit run as non-root inside, read-only roots, capabilities only as ADR 0003 lists | `docker inspect` of each shows a non-root user, read-only root and the listed capabilities only; the stack passes the release journey |
+| H4 | **Network segmentation.** One internal network per application, an edge network per application for Caddy and its routed components, `oap-ID-control` for oapd and Caddy's admin and DNS edge, `oap-ID-logs` for the log stack; oapd's listeners leave the shared network | From inside an application: other applications, oapd's listeners, Caddy's admin, the DNS responder and the log stack are unreachable; its own components and its declared connections work; scaling 1→3→1 still drops nothing |
+| H5 | **Docker API proxy.** oapd and Docker-granted builders reach the daemon only through an allowlisting proxy in the stack | The proxy refuses `exec`, `--privileged`, host mounts, settings H1 forbids and changes to containers without OAP's labels (tests for each); oapd and the builders pass their contract suites through it |
+| H6 | **Secrets as files.** Read-only `tmpfs` mounts at `/run/secrets/NAME`; `secrets_as: env` per component as a `sensitive` exception | `docker inspect` and `/proc/1/environ` show no secret value by default; a component asking for env receives it; journal entries and errors still hold no value |
+| H7 | **Spec and policy.** Fields `user`, `security.run_as_root`, `security.capabilities`, `security.writable_root`, `resources.pids`, `secrets_as`; each exception `sensitive`; refused capabilities (`SYS_ADMIN`, `NET_ADMIN`, `SYS_PTRACE`, `SYS_MODULE`) and `unconfined` seccomp; the skill teaches the defaults | Schema and policy tests per field; an agent following the skill deploys the journey's apps with no exception |
+| H8 | **Moving an install.** `oapctl host migrate-rootless`: export desired state and secrets, remove the root stack, install the rootless one, redeploy, verify | On a test host with the release journey's apps: every app serves again with the same data volumes, no secret is lost, and nothing of the root stack remains |
+| H9 | **Proof on a real server.** Move vultr_oap (Ubuntu 26.04.1, kernel 7.0, cgroup v2) to the rootless stack with H8 and run the release journey | Passes; memory peak, minimum available and HTTPS throughput are recorded next to R5.3's; `oom_kill 0` |
+
+Order: H1 first (it closes most of the gap on today's hosts and fixes the
+unenforced `allow_privilege_escalation`), then H7 with it, then H2 and H3,
+H4, H5, H6, H8, H9.
+
 ## Status
 
 | ID | Status | Commit | Evidence |

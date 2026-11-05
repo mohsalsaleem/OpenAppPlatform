@@ -51,6 +51,13 @@ the pre-release review that checked it is R5.8 in
 
 ## Known limitations
 
+- Containers run with Docker's default privileges: no capabilities are
+  dropped, `no-new-privileges` isn't set, and the spec's
+  `security.allow_privilege_escalation` is checked but not applied. Docker
+  runs as root, and applications share one network with oapd and Caddy.
+  [ADR 0003](architecture/adr/0003-rootless-least-privilege.md) proposes the
+  fix.
+
 - Releases aren't signed. `SHA256SUMS` catches a corrupted or swapped
   download, not a compromised release.
 - An extension granted Docker's socket (the builders) is root on the host
