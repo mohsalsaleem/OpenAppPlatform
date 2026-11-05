@@ -317,12 +317,11 @@ relies on it.
   password login says what hand-off actually does (advise, not offer).
   Tests on the rendered text.
 
-**Application logs with VictoriaLogs** (proposed 2026-11-05;
-[ADR 0002](adr/0002-application-logs.md)). Owner decisions, 2026-11-05:
-VictoriaLogs runs on the server as part of the OAP stack, installed and
-removed with oapd and Caddy; agents read their applications' logs and the
-owner reads everything; target v0.3. The design and these tasks
-still need the owner's approval before code relies on them.
+### Application logs with VictoriaLogs
+
+Approved by the owner, 2026-11-05 ([ADR 0002](adr/0002-application-logs.md)):
+VictoriaLogs and a Fluent Bit forwarder as part of the OAP stack; agents read
+their applications' logs and the owner reads everything; v0.3.
 
 | ID | Task | Acceptance |
 |---|---|---|
