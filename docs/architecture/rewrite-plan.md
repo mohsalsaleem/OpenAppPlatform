@@ -317,6 +317,28 @@ relies on it.
   password login says what hand-off actually does (advise, not offer).
   Tests on the rendered text.
 
+**Rootless Docker, least privilege and zero trust** (proposed 2026-11-05;
+[ADR 0003](adr/0003-rootless-least-privilege.md)). Owner decision,
+2026-11-05: rootless, least privilege, zero trust, with no standing root.
+The design and these tasks still need the owner's approval before code
+relies on them.
+
+| ID | Task | Acceptance |
+|---|---|---|
+| H1 | **Container defaults.** Every container OAP creates gets `--cap-drop ALL`, `no-new-privileges` (enforcing the existing `allow_privilege_escalation` field), Docker's default seccomp, a read-only root with `tmpfs` `/tmp`, `--pids-limit` and a memory limit; never `--privileged`, host namespaces, devices, host paths or the Docker socket. Works on today's root Docker too | Real Docker (`OAP_TEST_DOCKER=1`): a fixture tries `setuid` escalation, a write outside `/tmp` and volumes, a capability it lacks, and a fork bomb, and each fails; the Runtime contract suite checks every setting on started instances; the release journey's fixtures pass unchanged or with documented spec changes |
+| H2 | **Rootless host.** Onboarding creates user `oap` (no password, no sudo, not in `docker`), subuid/subgid, lingering, systemd delegation for `cpu cpuset io memory pids`, low-port access (sysctl or `rootlesskit` capability, chosen by test) and a port driver that preserves client addresses; installs the rootless daemon; `check` reports and refuses unsupported hosts (cgroup v1, old kernels) | On a fresh Ubuntu 24.04 and Debian 12 host: no OAP process runs as root after hand-off (`ps`), `oap` has no sudo and no `docker` group, the socket is 0600 and owned by `oap`, memory and pids limits are enforced (a container over its limit is killed), Caddy sees real client addresses, and an Ubuntu 18.04 host is refused with the reason |
+| H3 | **Non-root stack.** oapd, Caddy, VictoriaLogs and Fluent Bit run as non-root inside, read-only roots, capabilities only as ADR 0003 lists | `docker inspect` of each shows a non-root user, read-only root and the listed capabilities only; the stack passes the release journey |
+| H4 | **Network segmentation.** One internal network per application, an edge network per application for Caddy and its routed components, `oap-ID-control` for oapd and Caddy's admin and DNS edge, `oap-ID-logs` for the log stack; oapd's listeners leave the shared network | From inside an application: other applications, oapd's listeners, Caddy's admin, the DNS responder and the log stack are unreachable; its own components and its declared connections work; scaling 1→3→1 still drops nothing |
+| H5 | **Docker API proxy.** oapd and Docker-granted builders reach the daemon only through an allowlisting proxy in the stack | The proxy refuses `exec`, `--privileged`, host mounts, settings H1 forbids and changes to containers without OAP's labels (tests for each); oapd and the builders pass their contract suites through it |
+| H6 | **Secrets as files.** Read-only `tmpfs` mounts at `/run/secrets/NAME`; `secrets_as: env` per component as a `sensitive` exception | `docker inspect` and `/proc/1/environ` show no secret value by default; a component asking for env receives it; journal entries and errors still hold no value |
+| H7 | **Spec and policy.** Fields `user`, `security.run_as_root`, `security.capabilities`, `security.writable_root`, `resources.pids`, `secrets_as`; each exception `sensitive`; refused capabilities (`SYS_ADMIN`, `NET_ADMIN`, `SYS_PTRACE`, `SYS_MODULE`) and `unconfined` seccomp; the skill teaches the defaults | Schema and policy tests per field; an agent following the skill deploys the journey's apps with no exception |
+| H8 | **Moving an install.** `oapctl host migrate-rootless`: export desired state and secrets, remove the root stack, install the rootless one, redeploy, verify | On a test host with the release journey's apps: every app serves again with the same data volumes, no secret is lost, and nothing of the root stack remains |
+| H9 | **Proof on a real server.** Rebuild vultr_oap on a supported release (it runs Ubuntu 18.04 with cgroup v1) and run the release journey rootless | Passes; memory peak, minimum available and HTTPS throughput are recorded next to R5.3's; `oom_kill 0` |
+
+Order: H1 first (it closes most of the gap on today's hosts and fixes the
+unenforced `allow_privilege_escalation`), then H7 with it, then H2 and H3,
+H4, H5, H6, H8, H9.
+
 ## Status
 
 | ID | Status | Commit | Evidence |

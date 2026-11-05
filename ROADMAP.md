@@ -21,6 +21,13 @@ deploys without dropped requests, extensions. See the
 
 ## v0.3 candidates
 
+- **Rootless Docker, least privilege and zero trust**: containers with no
+  capabilities, no privilege escalation and read-only roots; Docker
+  rootless as a dedicated user with no standing root; a network per
+  application; secrets as files
+  ([ADR 0003](docs/architecture/adr/0003-rootless-least-privilege.md),
+  proposed). Hosts need cgroup v2 (Ubuntu 22.04+, Debian 12+).
+
 - **Notifications by email**, and digests (R4.4).
 - **Compose import**: an `oap.yaml` from a `compose.yaml` (R4.5).
 - **The agent store and harness packages**: an agent resumes on a new
