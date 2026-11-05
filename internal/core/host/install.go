@@ -66,7 +66,7 @@ cat > /var/lib/oap/caddy.json <<'CADDYJSON'
 {"admin": {"listen": "unix//run/oap-caddy/admin.sock"}, "apps": {"http": {"grace_period": "30s", "servers": {}}}}
 CADDYJSON
 docker network inspect "oap-$ID" >/dev/null 2>&1 || docker network create $L --label io.openappplatform.role=network "oap-$ID" >/dev/null
-for v in data caddy-data caddy-config caddy-admin; do
+for v in data tmp caddy-data caddy-config caddy-admin; do
   docker volume inspect "oap-$ID-$v" >/dev/null 2>&1 || docker volume create $L --label io.openappplatform.role=volume "oap-$ID-$v" >/dev/null
 done
 docker image inspect "$CADDY" >/dev/null 2>&1 || { docker pull -q "$CADDY" >/dev/null; printf '%%s\n' "$CADDY" >> /var/lib/oap/images; }
@@ -77,7 +77,14 @@ current() {
   [ "$(docker inspect -f '{{.Image}} {{.State.Running}} {{index .Config.Labels "io.openappplatform.config"}}' "$1" 2>/dev/null)" = "$(docker image inspect -f '{{.Id}}' "$2") true $3" ]
 }
 
-CADDYCONF="caddy-1"
+# Both containers drop every capability and keep only what they need (ADR
+# 0003): Caddy NET_BIND_SERVICE, which its binary's file capability also
+# needs to run at all; oapd SETUID, SETGID and KILL, to run extensions as
+# nobody and stop them. Neither can gain privileges, and both have
+# read-only roots: Caddy writes only its volumes and a small /tmp, oapd its
+# volumes, including a disk-backed /tmp for builds.
+HARDEN="--cap-drop ALL --security-opt no-new-privileges:true --read-only --pids-limit 512"
+CADDYCONF="caddy-2"
 if current "oap-$ID-caddy" "$CADDY" "$CADDYCONF"; then
   echo "caddy unchanged"
 else
@@ -85,13 +92,14 @@ else
   docker run -d --name "oap-$ID-caddy" --restart unless-stopped $L \
     --label io.openappplatform.role=system --label io.openappplatform.component=caddy --label "io.openappplatform.config=$CADDYCONF" \
     --network "oap-$ID" -p 80:80 -p 443:443 -p 443:443/udp --memory 160m \
+    $HARDEN --cap-add NET_BIND_SERVICE --tmpfs /tmp:rw,noexec,nosuid,nodev,size=16m \
     -v "oap-$ID-caddy-data:/data" -v "oap-$ID-caddy-config:/config" -v "oap-$ID-caddy-admin:/run/oap-caddy" \
     -v /var/lib/oap/caddy.json:/etc/oap/caddy.json:ro \
     "$CADDY" caddy run --resume --config /etc/oap/caddy.json >/dev/null
   echo "caddy started"
 fi
 
-OAPDCONF="oapd-2-tls-$TLS-api-$API"
+OAPDCONF="oapd-3-tls-$TLS-api-$API"
 if current "oap-$ID-oapd" "$OAPD" "$OAPDCONF"; then
   echo "oapd unchanged"
 else
@@ -99,7 +107,8 @@ else
   docker run -d --name "oap-$ID-oapd" --restart unless-stopped $L \
     --label io.openappplatform.role=system --label io.openappplatform.component=oapd --label "io.openappplatform.config=$OAPDCONF" \
     --network "oap-$ID" --memory 160m \
-    -v /var/run/docker.sock:/var/run/docker.sock -v "oap-$ID-data:/var/lib/oapd" \
+    $HARDEN --cap-add SETUID --cap-add SETGID --cap-add KILL \
+    -v /var/run/docker.sock:/var/run/docker.sock -v "oap-$ID-data:/var/lib/oapd" -v "oap-$ID-tmp:/tmp" \
     -v "oap-$ID-caddy-admin:/run/oap-caddy" -v /run/oapd:/run/oapd \
     -e "OAPD_INSTALL=$ID" -e "OAPD_TLS=$TLS" -e "OAPD_API_HOST=$API" \
     "$OAPD" >/dev/null

@@ -43,6 +43,7 @@ func InstanceSpecFor(app *spec.Application, component string, ordinal int) Insta
 	if r := c.Resources; r != nil {
 		s.MemoryMiB, s.CPUMillis = r.MemoryMiB, r.CPUMillis
 	}
+	s.Security = securityFor(c)
 	if h := c.Health; h != nil {
 		s.Health = &HealthCheck{HTTPPath: h.Path, IntervalSeconds: h.IntervalSeconds, TimeoutSeconds: h.TimeoutSeconds,
 			Retries: h.Retries, StartPeriod: time.Duration(h.StartPeriodSeconds) * time.Second}
@@ -72,7 +73,12 @@ func JobSpecFor(app *spec.Application, component string) JobSpec {
 	for k, v := range c.Env {
 		env[k] = v
 	}
-	return JobSpec{Ref: Ref(app.Name, component, c, 1), Image: c.Image, Env: env, SecretRefs: c.Secrets, Timeout: timeout}
+	js := JobSpec{Ref: Ref(app.Name, component, c, 1), Image: c.Image, Env: env, SecretRefs: c.Secrets, Timeout: timeout,
+		Security: securityFor(c)}
+	if r := c.Resources; r != nil {
+		js.MemoryMiB, js.CPUMillis = r.MemoryMiB, r.CPUMillis
+	}
+	return js
 }
 
 // Members returns the route members for one instance of a component: one per
@@ -153,4 +159,18 @@ func sortMembers(ms []RouteMember) {
 		}
 		return ai.Release < bi.Release
 	})
+}
+
+// securityFor returns a component's departures from the default hardening.
+func securityFor(c spec.Component) Security {
+	var out Security
+	if s := c.Security; s != nil {
+		out.AllowPrivilegeEscalation = s.AllowPrivilegeEscalation
+		out.Capabilities = append([]string(nil), s.Capabilities...)
+		out.WritableRoot = s.WritableRoot
+	}
+	if r := c.Resources; r != nil {
+		out.Pids = r.Pids
+	}
+	return out
 }
