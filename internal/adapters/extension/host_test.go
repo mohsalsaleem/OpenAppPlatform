@@ -35,6 +35,7 @@ func TestMain(m *testing.M) {
 		}
 		binaries[mode] = out
 	}
+	reachableByNobody(dir)
 	code := m.Run()
 	os.RemoveAll(dir)
 	os.Exit(code)
