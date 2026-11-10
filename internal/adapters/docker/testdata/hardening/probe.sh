@@ -7,6 +7,7 @@ try tmp_write 'echo x > /tmp/oap-probe'
 try volume_write 'echo x > /data/oap-probe'
 try chown 'touch /tmp/c && chown 1:1 /tmp/c'
 try mknod 'mknod /tmp/null c 1 3'
+echo "uid=$(id -u)"
 echo "no_new_privs=$(awk '/^NoNewPrivs/ {print $2}' /proc/self/status)"
 echo "cap_eff=$(awk '/^CapEff/ {print $2}' /proc/self/status)"
 # Fork until the process limit stops it. busybox sh exits when a fork

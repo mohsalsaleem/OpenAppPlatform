@@ -65,6 +65,10 @@ type JobSpec struct {
 // read-only root with a writable /tmp, and a process limit. The zero value
 // is the default.
 type Security struct {
+	// User runs the container as a numeric uid[:gid]; empty keeps the image's
+	// user, which must then not be root unless RunAsRoot is set.
+	User                     string
+	RunAsRoot                bool
 	AllowPrivilegeEscalation bool
 	// Capabilities to keep, from Docker's default set.
 	Capabilities []string
@@ -169,3 +173,13 @@ type BuildResult struct {
 	Commit  string // the full commit built
 	LogTail string
 }
+
+// Refusal is a runtime's permanent refusal to run something as specified,
+// for example an image that runs as root without the spec allowing it.
+// Retrying can't help, so the step fails with Reason.
+type Refusal struct {
+	Why    string
+	Reason string
+}
+
+func (r *Refusal) Error() string { return r.Why + ": " + r.Reason }

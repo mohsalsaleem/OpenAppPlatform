@@ -104,7 +104,7 @@ func TestTrafficAcrossReload(t *testing.T) {
 	r1 := ops.InstanceRef{Application: "edge", Component: "web", Ordinal: 1, Release: "r-1"}
 	r2 := ops.InstanceRef{Application: "edge", Component: "web", Ordinal: 2, Release: "r-1"}
 	for _, r := range []ops.InstanceRef{r1, r2} {
-		if _, err := rt.Start(ctx, ops.InstanceSpec{Ref: r, Image: "traefik/whoami:v1.10.3", Port: 80}); err != nil {
+		if _, err := rt.Start(ctx, ops.InstanceSpec{Ref: r, Image: "traefik/whoami:v1.10.3", Port: 80, Security: ops.Security{User: "65532:65532"}}); err != nil {
 			t.Fatal(err)
 		}
 	}

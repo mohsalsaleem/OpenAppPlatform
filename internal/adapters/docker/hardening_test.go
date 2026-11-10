@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -48,6 +49,7 @@ func probe(t *testing.T, r *Runtime, component string, sec ops.Security, memoryM
 }
 
 type inspected struct {
+	ID         string
 	HostConfig struct {
 		CapDrop, CapAdd, SecurityOpt []string
 		ReadonlyRootfs, Privileged   bool
@@ -100,7 +102,9 @@ func parseReport(s string) map[string]string {
 // same settings, and none of the forbidden ones.
 func TestHardening(t *testing.T) {
 	r := newRuntime(t)
-	report, c := probe(t, r, "default", ops.Security{}, 0)
+	// The probe runs as root on purpose: it shows root without capabilities
+	// can't do what root normally can.
+	report, c := probe(t, r, "default", ops.Security{RunAsRoot: true}, 0)
 	want := map[string]string{"root_write": "denied", "tmp_write": "ok", "volume_write": "ok",
 		"chown": "denied", "mknod": "denied", "no_new_privs": "1", "cap_eff": "0000000000000000"}
 	for k, v := range want {
@@ -139,7 +143,7 @@ func TestHardening(t *testing.T) {
 // escalation and a different process limit.
 func TestHardeningExceptions(t *testing.T) {
 	r := newRuntime(t)
-	report, c := probe(t, r, "exceptions", ops.Security{Capabilities: []string{"CHOWN"}, WritableRoot: true,
+	report, c := probe(t, r, "exceptions", ops.Security{RunAsRoot: true, Capabilities: []string{"CHOWN"}, WritableRoot: true,
 		AllowPrivilegeEscalation: true, Pids: 64}, 128)
 	want := map[string]string{"root_write": "ok", "chown": "ok", "mknod": "denied", "no_new_privs": "0"}
 	for k, v := range want {
@@ -160,7 +164,7 @@ func TestHardeningExceptions(t *testing.T) {
 func TestJobHardening(t *testing.T) {
 	r := newRuntime(t)
 	ref := ops.InstanceRef{Application: "probe", Component: "migrate", Ordinal: 1, Release: "r-1"}
-	if err := r.RunJob(ctx, ops.JobSpec{Ref: ref, Image: images.Job, Timeout: time.Minute}); err != nil {
+	if err := r.RunJob(ctx, ops.JobSpec{Ref: ref, Image: images.Job, Timeout: time.Minute, Security: ops.Security{User: "65532:65532"}}); err != nil {
 		t.Fatal(err)
 	}
 	cs, err := r.containers(ctx, RoleJob, &ref)
@@ -174,5 +178,41 @@ func TestJobHardening(t *testing.T) {
 	h := c.HostConfig
 	if strings.Join(h.CapDrop, ",") != "ALL" || !h.ReadonlyRootfs || h.PidsLimit != DefaultPids || h.Memory != DefaultMemoryMiB<<20 || len(h.SecurityOpt) != 1 {
 		t.Errorf("job host config: %+v", h)
+	}
+}
+
+// An image that runs as root is refused unless the spec sets a user or
+// allows root, and the refusal says how to fix it.
+func TestRootImageRefused(t *testing.T) {
+	r := newRuntime(t)
+	if out, err := exec.Command("docker", "build", "-q", "-t", probeImage, "testdata/hardening").CombinedOutput(); err != nil {
+		t.Fatalf("build probe: %v\n%s", err, out)
+	}
+	ref := ops.InstanceRef{Application: "probe", Component: "root", Ordinal: 1, Release: "r-1"}
+	_, err := r.Start(ctx, ops.InstanceSpec{Ref: ref, Image: probeImage})
+	var refused *ops.Refusal
+	if !errors.As(err, &refused) || refused.Why != "runtime.runs_as_root" || !strings.Contains(refused.Reason, "run_as_root") {
+		t.Fatalf("want a runs_as_root refusal, got %v", err)
+	}
+	job := ops.InstanceRef{Application: "probe", Component: "migrate", Ordinal: 1, Release: "r-1"}
+	if err := r.RunJob(ctx, ops.JobSpec{Ref: job, Image: probeImage, Timeout: time.Minute}); !errors.As(err, &refused) {
+		t.Fatalf("jobs are refused too, got %v", err)
+	}
+	if cs, _ := r.containers(ctx, RoleInstance, &ref); len(cs) != 0 {
+		t.Fatal("a refused instance must not be created")
+	}
+}
+
+// With a user, the process runs as that uid and its new volume belongs to
+// it, so it can write its data without any capability.
+func TestRunsAsUserAndOwnsNewVolume(t *testing.T) {
+	r := newRuntime(t)
+	report, c := probe(t, r, "user", ops.Security{User: "65532:65532"}, 0)
+	if report["uid"] != "65532" || report["volume_write"] != "ok" || report["tmp_write"] != "ok" || report["cap_eff"] != "0000000000000000" {
+		t.Fatalf("report: %v", report)
+	}
+	var cfg struct{ Config struct{ User string } }
+	if err := r.c.do(ctx, http.MethodGet, "/containers/"+c.ID+"/json", nil, nil, &cfg); err != nil || cfg.Config.User != "65532:65532" {
+		t.Fatalf("container user %q %v", cfg.Config.User, err)
 	}
 }

@@ -71,6 +71,9 @@ type Runtime struct {
 	Unhealthy map[string]bool
 	// JobFails lists job components whose runs fail.
 	JobFails map[string]bool
+	// Refuses lists components whose instances the runtime refuses to start,
+	// as the Docker runtime refuses an image that runs as root.
+	Refuses map[string]bool
 	// Secrets resolves secret references when an instance starts, as the
 	// Docker runtime does; nil leaves them unresolved.
 	Secrets ports.Secrets
@@ -85,7 +88,7 @@ type Runtime struct {
 func NewRuntime(clock *Clock, host model.HostObservation) *Runtime {
 	return &Runtime{clock: clock, host: host, instances: map[ops.InstanceRef]*instance{},
 		snapshots: map[string]string{}, volumes: map[string]bool{},
-		Unhealthy: map[string]bool{}, JobFails: map[string]bool{},
+		Unhealthy: map[string]bool{}, JobFails: map[string]bool{}, Refuses: map[string]bool{},
 		Starts: map[ops.InstanceRef]int{}, Stops: map[ops.InstanceRef]int{}, JobRuns: map[ops.InstanceRef]int{}}
 }
 
@@ -94,6 +97,9 @@ func (r *Runtime) Start(ctx context.Context, s ops.InstanceSpec) (string, error)
 	defer r.mu.Unlock()
 	if in, ok := r.instances[s.Ref]; ok {
 		return in.id, nil
+	}
+	if r.Refuses[s.Ref.Component] {
+		return "", &ops.Refusal{Why: "runtime.runs_as_root", Reason: s.Image + " runs as root"}
 	}
 	env := map[string]string{}
 	for k, v := range s.Env {

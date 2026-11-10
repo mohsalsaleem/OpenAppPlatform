@@ -73,6 +73,10 @@
           "propertyNames": {"$ref": "#/$defs/env_name"},
           "additionalProperties": {"$ref": "#/$defs/slug"}
         },
+        "user": {
+          "description": "The numeric uid[:gid] the container runs as. Needed when the image's own user is root; volumes created for the component belong to it.",
+          "type": "string", "pattern": "^[0-9]{1,10}(:[0-9]{1,10})?$"
+        },
         "destructive": {
           "description": "Jobs only: runs change data in ways a rollback can't undo, so plans that run this job are irreversible and need the owner.",
           "type": "boolean"
@@ -141,6 +145,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "run_as_root": {"description": "Exception: let the container run as root (it still has no capabilities unless capabilities lists some).", "type": "boolean"},
             "allow_privilege_escalation": {"description": "Exception: allow setuid binaries and similar to gain privileges (no-new-privileges is set otherwise).", "type": "boolean"},
             "capabilities": {
               "description": "Exception: Linux capabilities to keep; every other one is dropped. Only Docker's default set can be kept.",

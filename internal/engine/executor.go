@@ -140,6 +140,11 @@ func (x *Executor) Run(ctx context.Context, op Operation) error {
 			}
 		}
 		detail, err := x.step(ctx, op, i, s)
+		// A runtime's permanent refusal fails the step: retrying can't help.
+		var refused *ops.Refusal
+		if errors.As(err, &refused) {
+			err = &StepError{Step: i, Kind: s.Kind, Reason: refused.Reason}
+		}
 		var failed *StepError
 		if errors.As(err, &failed) {
 			if rerr := x.record(ctx, op.ID, i, StateFailed, stepDetail{Reason: failed.Reason}); rerr != nil {

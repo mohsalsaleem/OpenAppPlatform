@@ -287,6 +287,7 @@ func memory(app *spec.Application) int {
 var defaultTiers = map[string]oapv1.Risk{
 	"images": oapv1.Risk_RISK_ROUTINE, "instances": oapv1.Risk_RISK_ROUTINE, "env": oapv1.Risk_RISK_ROUTINE,
 	"health": oapv1.Risk_RISK_ROUTINE, "ordering": oapv1.Risk_RISK_ROUTINE, "components-added": oapv1.Risk_RISK_ROUTINE,
+	"user":      oapv1.Risk_RISK_ROUTINE,
 	"resources": oapv1.Risk_RISK_SENSITIVE, "secret-bindings": oapv1.Risk_RISK_SENSITIVE,
 	"connections": oapv1.Risk_RISK_SENSITIVE, "routes": oapv1.Risk_RISK_SENSITIVE, "domains": oapv1.Risk_RISK_SENSITIVE,
 	"volumes": oapv1.Risk_RISK_SENSITIVE, "host-ports": oapv1.Risk_RISK_SENSITIVE,
@@ -302,7 +303,7 @@ var fieldCategory = map[string]string{
 	"image": "images", "instances": "instances", "env": "env", "resources": "resources",
 	"secrets": "secret-bindings", "registry_credential": "secret-bindings", "uses": "connections",
 	"port": "connections", "after": "ordering", "volumes": "volumes", "host_port": "host-ports",
-	"health": "health", "readiness": "health", "destructive": "job-flags", "security": "security",
+	"health": "health", "readiness": "health", "user": "user", "destructive": "job-flags", "security": "security",
 }
 
 // Category returns the change category of a spec path. Paths that fit no

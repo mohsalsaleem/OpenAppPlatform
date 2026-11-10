@@ -174,6 +174,10 @@ func TestParseApplicationRejections(t *testing.T) {
 		{"capability beyond Docker's defaults", "components.api.security", obj(t, `{"capabilities": ["SYS_ADMIN"], "exception_reason": "needs to mount things"}`), "components.api.security.capabilities[0]", WhyEnum},
 		{"capability with prefix", "components.api.security", obj(t, `{"capabilities": ["CAP_CHOWN"], "exception_reason": "entrypoint chowns its data"}`), "components.api.security.capabilities[0]", WhyEnum},
 		{"capability twice", "components.api.security", obj(t, `{"capabilities": ["CHOWN", "CHOWN"], "exception_reason": "entrypoint chowns its data"}`), "components.api.security.capabilities[1]", WhyConflict},
+		{"user 0", "components.api.user", "0", "components.api.user", WhyConflict},
+		{"user 0 with group", "components.api.user", "000:1000", "components.api.user", WhyConflict},
+		{"user by name", "components.api.user", "postgres", "components.api.user", WhyPattern},
+		{"run as root without reason", "components.worker.security", obj(t, `{"run_as_root": true}`), "components.worker.security.exception_reason", WhyRequired},
 		{"pids too low", "components.api.resources", obj(t, `{"memory_mib": 256, "cpu_millis": 500, "pids": 4}`), "components.api.resources.pids", WhyRange},
 		{"bad digest", "components.api.image", "ghcr.io/acme/api@sha256:abc", "components.api.image", WhyPattern},
 		{"after unknown", "components.web.after", []any{"nope"}, "components.web.after[0]", WhyUnknownComponent},
@@ -215,5 +219,23 @@ func TestSecurityExceptionsWithReason(t *testing.T) {
 	var none *Security
 	if none.Exceptions() || (&Security{ExceptionReason: "a reason that is long"}).Exceptions() {
 		t.Fatal("no exception asked")
+	}
+}
+
+func TestUserAndRunAsRoot(t *testing.T) {
+	app, probs := ParseApplication(edit(t, "components.api.user", "65532:65532"))
+	if len(probs) > 0 || app.Components["api"].User != "65532:65532" {
+		t.Fatalf("%v %+v", probs, app)
+	}
+	app, probs = ParseApplication(edit(t, "components.worker.security", obj(t, `{"run_as_root": true, "exception_reason": "entrypoint drops to its user"}`)))
+	if len(probs) > 0 || !app.Components["worker"].Security.Exceptions() {
+		t.Fatalf("%v", probs)
+	}
+	// A user and run_as_root on one component contradict each other.
+	both := edit(t, "components.worker.security", obj(t, `{"run_as_root": true, "exception_reason": "entrypoint drops to its user"}`))
+	both.(map[string]any)["components"].(map[string]any)["worker"].(map[string]any)["user"] = "1000"
+	_, probs = ParseApplication(both)
+	if len(probs) != 1 || probs[0].Path != "components.worker.user" || probs[0].Why != WhyConflict {
+		t.Fatalf("want a conflict at components.worker.user, got %v", probs)
 	}
 }
