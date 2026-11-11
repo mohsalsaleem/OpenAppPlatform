@@ -80,7 +80,8 @@ current() {
 # Both containers drop every capability and keep only what they need (ADR
 # 0003): Caddy NET_BIND_SERVICE, which its binary's file capability also
 # needs to run at all; oapd SETUID, SETGID and KILL, to run extensions as
-# nobody and stop them. Neither can gain privileges, and both have
+# nobody and stop them, and nobody's group, so it can reach the sockets they
+# make group-writable without overriding file permissions. Neither can gain privileges, and both have
 # read-only roots: Caddy writes only its volumes and a small /tmp, oapd its
 # volumes, including a disk-backed /tmp for builds.
 HARDEN="--cap-drop ALL --security-opt no-new-privileges:true --read-only --pids-limit 512"
@@ -107,7 +108,7 @@ else
   docker run -d --name "oap-$ID-oapd" --restart unless-stopped $L \
     --label io.openappplatform.role=system --label io.openappplatform.component=oapd --label "io.openappplatform.config=$OAPDCONF" \
     --network "oap-$ID" --memory 160m \
-    $HARDEN --cap-add SETUID --cap-add SETGID --cap-add KILL \
+    $HARDEN --cap-add SETUID --cap-add SETGID --cap-add KILL --group-add 65534 \
     -v /var/run/docker.sock:/var/run/docker.sock -v "oap-$ID-data:/var/lib/oapd" -v "oap-$ID-tmp:/tmp" \
     -v "oap-$ID-caddy-admin:/run/oap-caddy" -v /run/oapd:/run/oapd \
     -e "OAPD_INSTALL=$ID" -e "OAPD_TLS=$TLS" -e "OAPD_API_HOST=$API" \
