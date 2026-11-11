@@ -91,7 +91,7 @@ docker network ls --format '{{.Name}}' | sort`)
 	// An application, deployed through oapd's API on its socket.
 	const site = `{"intent": {"application": "demo", "spec_patch": {"merge_patch": {"environment": "production",
   "components": {"web": {"kind": "web", "image": "` + host.CaddyImage + `", "port": 80, "volumes": {"data": "/data"},
-    "security": {"capabilities": ["NET_BIND_SERVICE"], "exception_reason": "caddy's binary carries this file capability"}}},
+    "security": {"capabilities": ["NET_BIND_SERVICE"], "exception_reason": "the Caddy binary carries this file capability"}}},
   "ingress": {"domain": "demo.test", "routes": {"/": {"component": "web"}}}}}}}`
 	out := sh(`set -eu
 api() { curl -sf --unix-socket /run/oapd/oapd.sock -H 'Content-Type: application/json' -d "$2" "http://oapd/oap.v1.AgentService/$1"; }
