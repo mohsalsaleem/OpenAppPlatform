@@ -234,7 +234,8 @@ func journeySpec(app string) map[string]any {
 		"components": map[string]any{
 			"migrate": map[string]any{"kind": "job", "image": "hello-world:latest"},
 			"web": map[string]any{"kind": "web", "image": webV1, "port": 80, "after": []any{"migrate"},
-				"health": map[string]any{"mode": "http", "path": "/"}, "readiness": map[string]any{"timeout_seconds": 30}},
+				"health": map[string]any{"mode": "http", "path": "/"}, "readiness": map[string]any{"timeout_seconds": 30},
+				"security": map[string]any{"capabilities": []any{"NET_BIND_SERVICE"}, "exception_reason": "the Caddy binary carries this file capability"}},
 		},
 	})
 }

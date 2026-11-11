@@ -263,6 +263,7 @@ func (h *Host) start(ctx context.Context, r *running) (*grpc.ClientConn, error) 
 		Logger:           logger.Named(cfg.Name),
 		SyncStdout:       io.Discard,
 		SyncStderr:       io.Discard,
+		UnixSocketConfig: socketConfig(),
 	})
 	rpc, err := client.Client()
 	if err != nil {

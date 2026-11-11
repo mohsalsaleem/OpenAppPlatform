@@ -2,7 +2,10 @@ package extension
 
 import (
 	"os"
+	"strconv"
 	"syscall"
+
+	"github.com/hashicorp/go-plugin"
 )
 
 // Extensions run as nobody when oapd runs as root (R5.8): they can't read
@@ -25,4 +28,15 @@ func unprivileged(cfg Config) *syscall.SysProcAttr {
 		}
 	}
 	return &syscall.SysProcAttr{Credential: cred}
+}
+
+// socketConfig makes an extension's socket writable by nobody's group when
+// oapd runs as root. oapd keeps no capability to override file permissions
+// (ADR 0003), so it reaches the socket as a member of that group, which the
+// install gives it, not as root.
+func socketConfig() *plugin.UnixSocketConfig {
+	if os.Geteuid() != 0 {
+		return nil
+	}
+	return &plugin.UnixSocketConfig{Group: strconv.Itoa(nobody)}
 }

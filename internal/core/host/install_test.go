@@ -17,7 +17,7 @@ func TestInstallScript(t *testing.T) {
 		`--restart unless-stopped`, "-p 80:80 -p 443:443", OapdSocket, "OAPD_TLS=$TLS", "TLS=true",
 		`echo "caddy unchanged"`, `echo "oapd unchanged"`, "grace_period", "--memory 160m",
 		"--cap-drop ALL", "no-new-privileges:true", "--read-only", "--pids-limit",
-		"--cap-add NET_BIND_SERVICE", "--cap-add SETUID --cap-add SETGID --cap-add KILL", `"oap-$ID-tmp:/tmp"`,
+		"--cap-add NET_BIND_SERVICE", "--cap-add SETUID --cap-add SETGID --cap-add KILL --group-add 65534", `"oap-$ID-tmp:/tmp"`,
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("install script lacks %q", want)
