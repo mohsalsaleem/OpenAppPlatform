@@ -26,6 +26,7 @@ import (
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/notify"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/secretstore"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/adapters/sqlite"
+	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/host"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/core/ops"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/engine"
 	"github.com/mohsalsaleem/OpenAppPlatform/internal/ports"
@@ -132,6 +133,7 @@ func run(ctx context.Context, c config, log *slog.Logger) error {
 		return err
 	}
 	rt.Secrets = secrets
+	rt.HelperImage = host.HelperImage // the image the install brought
 	admin := caddy.Unix(c.caddyAdmin, func(r ops.InstanceRef) string { return docker.ContainerName(c.install, r) })
 	admin.TLS = c.tls
 	if c.tls {
