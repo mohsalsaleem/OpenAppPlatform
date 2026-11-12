@@ -163,8 +163,9 @@ func sortMembers(ms []RouteMember) {
 
 // securityFor returns a component's departures from the default hardening.
 func securityFor(c spec.Component) Security {
-	var out Security
+	out := Security{User: c.User}
 	if s := c.Security; s != nil {
+		out.RunAsRoot = s.RunAsRoot
 		out.AllowPrivilegeEscalation = s.AllowPrivilegeEscalation
 		out.Capabilities = append([]string(nil), s.Capabilities...)
 		out.WritableRoot = s.WritableRoot

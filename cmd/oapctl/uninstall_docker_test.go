@@ -90,7 +90,7 @@ docker network ls --format '{{.Name}}' | sort`)
 
 	// An application, deployed through oapd's API on its socket.
 	const site = `{"intent": {"application": "demo", "spec_patch": {"merge_patch": {"environment": "production",
-  "components": {"web": {"kind": "web", "image": "` + host.CaddyImage + `", "port": 80, "volumes": {"data": "/data"},
+  "components": {"web": {"kind": "web", "image": "` + host.CaddyImage + `", "port": 80, "volumes": {"data": "/data"}, "user": "65532:65532",
     "security": {"capabilities": ["NET_BIND_SERVICE"], "exception_reason": "the Caddy binary carries this file capability"}}},
   "ingress": {"domain": "demo.test", "routes": {"/": {"component": "web"}}}}}}}`
 	out := sh(`set -eu

@@ -139,14 +139,22 @@ Other fields you'll need:
 
 ### Hardening and its exceptions
 
-Every container OAP runs drops all Linux capabilities, can't gain
-privileges (setuid binaries don't elevate), has a read-only root with a
-64 MiB writable `/tmp`, at most 256 processes, and a memory limit (256 MiB
-when `resources` sets none). Plan for that; don't ask for exceptions by
-default.
+Every container OAP runs as a non-root user, drops all Linux capabilities,
+can't gain privileges (setuid binaries don't elevate), has a read-only root
+with a 64 MiB writable `/tmp`, at most 256 processes, and a memory limit
+(256 MiB when `resources` sets none). Plan for that; don't ask for
+exceptions by default.
+
+**The user.** If the image's own user is root (many images don't set one),
+OAP refuses to start it. Set the component's `user` to a numeric uid and
+gid, for example `user: "65532:65532"`: the process runs as that user, and
+volumes OAP creates for the component belong to it, so it can write its
+data. A process that binds a port below 1024 still can as non-root. This is
+not an exception and needs no approval.
 
 If an image really needs more, say exactly what under the component's
-`security`, with a reason. Each exception is sensitive, so the owner
+`security`, with a reason. `run_as_root` is for images that must start as
+root, usually to switch to their own user in the entrypoint. Each exception is sensitive, so the owner
 usually has to approve it:
 
 ```yaml
@@ -163,13 +171,14 @@ components:
       pgdata: /var/lib/postgresql/data
       pgrun: /var/run/postgresql
     security:
+      run_as_root: true
       capabilities: [CHOWN, SETUID, SETGID]
       exception_reason: "the official image chowns its data and drops to its own user at start"
 ```
 
-This is the official PostgreSQL image under OAP's defaults: it needs those
-three capabilities to switch to its own user, and a volume for its socket
-directory instead of a writable root.
+This is the official PostgreSQL image under OAP's defaults: it starts as
+root and needs those three capabilities to switch to its own user, and a
+volume for its socket directory instead of a writable root.
 
 - `capabilities` keeps those capabilities only; anything outside Docker's
   default set (such as `SYS_ADMIN`) is refused. Write names without `CAP_`.
@@ -249,6 +258,8 @@ Later changes use the narrow intents: `deploy` (new images), `scale`,
 - [ ] `data` components have a volume; nothing else writes data it needs
       to keep outside a volume.
 - [ ] The image can be pulled without credentials.
+- [ ] Every component runs as non-root: the image sets a non-root user, or
+      the spec sets `user`, or `run_as_root` with a reason.
 - [ ] The image writes only to `/tmp` and volumes, or the spec has
       `writable_root` with a reason; any `capabilities` are the fewest it
       needs.

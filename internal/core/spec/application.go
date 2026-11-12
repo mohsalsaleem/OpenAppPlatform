@@ -49,6 +49,7 @@ type Component struct {
 	Instances          int               `json:"instances,omitempty"`
 	Env                map[string]string `json:"env,omitempty"`
 	Secrets            map[string]string `json:"secrets,omitempty"`
+	User               string            `json:"user,omitempty"`
 	Destructive        bool              `json:"destructive,omitempty"`
 	After              []string          `json:"after,omitempty"`
 	Uses               map[string]Use    `json:"uses,omitempty"`
@@ -89,6 +90,7 @@ type Readiness struct {
 // Security holds a component's exceptions to the default container
 // hardening (ADR 0003). Each needs a reason.
 type Security struct {
+	RunAsRoot                bool     `json:"run_as_root,omitempty"`
 	AllowPrivilegeEscalation bool     `json:"allow_privilege_escalation,omitempty"`
 	Capabilities             []string `json:"capabilities,omitempty"`
 	WritableRoot             bool     `json:"writable_root,omitempty"`
@@ -97,7 +99,7 @@ type Security struct {
 
 // Exceptions reports whether the component asks for any exception.
 func (s *Security) Exceptions() bool {
-	return s != nil && (s.AllowPrivilegeEscalation || len(s.Capabilities) > 0 || s.WritableRoot)
+	return s != nil && (s.RunAsRoot || s.AllowPrivilegeEscalation || len(s.Capabilities) > 0 || s.WritableRoot)
 }
 
 var (
@@ -231,6 +233,13 @@ func (a *Application) check() []Problem {
 		}
 		if s := c.Security; s.Exceptions() && s.ExceptionReason == "" {
 			add(Join(Join(at, "security"), "exception_reason"), WhyRequired, "security exceptions need a reason")
+		}
+		if u := c.User; u != "" {
+			if uid, _, _ := strings.Cut(u, ":"); strings.TrimLeft(uid, "0") == "" {
+				add(Join(at, "user"), WhyConflict, "user 0 is root; use security.run_as_root with a reason instead")
+			} else if c.Security != nil && c.Security.RunAsRoot {
+				add(Join(at, "user"), WhyConflict, "a component can't set a user and run as root")
+			}
 		}
 		if s := c.Security; s != nil {
 			seen := map[string]bool{}

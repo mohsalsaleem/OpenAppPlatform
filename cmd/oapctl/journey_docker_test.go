@@ -228,7 +228,7 @@ func (h *journeyHost) serving(t *testing.T, domain, text string) {
 }
 
 func journeySpec(app string) map[string]any {
-	return map[string]any{
+	return nonRoot(map[string]any{
 		"environment": "production",
 		"ingress":     map[string]any{"domain": app + ".journey.test", "routes": map[string]any{"/": map[string]any{"component": "web"}}},
 		"components": map[string]any{
@@ -237,7 +237,7 @@ func journeySpec(app string) map[string]any {
 				"health": map[string]any{"mode": "http", "path": "/"}, "readiness": map[string]any{"timeout_seconds": 30},
 				"security": map[string]any{"capabilities": []any{"NET_BIND_SERVICE"}, "exception_reason": "the Caddy binary carries this file capability"}},
 		},
-	}
+	})
 }
 
 // Images for the journey: three good web releases (Alpine-based, so the
@@ -484,4 +484,13 @@ func cliJourney(t *testing.T, h *journeyHost) {
 		t.Fatalf("explain after rolling back:\n%s", out)
 	}
 	h.serving(t, domain, "Caddy")
+}
+
+// nonRoot runs every component of a spec as an unprivileged user: OAP
+// refuses images that run as root unless the spec allows it (ADR 0003).
+func nonRoot(spec map[string]any) map[string]any {
+	for _, c := range spec["components"].(map[string]any) {
+		c.(map[string]any)["user"] = "65532:65532"
+	}
+	return spec
 }

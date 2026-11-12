@@ -17,6 +17,10 @@ import (
 
 var ctx = context.Background()
 
+// nonRoot runs the test images as an unprivileged user: real runtimes refuse
+// images that run as root unless the spec allows it (ADR 0003).
+var nonRoot = ops.Security{User: "65532:65532"}
+
 func ref(component string, ordinal int, release string) ops.InstanceRef {
 	return ops.InstanceRef{Application: "contract", Component: component, Ordinal: ordinal, Release: release}
 }
@@ -49,7 +53,7 @@ var FakeImages = Images{Web1: "contract/web:1", Web2: "contract/web:2", DB: "con
 func Runtime(t *testing.T, img Images, newRuntime func(t *testing.T) ports.Runtime, wait func(time.Duration)) {
 	t.Run("start is idempotent by ref and labels the instance", func(t *testing.T) {
 		rt := newRuntime(t)
-		s := ops.InstanceSpec{Ref: ref("web", 1, "r-1"), Image: img.Web1, Port: 8080}
+		s := ops.InstanceSpec{Ref: ref("web", 1, "r-1"), Image: img.Web1, Port: 8080, Security: nonRoot}
 		id1, err := rt.Start(ctx, s)
 		if err != nil {
 			t.Fatal(err)
@@ -65,8 +69,8 @@ func Runtime(t *testing.T, img Images, newRuntime func(t *testing.T) ports.Runti
 	})
 	t.Run("different releases are different instances", func(t *testing.T) {
 		rt := newRuntime(t)
-		a, _ := rt.Start(ctx, ops.InstanceSpec{Ref: ref("web", 1, "r-1"), Image: img.Web1})
-		b, _ := rt.Start(ctx, ops.InstanceSpec{Ref: ref("web", 1, "r-2"), Image: img.Web2})
+		a, _ := rt.Start(ctx, ops.InstanceSpec{Ref: ref("web", 1, "r-1"), Image: img.Web1, Security: nonRoot})
+		b, _ := rt.Start(ctx, ops.InstanceSpec{Ref: ref("web", 1, "r-2"), Image: img.Web2, Security: nonRoot})
 		if a == b {
 			t.Fatal("same id for two releases")
 		}
@@ -77,7 +81,7 @@ func Runtime(t *testing.T, img Images, newRuntime func(t *testing.T) ports.Runti
 		if err := rt.Stop(ctx, r); err != nil {
 			t.Fatalf("stopping an absent instance: %v", err)
 		}
-		rt.Start(ctx, ops.InstanceSpec{Ref: r, Image: img.Web1})
+		rt.Start(ctx, ops.InstanceSpec{Ref: r, Image: img.Web1, Security: nonRoot})
 		if err := rt.Stop(ctx, r); err != nil {
 			t.Fatal(err)
 		}
@@ -90,7 +94,7 @@ func Runtime(t *testing.T, img Images, newRuntime func(t *testing.T) ports.Runti
 	})
 	t.Run("a job runs once per release and reports its result", func(t *testing.T) {
 		rt := newRuntime(t)
-		j := ops.JobSpec{Ref: ref("migrate", 1, "r-1"), Image: img.Job, Timeout: time.Minute}
+		j := ops.JobSpec{Ref: ref("migrate", 1, "r-1"), Image: img.Job, Timeout: time.Minute, Security: nonRoot}
 		if err := rt.RunJob(ctx, j); err != nil {
 			t.Fatal(err)
 		}
@@ -120,7 +124,7 @@ func Runtime(t *testing.T, img Images, newRuntime func(t *testing.T) ports.Runti
 	})
 	t.Run("snapshots are idempotent by key; deleting a missing volume succeeds", func(t *testing.T) {
 		rt := newRuntime(t)
-		rt.Start(ctx, ops.InstanceSpec{Ref: ref("db", 1, "r-1"), Image: img.DB, Volumes: map[string]string{"data": "/data"}})
+		rt.Start(ctx, ops.InstanceSpec{Ref: ref("db", 1, "r-1"), Image: img.DB, Volumes: map[string]string{"data": "/data"}, Security: nonRoot})
 		a, err := rt.SnapshotVolume(ctx, "k1", "contract", "db", "data")
 		if err != nil {
 			t.Fatal(err)

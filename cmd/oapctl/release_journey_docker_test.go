@@ -123,7 +123,7 @@ func journeyApp(name, domain string, apiInstances int) map[string]any {
 		return m
 	}
 	http := map[string]any{"mode": "http", "path": "/health"}
-	return map[string]any{
+	return nonRoot(map[string]any{
 		"api_version": "oap.dev/v1", "kind": "Application", "name": name, "environment": "production",
 		"ingress": map[string]any{"domain": domain, "routes": map[string]any{
 			"/": map[string]any{"component": "web"}, "/api": map[string]any{"component": "api"}, "/notes": map[string]any{"component": "notes"}}},
@@ -136,7 +136,7 @@ func journeyApp(name, domain string, apiInstances int) map[string]any {
 			"web":    map[string]any{"kind": "web", "image": img, "port": 80, "env": env("web"), "health": http},
 			"worker": map[string]any{"kind": "worker", "image": img, "env": env("worker"), "health": map[string]any{"mode": "image"}},
 		},
-	}
+	})
 }
 
 // trafficProbe requests a path on a domain through the edge until stopped.

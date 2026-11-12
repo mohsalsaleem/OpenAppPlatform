@@ -110,7 +110,7 @@ func TestAdoptsOnlyByLabels(t *testing.T) {
 	if len(obs.Instances) != 0 {
 		t.Fatalf("observed containers OAP didn't create: %+v", obs.Instances)
 	}
-	_, err = r.Start(ctx, ops.InstanceSpec{Ref: ref, Image: images.Web1, Port: 80})
+	_, err = r.Start(ctx, ops.InstanceSpec{Ref: ref, Image: images.Web1, Port: 80, Security: ops.Security{User: "65532:65532"}})
 	if err == nil || !strings.Contains(err.Error(), "left alone") {
 		t.Fatalf("start over a squatted name: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestAdoptsOnlyByLabels(t *testing.T) {
 func TestServiceNamesResolve(t *testing.T) {
 	r := newRuntime(t)
 	ref := ops.InstanceRef{Application: "site", Component: "web", Ordinal: 1, Release: "r-1"}
-	if _, err := r.Start(ctx, ops.InstanceSpec{Ref: ref, Image: images.Web1, Port: 80}); err != nil {
+	if _, err := r.Start(ctx, ops.InstanceSpec{Ref: ref, Image: images.Web1, Port: 80, Security: ops.Security{User: "65532:65532"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.ensureImage(ctx, r.HelperImage); err != nil {
@@ -171,7 +171,7 @@ func TestStartEventWithoutHealthCheck(t *testing.T) {
 		t.Fatal(err)
 	}
 	ref := ops.InstanceRef{Application: "shop", Component: "worker", Ordinal: 1, Release: "r-1"}
-	if _, err := r.Start(ctx, ops.InstanceSpec{Ref: ref, Image: images.Web1}); err != nil {
+	if _, err := r.Start(ctx, ops.InstanceSpec{Ref: ref, Image: images.Web1, Security: ops.Security{User: "65532:65532"}}); err != nil {
 		t.Fatal(err)
 	}
 	for e := range events {

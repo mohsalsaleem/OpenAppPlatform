@@ -33,7 +33,7 @@ func TestDNSEdgeScalesWithoutLoss(t *testing.T) {
 	for i := 1; i <= 3; i++ {
 		refs[i] = ops.InstanceRef{Application: "edge", Component: "web", Ordinal: i, Release: "r-1"}
 	}
-	if _, err := rt.Start(ctx, ops.InstanceSpec{Ref: refs[1], Image: "traefik/whoami:v1.10.3", Port: 80}); err != nil {
+	if _, err := rt.Start(ctx, ops.InstanceSpec{Ref: refs[1], Image: "traefik/whoami:v1.10.3", Port: 80, Security: ops.Security{User: "65532:65532"}}); err != nil {
 		t.Fatal(err)
 	}
 	adminAddr, webAddr := caddy(t, rt.Install, docker.NetworkName(rt.Install))
@@ -115,7 +115,7 @@ func TestDNSEdgeScalesWithoutLoss(t *testing.T) {
 	}
 	time.Sleep(2 * time.Second)
 	for i := 2; i <= 3; i++ { // scale up: start, then route
-		if _, err := rt.Start(ctx, ops.InstanceSpec{Ref: refs[i], Image: "traefik/whoami:v1.10.3", Port: 80}); err != nil {
+		if _, err := rt.Start(ctx, ops.InstanceSpec{Ref: refs[i], Image: "traefik/whoami:v1.10.3", Port: 80, Security: ops.Security{User: "65532:65532"}}); err != nil {
 			t.Fatal(err)
 		}
 	}

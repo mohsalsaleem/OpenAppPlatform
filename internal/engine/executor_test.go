@@ -356,3 +356,20 @@ func indexOf(list []string, s string) int {
 	}
 	return -1
 }
+
+// A runtime's refusal fails the step with its reason and isn't retried: the
+// operation stops, and running it again reports the recorded failure.
+func TestRefusalFailsTheStep(t *testing.T) {
+	sc := scenarios(t)[0] // scale up
+	w := newWorld(t, sc)
+	w.runtime.Refuses["web"] = true
+	err := w.executor().Run(ctx, sc.op)
+	var se *StepError
+	if !errors.As(err, &se) || se.Kind != oapv1.StepKind_STEP_KIND_START_INSTANCE || !strings.Contains(se.Reason, "runs as root") {
+		t.Fatalf("want the start to fail with the refusal, got %v", err)
+	}
+	w.runtime.Refuses["web"] = false
+	if err := w.executor().Run(ctx, sc.op); !errors.As(err, &se) {
+		t.Fatalf("a failed step stays failed: %v", err)
+	}
+}

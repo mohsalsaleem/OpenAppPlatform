@@ -41,8 +41,10 @@ the pre-release review that checked it is R5.8 in
   (`oapctl owner secret set`); oapd passes them to the containers whose
   spec references them. Agents see names only.
 - **Pause and revoke take effect at once.**
-- **Containers are hardened by default.** Every container OAP creates drops
-  all Linux capabilities, can't gain privileges (`no-new-privileges`), keeps
+- **Containers are hardened by default.** Every container OAP creates runs
+  as a non-root user (an image that runs as root is refused unless the spec
+  sets a `user` or, with a reason, `run_as_root`), drops all Linux
+  capabilities, can't gain privileges (`no-new-privileges`), keeps
   Docker's default seccomp profile, has a read-only root with a small
   writable `/tmp`, a process limit and a memory limit. A component that
   needs more names it in `security` with a reason (capabilities only from

@@ -196,6 +196,9 @@ func (r *Runtime) Start(ctx context.Context, s ops.InstanceSpec) (string, error)
 	if err != nil {
 		return "", err
 	}
+	if err := r.checkUser(ctx, s.Image, s.Security); err != nil {
+		return "", err
+	}
 	labels := refLabels(r.labels(RoleInstance), s.Ref)
 	labels[LabelImage] = s.Image
 	host := hostConfig{NanoCPUs: int64(s.CPUMillis) * 1e6, RestartPolicy: restartPolicy{Name: "unless-stopped"}}
@@ -204,12 +207,25 @@ func (r *Runtime) Start(ctx context.Context, s ops.InstanceSpec) (string, error)
 		name := volumeName(r.Install, s.Ref.Application, s.Ref.Component, v)
 		vl := r.labels(RoleVolume)
 		vl[LabelApplication], vl[LabelComponent], vl[LabelVolume] = s.Ref.Application, s.Ref.Component, v
-		if err := r.ensureVolume(ctx, name, vl); err != nil {
+		created, err := r.ensureVolume(ctx, name, vl)
+		if err != nil {
 			return "", err
+		}
+		if created && s.Security.User != "" {
+			// A new volume belongs to the component's user, so a non-root
+			// process can write its data.
+			owner := s.Security.User
+			if !strings.Contains(owner, ":") {
+				owner += ":" + owner
+			}
+			if err := r.helper(ctx, []string{"chown", owner, "/v"}, []string{"CHOWN"},
+				[]mount{{Type: "volume", Source: name, Target: "/v"}}); err != nil {
+				return "", err
+			}
 		}
 		host.Mounts = append(host.Mounts, mount{Type: "volume", Source: name, Target: s.Volumes[v]})
 	}
-	cfg := containerConfig{Image: s.Image, Env: env, Labels: labels, HostConfig: host,
+	cfg := containerConfig{Image: s.Image, User: s.Security.User, Env: env, Labels: labels, HostConfig: host,
 		// Other components reach this one by its service name (ops.ServiceURL);
 		// Docker's DNS answers it with every running instance.
 		NetworkingConfig: &networkingConfig{EndpointsConfig: map[string]endpointConfig{
@@ -348,19 +364,74 @@ func (r *Runtime) ensureNetwork(ctx context.Context) error {
 }
 
 // ensureVolume creates a volume, or checks that the existing one is ours.
-func (r *Runtime) ensureVolume(ctx context.Context, name string, labels map[string]string) error {
+// It reports whether it created the volume.
+func (r *Runtime) ensureVolume(ctx context.Context, name string, labels map[string]string) (bool, error) {
 	var v struct{ Labels map[string]string }
 	err := r.c.do(ctx, http.MethodGet, "/volumes/"+name, nil, nil, &v)
 	if err == nil {
 		if !r.owned(v.Labels, labels[LabelRole]) {
-			return fmt.Errorf("docker: volume %s exists without this installation's labels; it is left alone", name)
+			return false, fmt.Errorf("docker: volume %s exists without this installation's labels; it is left alone", name)
 		}
-		return nil
+		return false, nil
 	}
 	if !isStatus(err, http.StatusNotFound) {
+		return false, err
+	}
+	return true, r.c.do(ctx, http.MethodPost, "/volumes/create", nil, map[string]any{"Name": name, "Labels": labels}, nil)
+}
+
+// imageUser returns the user an image runs as by default ("" is root).
+func (r *Runtime) imageUser(ctx context.Context, image string) (string, error) {
+	if err := r.ensureImage(ctx, image); err != nil {
+		return "", err
+	}
+	var img struct{ Config struct{ User string } }
+	err := r.c.do(ctx, http.MethodGet, "/images/"+image+"/json", nil, nil, &img)
+	return img.Config.User, err
+}
+
+// isRoot reports whether a Docker user value means root.
+func isRoot(user string) bool {
+	name, _, _ := strings.Cut(user, ":")
+	return name == "" || name == "root" || strings.TrimLeft(name, "0") == ""
+}
+
+// checkUser refuses an image that would run as root unless the spec allows
+// it (ADR 0003): the spec's user wins over the image's.
+func (r *Runtime) checkUser(ctx context.Context, image string, sec ops.Security) error {
+	if sec.User != "" || sec.RunAsRoot {
+		return nil
+	}
+	u, err := r.imageUser(ctx, image)
+	if err != nil {
 		return err
 	}
-	return r.c.do(ctx, http.MethodPost, "/volumes/create", nil, map[string]any{"Name": name, "Labels": labels}, nil)
+	if isRoot(u) {
+		return &ops.Refusal{Why: "runtime.runs_as_root", Reason: fmt.Sprintf(
+			"%s runs as root; set the component's user to a non-root uid such as \"65532:65532\", or security.run_as_root with a reason", image)}
+	}
+	return nil
+}
+
+// helper runs a short-lived OAP container with only the given capabilities
+// and waits for it to exit 0.
+func (r *Runtime) helper(ctx context.Context, cmd []string, caps []string, mounts []mount) error {
+	host := hostConfig{Mounts: mounts, NetworkMode: "none", CapDrop: []string{"ALL"}, CapAdd: caps,
+		SecurityOpt: []string{"no-new-privileges:true"}, ReadonlyRootfs: true, PidsLimit: 64, Memory: 64 << 20}
+	cfg := containerConfig{Image: r.HelperImage, Labels: r.labels(RoleHelper), Cmd: cmd, HostConfig: host}
+	id, err := r.run(ctx, clean(fmt.Sprintf("oap-%s-helper-%d", r.Install, time.Now().UnixNano())), cfg, false)
+	if err != nil {
+		return err
+	}
+	defer r.remove(context.WithoutCancel(ctx), id)
+	var res struct{ StatusCode int }
+	if err := r.c.do(ctx, http.MethodPost, "/containers/"+id+"/wait", nil, nil, &res); err != nil {
+		return err
+	}
+	if res.StatusCode != 0 {
+		return fmt.Errorf("docker: helper %v exited %d", cmd, res.StatusCode)
+	}
+	return nil
 }
 
 // Stop stops and removes an instance's containers. Its volumes stay.
@@ -394,11 +465,14 @@ func (r *Runtime) RunJob(ctx context.Context, s ops.JobSpec) error {
 	if err != nil {
 		return err
 	}
+	if err := r.checkUser(ctx, s.Image, s.Security); err != nil {
+		return err
+	}
 	labels := refLabels(r.labels(RoleJob), s.Ref)
 	labels[LabelImage] = s.Image
 	host := hostConfig{NanoCPUs: int64(s.CPUMillis) * 1e6}
 	harden(&host, s.Security, s.MemoryMiB)
-	_, err = r.run(ctx, jobName(r.Install, s.Ref), containerConfig{Image: s.Image, Env: env, Labels: labels, HostConfig: host}, true)
+	_, err = r.run(ctx, jobName(r.Install, s.Ref), containerConfig{Image: s.Image, User: s.Security.User, Env: env, Labels: labels, HostConfig: host}, true)
 	return err
 }
 
@@ -590,25 +664,16 @@ func (r *Runtime) SnapshotVolume(ctx context.Context, key, app, component, volum
 	dst := fmt.Sprintf("oap-%s-snap-%x", r.Install, sum[:8])
 	labels := r.labels(RoleSnapshot)
 	labels[LabelApplication], labels[LabelComponent], labels[LabelVolume], labels[LabelSnapshotKey] = app, component, volume, key
-	if err := r.ensureVolume(ctx, dst, labels); err != nil {
+	if _, err := r.ensureVolume(ctx, dst, labels); err != nil {
 		return "", err
 	}
-	cfg := containerConfig{Image: r.HelperImage, Labels: r.labels(RoleHelper),
-		Cmd: []string{"sh", "-c", "test -f /to/.oap-snapshot-complete || { cp -a /from/. /to/ && touch /to/.oap-snapshot-complete; }"},
-		HostConfig: hostConfig{Mounts: []mount{
-			{Type: "volume", Source: src, Target: "/from", ReadOnly: true},
-			{Type: "volume", Source: dst, Target: "/to"}}}}
-	id, err := r.run(ctx, clean(fmt.Sprintf("oap-%s-helper-%d", r.Install, time.Now().UnixNano())), cfg, false)
+	// cp -a reads every file and keeps owners and modes, which takes these
+	// capabilities and nothing else.
+	err := r.helper(ctx, []string{"sh", "-c", "test -f /to/.oap-snapshot-complete || { cp -a /from/. /to/ && touch /to/.oap-snapshot-complete; }"},
+		[]string{"CHOWN", "DAC_OVERRIDE", "FOWNER", "FSETID"},
+		[]mount{{Type: "volume", Source: src, Target: "/from", ReadOnly: true}, {Type: "volume", Source: dst, Target: "/to"}})
 	if err != nil {
-		return "", err
-	}
-	defer r.remove(context.WithoutCancel(ctx), id)
-	var res struct{ StatusCode int }
-	if err := r.c.do(ctx, http.MethodPost, "/containers/"+id+"/wait", nil, nil, &res); err != nil {
-		return "", err
-	}
-	if res.StatusCode != 0 {
-		return "", fmt.Errorf("docker: copying %s to %s exited %d", src, dst, res.StatusCode)
+		return "", fmt.Errorf("docker: copying %s to %s: %w", src, dst, err)
 	}
 	return dst, nil
 }
@@ -686,6 +751,7 @@ func (r *Runtime) RemoveAll(ctx context.Context) error {
 
 type containerConfig struct {
 	Image            string
+	User             string              `json:",omitempty"`
 	Cmd              []string            `json:",omitempty"`
 	Env              []string            `json:",omitempty"`
 	Labels           map[string]string   `json:",omitempty"`

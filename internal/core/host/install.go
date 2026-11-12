@@ -9,6 +9,11 @@ import (
 // CaddyImage is the edge OAP installs, pinned by digest.
 const CaddyImage = "caddy:2.10.2-alpine@sha256:4c6e91c6ed0e2fa03efd5b44747b625fec79bc9cd06ac5235a779726618e530d"
 
+// HelperImage is the image oapd runs short helpers from: giving a new volume
+// to a component's user, and copying volumes for snapshots. The install
+// brings it, so uninstall can take it away again.
+const HelperImage = "busybox:1.37"
+
 // OapdSocket is where oapd's agent API listens on the server. Only root can
 // reach it; the owner does so over SSH.
 const OapdSocket = "/run/oapd/oapd.sock"
@@ -56,6 +61,7 @@ func (in Install) Script() (string, error) {
 ID=%s
 OAPD=%s
 CADDY=%s
+HELPER=%s
 TLS=%s
 API=%s
 L="--label io.openappplatform.install=$ID"
@@ -70,6 +76,7 @@ for v in data tmp caddy-data caddy-config caddy-admin; do
   docker volume inspect "oap-$ID-$v" >/dev/null 2>&1 || docker volume create $L --label io.openappplatform.role=volume "oap-$ID-$v" >/dev/null
 done
 docker image inspect "$CADDY" >/dev/null 2>&1 || { docker pull -q "$CADDY" >/dev/null; printf '%%s\n' "$CADDY" >> /var/lib/oap/images; }
+docker image inspect "$HELPER" >/dev/null 2>&1 || { docker pull -q "$HELPER" >/dev/null; printf '%%s\n' "$HELPER" >> /var/lib/oap/images; }
 docker image inspect "$OAPD" >/dev/null 2>&1 || { docker pull -q "$OAPD" >/dev/null || { echo "oap: image $OAPD isn't on the server and couldn't be pulled" >&2; exit 3; }; printf '%%s\n' "$OAPD" >> /var/lib/oap/images; }
 
 # current NAME IMAGE: true when NAME runs IMAGE with this configuration.
@@ -127,7 +134,7 @@ until [ -S %s ] && curl -sf --unix-socket %s http://oapd/healthz >/dev/null 2>&1
   sleep 1
 done
 echo "oapd ready"
-`, in.ID, in.Oapd, in.Caddy, tls, in.APIHost, OapdSocket, OapdSocket)
+`, in.ID, in.Oapd, in.Caddy, HelperImage, tls, in.APIHost, OapdSocket, OapdSocket)
 	return s, nil
 }
 
