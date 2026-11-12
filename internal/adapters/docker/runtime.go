@@ -198,8 +198,8 @@ func (r *Runtime) Start(ctx context.Context, s ops.InstanceSpec) (string, error)
 	}
 	labels := refLabels(r.labels(RoleInstance), s.Ref)
 	labels[LabelImage] = s.Image
-	host := hostConfig{Memory: int64(s.MemoryMiB) << 20, NanoCPUs: int64(s.CPUMillis) * 1e6,
-		RestartPolicy: restartPolicy{Name: "unless-stopped"}}
+	host := hostConfig{NanoCPUs: int64(s.CPUMillis) * 1e6, RestartPolicy: restartPolicy{Name: "unless-stopped"}}
+	harden(&host, s.Security, s.MemoryMiB)
 	for _, v := range sortedKeys(s.Volumes) {
 		name := volumeName(r.Install, s.Ref.Application, s.Ref.Component, v)
 		vl := r.labels(RoleVolume)
@@ -396,7 +396,9 @@ func (r *Runtime) RunJob(ctx context.Context, s ops.JobSpec) error {
 	}
 	labels := refLabels(r.labels(RoleJob), s.Ref)
 	labels[LabelImage] = s.Image
-	_, err = r.run(ctx, jobName(r.Install, s.Ref), containerConfig{Image: s.Image, Env: env, Labels: labels}, true)
+	host := hostConfig{NanoCPUs: int64(s.CPUMillis) * 1e6}
+	harden(&host, s.Security, s.MemoryMiB)
+	_, err = r.run(ctx, jobName(r.Install, s.Ref), containerConfig{Image: s.Image, Env: env, Labels: labels, HostConfig: host}, true)
 	return err
 }
 
@@ -708,12 +710,54 @@ type healthcheck struct {
 }
 
 type hostConfig struct {
-	NetworkMode   string                   `json:",omitempty"`
-	Memory        int64                    `json:",omitempty"`
-	NanoCPUs      int64                    `json:"NanoCpus,omitempty"`
-	Mounts        []mount                  `json:",omitempty"`
-	PortBindings  map[string][]portBinding `json:",omitempty"`
-	RestartPolicy restartPolicy            `json:",omitempty"`
+	NetworkMode    string                   `json:",omitempty"`
+	Memory         int64                    `json:",omitempty"`
+	NanoCPUs       int64                    `json:"NanoCpus,omitempty"`
+	Mounts         []mount                  `json:",omitempty"`
+	PortBindings   map[string][]portBinding `json:",omitempty"`
+	RestartPolicy  restartPolicy            `json:",omitempty"`
+	CapDrop        []string                 `json:",omitempty"`
+	CapAdd         []string                 `json:",omitempty"`
+	SecurityOpt    []string                 `json:",omitempty"`
+	ReadonlyRootfs bool                     `json:",omitempty"`
+	Tmpfs          map[string]string        `json:",omitempty"`
+	PidsLimit      int64                    `json:",omitempty"`
+}
+
+// Defaults for every application container (ADR 0003, H1).
+const (
+	// DefaultMemoryMiB limits a container whose spec sets no memory.
+	DefaultMemoryMiB = 256
+	// DefaultPids limits processes and threads.
+	DefaultPids = 256
+	// TmpfsMiB sizes the writable /tmp of a read-only container.
+	TmpfsMiB = 64
+)
+
+// harden applies OAP's container defaults: every capability dropped except
+// those the spec keeps, no privilege escalation unless the spec allows it,
+// Docker's default seccomp profile (never replaced), a read-only root with a
+// small writable /tmp unless the spec asks for a writable root, a process
+// limit and a memory limit. Privileged mode, host namespaces, devices and
+// host paths are never set.
+func harden(h *hostConfig, sec ops.Security, memoryMiB int) {
+	h.CapDrop = []string{"ALL"}
+	h.CapAdd = append([]string(nil), sec.Capabilities...)
+	if !sec.AllowPrivilegeEscalation {
+		h.SecurityOpt = []string{"no-new-privileges:true"}
+	}
+	if !sec.WritableRoot {
+		h.ReadonlyRootfs = true
+		h.Tmpfs = map[string]string{"/tmp": fmt.Sprintf("rw,noexec,nosuid,nodev,size=%dm", TmpfsMiB)}
+	}
+	h.PidsLimit = DefaultPids
+	if sec.Pids > 0 {
+		h.PidsLimit = int64(sec.Pids)
+	}
+	if memoryMiB <= 0 {
+		memoryMiB = DefaultMemoryMiB
+	}
+	h.Memory = int64(memoryMiB) << 20
 }
 
 type restartPolicy struct {

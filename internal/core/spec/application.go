@@ -69,6 +69,7 @@ type Use struct {
 type Resources struct {
 	MemoryMiB int `json:"memory_mib"`
 	CPUMillis int `json:"cpu_millis"`
+	Pids      int `json:"pids,omitempty"`
 }
 
 type Health struct {
@@ -85,9 +86,18 @@ type Readiness struct {
 	TimeoutSeconds int  `json:"timeout_seconds,omitempty"`
 }
 
+// Security holds a component's exceptions to the default container
+// hardening (ADR 0003). Each needs a reason.
 type Security struct {
-	AllowPrivilegeEscalation bool   `json:"allow_privilege_escalation,omitempty"`
-	ExceptionReason          string `json:"exception_reason,omitempty"`
+	AllowPrivilegeEscalation bool     `json:"allow_privilege_escalation,omitempty"`
+	Capabilities             []string `json:"capabilities,omitempty"`
+	WritableRoot             bool     `json:"writable_root,omitempty"`
+	ExceptionReason          string   `json:"exception_reason,omitempty"`
+}
+
+// Exceptions reports whether the component asks for any exception.
+func (s *Security) Exceptions() bool {
+	return s != nil && (s.AllowPrivilegeEscalation || len(s.Capabilities) > 0 || s.WritableRoot)
 }
 
 var (
@@ -219,8 +229,17 @@ func (a *Application) check() []Problem {
 		if strings.Contains(c.Image, "@") && !digestSuffix.MatchString(c.Image) {
 			add(Join(at, "image"), WhyPattern, "an image pinned with @ needs a full sha256 digest")
 		}
-		if s := c.Security; s != nil && s.AllowPrivilegeEscalation && s.ExceptionReason == "" {
-			add(Join(Join(at, "security"), "exception_reason"), WhyRequired, "privilege escalation needs an exception reason")
+		if s := c.Security; s.Exceptions() && s.ExceptionReason == "" {
+			add(Join(Join(at, "security"), "exception_reason"), WhyRequired, "security exceptions need a reason")
+		}
+		if s := c.Security; s != nil {
+			seen := map[string]bool{}
+			for i, cp := range s.Capabilities {
+				if seen[cp] {
+					add(Index(Join(Join(at, "security"), "capabilities"), i), WhyConflict, "%s is listed twice", cp)
+				}
+				seen[cp] = true
+			}
 		}
 		seen := map[string]bool{}
 		for i, dep := range c.After {

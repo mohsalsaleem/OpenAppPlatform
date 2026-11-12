@@ -37,6 +37,7 @@ type InstanceSpec struct {
 	MemoryMiB  int
 	CPUMillis  int
 	Health     *HealthCheck
+	Security   Security
 }
 
 type HealthCheck struct {
@@ -54,6 +55,22 @@ type JobSpec struct {
 	Env        map[string]string
 	SecretRefs map[string]string
 	Timeout    time.Duration
+	MemoryMiB  int
+	CPUMillis  int
+	Security   Security
+}
+
+// Security is how far a container may depart from OAP's default hardening
+// (ADR 0003): every capability dropped, no privilege escalation, a
+// read-only root with a writable /tmp, and a process limit. The zero value
+// is the default.
+type Security struct {
+	AllowPrivilegeEscalation bool
+	// Capabilities to keep, from Docker's default set.
+	Capabilities []string
+	WritableRoot bool
+	// Pids limits processes and threads; 0 means the runtime's default.
+	Pids int
 }
 
 // RouteMember is one instance receiving traffic for one route.

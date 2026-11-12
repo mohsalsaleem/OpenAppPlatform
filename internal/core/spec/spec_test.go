@@ -169,6 +169,12 @@ func TestParseApplicationRejections(t *testing.T) {
 		{"bad route path", "ingress.routes", obj(t, `{"/a//b": {"component": "web"}}`), "ingress.routes./a//b", WhyPattern},
 		{"image health with path", "components.worker.health", obj(t, `{"mode": "image", "path": "/x"}`), "components.worker.health", WhyConflict},
 		{"escalation without reason", "components.api.security", obj(t, `{"allow_privilege_escalation": true}`), "components.api.security.exception_reason", WhyRequired},
+		{"capabilities without reason", "components.api.security", obj(t, `{"capabilities": ["CHOWN"]}`), "components.api.security.exception_reason", WhyRequired},
+		{"writable root without reason", "components.api.security", obj(t, `{"writable_root": true}`), "components.api.security.exception_reason", WhyRequired},
+		{"capability beyond Docker's defaults", "components.api.security", obj(t, `{"capabilities": ["SYS_ADMIN"], "exception_reason": "needs to mount things"}`), "components.api.security.capabilities[0]", WhyEnum},
+		{"capability with prefix", "components.api.security", obj(t, `{"capabilities": ["CAP_CHOWN"], "exception_reason": "entrypoint chowns its data"}`), "components.api.security.capabilities[0]", WhyEnum},
+		{"capability twice", "components.api.security", obj(t, `{"capabilities": ["CHOWN", "CHOWN"], "exception_reason": "entrypoint chowns its data"}`), "components.api.security.capabilities[1]", WhyConflict},
+		{"pids too low", "components.api.resources", obj(t, `{"memory_mib": 256, "cpu_millis": 500, "pids": 4}`), "components.api.resources.pids", WhyRange},
 		{"bad digest", "components.api.image", "ghcr.io/acme/api@sha256:abc", "components.api.image", WhyPattern},
 		{"after unknown", "components.web.after", []any{"nope"}, "components.web.after[0]", WhyUnknownComponent},
 		{"after twice", "components.web.after", []any{"db", "db"}, "components.web.after[1]", WhyConflict},
@@ -193,5 +199,21 @@ func TestParseApplicationRejections(t *testing.T) {
 func TestJoinQuotesDottedKeys(t *testing.T) {
 	if got := Join(Join("ingress.routes", "/a.b"), "component"); got != `ingress.routes."/a.b".component` {
 		t.Fatal(got)
+	}
+}
+
+func TestSecurityExceptionsWithReason(t *testing.T) {
+	app, probs := ParseApplication(edit(t, "components.api.security", obj(t, `{"capabilities": ["CHOWN", "SETUID", "SETGID"],
+	  "writable_root": true, "allow_privilege_escalation": true, "exception_reason": "official image drops root in its entrypoint"}`)))
+	if len(probs) > 0 {
+		t.Fatal(probs)
+	}
+	s := app.Components["api"].Security
+	if !s.Exceptions() || len(s.Capabilities) != 3 || !s.WritableRoot {
+		t.Fatalf("%+v", s)
+	}
+	var none *Security
+	if none.Exceptions() || (&Security{ExceptionReason: "a reason that is long"}).Exceptions() {
+		t.Fatal("no exception asked")
 	}
 }
