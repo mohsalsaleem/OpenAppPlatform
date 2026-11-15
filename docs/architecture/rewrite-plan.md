@@ -288,17 +288,8 @@ clears vultr_oap's journey applications; the rest are v0.3 candidates.
 Each still needs the owner's approval of its scope below before code
 relies on it.
 
-- **Remove an application, and scale to 0** (findings 5 and 6). Today an
-  application can't be taken away: the journey's 18 containers stay on
-  vultr_oap after hand-off, and a failed create leaves its application in
-  desired state. Add a `remove` change to `propose` (a spec patch that
-  deletes the application: stop and remove its instances, routes, jobs and
-  network; volumes only when the proposal says so, which makes it
-  sensitive), allow `replicas: 0`, and have a failed create offer its own
-  removal in the outcome. Tests: removal under traffic to another app drops
-  none of its requests; data volumes survive a removal that doesn't name
-  them; `explain` shows no gaps afterwards. Then clear vultr_oap's journey
-  applications through OAP and record it.
+- **Remove an application, and scale to 0** (findings 5 and 6): now tasks
+  A1 to A4 under "Approved after v0.2.0".
 - **Honour `ingress.https`** (finding 4). The spec has the field, but oapd
   with TLS serves every routed host over HTTPS and redirects HTTP. Either
   route `https: false` hosts over plain HTTP, or remove the field from the
@@ -321,6 +312,21 @@ relies on it.
 
 Tasks the owner approved for v0.2.1 and v0.3. They follow the guardrails
 and definition of done above.
+
+### Removing applications and scaling to 0
+
+Proposed 2026-11-15 from R5.3's findings 5 and 6, as the scope the owner
+decision of 2026-10-28 asked for; approved when this section merges. Targets
+v0.2.1. A removal is a change through `propose`, not a new primitive.
+
+| ID | Task | Acceptance |
+|---|---|---|
+| A1 | **Scale to 0.** `replicas: 0` (and `oapctl app scale NAME COMPONENT 0`) is valid for web and worker components: the plan stops and removes every instance and the component's routes, and keeps its volumes, secrets and desired spec. Scaling back up starts it again like a deploy | Spec and planner tests for 0 and back; real Docker: a web component scaled 1→0→1 is removed and then served again with its volume data intact; while at 0 its host returns Caddy's "no upstream" answer, other applications' requests through the same Caddy all succeed, and `explain` shows no gaps; scaling a data or job component to 0 is refused with a reason |
+| A2 | **Remove an application.** A `remove` change to `propose` deletes the application from desired state; the plan stops and removes its instances, jobs, routes and network. Volumes go only when the proposal names them (`remove.volumes`), which makes it `sensitive`; without them it is routine for the application's own agent | Planner and service tests; real Docker: removing one of two applications under traffic to the other drops none of the other's requests; a removal that doesn't name volumes leaves them and a re-create with the same spec finds the data; one that names them leaves no container, network, route or volume with the application's labels; `observe` no longer lists it and `explain` shows no gaps; an agent can't remove another agent's application |
+| A3 | **A failed create offers its removal.** When a create is not achieved, the outcome names the removal as its next step (a `remove` proposal ready to apply), and `explain` says the same | Executor and outcome tests; in the Phase 3 journey's failure step, applying the offered removal leaves nothing of the application |
+| A4 | **Clear vultr_oap's journey applications** through OAP with A2, in a window the owner picks; Nisha Shipping stays untouched | Each journey application removed through `propose` and approved by the owner; afterwards the server has no container, network or route of theirs, Nisha Shipping serves throughout (probe log), and the record lists what was removed |
+
+Order: A1, A2, A3, then A4 once v0.2.1 is released to the server.
 
 ### Application logs with VictoriaLogs
 
@@ -361,6 +367,36 @@ v0.2.1; the rest targets v0.3.
 Order: H1 first (it closes most of the gap on today's hosts and fixes the
 unenforced `allow_privilege_escalation`), then H7 with it, then H2 and H3,
 H4, H5, H6, H8, H9.
+
+## Release exits
+
+A release is done when every item of its exit holds; until then it isn't
+released, whatever the roadmap says. The release itself (`make release`,
+publishing it, making images public) is the owner's step.
+
+**v0.2.0.** The rewrite (R0 to R5) is done and on `main`, but step 7 of the
+[release plan](release-plan.md) hasn't happened: only `v0.2.0-rc.1` and
+`v0.2.0-rc.2` are tagged. Exit: `v0.2.0` tagged on `main`, `make release`
+run, the GitHub release published with its notes and `SHA256SUMS`, the GHCR
+image public, and an anonymous pull of the pinned digest works.
+
+**v0.2.1.** Exit:
+- H1 and A1 to A3 done.
+- `TestReleaseJourney`, `TestPhase3Journey`, `TestBuildsOneAtATimeOn1GB`
+  and `TestInstallUninstallRestoresHost` pass unmodified on a cgroup v2
+  host, on the release commit.
+- `v0.2.1` tagged and released as v0.2.0 was, with release notes that say
+  what the container defaults change for existing applications.
+- vultr_oap upgraded to it (the site serving throughout, probe log), then A4.
+
+**v0.3.** Exit:
+- H2 to H9 and L1 to L6 done, and any v0.3 candidates the owner approves
+  as tasks.
+- H9 passes on vultr_oap: the rootless stack with the release journey,
+  memory and throughput recorded next to R5.3's, `oom_kill 0`.
+- L6's acceptance passes on vultr_oap.
+- `v0.3.0` tagged and released with notes and a migration guide for
+  rootful installs (H8); signed, if signed releases are approved for it.
 
 ## Status
 

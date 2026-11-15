@@ -6,12 +6,16 @@ AI agents doing most of the operating. The design is in
 the order of work after v0.2.0. Each item becomes tasks in a plan the owner
 approves before work starts.
 
-## v0.2.0 (released)
+## v0.2.0 (release candidates out; final release pending)
 
 The agent-native rewrite: onboarding from a password, one API over the CLI,
 MCP, Connect, gRPC and JSON, scoped agents and the policy envelope,
 deploys without dropped requests, extensions. See the
-[release notes](docs/release-notes/v0.2.0.md).
+[release notes](docs/release-notes/v0.2.0.md). `v0.2.0-rc.1` and
+`v0.2.0-rc.2` are published; the final tag and release are the last step.
+
+Each release is done when its exit in the
+[rewrite plan](docs/architecture/rewrite-plan.md#release-exits) holds.
 
 ## v0.2.1
 
@@ -22,8 +26,9 @@ deploys without dropped requests, extensions. See the
   apply ([ADR 0003](docs/architecture/adr/0003-rootless-least-privilege.md)).
 
 - **Remove an application, and scale a component to 0.** A failed create
-  offers its own removal. Proposed in the
-  [rewrite plan](docs/architecture/rewrite-plan.md#proposals-awaiting-the-owner).
+  offers its own removal; then vultr_oap's journey applications are cleared
+  through OAP (tasks A1 to A4 in the
+  [rewrite plan](docs/architecture/rewrite-plan.md#removing-applications-and-scaling-to-0)).
 
 ## v0.3 candidates
 
